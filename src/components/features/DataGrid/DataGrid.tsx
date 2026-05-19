@@ -60,7 +60,7 @@ interface DataGridProps {
   onCategorySelect: (id: string) => void;
   onViewDetails: (product: Product) => void;
   selectedIds: Set<string>;
-  onSelectionChange: (ids: Set<string>) => void;
+  onSelectionChange: React.Dispatch<React.SetStateAction<Set<string>>>;
   onClearFilters?: () => void;
   onSearchChange?: (query: string) => void;
   activeFilters?: FilterItem[];

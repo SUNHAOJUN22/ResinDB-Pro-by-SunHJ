@@ -31,7 +31,7 @@ interface DataContextType {
   moveColumn: (fromIndex: number, toIndex: number) => void;
   togglePin: (key: string) => void;
   formulas: FormulaConfig[];
-  addFormula: (f: FormulaConfig) => void;
+  addFormula: (f: Omit<FormulaConfig, "id">) => void;
   updateFormula: (id: string, updates: Partial<FormulaConfig>) => void;
   removeFormula: (id: string) => void;
   categoryNameMap: Map<string, string>;

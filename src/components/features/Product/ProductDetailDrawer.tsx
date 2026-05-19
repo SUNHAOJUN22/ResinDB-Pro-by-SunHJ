@@ -101,7 +101,7 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
           [displayProduct],
           `Provide a technical deep-dive into this specific material. Discuss its unique property balance and suggest the most challenging automotive or electrical application it would excel in.`,
         );
-        setAiInsight(result);
+        setAiInsight(result || null);
       } catch {
         setAiError("AI insights unavailable. Connection error.");
       } finally {

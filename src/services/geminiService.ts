@@ -62,7 +62,7 @@ Only suggest an action if it directly helps the user based on their query or cle
     ? `User is asking: "${opts.query}". Based on these products: ${JSON.stringify(summaryData)}`
     : `Provide a comprehensive technical summary of these products: ${JSON.stringify(summaryData)}`;
 
-  const contents: unknown[] = [prompt];
+  const contents: any[] = [prompt];
   if (opts.imagePart) {
     contents.push(opts.imagePart);
   }

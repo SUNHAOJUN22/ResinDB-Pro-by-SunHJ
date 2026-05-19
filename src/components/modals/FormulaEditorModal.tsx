@@ -82,7 +82,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
              chartInstance.current = echarts.getInstanceByDom(chartRef.current) || echarts.init(chartRef.current);
          }
          
-         const data = simulationStats.kde.map(d => [d.x, d.y]);
+         const data = simulationStats.kde.map((d: any) => [d.x, d.y]);
          
          chartInstance.current.setOption({
             backgroundColor: 'transparent',

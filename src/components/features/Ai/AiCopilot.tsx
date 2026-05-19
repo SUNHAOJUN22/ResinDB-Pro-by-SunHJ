@@ -206,7 +206,7 @@ export const AiCopilot: React.FC<AiCopilotProps> = React.memo(({
         data,
         activeChart
           ? `Analyze this data with focus on the ${activeChart} view.`
-          : undefined,
+          : {}
       );
       setMessages((prev) => [
         ...prev.filter(

@@ -27,7 +27,6 @@ export const MahalanobisChart: React.FC<MahalanobisChartProps> = React.memo(({ d
         
         // Prepare scatter data
         const seriesData = distances.map(d => ({
-            name: d.name,
             value: [d.index, d.distance],
             itemStyle: {
                 color: d.isOutlier ? outlierColor : normalColor,

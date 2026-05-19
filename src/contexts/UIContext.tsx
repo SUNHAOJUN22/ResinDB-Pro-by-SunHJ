@@ -5,7 +5,7 @@ interface UIContextType {
   activeView: AppView;
   setActiveView: (view: AppView) => void;
   showSidebar: boolean;
-  setShowSidebar: (show: boolean) => void;
+  setShowSidebar: React.Dispatch<React.SetStateAction<boolean>>;
   systemStatus: "online" | "syncing" | "error";
   setSystemStatus: (status: "online" | "syncing" | "error") => void;
   showWelcome: boolean;

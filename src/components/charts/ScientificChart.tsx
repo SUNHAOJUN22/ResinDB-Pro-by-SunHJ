@@ -134,10 +134,10 @@ export const ScientificChart: React.FC<ScientificChartProps> = React.memo(({
           break;
         }
         case "ashby":
-          option = getAshbyChartOption(data, theme);
+          option = getAshbyChartOption(data as any, theme);
           break;
         case "mfr_density":
-          option = getMfrDensityChartOption(data, theme);
+          option = getMfrDensityChartOption(data as any, theme);
           break;
         case "parallel": {
           const pData = data as {

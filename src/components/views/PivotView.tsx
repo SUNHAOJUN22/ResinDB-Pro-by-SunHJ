@@ -393,7 +393,7 @@ const PivotRows: React.FC<{
             <AnimatePresence>
               {isExpanded && hasChildren && (
                 <PivotRows 
-                  rows={row._children} 
+                  rows={row._children || []} 
                   valueMetrics={valueMetrics} 
                   expandedRows={expandedRows} 
                   toggleExpand={toggleExpand}

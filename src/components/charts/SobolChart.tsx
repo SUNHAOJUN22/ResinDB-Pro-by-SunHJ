@@ -37,12 +37,10 @@ export const SobolChart: React.FC<SobolChartProps> = React.memo(({ firstOrder, t
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
-        
-        // @ts-expect-error - ECharts type mismatch
-      formatter: (params: Array<{name: string, seriesName: string, value: number}>) => {
+      formatter: (params: any) => {
             const name = params[0].name;
-            const first = params.find((p: {seriesName: string, value: number}) => p.seriesName === 'First-Order (Main Effect)')?.value || 0;
-            const inter = params.find((p: {seriesName: string, value: number}) => p.seriesName === 'Interactions (Coupling)')?.value || 0;
+            const first = params.find((p: any) => p.seriesName === 'First-Order (Main Effect)')?.value || 0;
+            const inter = params.find((p: any) => p.seriesName === 'Interactions (Coupling)')?.value || 0;
             const total = first + inter;
             return `<strong>${name}</strong><br/>
                     Total Effect (S_T): ${total.toFixed(4)}<br/>

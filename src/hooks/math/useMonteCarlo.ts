@@ -4,7 +4,7 @@ import { Product, FormulaConfig } from '@/types/index';
 import type { MonteCarloMessage, MonteCarloResponse } from '@/workers/monteCarloWorker';
 
 export function useMonteCarlo() {
-  const [simulationStats, setSimulationStats] = useState<MonteCarloResponse['payload']['stats'] | null>(null);
+  const [simulationStats, setSimulationStats] = useState<NonNullable<MonteCarloResponse['payload']>['stats'] | null>(null);
   const [isSimulating, setIsSimulating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const workerRef = useRef<Worker | null>(null);

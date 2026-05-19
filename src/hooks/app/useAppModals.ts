@@ -19,16 +19,16 @@ export function useAppModals() {
 
     const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
 
-    const openModal = useCallback((name: keyof typeof modals) => {
-        setModals(prev => ({ ...prev, [name]: true }));
+    const openModal = useCallback((name: string) => {
+        setModals(prev => ({ ...prev, [name as keyof typeof modals]: true }));
     }, []);
 
-    const closeModal = useCallback((name: keyof typeof modals) => {
-        setModals(prev => ({ ...prev, [name]: false }));
+    const closeModal = useCallback((name: string) => {
+        setModals(prev => ({ ...prev, [name as keyof typeof modals]: false }));
     }, []);
 
-    const toggleModal = useCallback((name: keyof typeof modals) => {
-        setModals(prev => ({ ...prev, [name]: !prev[name] }));
+    const toggleModal = useCallback((name: string) => {
+        setModals(prev => ({ ...prev, [name as keyof typeof modals]: !prev[name as keyof typeof modals] }));
     }, []);
 
     const closeAllModals = useCallback(() => {

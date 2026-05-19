@@ -37,8 +37,7 @@ export const getMfrDensityChartOption = (
       backgroundColor: isDark ? "rgba(15, 23, 42, 0.95)" : "rgba(255, 255, 255, 0.98)",
       borderColor: isDark ? "#334155" : "#e2e8f0",
       textStyle: { color: isDark ? "#f1f5f9" : "#1e293b", fontSize: 12 },
-    // @ts-expect-error - ECharts type mismatch
-      formatter: (params: { value: [number, number, string]; color?: string }) => {
+      formatter: (params: any) => {
         const val = params.value;
         return `
           <div style="font-weight: 800; margin-bottom: 6px;">${val[2]}</div>
@@ -63,6 +62,18 @@ export const getMfrDensityChartOption = (
       textStyle: { color: axisColor, fontSize: 10, fontWeight: 600 },
       type: "scroll",
     },
+    toolbox: {
+      feature: {
+        dataZoom: { yAxisIndex: "none" },
+        restore: {},
+        saveAsImage: { name: 'density_scatter', pixelRatio: 2 }
+      },
+      iconStyle: { borderColor: isDark ? '#94a3b8' : '#475569' }
+    },
+    dataZoom: [
+      { type: 'inside', xAxisIndex: 0, filterMode: 'filter' },
+      { type: 'inside', yAxisIndex: 0, filterMode: 'filter' },
+    ],
     xAxis: {
       type: "value",
       name: xAxisName,
@@ -112,7 +123,7 @@ export const getMfrDensityChartOption = (
       emphasis: {
         itemStyle: { opacity: 1, borderWidth: 2, scale: 1.3 }
       },
-      data: s.data.filter((d: [number, number, string]) => d[0] > 0 && d[1] > 0),
+      data: (s.data as [number, number, string][]).filter((d) => Number(d[0]) > 0 && Number(d[1]) > 0),
     })),
     animationDuration: 1200,
     animationEasing: "cubicOut",

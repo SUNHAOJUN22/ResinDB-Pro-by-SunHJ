@@ -10,6 +10,7 @@ import {
   TableProperties,
 } from "lucide-react";
 import { AppView } from '@/types/index';
+import { ModalType } from '@/contexts/ModalContext';
 
 export const SystemNav: React.FC<{
   activeView: AppView;
@@ -17,9 +18,9 @@ export const SystemNav: React.FC<{
   showAppMenu: boolean;
   setShowAppMenu: (val: boolean) => void;
   showSidebar: boolean;
-  setShowSidebar: (val: boolean) => void;
+  setShowSidebar: React.Dispatch<React.SetStateAction<boolean>>;
   systemStatus: "online" | "syncing" | "error";
-  openModal: (modal: string) => void;
+  openModal: (modal: ModalType) => void;
   t: (key: string, fallback?: string) => string;
 }> = ({
   activeView,

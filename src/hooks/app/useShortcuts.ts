@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
+import { ModalType } from '@/contexts/ModalContext';
 
 interface UseShortcutsProps {
   closeAllModals: () => void;
-  openModal: (modalName: string) => void;
+  openModal: (modalName: ModalType) => void;
   setShowSidebar: React.Dispatch<React.SetStateAction<boolean>>;
   selectedIds: Set<string>;
   handleExport: () => void;

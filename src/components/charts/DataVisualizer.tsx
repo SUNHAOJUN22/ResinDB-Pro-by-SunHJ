@@ -2369,7 +2369,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                 </span>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-                {chartDescriptions[activeChart]}
+                {(chartDescriptions as Record<string, string>)[activeChart]}
               </p>
               <div className="mt-3 pt-3 border-t border-slate-200/50 dark:border-slate-800/50 flex items-center justify-between text-[10px]">
                 <span className="text-slate-400 font-bold uppercase tracking-wider">

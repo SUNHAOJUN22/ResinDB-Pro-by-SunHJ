@@ -62,6 +62,12 @@ export const getRadarChartOption = (
       data: data.map((d) => d.name),
       textStyle: { color: isDark ? "#94a3b8" : "#666666" },
     },
+    toolbox: {
+      feature: {
+        saveAsImage: { name: 'radar_benchmark', pixelRatio: 2 }
+      },
+      iconStyle: { borderColor: isDark ? '#94a3b8' : '#475569' }
+    },
     radar: {
       indicator: indicators,
       shape: "polygon",

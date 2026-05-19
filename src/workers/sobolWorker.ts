@@ -106,9 +106,9 @@ self.onmessage = (e: MessageEvent<SobolMessage>) => {
         throw new Error("Variance of output is 0. Sensitivity indices cannot be calculated.");
     }
 
-    const firstOrder = [];
-    const totalEffect = [];
-    const interactions = [];
+    const firstOrder: {name: string, value: number}[] = [];
+    const totalEffect: {name: string, value: number}[] = [];
+    const interactions: {name: string, value: number}[] = [];
 
     // For each variable
     for (let i = 0; i < D; i++) {

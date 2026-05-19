@@ -90,6 +90,6 @@ export const aiService = {
       contents: prompt,
     });
 
-    return response.text;
+    return response.text || "";
   }
 };

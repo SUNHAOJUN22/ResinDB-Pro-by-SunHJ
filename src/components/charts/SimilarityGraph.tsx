@@ -47,7 +47,7 @@ export const SimilarityGraph: React.FC<SimilarityGraphProps> = React.memo(({ nod
     const option: echarts.EChartsOption = {
       backgroundColor: 'transparent',
       tooltip: {
-          formatter: (params: echarts.DefaultLabelFormatterCallbackParams) => {
+          formatter: (params: any) => {
               if (params.dataType === 'node') {
                   const data = params.data as Record<string, unknown>;
                   return `<div class="font-bold text-sm mb-1">${String(data.name)}</div>

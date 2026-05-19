@@ -65,6 +65,18 @@ export const WeibullChart: React.FC<WeibullChartProps> = React.memo(({ points, m
          right: '10%',
          containLabel: true
       },
+      toolbox: {
+         feature: {
+            dataZoom: { yAxisIndex: "none" },
+            restore: {},
+            saveAsImage: { name: 'weibull_chart', pixelRatio: 2 }
+         },
+         iconStyle: { borderColor: textColor }
+      },
+      dataZoom: [
+         { type: 'inside', xAxisIndex: 0, filterMode: 'filter' },
+         { type: 'inside', yAxisIndex: 0, filterMode: 'filter' },
+      ],
       xAxis: {
         type: 'value',
         name: `ln(${targetKey})`,

@@ -32,7 +32,7 @@ export const DashboardAiCard: React.FC<DashboardAiCardProps> = ({ data }) => {
         data,
         "Provide a 3-sentence executive summary of the current dataset. Focus on the variety of grades and manufacturer distribution. Keep it professional and technical.",
       );
-      setInsight(result);
+      setInsight(result || null);
     } catch {
       setError("AI Service unavailable. Check API key in settings.");
     } finally {
