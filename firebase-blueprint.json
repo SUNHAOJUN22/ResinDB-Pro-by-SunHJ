@@ -1,0 +1,61 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Material product data",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "gradeName": { "type": "string" },
+        "manufacturerId": { "type": "string" },
+        "manufacturer": { "type": "string" },
+        "categoryIds": { "type": "array", "items": { "type": "string" } },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "value": { "type": ["string", "number"] },
+              "unit": { "type": "string" },
+              "standard": { "type": "string" },
+              "temperature": { "type": "string" },
+              "referenceId": { "type": "string" },
+              "instrument": { "type": "string" },
+              "sourceUrl": { "type": "string" },
+              "annotation": { "type": "string" },
+              "mean": { "type": "number" },
+              "stdDev": { "type": "number" },
+              "min": { "type": "number" },
+              "max": { "type": "number" },
+              "count": { "type": "number" }
+            }
+          }
+        },
+        "createdAt": { "type": "integer" },
+        "updatedAt": { "type": "integer" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["gradeName", "properties"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profile with role",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "editor", "viewer"] },
+        "createdAt": { "type": "integer" }
+      }
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Store all material products"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Store user profiles and roles."
+    }
+  }
+}

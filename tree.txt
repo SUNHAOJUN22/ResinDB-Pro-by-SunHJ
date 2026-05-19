@@ -1,0 +1,188 @@
+src/
+├── api.ts
+├── components
+│   ├── App.tsx
+│   ├── auth
+│   │   └── AuthScreen.tsx
+│   ├── charts
+│   │   ├── ArrheniusChart.tsx
+│   │   ├── AshbyScatter.ts
+│   │   ├── BayesChart.tsx
+│   │   ├── CanvasScatterGraph.tsx
+│   │   ├── CopulaChart.tsx
+│   │   ├── CorrelationMatrix.tsx
+│   │   ├── DataVisualizer.tsx
+│   │   ├── DegradationSimulator.tsx
+│   │   ├── FeatureImportanceChart.tsx
+│   │   ├── GpcDistribution.ts
+│   │   ├── KdeTopologyChart.tsx
+│   │   ├── KineticsChart.tsx
+│   │   ├── MahalanobisChart.tsx
+│   │   ├── MfrDensityScatter.ts
+│   │   ├── MooChart.tsx
+│   │   ├── ParallelCoordinates.ts
+│   │   ├── PronyChart.tsx
+│   │   ├── RadarBenchmark.ts
+│   │   ├── RheologyCurve.ts
+│   │   ├── RheologyGraph.tsx
+│   │   ├── RsmHeatmapChart.tsx
+│   │   ├── ScientificChart.tsx
+│   │   ├── SimilarProductsRadar.tsx
+│   │   ├── SimilarityGraph.tsx
+│   │   ├── SobolChart.tsx
+│   │   ├── SpcChart.tsx
+│   │   ├── WeibullChart.tsx
+│   │   └── WlfTtsChart.tsx
+│   ├── features
+│   │   ├── Ai
+│   │   │   ├── AiCopilot.tsx
+│   │   │   └── DashboardAiCard.tsx
+│   │   ├── Dashboard
+│   │   │   ├── DashboardComponents.tsx
+│   │   │   ├── DashboardStats.tsx
+│   │   │   └── MarketTrendsSection.tsx
+│   │   ├── DataGrid
+│   │   │   ├── BatchActionBar.tsx
+│   │   │   ├── ColumnResizer.tsx
+│   │   │   ├── ColumnVisibilityMenu.tsx
+│   │   │   ├── DataGrid.tsx
+│   │   │   ├── DataGridComponents.tsx
+│   │   │   └── DataGridRow.tsx
+│   │   └── Filters
+│   │       ├── FilterBuilder.tsx
+│   │       └── FilterPanel.tsx
+│   ├── layout
+│   │   ├── MobileBottomNav.tsx
+│   │   ├── SystemNav.tsx
+│   │   ├── TopBar.tsx
+│   │   └── TreeSidebar.tsx
+│   ├── modals
+│   │   ├── AddProductModal.tsx
+│   │   ├── AdminModal.tsx
+│   │   ├── BatchEditModal.tsx
+│   │   ├── DeleteConfirmationModal.tsx
+│   │   ├── EditProductModal.tsx
+│   │   ├── FeedbackModal.tsx
+│   │   ├── FormulaEditorModal.tsx
+│   │   ├── HelpModal.tsx
+│   │   ├── ImportModal.tsx
+│   │   ├── ProfileModal.tsx
+│   │   ├── ShortcutsModal.tsx
+│   │   ├── SmartAnalysisModal.tsx
+│   │   └── SystemHealthModal.tsx
+│   ├── shared
+│   │   ├── CommandPalette.tsx
+│   │   ├── ControlToolbar.tsx
+│   │   ├── ErrorBoundary.tsx
+│   │   ├── FloatingParticles.tsx
+│   │   ├── HistoryDrawer.tsx
+│   │   ├── NotificationMenu.tsx
+│   │   ├── OnboardingTour.tsx
+│   │   ├── PdfReportTemplate.tsx
+│   │   ├── ProductDetailDrawer.tsx
+│   │   ├── QuickActionMenu.tsx
+│   │   ├── SavedViewsMenu.tsx
+│   │   ├── SearchControl.tsx
+│   │   ├── SystemAlert.tsx
+│   │   ├── SystemStatusIndicator.tsx
+│   │   ├── ToastContainer.tsx
+│   │   └── UserAccountMenu.tsx
+│   ├── ui
+│   │   ├── Skeleton.tsx
+│   │   └── TreeNode.tsx
+│   └── views
+│       ├── AnalyticsView.tsx
+│       ├── ComparisonView.tsx
+│       ├── DashboardView.tsx
+│       └── PivotView.tsx
+├── constants.ts
+├── contexts
+│   ├── AuthContext.tsx
+│   ├── DataContext.tsx
+│   ├── LanguageContext.tsx
+│   ├── ModalContext.tsx
+│   ├── ThemeContext.tsx
+│   ├── ToastContext.tsx
+│   └── UIContext.tsx
+├── hooks
+│   ├── useActiveFilters.ts
+│   ├── useAnomalyGuard.ts
+│   ├── useAppActions.ts
+│   ├── useAppModals.ts
+│   ├── useArrheniusWorker.ts
+│   ├── useBayesWorker.ts
+│   ├── useCarreau.ts
+│   ├── useColumnResizing.ts
+│   ├── useColumns.ts
+│   ├── useCopulaWorker.ts
+│   ├── useDataGrid.ts
+│   ├── useDataGridWorker.ts
+│   ├── useDatabase.ts
+│   ├── useExportData.ts
+│   ├── useFeatureImportanceWorker.ts
+│   ├── useFormulas.ts
+│   ├── useHistory.ts
+│   ├── useKMeansWorker.ts
+│   ├── useKdeWorker.ts
+│   ├── useKineticsWorker.ts
+│   ├── useMahalanobis.ts
+│   ├── useMahalanobisWorker.ts
+│   ├── useMonteCarlo.ts
+│   ├── useMooWorker.ts
+│   ├── useParetoWorker.ts
+│   ├── usePronyWorker.ts
+│   ├── useRsmWorker.ts
+│   ├── useSavedViews.ts
+│   ├── useShortcuts.ts
+│   ├── useSimilarity.ts
+│   ├── useSobolWorker.ts
+│   ├── useSpcWorker.ts
+│   ├── useWeibullWorker.ts
+│   └── useWlfWorker.ts
+├── i18n.ts
+├── index.css
+├── index.tsx
+├── lib
+│   ├── adapters
+│   │   ├── IndexedDBProductAdapter.ts
+│   │   ├── MockProductAdapter.ts
+│   │   ├── index.ts
+│   │   └── types.ts
+│   ├── arrheniusWorker.ts
+│   ├── bayesWorker.ts
+│   ├── carreauWorker.ts
+│   ├── copulaWorker.ts
+│   ├── dataWorker.ts
+│   ├── featureImportanceWorker.ts
+│   ├── filterUtils.ts
+│   ├── formulaParser.ts
+│   ├── historyWorker.ts
+│   ├── kdeWorker.ts
+│   ├── kineticsWorker.ts
+│   ├── kmeansWorker.ts
+│   ├── logger.ts
+│   ├── mahalanobisWorker.ts
+│   ├── materialScience.ts
+│   ├── math
+│   │   ├── convexHull.ts
+│   │   └── pca.ts
+│   ├── math.ts
+│   ├── monteCarloWorker.ts
+│   ├── mooWorker.ts
+│   ├── paretoWorker.ts
+│   ├── pronyWorker.ts
+│   ├── rsmWorker.ts
+│   ├── similarityWorker.ts
+│   ├── sobolWorker.ts
+│   ├── spcWorker.ts
+│   ├── spearmanWorker.ts
+│   ├── topsisAnalyzer.ts
+│   ├── utils.ts
+│   ├── weibullWorker.ts
+│   └── wlfWorker.ts
+├── productUtils.ts
+├── services
+│   ├── aiService.ts
+│   ├── geminiService.ts
+│   └── mathUtils.ts
+└── types.ts

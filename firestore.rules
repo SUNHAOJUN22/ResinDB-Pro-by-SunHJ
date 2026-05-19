@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} { 
+      allow read, write: if false; 
+    }
+
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null && request.auth.token.email_verified == true; }
+    function isAdmin() { 
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; 
+    }
+    function isEditor() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || 
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'editor');
+    }
+
+    function isValidProduct(data) {
+      return data.keys().hasAll(['gradeName', 'properties', 'ownerId', 'createdAt', 'updatedAt']) 
+             && data.gradeName is string && data.gradeName.size() > 0 && data.gradeName.size() <= 200
+             && data.properties is map
+             && data.ownerId == request.auth.uid
+             && (!('manufacturerId' in data) || (data.manufacturerId is string && data.manufacturerId.size() <= 200))
+             && (!('manufacturer' in data) || (data.manufacturer is string && data.manufacturer.size() <= 200))
+             && (!('categoryIds' in data) || (data.categoryIds is list && data.categoryIds.size() <= 50));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'role', 'createdAt'])
+             && data.email is string && data.email.size() > 0 && data.email.size() <= 200
+             && data.role is string && (data.role == 'admin' || data.role == 'editor' || data.role == 'viewer');
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && request.auth.uid == userId;
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming()) && incoming().createdAt is number && (incoming().role == 'viewer' || incoming().role == 'editor');
+      allow update: if isAdmin() && isValidUser(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'email']);
+    }
+
+    match /products/{productId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn(); // We might want to restrict list or not, but for a database explorer users need to list products.
+      
+      allow create: if isEditor() && isValidId(productId) && isValidProduct(incoming()) && incoming().createdAt is number && incoming().updatedAt is number;
+      allow update: if isEditor() && isValidId(productId) && isValidProduct(incoming()) && incoming().ownerId == existing().ownerId && incoming().createdAt == existing().createdAt && incoming().updatedAt is number;
+      allow delete: if isEditor() && existing().ownerId == request.auth.uid || isAdmin();
+    }
+  }
+}
