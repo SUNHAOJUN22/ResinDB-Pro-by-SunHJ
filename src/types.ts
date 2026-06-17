@@ -58,6 +58,7 @@ export interface Product {
   properties: Record<string, PropertyValue>;
   createdAt: string;
   updatedAt: string;
+  isExperimental?: boolean; // Label for self-tested custom experimental data
 }
 
 export type ViewMode = 'grid' | 'chart';

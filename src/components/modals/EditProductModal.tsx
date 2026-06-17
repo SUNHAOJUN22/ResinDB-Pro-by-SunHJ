@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Product, PropertyValue } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useToasts } from "@/contexts/ToastContext";
 import { motion, AnimatePresence } from "motion/react";
 import { aiService } from "@/services/aiService";
 
@@ -49,6 +50,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = React.memo(({
   product,
 }) => {
   const { t } = useLanguage();
+  const { addToast } = useToasts();
   const [formData, setFormData] = useState<Partial<Product>>({});
   const [propertyRows, setPropertyRows] = useState<PropertyRow[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -84,6 +86,28 @@ export const EditProductModal: React.FC<EditProductModalProps> = React.memo(({
         formData.manufacturer || ""
       );
 
+      // Verify that there are valid properties
+      let validCount = 0;
+      if (generated && typeof generated === "object") {
+        Object.values(generated).forEach((val: any) => {
+          if (
+            val && 
+            val.value !== undefined && 
+            val.value !== null && 
+            String(val.value).trim() !== "" && 
+            !["unknown", "n/a", "none", "null", "-", "未检测", "暂无", "无"].includes(String(val.value).toLowerCase().trim())
+          ) {
+            validCount++;
+          }
+        });
+      }
+
+      if (validCount < 2) {
+        addToast("error", "该材料物理性指标深度在专业大盘库判定不足（没有具体详细物性），已遵照安全原则自动丢弃删除");
+        setIsAiGenerating(false);
+        return;
+      }
+
       const newRows: PropertyRow[] = Object.entries(generated).map(([key, val]) => ({
         id: `ai-${Date.now()}-${key}`,
         key,
@@ -99,8 +123,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = React.memo(({
 
       // Merge behavior: avoid duplicates or just append? Append is safer for users to review.
       setPropertyRows(prev => [...newRows, ...prev]);
+      addToast("success", "已成功从专业库抓取并自动同步详细物理性能参数！");
     } catch (error) {
       logger.error("AI Generation failed:", error);
+      addToast("error", "获取物性性能参数失败，该无效牌号记录已被自动撤销并丢弃！");
     } finally {
       setIsAiGenerating(false);
     }

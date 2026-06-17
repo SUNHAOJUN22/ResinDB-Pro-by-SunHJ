@@ -21,57 +21,35 @@
   --color-primary-900: #020617;
   --color-primary-950: #000000;
   
-  --radius-sm: 4px;
-  --radius: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-sm: 2px;
+  --radius: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
 
-  /* Windows 11 / Mac OS style Shadows */
+  /* Classic / Enterprise Shadows */
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-window: 0 8px 32px 0 rgba(0, 0, 0, 0.08), 0 1px 2px 0 rgba(0, 0, 0, 0.04);
-  --shadow-popup: 0 32px 64px -12px rgba(0, 0, 0, 0.14);
+  --shadow-window: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 1px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-popup: 0 10px 30px -5px rgba(0, 0, 0, 0.08);
 }
 
 @layer utilities {
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: var(--color-primary-200);
-    border-radius: 20px;
-    border: 1px solid transparent;
-    background-clip: content-box;
-  }
-  .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-    background-color: var(--color-primary-300);
-  }
-  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: var(--color-primary-700);
-  }
-  .dark .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-    background-color: var(--color-primary-600);
-  }
-  
   .mica-effect {
-    backdrop-filter: blur(24px) saturate(150%);
-    -webkit-backdrop-filter: blur(24px) saturate(150%);
-    background-color: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px) saturate(120%);
+    -webkit-backdrop-filter: blur(12px) saturate(120%);
+    background-color: rgba(255, 255, 255, 0.85);
   }
   .dark .mica-effect {
-    backdrop-filter: blur(24px) saturate(120%);
-    -webkit-backdrop-filter: blur(24px) saturate(120%);
-    background-color: rgba(14, 18, 27, 0.75);
+    backdrop-filter: blur(12px) saturate(100%);
+    -webkit-backdrop-filter: blur(12px) saturate(100%);
+    background-color: rgba(15, 23, 42, 0.85);
   }
   
   /* Hardware Acceleration utilities */
   .transform-gpu {
     transform: translateZ(0);
     will-change: transform, opacity;
+    backface-visibility: hidden;
   }
   
   .hardware-layer {

@@ -11,6 +11,13 @@
     <title>CNPC ResinDB.pri - Synthetic Resin Database</title>
     
     <script>
+      window.addEventListener('error', function(e) {
+        if (e.message && e.message.includes('ResizeObserver loop')) {
+          e.stopImmediatePropagation();
+        }
+      });
+    </script>
+    <script>
       (function() {
         try {
           var saved = localStorage.getItem('resindb-theme');

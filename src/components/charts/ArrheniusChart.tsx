@@ -94,7 +94,13 @@ export const ArrheniusChart: React.FC<ArrheniusChartProps> = React.memo(({ point
 
     chartInstance.current.setOption(option);
     
-    const ro = new ResizeObserver(() => { if(chartInstance.current) chartInstance.current.resize(); });
+    const ro = new ResizeObserver(() => {
+      if (chartInstance.current) {
+        requestAnimationFrame(() => {
+          chartInstance.current?.resize();
+        });
+      }
+    });
     if (chartRef.current) ro.observe(chartRef.current);
     return () => ro.disconnect();
   }, [points, equation, rSquared, theme]);

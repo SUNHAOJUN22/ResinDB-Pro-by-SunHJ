@@ -3,6 +3,7 @@ import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Category, Product, ProductUpdates, PropertyValue } from '@/types/index';
 import { PRODUCT_CATALOG, CATEGORY_TREE } from '@/config/constants';
 import { IProductAdapter } from "@/lib/adapters/types";
+import { UniversalStorageBridge } from './UniversalStorageBridge';
 
 interface ResinDB extends DBSchema {
   products: {
@@ -60,6 +61,18 @@ export class IndexedDBProductAdapter implements IProductAdapter {
         for (const product of PRODUCT_CATALOG) {
           tx.store.add(product);
         }
+        
+        // Dynamic seeding of custom experimental labs from UniversalStorageBridge
+        try {
+          const labs = UniversalStorageBridge.getLabRecords();
+          for (const lab of labs) {
+            const product = UniversalStorageBridge.recordToProduct(lab);
+            tx.store.add(product);
+          }
+        } catch (e) {
+          logger.error("Failed to seed initial experimental products", e);
+        }
+
         await tx.done;
       }
       
@@ -133,17 +146,37 @@ export class IndexedDBProductAdapter implements IProductAdapter {
       properties: product.properties || {},
       updatedAt: new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString().split('T')[0],
+      isExperimental: product.isExperimental ?? false,
     };
 
     const db = await this.getDB();
     try {
       await db.add('products', newProduct);
+      
+      // Sync to UniversalStorageBridge if experimental
+      if (newProduct.isExperimental) {
+        try {
+          const rec = UniversalStorageBridge.productToRecord(newProduct, 'my_lab');
+          UniversalStorageBridge.saveLabRecord(rec);
+        } catch (err) {
+          logger.error("Failed to sync experimental create to storage bridge", err);
+        }
+      }
     } catch (e) {
       logger.error("IndexedDB Create Failed:", e);
       // If ID collision, try one more time with a different ID
       if (e instanceof Error && e.name === 'ConstraintError') {
         newProduct.id = `p-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
         await db.add('products', newProduct);
+        
+        if (newProduct.isExperimental) {
+          try {
+            const rec = UniversalStorageBridge.productToRecord(newProduct, 'my_lab');
+            UniversalStorageBridge.saveLabRecord(rec);
+          } catch (err) {
+            logger.error("Failed to sync experimental collision-recreated to storage bridge", err);
+          }
+        }
       } else {
         throw e;
       }
@@ -172,6 +205,16 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     }
 
     await db.put('products', updatedProduct);
+
+    // Sync to UniversalStorageBridge if experimental
+    if (updatedProduct.isExperimental) {
+      try {
+        const rec = UniversalStorageBridge.productToRecord(updatedProduct, 'my_lab');
+        UniversalStorageBridge.saveLabRecord(rec);
+      } catch (err) {
+        logger.error("Failed to sync experimental update to storage bridge", err);
+      }
+    }
     
     return updatedProduct;
   }
@@ -233,11 +276,22 @@ export class IndexedDBProductAdapter implements IProductAdapter {
         properties: p.properties || {},
         updatedAt: now,
         createdAt: now,
+        isExperimental: p.isExperimental ?? false,
       };
       
       try {
         await tx.store.add(newProduct);
         createdProducts.push(newProduct);
+
+        // Sync to UniversalStorageBridge if experimental
+        if (newProduct.isExperimental) {
+          try {
+            const rec = UniversalStorageBridge.productToRecord(newProduct, 'my_lab');
+            UniversalStorageBridge.saveLabRecord(rec);
+          } catch (err) {
+            logger.error("Failed to sync batch created exp product", err);
+          }
+        }
       } catch (err) {
         logger.warn(`Skipping product due to error during batch export: ${newProduct.id}`, err);
         // Continue with others
@@ -256,15 +310,49 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     const tx = db.transaction('products', 'readwrite');
     for (const id of ids) {
       await tx.store.delete(id);
+      // Sync delete to UniversalStorageBridge
+      try {
+        UniversalStorageBridge.deleteLabRecord(id);
+      } catch (err) {
+        logger.error("Failed to sync delete to storage bridge", err);
+      }
     }
     await tx.done;
   }
 
-  async exportReport(products: Product[], _format: 'csv' | 'xlsx'): Promise<Blob> {
+  async exportReport(products: Product[], format: 'csv' | 'xlsx' | 'json' | 'xml'): Promise<Blob> {
     await this.simulateLatency();
 
     if (products.length === 0) {
       throw new Error("400 Bad Request: No data to export");
+    }
+
+    if (format === 'json') {
+      const jsonContent = JSON.stringify(products, null, 2);
+      return new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+    }
+
+    if (format === 'xml') {
+      const xmlContent = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<Products>',
+        ...products.map(p => {
+          const props = Object.entries(p.properties)
+            .map(([k, v]) => `      <Property name="${k}" value="${v.value}" unit="${v.unit || ''}"/>`)
+            .join('\n');
+          return `  <Product id="${p.id}">
+    <GradeName>${p.gradeName}</GradeName>
+    <Manufacturer>${p.manufacturer}</Manufacturer>
+    <Categories>${p.categoryIds.join(',')}</Categories>
+    <UpdatedAt>${p.updatedAt}</UpdatedAt>
+    <Properties>
+${props}
+    </Properties>
+  </Product>`;
+        }),
+        '</Products>'
+      ].join('\n');
+      return new Blob([xmlContent], { type: 'application/xml;charset=utf-8;' });
     }
 
     const headers = ['ID', 'Grade', 'Manufacturer', 'Category', 'Updated'];

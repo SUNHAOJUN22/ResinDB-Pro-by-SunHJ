@@ -44,7 +44,7 @@ export const UserAccountMenu: React.FC<UserAccountMenuProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { t, toggleLanguage } = useLanguage();
+  const { t, toggleLanguage, language } = useLanguage();
   const { theme, toggleTheme, colorTheme, setColorTheme } = useTheme();
 
   const colors: { id: ColorTheme; color: string; label: string }[] = [
@@ -149,7 +149,7 @@ export const UserAccountMenu: React.FC<UserAccountMenuProps> = ({
                 <div className="flex items-center gap-2 mb-3">
                   <Palette size={12} className="text-slate-400" />
                   <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">
-                    UI Color Theme
+                    {language === 'zh' ? "界面主题色" : "UI Color Theme"}
                   </span>
                 </div>
                 <div className="flex justify-between items-center gap-1.5">

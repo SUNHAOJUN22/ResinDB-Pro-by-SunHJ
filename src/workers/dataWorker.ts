@@ -135,6 +135,13 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
             }
             return 0;
           });
+        } else {
+          // Default sort by priority (user-controlled, smaller priority first, unprioritized items last)
+          sortedData = [...filteredData].sort((a, b) => {
+            const pA = a.priority !== undefined ? a.priority : 1000000;
+            const pB = b.priority !== undefined ? b.priority : 1000000;
+            return pA - pB;
+          });
         }
 
         // 3. Anomaly Detection

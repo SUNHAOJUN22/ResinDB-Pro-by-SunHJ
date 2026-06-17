@@ -17,6 +17,8 @@ import {
 import { AppView, Product, Manufacturer } from '@/types/index';
 import { motion, AnimatePresence } from "motion/react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useData } from "@/contexts/DataContext";
+import { History } from "lucide-react";
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -46,6 +48,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = React.memo(({
   onViewProduct,
 }) => {
   const { t } = useLanguage();
+  const { recentSearches, setSearchQuery, setAdvancedFilterGroup, setSelectedCategoryIds } = useData();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -104,8 +107,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = React.memo(({
       },
     ];
 
-    if (!q) return commands.map((c) => ({ ...c, type: "command" }));
-
     // 1. Search Commands
     const cmdResults = commands
       .filter(
@@ -149,13 +150,39 @@ export const CommandPalette: React.FC<CommandPaletteProps> = React.memo(({
         meta: m.country || "",
       }));
 
-    return [...cmdResults, ...productResults, ...manufacturerResults];
+    // 4. Recent Searches
+    const recentResults = recentSearches
+      .filter((r) => r.label.toLowerCase().includes(q))
+      .map((r) => ({
+        id: `recent-${r.id}`,
+        label: r.label,
+        icon: History,
+        category: t("recentSearches") || "近期搜索 / 预设过滤",
+        action: () => {
+          setSearchQuery(r.query);
+          setAdvancedFilterGroup(r.filters);
+          setSelectedCategoryIds(new Set(r.selectedCategoryIds || []));
+          onNavigate("dashboard");
+        },
+        type: "recent",
+        meta: new Date(r.timestamp).toLocaleTimeString(),
+      }));
+
+    if (!q) {
+      return [...recentResults, ...commands.map((c) => ({ ...c, type: "command" }))];
+    }
+
+    return [...cmdResults, ...recentResults, ...productResults, ...manufacturerResults];
   }, [
     query,
     products,
     manufacturers,
+    recentSearches,
     onNavigate,
     onViewProduct,
+    setSearchQuery,
+    setAdvancedFilterGroup,
+    setSelectedCategoryIds,
     onOpenProfile,
     onOpenAdmin,
     onToggleTheme,
@@ -307,7 +334,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = React.memo(({
                                       ? (res as { meta?: string }).meta
                                       : res.type === "manufacturer"
                                         ? (res as { meta?: string }).meta
-                                        : t("executeAction")}
+                                        : res.type === "recent"
+                                          ? (res as { meta?: string }).meta
+                                          : t("executeAction")}
                                   </span>
                                 </div>
                               </div>

@@ -5,10 +5,10 @@ import { useLanguage } from "@/contexts/LanguageContext";
 
 interface QuickActionMenuProps {
   onOpenImport: () => void;
-  onExport: () => void;
-  onExportPdf?: () => void;
+  onOpenSmartExport: () => void;
   isExporting: boolean;
   onOpenAdmin: () => void;
+  onOpenQualityAudit: () => void;
 }
 
 const popoverVariants: Variants = {
@@ -29,14 +29,14 @@ const popoverVariants: Variants = {
 
 export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
   onOpenImport,
-  onExport,
-  onExportPdf,
+  onOpenSmartExport,
   isExporting,
   onOpenAdmin,
+  onOpenQualityAudit,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -104,7 +104,7 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
               onClick={() => {
                 if (!isExporting) {
                   setIsOpen(false);
-                  onExport();
+                  onOpenSmartExport();
                 }
               }}
               disabled={isExporting}
@@ -115,19 +115,7 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
               ) : (
                 <Download size={12} className="text-emerald-500" />
               )}
-              {isExporting ? t("exporting") : t("exportReport")}
-            </motion.button>
-            <motion.button
-              whileHover={{ backgroundColor: "rgba(79, 70, 229, 0.1)" }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                setIsOpen(false);
-                onExportPdf?.();
-              }}
-              className="w-full px-3 py-2 mt-1 text-left text-xs font-mono text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2 group border border-transparent hover:border-slate-200 dark:hover:border-slate-700 rounded-lg"
-            >
-              <Download size={12} className="text-pink-500" />
-              {t("exportPdf", "打印工业报告 (PDF)")}
+              {isExporting ? t("exporting", "Exporting...") : language === 'zh' ? "智能导出数据" : "Smart Export"}
             </motion.button>
             <div className="my-1 border-t border-slate-200 dark:border-slate-800" />
             <motion.button
@@ -135,9 +123,21 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
               whileTap={{ scale: 0.95 }}
               onClick={() => {
                 setIsOpen(false);
-                onOpenAdmin();
+                onOpenQualityAudit();
               }}
               className="w-full px-3 py-2 text-left text-xs font-mono text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2 group border border-transparent hover:border-slate-200 dark:hover:border-slate-700 rounded-lg"
+            >
+              <Shield size={12} className="text-teal-500" />
+              {t("dataQualityAudit", "Data Quality Audit")}
+            </motion.button>
+            <motion.button
+              whileHover={{ backgroundColor: "rgba(79, 70, 229, 0.1)" }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                setIsOpen(false);
+                onOpenAdmin();
+              }}
+              className="w-full px-3 py-2 mt-1 text-left text-xs font-mono text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2 group border border-transparent hover:border-slate-200 dark:hover:border-slate-700 rounded-lg"
             >
               <Shield size={12} className="text-amber-500" />
               {t("systemSettings")}

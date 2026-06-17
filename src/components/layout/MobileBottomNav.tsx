@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "motion/react";
-import { LayoutDashboard, PieChart, ShieldCheck, TableProperties } from "lucide-react";
+import { LayoutDashboard, PieChart, ShieldCheck, TableProperties, Network } from "lucide-react";
 import { AppView } from '@/types/index';
 
 export const MobileBottomNav: React.FC<{
@@ -48,6 +48,19 @@ export const MobileBottomNav: React.FC<{
         />
         <span className="text-[9px] font-black uppercase tracking-widest leading-none">
           Pivot
+        </span>
+      </motion.button>
+      <motion.button
+        whileTap={{ scale: 0.9 }}
+        onClick={() => setActiveView("dependencies")}
+        className={`flex flex-col items-center gap-1 transition-colors ${activeView === "dependencies" ? "text-primary-600 dark:text-primary-400" : "text-slate-400 dark:text-slate-500"}`}
+      >
+        <Network
+          size={20}
+          strokeWidth={activeView === "dependencies" ? 2.5 : 2}
+        />
+        <span className="text-[9px] font-black uppercase tracking-widest leading-none">
+          Map
         </span>
       </motion.button>
       <motion.button

@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 type Theme = 'light' | 'dark';
-export type ColorTheme = 'indigo' | 'emerald' | 'rose' | 'blue' | 'amber' | 'violet';
+export type ColorTheme = 'indigo' | 'emerald' | 'rose' | 'blue' | 'amber' | 'violet' | 'high-contrast';
 
 interface ThemeContextType {
   theme: Theme;
@@ -44,6 +44,11 @@ const PALETTES: Record<ColorTheme, Record<string, string>> = {
     50: '#f5f3ff', 100: '#ede9fe', 200: '#ddd6fe', 300: '#c4b5fd', 400: '#a78bfa', 
     500: '#8b5cf6', 600: '#7c3aed', 700: '#6d28d9', 800: '#5b21b6', 900: '#4c1d95', 950: '#2e1065',
     rgb: '139, 92, 246'
+  },
+  'high-contrast': { // Accessibility
+    50: '#ffffff', 100: '#e5e5e5', 200: '#cccccc', 300: '#b2b2b2', 400: '#999999', 
+    500: '#000000', 600: '#000000', 700: '#000000', 800: '#000000', 900: '#000000', 950: '#000000',
+    rgb: '0, 0, 0'
   }
 };
 
@@ -51,9 +56,13 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Light/Dark Theme
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('resindb-theme');
-        if (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
-        return (saved as Theme) || 'light';
+        try {
+          const saved = localStorage.getItem('resindb-theme');
+          if (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+          return (saved as Theme) || 'light';
+        } catch {
+          return 'light';
+        }
     }
     return 'light';
   });
@@ -61,7 +70,11 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Color Theme
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
       if (typeof window !== 'undefined') {
-          return (localStorage.getItem('resindb-color-theme') as ColorTheme) || 'indigo';
+          try {
+              return (localStorage.getItem('resindb-color-theme') as ColorTheme) || 'indigo';
+          } catch {
+              return 'indigo';
+          }
       }
       return 'indigo';
   });
@@ -69,7 +82,11 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Apply Light/Dark
   useEffect(() => {
     const root = document.documentElement;
-    localStorage.setItem('resindb-theme', theme);
+    try {
+      localStorage.setItem('resindb-theme', theme);
+    } catch {
+      // Ignore security error inside sandboxed iframe
+    }
     if (theme === 'dark') {
       root.classList.add('dark');
       root.style.colorScheme = 'dark';
@@ -82,7 +99,11 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   // Apply Color Palette
   useEffect(() => {
       const root = document.documentElement;
-      localStorage.setItem('resindb-color-theme', colorTheme);
+      try {
+        localStorage.setItem('resindb-color-theme', colorTheme);
+      } catch {
+        // Ignore security error
+      }
       const palette = PALETTES[colorTheme];
       
       // Update CSS Variables dynamically

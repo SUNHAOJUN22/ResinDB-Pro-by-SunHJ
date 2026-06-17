@@ -24,9 +24,13 @@ export const UIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const [activeView, setActiveView] = useState<AppView>("dashboard");
   const [showSidebar, setShowSidebar] = useState(true);
   const [systemStatus, setSystemStatus] = useState<"online" | "syncing" | "error">("online");
-  const [showWelcome, setShowWelcome] = useState(
-    () => !localStorage.getItem("resindb-welcome-dismissed")
-  );
+  const [showWelcome, setShowWelcome] = useState(() => {
+    try {
+      return !localStorage.getItem("resindb-welcome-dismissed");
+    } catch {
+      return true;
+    }
+  });
   const [showSummary, setShowSummary] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [isHistoryOpen, setHistoryOpen] = useState(false);

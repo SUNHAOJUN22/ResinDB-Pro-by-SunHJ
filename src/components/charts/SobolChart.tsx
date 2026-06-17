@@ -89,7 +89,13 @@ export const SobolChart: React.FC<SobolChartProps> = React.memo(({ firstOrder, t
 
     chartInstance.current.setOption(option);
     
-    const ro = new ResizeObserver(() => { if(chartInstance.current) chartInstance.current.resize(); });
+    const ro = new ResizeObserver(() => {
+      if (chartInstance.current) {
+        requestAnimationFrame(() => {
+          chartInstance.current?.resize();
+        });
+      }
+    });
     if (chartRef.current) ro.observe(chartRef.current);
     return () => ro.disconnect();
   }, [firstOrder, interactions, totalEffect, theme]);

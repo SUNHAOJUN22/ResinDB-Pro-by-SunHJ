@@ -287,7 +287,11 @@ export const translations = {
     op_lt: '小于',
     op_lte: '小于等于',
     op_isEmpty: '为空',
-    op_isNotEmpty: '不为空'
+    op_isNotEmpty: '不为空',
+    DependencyMapTitle: '高分子材料合成图谱',
+    DependencyMapDesc: '展示从基础化工单体到高分子合成树脂的反应链全景互动图谱。',
+    BaseChemical: '基础化学品',
+    ResinType: '合成树脂'
   },
   en: {
     appTitle: 'ResinDB Pro',
@@ -576,7 +580,11 @@ export const translations = {
     op_lt: 'Less than',
     op_lte: 'Less than or equal',
     op_isEmpty: 'Is empty',
-    op_isNotEmpty: 'Is not empty'
+    op_isNotEmpty: 'Is not empty',
+    DependencyMapTitle: 'Resin Dependency Map',
+    DependencyMapDesc: 'Interactive graph illustrating the relationships between base chemical components (monomers) and final resin types (polymers).',
+    BaseChemical: 'Base Chemical',
+    ResinType: 'Resin Type'
   }
 };
 

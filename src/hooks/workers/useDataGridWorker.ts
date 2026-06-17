@@ -22,7 +22,12 @@ export function useDataGridWorker({
   const { formulas } = useFormulas();
   
   const [sortConfig, setSortConfig] = useState<SortConfig[]>(() => {
-    const saved = localStorage.getItem('resindb-sort-config-multi');
+    let saved = null;
+    try {
+      saved = localStorage.getItem('resindb-sort-config-multi');
+    } catch {
+      // Ignore
+    }
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -49,7 +54,11 @@ export function useDataGridWorker({
         const newSort: SortConfig = { key, direction: 'asc' };
         next = multi ? [...prev, newSort] : [newSort];
       }
-      localStorage.setItem('resindb-sort-config-multi', JSON.stringify(next));
+      try {
+        localStorage.setItem('resindb-sort-config-multi', JSON.stringify(next));
+      } catch {
+        // Ignore
+      }
       return next;
     });
   }, []);

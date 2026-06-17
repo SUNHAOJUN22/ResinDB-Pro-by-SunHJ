@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import * as echarts from 'echarts';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface KineticsChartProps {
     points: { x: number; y: number }[];
@@ -12,6 +13,7 @@ interface KineticsChartProps {
 export const KineticsChart: React.FC<KineticsChartProps> = React.memo(({ points, line, isoCurve, isoTemp, theme }) => {
     const chartRef = useRef<HTMLDivElement>(null);
     const instanceRef = useRef<echarts.ECharts | null>(null);
+    const { language } = useLanguage();
 
     useEffect(() => {
         if (!chartRef.current) return;
@@ -50,7 +52,7 @@ export const KineticsChart: React.FC<KineticsChartProps> = React.memo(({ points,
                 {
                     gridIndex: 1,
                     type: "value",
-                    name: "恒温时间 Time (min)",
+                    name: language === "en" ? "Isothermal Time (min)" : "恒温时间 (分钟)",
                     nameLocation: "middle",
                     nameGap: 25,
                     scale: true,
@@ -72,7 +74,7 @@ export const KineticsChart: React.FC<KineticsChartProps> = React.memo(({ points,
                 {
                     gridIndex: 1,
                     type: "value",
-                    name: "转化率 Conversion (%)",
+                    name: language === "en" ? "Conversion Rate (%)" : "转化率 (%)",
                     nameLocation: "middle",
                     nameGap: 35,
                     min: 0,
@@ -84,7 +86,7 @@ export const KineticsChart: React.FC<KineticsChartProps> = React.memo(({ points,
             series: [
                 // Plot 1: Kissinger Plot
                 {
-                    name: "实测点",
+                    name: language === "en" ? "Measured Point" : "实测点",
                     type: "scatter",
                     xAxisIndex: 0,
                     yAxisIndex: 0,
@@ -93,7 +95,7 @@ export const KineticsChart: React.FC<KineticsChartProps> = React.memo(({ points,
                     symbolSize: 10
                 },
                 {
-                    name: "Kissinger 拟合线",
+                    name: language === "en" ? "Kissinger Fitting Line" : "Kissinger 拟合线",
                     type: "line",
                     xAxisIndex: 0,
                     yAxisIndex: 0,
@@ -104,7 +106,7 @@ export const KineticsChart: React.FC<KineticsChartProps> = React.memo(({ points,
                 },
                 // Plot 2: Isothermal Curing Curve
                 {
-                    name: `恒温固化模拟 (${isoTemp}°C)`,
+                    name: language === "en" ? `Isothermal Curing Simulation (${isoTemp}°C)` : `恒温固化模拟 (${isoTemp}°C)`,
                     type: "line",
                     xAxisIndex: 1,
                     yAxisIndex: 1,
@@ -124,10 +126,16 @@ export const KineticsChart: React.FC<KineticsChartProps> = React.memo(({ points,
 
         instanceRef.current.setOption(option);
 
-        const ro = new ResizeObserver(() => { if (instanceRef.current) instanceRef.current.resize(); });
+        const ro = new ResizeObserver(() => {
+            if (instanceRef.current) {
+                requestAnimationFrame(() => {
+                    instanceRef.current?.resize();
+                });
+            }
+        });
     if (chartRef.current) ro.observe(chartRef.current);
     return () => ro.disconnect();
-    }, [points, line, isoCurve, isoTemp, theme]);
+    }, [points, line, isoCurve, isoTemp, theme, language]);
 
     return (
         <div ref={chartRef} className="w-full h-full min-h-[500px]"></div>

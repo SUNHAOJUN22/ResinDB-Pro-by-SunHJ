@@ -17,6 +17,7 @@ import {
   Trash2,
   Eye,
   Copy,
+  Edit,
   Tag,
   Search,
   X,
@@ -131,8 +132,18 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
       columnKey?: string;
       cellValue?: unknown;
     } | null>(null);
-    const { t, tProp } = useLanguage();
+    const { t, tProp, language } = useLanguage();
     const { addToast } = useToasts();
+    const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null);
+
+    const handleHighlightRow = useCallback((id: string) => {
+      setHighlightedRowId(id);
+      addToast("success", t("highlightedRow", "已定位并高亮对应行"));
+      setTimeout(() => {
+        setHighlightedRowId((prev) => (prev === id ? null : prev));
+      }, 5000);
+    }, [addToast, t]);
+
     const parentRef = useRef<HTMLDivElement>(null);
 
     const currentViewData = useMemo(() => {
@@ -350,17 +361,24 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
     );
 
     const handleCellEdit = React.useCallback((p: Product, colKey: string, newValue: string | number) => {
-      const newProduct = {
-        ...p,
-        properties: {
-          ...p.properties,
-          [colKey]: {
-            ...p.properties?.[colKey],
-            value: newValue,
-            unit: p.properties?.[colKey]?.unit || ""
+      let newProduct: Product;
+      if (colKey === "gradeName") {
+        newProduct = { ...p, gradeName: String(newValue) };
+      } else if (colKey === "manufacturer") {
+        newProduct = { ...p, manufacturer: String(newValue) };
+      } else {
+        newProduct = {
+          ...p,
+          properties: {
+            ...p.properties,
+            [colKey]: {
+              ...p.properties?.[colKey],
+              value: typeof newValue === 'number' || !isNaN(Number(newValue)) && newValue !== '' ? Number(newValue) : newValue,
+              unit: p.properties?.[colKey]?.unit || ""
+            }
           }
-        }
-      };
+        };
+      }
       onUpdate(newProduct);
     }, [onUpdate]);
 
@@ -425,6 +443,44 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
               />{" "}
               {t("copyGrade")}
             </motion.button>
+            {contextMenu.cellValue !== undefined && onSearchChange && (
+              <motion.button
+                whileHover={{
+                  scale: 0.99,
+                  backgroundColor: "var(--color-primary-50)",
+                }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  onSearchChange(String(contextMenu.cellValue));
+                  setContextMenu(null);
+                }}
+                className="w-[calc(100%-1rem)] mx-2 my-0.5 px-3 py-2 rounded-xl text-left text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-600 flex items-center gap-2 transition-all group"
+              >
+                <Filter
+                  size={14}
+                  className="text-slate-400 group-hover:text-primary-500"
+                />{" "}
+                {t("filterThis", "筛选此项数值")}
+              </motion.button>
+            )}
+            <motion.button
+              whileHover={{
+                scale: 0.99,
+                backgroundColor: "var(--color-primary-50)",
+              }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                handleHighlightRow(contextMenu.product.id);
+                setContextMenu(null);
+              }}
+              className="w-[calc(100%-1rem)] mx-2 my-0.5 px-3 py-2 rounded-xl text-left text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-600 flex items-center gap-2 transition-all group"
+            >
+              <Search
+                size={14}
+                className="text-slate-400 group-hover:text-primary-500"
+              />{" "}
+              {t("locateRow", "定位并高亮对应行")}
+            </motion.button>
             <div className="my-1 border-t border-slate-100/50 dark:border-slate-800/50 mx-2" />
             <motion.button
               whileHover={{
@@ -444,6 +500,42 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
                 className="text-indigo-400 group-hover:text-indigo-500"
               />{" "}
               {t("smartAnalysis", "Smart Analysis")}
+            </motion.button>
+            <motion.button
+              whileHover={{
+                scale: 0.99,
+                backgroundColor: "var(--color-primary-50)",
+              }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                onUpdate(contextMenu.product);
+                setContextMenu(null);
+              }}
+              className="w-[calc(100%-1rem)] mx-2 my-0.5 px-3 py-2 rounded-xl text-left text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-600 flex items-center gap-2 transition-all group"
+            >
+              <Edit
+                size={14}
+                className="text-slate-400 group-hover:text-primary-500"
+              />{" "}
+              {t("edit", "Edit Record")}
+            </motion.button>
+            <motion.button
+              whileHover={{
+                scale: 0.99,
+                backgroundColor: "rgba(225, 29, 72, 0.1)",
+              }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => {
+                onDelete([contextMenu.product.id]);
+                setContextMenu(null);
+              }}
+              className="w-[calc(100%-1rem)] mx-2 mt-0.5 mb-1 px-3 py-2 rounded-xl text-left text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 flex items-center gap-2 transition-all group"
+            >
+              <Trash2
+                size={14}
+                className="text-rose-400 group-hover:text-rose-500"
+              />{" "}
+              {t("delete", "Delete")}
             </motion.button>
             <motion.button
               whileHover={{
@@ -693,7 +785,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
             >
               <div className="flex items-center gap-1 text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest shrink-0">
                 <Filter size={12} /> {activeFilters.length}{" "}
-                <span className="hidden sm:inline">Active Filters</span>
+                <span className="hidden sm:inline">{language === "en" ? "Active Filters" : "已激活过滤器"}</span>
               </div>
               <div className="h-4 w-px bg-slate-200 dark:bg-slate-800 shrink-0 mx-0.5 md:mx-1"></div>
 
@@ -742,7 +834,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
                   onClick={onClearFilters}
                   className="ml-auto text-[9px] md:text-[10px] font-bold text-slate-400 hover:text-rose-500 hover:underline transition-colors whitespace-nowrap px-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50 rounded-md shrink-0"
                 >
-                  Clear All
+                  {language === "en" ? "Clear All" : "清除所有"}
                 </motion.button>
               )}
             </motion.div>
@@ -802,7 +894,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
                   onClick={(e) => setSortConfig("completeness", e.shiftKey)}
                 >
                   <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="truncate">Score</span>
+                    <span className="truncate">{language === "en" ? "Score" : "完整性得分"}</span>
                     {sortConfig.find((s) => s.key === "completeness") && (
                       <div className="flex items-center gap-0.5">
                         <span className="text-primary-500">
@@ -978,6 +1070,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
                     const score = calculateCompleteness(p);
                     const isFocused = actualIndex === focusedIndex;
                     const isSelected = selectedIds.has(p.id);
+                    const isHighlighted = highlightedRowId === p.id;
                     return (
                       <DataGridRow
                         key={virtualRow.key}
@@ -988,6 +1081,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
                         isCompact={isCompact}
                         isSelected={isSelected}
                         isFocused={isFocused}
+                        isHighlighted={isHighlighted}
                         score={score}
                         columnExtremes={columnExtremes}
                         toggleSelection={toggleSelection}

@@ -35,7 +35,7 @@ export class FormulaEngine {
       },
     );
 
-    sanitized = sanitized.replace(/[;| &<>{} `$]/g, (match) => {
+    sanitized = sanitized.replace(/[;<>{} `$]/g, (match) => {
       return match === " " ? " " : "";
     });
 

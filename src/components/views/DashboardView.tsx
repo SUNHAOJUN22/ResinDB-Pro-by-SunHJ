@@ -7,6 +7,8 @@ import { DashboardStats } from '@/components/features/Dashboard/DashboardStats';
 import { ControlToolbar } from '@/components/ui/ControlToolbar';
 import { SystemAlert } from '@/components/ui/SystemAlert';
 import { MarketTrendsSection } from '@/components/features/Dashboard/MarketTrendsSection';
+import { ChemicalSimilaritySearch } from '@/components/features/Dashboard/ChemicalSimilaritySearch';
+import { BulkValidation } from '@/components/features/Dashboard/BulkValidation';
 
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -76,15 +78,23 @@ export const DashboardView = React.memo(() => {
     clearFilters,
     moveColumn,
     activeFilters,
+    formulas,
   } = useData();
-  const { setViewingProduct } = useModals();
+  const { setViewingProduct, openModal } = useModals();
 
   const [layoutOrder, setLayoutOrder] = useState<string[]>(() => {
-    const saved = localStorage.getItem("resindb-dashboard-layout");
+    let saved = null;
+    try {
+      saved = localStorage.getItem("resindb-dashboard-layout");
+    } catch {
+      // Ignore
+    }
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length === 3) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter(key => key !== "similarity" && key !== "validation");
+        }
       } catch {
         // ignore JSON parse error
       }
@@ -94,7 +104,11 @@ export const DashboardView = React.memo(() => {
 
   const handleReorder = (newOrder: string[]) => {
     setLayoutOrder(newOrder);
-    localStorage.setItem("resindb-dashboard-layout", JSON.stringify(newOrder));
+    try {
+      localStorage.setItem("resindb-dashboard-layout", JSON.stringify(newOrder));
+    } catch {
+      // Ignore
+    }
   };
 
   const renderLayoutItem = (key: string) => {
@@ -116,6 +130,22 @@ export const DashboardView = React.memo(() => {
             <MarketTrendsSection products={allProducts} t={t} />
           </DraggableSection>
         ) : null;
+      case "validation":
+        return (
+          <DraggableSection key="validation" itemKey="validation" className="w-full relative group">
+            <BulkValidation 
+              allProducts={allProducts} 
+              formulas={formulas} 
+              onViewProduct={setViewingProduct} 
+            />
+          </DraggableSection>
+        );
+      case "similarity":
+        return (
+          <DraggableSection key="similarity" itemKey="similarity" className="w-full relative group">
+            <ChemicalSimilaritySearch allProducts={allProducts} onViewProduct={setViewingProduct} />
+          </DraggableSection>
+        );
       case "grid":
         return (
           <DraggableSection 
@@ -157,7 +187,7 @@ export const DashboardView = React.memo(() => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="absolute inset-0 flex flex-col gap-5 lg:gap-6 p-4 md:p-6 lg:p-8 pl-8 md:pl-10 overflow-x-hidden overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50"
+      className="absolute inset-0 flex flex-col gap-3.5 md:gap-4.5 p-3 md:p-4 lg:p-5 pl-7 md:pl-9 overflow-x-hidden overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50"
     >
       <AnimatePresence mode="popLayout">
         {showWelcome && currentUser && (
@@ -172,7 +202,11 @@ export const DashboardView = React.memo(() => {
               userName={currentUser.name}
               onDismiss={() => {
                 setShowWelcome(false);
-                localStorage.setItem("resindb-welcome-dismissed", "true");
+                try {
+                  localStorage.setItem("resindb-welcome-dismissed", "true");
+                } catch {
+                  // Ignore
+                }
               }}
             />
           </motion.div>
@@ -192,6 +226,7 @@ export const DashboardView = React.memo(() => {
         handleRefreshStats={refreshData}
         showSummary={showSummary}
         setShowSummary={setShowSummary}
+        onOpenDatabaseSync={() => openModal("databaseSync")}
         t={t}
       />
 
@@ -199,7 +234,7 @@ export const DashboardView = React.memo(() => {
         axis="y" 
         values={layoutOrder} 
         onReorder={handleReorder} 
-        className="flex-1 flex flex-col gap-5 lg:gap-6 min-h-0"
+        className="flex-1 flex flex-col gap-3.5 md:gap-4.5 min-h-0"
       >
         {layoutOrder.map((key) => renderLayoutItem(key))}
       </Reorder.Group>

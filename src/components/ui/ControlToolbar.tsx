@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "motion/react";
-import { Search, RefreshCw, Layers, X } from "lucide-react";
+import { Search, RefreshCw, Layers, X, Database } from "lucide-react";
 import { Breadcrumbs } from '@/components/features/Dashboard/DashboardComponents';
 
 interface ControlToolbarProps {
@@ -10,6 +10,7 @@ interface ControlToolbarProps {
   handleRefreshStats: () => void;
   showSummary: boolean;
   setShowSummary: (val: boolean) => void;
+  onOpenDatabaseSync: () => void;
   t: (key: string, fallback?: string) => string;
 }
 
@@ -21,6 +22,7 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = React.memo(
     handleRefreshStats,
     showSummary,
     setShowSummary,
+    onOpenDatabaseSync,
     t,
   }) => {
     // Local state for debouncing
@@ -31,11 +33,18 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = React.memo(
       setLocalQuery(searchQuery);
     }, [searchQuery]);
 
-    // Send updates immediately to parent; parent handles its own debounce/deferred value
+    // Use effect for debouncing local state changes up to parent
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        if (localQuery !== searchQuery) {
+          setSearchQuery(localQuery);
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }, [localQuery, setSearchQuery, searchQuery]);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = e.target.value;
-      setLocalQuery(val);
-      setSearchQuery(val);
+      setLocalQuery(e.target.value);
     };
 
     const handleClearSearch = useCallback(() => {
@@ -122,6 +131,18 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = React.memo(
                   : "transition-transform duration-200"
               }
             />
+          </motion.button>
+          <motion.button
+            whileHover={{
+              scale: 1.05,
+              backgroundColor: "rgba(16, 185, 129, 0.1)",
+            }}
+            whileTap={{ scale: 0.95 }}
+            onClick={onOpenDatabaseSync}
+            className="flex items-center text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-all uppercase tracking-wider px-2 py-1 bg-emerald-50/50 dark:bg-emerald-900/20 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-md border border-emerald-100/50 dark:border-emerald-800/30 shadow-sm"
+          >
+            <Database size={14} className="mr-1.5" />
+            {t("dbSync", "数据库验证 / 溯源")}
           </motion.button>
           <motion.button
             whileHover={{

@@ -5,6 +5,7 @@ import React, {
   Suspense,
   lazy,
   memo,
+  useEffect,
 } from "react";
 
 // --- ResizeObserver Error Suppression ---
@@ -57,9 +58,7 @@ const FilterPanel = lazy(() =>
 const ImportModal = lazy(() =>
   import("@/components/modals/ImportModal").then((m) => ({ default: m.ImportModal })),
 );
-const ProfileModal = lazy(() =>
-  import("@/components/modals/ProfileModal").then((m) => ({ default: m.ProfileModal })),
-);
+import { ProfileModal } from "@/components/modals/ProfileModal";
 const AdminModal = lazy(() =>
   import("@/components/modals/AdminModal").then((m) => ({ default: m.AdminModal })),
 );
@@ -72,8 +71,15 @@ const ComparisonView = lazy(() =>
 const PivotView = lazy(() =>
   import("@/components/views/PivotView").then((m) => ({ default: m.PivotView })),
 );
+const DependencyMapD3 = lazy(() => import("@/components/charts/DependencyMapD3"));
 const BatchEditModal = lazy(() =>
   import("@/components/modals/BatchEditModal").then((m) => ({ default: m.BatchEditModal })),
+);
+const BulkTaggingModal = lazy(() =>
+  import("@/components/modals/BulkTaggingModal").then((m) => ({ default: m.BulkTaggingModal })),
+);
+const BulkReorderModal = lazy(() =>
+  import("@/components/modals/BulkReorderModal").then((m) => ({ default: m.BulkReorderModal })),
 );
 const SystemHealthModal = lazy(() =>
   import("@/components/modals/SystemHealthModal").then((m) => ({ default: m.SystemHealthModal })),
@@ -99,15 +105,24 @@ const FormulaEditorModal = lazy(() =>
 const HistoryDrawer = lazy(() =>
   import("@/components/features/Navigation/HistoryDrawer").then((m) => ({ default: m.HistoryDrawer }))
 );
+const DatabaseSyncModal = lazy(() =>
+  import("@/components/modals/DatabaseSyncModal").then((m) => ({ default: m.DatabaseSyncModal }))
+);
+const QaReportModal = lazy(() =>
+  import("@/components/modals/QaReportModal").then((m) => ({ default: m.QaReportModal }))
+);
+const DataQualityAuditModal = lazy(() =>
+  import("@/components/modals/DataQualityAuditModal").then((m) => ({ default: m.DataQualityAuditModal }))
+);
+const SmartExportModal = lazy(() =>
+  import("@/components/modals/SmartExportModal").then((m) => ({ default: m.SmartExportModal }))
+);
 
 import { Loader2 } from "lucide-react";
 
-const DashboardView = lazy(() =>
-  import("@/components/views/DashboardView").then((m) => ({ default: m.DashboardView })),
-);
-const AnalyticsView = lazy(() =>
-  import("@/components/views/AnalyticsView").then((m) => ({ default: m.AnalyticsView })),
-);
+import { DashboardView } from "@/components/views/DashboardView";
+import { AnalyticsView } from "@/components/views/AnalyticsView";
+import { BetaSandboxView } from "@/components/views/BetaSandboxView";
 
 import { ToastProvider } from "@/contexts/ToastContext";
 import { ModalProvider } from "@/contexts/ModalContext";
@@ -130,12 +145,13 @@ const MemoizedTopBar = memo(TopBar);
 const MemoizedTreeSidebar = memo(TreeSidebar);
 const MemoizedDashboardView = memo(DashboardView);
 const MemoizedAnalyticsView = memo(AnalyticsView);
+const MemoizedBetaSandboxView = memo(BetaSandboxView);
 
 const AppContent = memo(() => {
   const { t } = useLanguage();
   const { toggleTheme } = useTheme();
   const { currentUser, login, updateUserProfile } = useAuth();
-  const { toasts, removeToast } = useToasts();
+  const { toasts, removeToast, addToast } = useToasts();
   const {
     activeView,
     setActiveView,
@@ -166,6 +182,8 @@ const AppContent = memo(() => {
     handleUpdate,
     handleCreate,
     handleBatchUpdate,
+    handleBatchTagging,
+    handleBatchReorder,
     handleImportData,
     minCompleteness,
     setMinCompleteness,
@@ -173,9 +191,12 @@ const AppContent = memo(() => {
     addFormula,
     updateFormula,
     removeFormula,
+    history,
+    restoreSnapshot,
   } = useData();
 
   const {
+    openModals,
     viewingProduct,
     analyzingProduct,
     openModal,
@@ -186,9 +207,13 @@ const AppContent = memo(() => {
     isModalOpen,
   } = useModals();
 
-  const [showTour, setShowTour] = useState(
-    () => !localStorage.getItem("resindb-tour-completed"),
-  );
+  const [showTour, setShowTour] = useState(() => {
+    try {
+      return !localStorage.getItem("resindb-tour-completed");
+    } catch {
+      return false;
+    }
+  });
   const [lastSyncTime] = useState<string>(new Date().toLocaleTimeString());
   const [showAppMenu, setShowAppMenu] = useState(false);
 
@@ -219,7 +244,7 @@ const AppContent = memo(() => {
   };
 
   // Re-use some hooks from original implementation
-  const { isExporting, handleExport } = useExportData(filteredData, () => {}, t);
+  const { isExporting, handleExport } = useExportData(filteredData, addToast, t);
 
   const handleExportPdf = useCallback(async () => {
       
@@ -239,6 +264,26 @@ const AppContent = memo(() => {
     selectedIds,
     handleExport,
   });
+
+  // --- Centralized Scroll Lock for Modals & Overlays ---
+  useEffect(() => {
+    const isAnyModalOpen =
+      (openModals && openModals.size > 0) ||
+      viewingProduct !== null ||
+      analyzingProduct !== null ||
+      showFilters ||
+      isHistoryOpen;
+
+    if (isAnyModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [openModals, viewingProduct, analyzingProduct, showFilters, isHistoryOpen]);
 
   const toggleCategory = useCallback(
     (id: string) => {
@@ -305,8 +350,6 @@ const AppContent = memo(() => {
         <div className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden bg-slate-50 dark:bg-slate-950">
           <div className="shrink-0 z-[60] relative print:hidden">
             <MemoizedTopBar
-              onExport={handleExport}
-              onExportPdf={handleExportPdf}
               isExporting={isExporting}
               savedViews={savedViews}
               onSaveView={saveView}
@@ -419,6 +462,38 @@ const AppContent = memo(() => {
                     <PivotView data={filteredData} columns={columns} formulas={formulas} />
                   </Suspense>
                 </motion.div>
+
+                <motion.div
+                  initial={false}
+                  animate={{ opacity: activeView === "dependencies" ? 1 : 0, zIndex: activeView === "dependencies" ? 10 : 0 }}
+                  className={`absolute inset-0 ${activeView === "dependencies" ? "pointer-events-auto" : "pointer-events-none"}`}
+                >
+                  <Suspense
+                    fallback={
+                      <div className="absolute inset-0 flex items-center justify-center bg-slate-50/50 dark:bg-slate-950/50">
+                        <Loader2 className="w-10 h-10 text-primary-500 animate-spin" />
+                      </div>
+                    }
+                  >
+                    <DependencyMapD3 />
+                  </Suspense>
+                </motion.div>
+
+                <motion.div
+                  initial={false}
+                  animate={{ opacity: activeView === "beta-sandbox" ? 1 : 0, zIndex: activeView === "beta-sandbox" ? 10 : 0 }}
+                  className={`absolute inset-0 ${activeView === "beta-sandbox" ? "pointer-events-auto" : "pointer-events-none"}`}
+                >
+                  <Suspense
+                    fallback={
+                      <div className="absolute inset-0 flex items-center justify-center bg-slate-50/50 dark:bg-slate-950/50">
+                        <Loader2 className="w-10 h-10 text-primary-500 animate-spin" />
+                      </div>
+                    }
+                  >
+                    <MemoizedBetaSandboxView />
+                  </Suspense>
+                </motion.div>
               </div>
             </div>
           </div>
@@ -435,9 +510,19 @@ const AppContent = memo(() => {
                 setIsBatchEditOpen={(val) =>
                   val ? openModal("batchEdit") : closeModal("batchEdit")
                 }
+                setIsBulkTaggingOpen={(val) =>
+                  val ? openModal("bulkTagging") : closeModal("bulkTagging")
+                }
+                setIsBulkReorderOpen={(val) =>
+                  val ? openModal("bulkReorder") : closeModal("bulkReorder")
+                }
                 handleExport={handleExport}
+                onOpenQaReport={() => openModal("qaReport")}
                 handleDelete={(ids) => handleDelete(ids)}
-                addToast={() => {}} // simplified
+                addToast={addToast}
+                allProducts={allProducts}
+                history={history}
+                restoreSnapshot={restoreSnapshot}
               />
             )}
           </AnimatePresence>
@@ -454,6 +539,7 @@ const AppContent = memo(() => {
         <ImportModal
           isOpen={isModalOpen("import")}
           onClose={() => closeModal("import")}
+          allProducts={allProducts}
           onImport={(data) => {
             handleImportData(data);
             closeModal("import");
@@ -515,21 +601,48 @@ const AppContent = memo(() => {
           isOpen={isModalOpen("addProduct")}
           onClose={() => closeModal("addProduct")}
           onSave={handleCreate}
+          allProducts={allProducts}
         />
         <SmartAnalysisModal
           isOpen={isModalOpen("smartAnalysis")}
           onClose={() => closeModal("smartAnalysis")}
           product={analyzingProduct}
         />
+        <DatabaseSyncModal
+          isOpen={isModalOpen("databaseSync")}
+          onClose={() => closeModal("databaseSync")}
+        />
+        <DataQualityAuditModal
+          isOpen={isModalOpen("dataQualityAudit")}
+          onClose={() => closeModal("dataQualityAudit")}
+        />
+        <SmartExportModal
+          isOpen={isModalOpen("smartExport")}
+          onClose={() => closeModal("smartExport")}
+          filteredData={filteredData}
+          handleExport={handleExport}
+          handleExportPdf={handleExportPdf}
+        />
+        <QaReportModal
+          isOpen={isModalOpen("qaReport")}
+          onClose={() => closeModal("qaReport")}
+          products={allProducts.filter((p) => selectedIds.has(p.id))}
+        />
         <ComparisonView
           isOpen={isModalOpen("comparison")}
           products={allProducts.filter((p) => selectedIds.has(p.id))}
+          allProducts={allProducts}
           onClose={() => closeModal("comparison")}
           onRemoveProduct={(id) => {
             const next = new Set(selectedIds);
             next.delete(id);
             setSelectedIds(next);
-            if (next.size < 2) closeModal("comparison");
+            if (next.size < 1) closeModal("comparison");
+          }}
+          onAddProduct={(id) => {
+            const next = new Set(selectedIds);
+            next.add(id);
+            setSelectedIds(next);
           }}
         />
         <AnimatePresence mode="popLayout">
@@ -566,6 +679,18 @@ const AppContent = memo(() => {
           isOpen={isModalOpen("batchEdit")}
           onClose={() => closeModal("batchEdit")}
           onSave={handleBatchUpdate}
+          selectedProducts={allProducts.filter((p) => selectedIds.has(p.id))}
+        />
+        <BulkTaggingModal
+          isOpen={isModalOpen("bulkTagging")}
+          onClose={() => closeModal("bulkTagging")}
+          onSave={handleBatchTagging}
+          selectedProducts={allProducts.filter((p) => selectedIds.has(p.id))}
+        />
+        <BulkReorderModal
+          isOpen={isModalOpen("bulkReorder")}
+          onClose={() => closeModal("bulkReorder")}
+          onSave={handleBatchReorder}
           selectedProducts={allProducts.filter((p) => selectedIds.has(p.id))}
         />
         <FormulaEditorModal

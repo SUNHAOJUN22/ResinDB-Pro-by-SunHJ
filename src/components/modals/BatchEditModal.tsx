@@ -26,6 +26,10 @@ export const BatchEditModal: React.FC<BatchEditModalProps> = ({
 }) => {
   const { t, tProp } = useLanguage();
 
+  const LOCAL_STORAGE_KEY = 'resindb_batch_edit_draft';
+  const dirtyRef = React.useRef(false);
+  const initializedIdsRef = React.useRef<string | null>(null);
+
   // Track which fields are enabled for bulk update
   const [enabledFields, setEnabledFields] = useState<Record<string, boolean>>({
     manufacturer: false,
@@ -37,32 +41,78 @@ export const BatchEditModal: React.FC<BatchEditModalProps> = ({
   >({});
 
   useEffect(() => {
+    if (!isOpen) {
+      initializedIdsRef.current = null;
+      return;
+    }
+
     if (isOpen && selectedProducts.length > 0) {
-      const first = selectedProducts[0];
-      setManufacturer(first.manufacturer);
+      const currentIds = selectedProducts.map(p => p.id).sort().join(',');
+      
+      if (initializedIdsRef.current === currentIds) {
+        return; // Prevent re-initialization if parent re-renders with the same product IDs
+      }
+      
+      dirtyRef.current = false;
+      initializedIdsRef.current = currentIds;
+      
+      const draftStr = localStorage.getItem(LOCAL_STORAGE_KEY);
+      
+      let restored = false;
+      if (draftStr) {
+        try {
+          const draft = JSON.parse(draftStr);
+          if (draft.productIds === currentIds) {
+            setManufacturer(draft.manufacturer);
+            setProperties(draft.properties);
+            setEnabledFields(draft.enabledFields);
+            restored = true;
+          }
+        } catch (e) {
+          console.error("Failed to parse batch edit draft", e);
+        }
+      }
 
-      // Initialize properties from all unique keys across selected products
-      const allPropKeys = new Set<string>();
-      selectedProducts.forEach((p) => {
-        Object.keys(p.properties).forEach((k) => allPropKeys.add(k));
-      });
+      if (!restored) {
+        const first = selectedProducts[0];
+        setManufacturer(first.manufacturer);
 
-      const initialProps: Record<
-        string,
-        { value: string; unit: string; enabled: boolean }
-      > = {};
-      allPropKeys.forEach((key) => {
-        const p = first.properties[key] as PropertyValue | undefined;
-        initialProps[key] = {
-          value: p ? String(p.value) : "",
-          unit: p?.unit || "",
-          enabled: false,
-        };
-      });
-      setProperties(initialProps);
-      setEnabledFields({ manufacturer: false });
+        // Initialize properties from all unique keys across selected products
+        const allPropKeys = new Set<string>();
+        selectedProducts.forEach((p) => {
+          Object.keys(p.properties).forEach((k) => allPropKeys.add(k));
+        });
+
+        const initialProps: Record<
+          string,
+          { value: string; unit: string; enabled: boolean }
+        > = {};
+        allPropKeys.forEach((key) => {
+          const p = first.properties[key] as PropertyValue | undefined;
+          initialProps[key] = {
+            value: p ? String(p.value) : "",
+            unit: p?.unit || "",
+            enabled: false,
+          };
+        });
+        setProperties(initialProps);
+        setEnabledFields({ manufacturer: false });
+      }
     }
   }, [isOpen, selectedProducts]);
+
+  useEffect(() => {
+    if (isOpen && dirtyRef.current && selectedProducts.length > 0) {
+      const currentIds = selectedProducts.map(p => p.id).sort().join(',');
+      const draft = {
+        productIds: currentIds,
+        manufacturer,
+        properties,
+        enabledFields
+      };
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(draft));
+    }
+  }, [manufacturer, properties, enabledFields, isOpen, selectedProducts]);
 
   const handleSave = () => {
     const updates: Partial<Product> = {};
@@ -96,14 +146,19 @@ export const BatchEditModal: React.FC<BatchEditModalProps> = ({
       selectedProducts.map((p) => p.id),
       updatesPayload,
     );
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
     onClose();
   };
 
+  const setDirty = () => { dirtyRef.current = true; };
+
   const toggleField = (field: string) => {
+    setDirty();
     setEnabledFields((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
   const toggleProp = (key: string) => {
+    setDirty();
     setProperties((prev) => ({
       ...prev,
       [key]: { ...prev[key], enabled: !prev[key].enabled },
@@ -111,6 +166,7 @@ export const BatchEditModal: React.FC<BatchEditModalProps> = ({
   };
 
   const updateProp = (key: string, field: "value" | "unit", val: string) => {
+    setDirty();
     setProperties((prev) => ({
       ...prev,
       [key]: { ...prev[key], [field]: val, enabled: true }, // Auto-enable on edit
@@ -213,6 +269,7 @@ export const BatchEditModal: React.FC<BatchEditModalProps> = ({
                       boxShadow: "0 0 0 4px rgba(79, 70, 229, 0.1)",
                     }}
                     onChange={(e) => {
+                      setDirty();
                       setManufacturer(e.target.value);
                       if (!enabledFields.manufacturer)
                         toggleField("manufacturer");

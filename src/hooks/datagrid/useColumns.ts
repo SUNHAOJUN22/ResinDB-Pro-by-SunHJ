@@ -57,8 +57,14 @@ export function useColumns(allProducts: Product[]) {
       isInitialized.current = true;
       let baseCols = [...getDynamicColumns(allProducts), ...computedColumns];
       
-      const savedVisibility = localStorage.getItem('resindb-visible-columns-v2');
-      const savedOrder = localStorage.getItem('resindb-column-order');
+      let savedVisibility = null;
+      let savedOrder = null;
+      try {
+        savedVisibility = localStorage.getItem('resindb-visible-columns-v2');
+        savedOrder = localStorage.getItem('resindb-column-order');
+      } catch {
+        // Ignore
+      }
 
       // Apply visibility
       if (savedVisibility) {
@@ -103,10 +109,13 @@ export function useColumns(allProducts: Product[]) {
   useEffect(() => {
     if (columns.length > 0) {
       const visibleKeys = columns.filter(c => c.visible).map(c => c.key);
-      localStorage.setItem('resindb-visible-columns-v2', JSON.stringify(visibleKeys));
-      
       const orderKeys = columns.map(c => c.key);
-      localStorage.setItem('resindb-column-order', JSON.stringify(orderKeys));
+      try {
+        localStorage.setItem('resindb-visible-columns-v2', JSON.stringify(visibleKeys));
+        localStorage.setItem('resindb-column-order', JSON.stringify(orderKeys));
+      } catch {
+        // Ignore security error inside sandboxed iframe
+      }
     }
   }, [columns]);
 

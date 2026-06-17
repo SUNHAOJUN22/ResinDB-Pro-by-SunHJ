@@ -1,5 +1,5 @@
 import { logger } from '@/lib/logger';
-import React, { useRef } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   X,
@@ -11,6 +11,7 @@ import {
   Download,
   Upload,
 } from "lucide-react";
+import { useData } from "@/contexts/DataContext";
 
 interface SystemHealthModalProps {
   isOpen: boolean;
@@ -28,6 +29,30 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({
   addToast,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { refreshData, isRefreshing, syncEvents } = useData();
+  const [syncProgress, setSyncProgress] = useState(0);
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (isRefreshing) {
+      setSyncProgress(0);
+      interval = setInterval(() => {
+        setSyncProgress(prev => {
+          if (prev >= 95) return prev;
+          return prev + Math.random() * 10;
+        });
+      }, 500);
+    } else {
+      setSyncProgress(prev => {
+        if (prev > 0) {
+          setTimeout(() => setSyncProgress(0), 1000);
+          return 100;
+        }
+        return prev;
+      });
+    }
+    return () => clearInterval(interval);
+  }, [isRefreshing]);
 
   const handleExportConfig = () => {
     const configKeys = [
@@ -212,25 +237,102 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="p-4 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex items-center gap-4 relative overflow-hidden"
+                className={`p-4 ${isRefreshing ? 'bg-primary-50 dark:bg-primary-900/10 border-primary-200 dark:border-primary-800' : 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800'} border rounded-2xl flex flex-col gap-3 relative overflow-hidden transition-colors`}
               >
-                <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent dark:via-emerald-500/5 animate-shimmer" />
-                <div className="relative">
-                  <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+                {!isRefreshing && <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent dark:via-emerald-500/5 animate-shimmer" />}
+                
+                <div className="flex items-center gap-4 relative z-10 w-full">
+                  <div className="relative">
+                    <div className={`w-3 h-3 ${isRefreshing ? 'bg-primary-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]'} rounded-full animate-pulse`}></div>
+                  </div>
+                  <div className="flex-1">
+                    <p className={`text-xs font-mono font-bold ${isRefreshing ? 'text-primary-900 dark:text-primary-300' : 'text-emerald-900 dark:text-emerald-300'} tracking-tight`}>
+                      {isRefreshing ? '系统数据同步中...' : '所有系统运行正常'}
+                    </p>
+                    <p className={`text-[9px] ${isRefreshing ? 'text-primary-600 dark:text-primary-500' : 'text-emerald-600 dark:text-emerald-500'} font-mono uppercase tracking-widest mt-1`}>
+                      延迟: 24ms | 吞吐量: 1.2GB/s
+                    </p>
+                  </div>
+                  <button
+                    onClick={refreshData}
+                    disabled={isRefreshing}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold tracking-widest uppercase transition-all ${
+                      isRefreshing
+                        ? 'bg-primary-100 text-primary-500 dark:bg-primary-900/30 dark:text-primary-400 cursor-not-allowed'
+                        : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 cursor-pointer shadow-sm'
+                    }`}
+                  >
+                    <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
+                    {isRefreshing ? 'Syncing...' : 'Sync Now'}
+                  </button>
                 </div>
-                <div className="flex-1 relative z-10">
-                  <p className="text-xs font-mono font-bold text-emerald-900 dark:text-emerald-300 tracking-tight">
-                    所有系统运行正常
-                  </p>
-                  <p className="text-[9px] text-emerald-600 dark:text-emerald-500 font-mono uppercase tracking-widest mt-1">
-                    延迟: 24ms | 吞吐量: 1.2GB/s
-                  </p>
-                </div>
-                <RefreshCw
-                  size={16}
-                  className="text-emerald-400 animate-spin-slow relative z-10"
-                />
+
+                {/* Progress Bar Container */}
+                <AnimatePresence>
+                  {(isRefreshing || syncProgress > 0) && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                      animate={{ height: 'auto', opacity: 1, marginTop: 4 }}
+                      exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                      className="w-full relative z-10"
+                    >
+                       <div className="flex items-center justify-between text-[10px] font-mono text-primary-600 dark:text-primary-400 mb-1.5 font-bold uppercase tracking-widest">
+                         <span>Database Synchronization Base Node</span>
+                         <span>{Math.round(syncProgress)}%</span>
+                       </div>
+                       <div className="h-1.5 w-full bg-primary-200 dark:bg-primary-900/40 rounded-full overflow-hidden shrink-0">
+                         <motion.div 
+                           className="h-full bg-primary-500" 
+                           animate={{ width: `${syncProgress}%` }}
+                           transition={{ ease: "easeInOut" }}
+                         />
+                       </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
+
+              {/* Recent Sync Events */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <h4 className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                    <Activity size={12} />
+                    最近同步日志
+                  </h4>
+                  <span className="text-[9px] font-mono text-slate-400">
+                    {syncEvents.length} events
+                  </span>
+                </div>
+                <div className="p-1 max-h-48 overflow-y-auto custom-scrollbar space-y-2 pr-2">
+                  {syncEvents.length === 0 ? (
+                    <div className="text-center p-4 text-[10px] font-mono text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                      暂无同步日志 (No recent events)
+                    </div>
+                  ) : (
+                    syncEvents.map((event) => (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        key={event.id}
+                        className="flex items-start gap-3 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl"
+                      >
+                        <div className={`mt-0.5 w-1.5 h-1.5 rounded-full ${event.status === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-[11px] font-mono leading-relaxed truncate ${event.status === 'success' ? 'text-slate-700 dark:text-slate-300' : 'text-rose-600 dark:text-rose-400'}`}>
+                            {event.message}
+                          </p>
+                          <p className="text-[9px] font-mono text-slate-400 mt-1">
+                            {new Date(event.timestamp).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className={`text-[9px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-md ${event.status === 'success' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400'}`}>
+                          {event.status}
+                        </div>
+                      </motion.div>
+                    ))
+                  )}
+                </div>
+              </div>
 
               <div className="space-y-6">
                 <motion.div

@@ -1,5 +1,5 @@
 import { logger } from '@/lib/logger';
-import React, { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   X,
   Save,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Product, PropertyValue } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useToasts } from "@/contexts/ToastContext";
 import { motion, AnimatePresence } from "motion/react";
 import { aiService } from "@/services/aiService";
 
@@ -22,6 +23,7 @@ interface AddProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (product: Partial<Product>) => Promise<void> | void;
+  allProducts: Product[];
 }
 
 interface PropertyRow {
@@ -41,8 +43,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = React.memo(({
   isOpen,
   onClose,
   onSave,
+  allProducts = [],
 }) => {
   const { t } = useLanguage();
+  const { addToast } = useToasts();
   const [formData, setFormData] = useState<Partial<Product>>({
     gradeName: "",
     manufacturer: "",
@@ -51,6 +55,63 @@ export const AddProductModal: React.FC<AddProductModalProps> = React.memo(({
   const [propertyRows, setPropertyRows] = useState<PropertyRow[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
+  const [activeInputId, setActiveInputId] = useState<string | null>(null);
+
+  const keySuggestions = useMemo(() => {
+    const keys = new Set<string>();
+    allProducts.forEach(p => {
+      Object.keys(p.properties).forEach(k => keys.add(k));
+    });
+    return Array.from(keys).sort();
+  }, [allProducts]);
+
+  const getPropertySuggestions = useCallback((key: string) => {
+    if (!key.trim()) return null;
+    const valueCounts: Record<string, number> = {};
+    let min: number | null = null;
+    let max: number | null = null;
+    const unitCounts: Record<string, number> = {};
+
+    allProducts.forEach(p => {
+      const matchKey = Object.keys(p.properties).find(k => k.toLowerCase() === key.toLowerCase());
+      if (matchKey) {
+        const prop = p.properties[matchKey];
+        if (prop.value !== undefined && prop.value !== null && prop.value !== "") {
+          const strVal = String(prop.value);
+          valueCounts[strVal] = (valueCounts[strVal] || 0) + 1;
+          
+          if (!isNaN(Number(prop.value))) {
+            const num = Number(prop.value);
+            if (min === null || num < min) min = num;
+            if (max === null || num > max) max = num;
+          }
+        }
+        if (prop.unit) {
+          unitCounts[prop.unit] = (unitCounts[prop.unit] || 0) + 1;
+        }
+      }
+    });
+
+    let mostCommonUnit = "";
+    let maxUnitCount = 0;
+    for (const [u, c] of Object.entries(unitCounts)) {
+       if (c > maxUnitCount) {
+         maxUnitCount = c;
+         mostCommonUnit = u;
+       }
+    }
+
+    const sortedValues = Object.entries(valueCounts).sort((a, b) => b[1] - a[1]).map(e => e[0]).slice(0, 5);
+
+    if (sortedValues.length === 0 && min === null) return null;
+
+    return {
+      values: sortedValues,
+      min,
+      max,
+      unit: mostCommonUnit
+    };
+  }, [allProducts]);
 
   const handleAiFill = async () => {
     if (!formData.gradeName || isAiGenerating) return;
@@ -60,6 +121,28 @@ export const AddProductModal: React.FC<AddProductModalProps> = React.memo(({
         formData.gradeName,
         formData.manufacturer || ""
       );
+
+      // Verify that there are valid properties
+      let validCount = 0;
+      if (generated && typeof generated === "object") {
+        Object.values(generated).forEach((val: any) => {
+          if (
+            val && 
+            val.value !== undefined && 
+            val.value !== null && 
+            String(val.value).trim() !== "" && 
+            !["unknown", "n/a", "none", "null", "-", "未检测", "暂无", "无"].includes(String(val.value).toLowerCase().trim())
+          ) {
+            validCount++;
+          }
+        });
+      }
+
+      if (validCount < 2) {
+        addToast("error", "该材料牌号在专业数据库未检出具体详细的数据物性指标（至少包含两项基本物性），该条数据已被自动丢弃删除！");
+        setIsAiGenerating(false);
+        return;
+      }
 
       const newRows: PropertyRow[] = Object.entries(generated).map(([key, val]) => ({
         id: `ai-${Date.now()}-${key}`,
@@ -75,8 +158,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = React.memo(({
       }));
 
       setPropertyRows(prev => [...newRows, ...prev]);
+      addToast("success", "已成功从专业库抓取并自动同步详细物理性能参数！");
     } catch (error) {
       logger.error("AI Generation failed:", error);
+      addToast("error", "获取物性性能参数失败，该无效牌号记录已被自动撤销并丢弃！");
     } finally {
       setIsAiGenerating(false);
     }
@@ -327,24 +412,95 @@ export const AddProductModal: React.FC<AddProductModalProps> = React.memo(({
                       >
                         <div className="flex items-center gap-3 p-3">
                           <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <motion.input
-                              type="text"
-                              placeholder={t("propertyName")}
-                              value={row.key || ""}
-                              onChange={(e) =>
-                                updateRow(row.id, "key", e.target.value)
-                              }
-                              className="px-2 py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-[10px] font-mono font-bold text-slate-800 dark:text-white rounded-lg"
-                            />
-                            <motion.input
-                              type="text"
-                              placeholder={t("propertyValue")}
-                              value={row.value || ""}
-                              onChange={(e) =>
-                                updateRow(row.id, "value", e.target.value)
-                              }
-                              className="px-2 py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-[10px] font-mono font-bold text-primary-600 dark:text-primary-400 rounded-lg"
-                            />
+                            <div className="relative">
+                              <motion.input
+                                type="text"
+                                placeholder={t("propertyName")}
+                                value={row.key || ""}
+                                onFocus={() => setActiveInputId(`${row.id}-key`)}
+                                onBlur={() => setTimeout(() => setActiveInputId(null), 200)}
+                                onChange={(e) =>
+                                  updateRow(row.id, "key", e.target.value)
+                                }
+                                className="w-full px-2 py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-[10px] font-mono font-bold text-slate-800 dark:text-white rounded-lg"
+                              />
+                              <AnimatePresence>
+                                {activeInputId === `${row.id}-key` && keySuggestions.length > 0 && (
+                                  <motion.div
+                                    initial={{ opacity: 0, y: -5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -5 }}
+                                    className="absolute left-0 top-full mt-1 w-full max-h-32 overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-50 py-1"
+                                  >
+                                    {keySuggestions.filter(k => k.toLowerCase().includes(row.key.toLowerCase())).length === 0 ? (
+                                       <div className="px-3 py-1.5 text-[10px] text-slate-400">No suggestions</div>
+                                    ) : (
+                                       keySuggestions.filter(k => k.toLowerCase().includes(row.key.toLowerCase())).slice(0, 15).map(k => (
+                                      <div
+                                        key={k}
+                                        onClick={() => updateRow(row.id, "key", k)}
+                                        className="px-3 py-1.5 text-[10px] font-mono text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
+                                      >
+                                        {k}
+                                      </div>
+                                    )))}
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                            
+                            <div className="relative">
+                              <motion.input
+                                type="text"
+                                placeholder={t("propertyValue")}
+                                value={row.value || ""}
+                                onFocus={() => setActiveInputId(`${row.id}-val`)}
+                                onBlur={() => setTimeout(() => setActiveInputId(null), 200)}
+                                onChange={(e) =>
+                                  updateRow(row.id, "value", e.target.value)
+                                }
+                                className="w-full px-2 py-1.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 text-[10px] font-mono font-bold text-primary-600 dark:text-primary-400 rounded-lg"
+                              />
+                              <AnimatePresence>
+                                {activeInputId === `${row.id}-val` && row.key && (() => {
+                                  const suggestions = getPropertySuggestions(row.key);
+                                  if (!suggestions) return null;
+                                  return (
+                                    <motion.div
+                                      initial={{ opacity: 0, y: -5 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      exit={{ opacity: 0, y: -5 }}
+                                      className="absolute left-0 top-full mt-1 w-full max-h-40 overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-50 py-1 flex flex-col"
+                                    >
+                                      {suggestions.min !== null && suggestions.max !== null && suggestions.min !== suggestions.max && (
+                                        <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-700/50">
+                                          <div className="text-[8px] text-slate-400 uppercase tracking-widest mb-0.5">Historical Range</div>
+                                          <div className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                                            {suggestions.min} {suggestions.unit} - {suggestions.max} {suggestions.unit}
+                                          </div>
+                                        </div>
+                                      )}
+                                      <div className="text-[8px] text-slate-400 uppercase tracking-widest px-3 pt-1.5 pb-0.5">Frequent Values</div>
+                                      {suggestions.values.map(v => (
+                                        <div
+                                          key={v}
+                                          onClick={() => {
+                                            updateRow(row.id, "value", v);
+                                            const unit = suggestions.unit;
+                                            if (unit && !row.unit) updateRow(row.id, "unit", unit);
+                                          }}
+                                          className="px-3 py-1.5 text-[10px] font-mono text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer flex justify-between items-center"
+                                        >
+                                          <span>{v}</span>
+                                          {suggestions.unit && <span className="text-[8px] text-slate-400">{suggestions.unit}</span>}
+                                        </div>
+                                      ))}
+                                    </motion.div>
+                                  );
+                                })()}
+                              </AnimatePresence>
+                            </div>
+
                             <motion.input
                               type="text"
                               placeholder={t("unit")}

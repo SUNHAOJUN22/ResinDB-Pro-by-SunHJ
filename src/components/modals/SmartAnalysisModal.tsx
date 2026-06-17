@@ -26,7 +26,7 @@ export const SmartAnalysisModal: React.FC<SmartAnalysisModalProps> = ({
   onClose,
   product,
 }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [analysis, setAnalysis] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -123,9 +123,9 @@ export const SmartAnalysisModal: React.FC<SmartAnalysisModalProps> = ({
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <h4 className="text-lg font-serif font-bold text-slate-900 dark:text-white">Synthesizing Material Wisdom</h4>
+                    <h4 className="text-lg font-serif font-bold text-slate-900 dark:text-white">{language === "en" ? "Synthesizing Material Wisdom" : "正在提取材料智慧"}</h4>
                     <p className="text-xs font-mono text-slate-500 uppercase tracking-widest max-w-xs leading-relaxed">
-                      Gemini is currently cross-referencing technical specifications with market trends and competitor portfolios...
+                      {language === "en" ? "Gemini is currently cross-referencing technical specifications with market trends and competitor portfolios..." : "Gemini 正在将技术规格参数与市场趋势及竞品数据进行交叉对比与分析..."}
                     </p>
                   </div>
                   <div className="flex gap-1.5">
@@ -160,13 +160,13 @@ export const SmartAnalysisModal: React.FC<SmartAnalysisModalProps> = ({
                     className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"
                   >
                     <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
-                      <InsightCard icon={<TrendingUp size={16} />} label="Market Potential" value="High Growth" color="blue" />
+                      <InsightCard icon={<TrendingUp size={16} />} label={language === "en" ? "Market Potential" : "市场潜力"} value={language === "en" ? "High Growth" : "高成长"} color="blue" />
                     </motion.div>
                     <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
-                      <InsightCard icon={<ShieldCheck size={16} />} label="Quality Score" value="Premium Grade" color="emerald" />
+                      <InsightCard icon={<ShieldCheck size={16} />} label={language === "en" ? "Quality Score" : "质量得分"} value={language === "en" ? "Premium Grade" : "尊享级"} color="emerald" />
                     </motion.div>
                     <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
-                      <InsightCard icon={<Zap size={16} />} label="Innovation Level" value="Specialized" color="purple" />
+                      <InsightCard icon={<Zap size={16} />} label={language === "en" ? "Innovation Level" : "创新等级"} value={language === "en" ? "Specialized" : "专精级"} color="purple" />
                     </motion.div>
                   </motion.div>
 
@@ -194,7 +194,7 @@ export const SmartAnalysisModal: React.FC<SmartAnalysisModalProps> = ({
                       </div>
                     ))}
                  </div>
-                 <span className="text-[10px] font-mono text-slate-400">Trusted by Strategy Teams</span>
+                 <span className="text-[10px] font-mono text-slate-400">{language === "en" ? "Trusted by Strategy Teams" : "备受策略团队信赖"}</span>
                </div>
                <div className="flex gap-3">
                  <motion.button
@@ -203,7 +203,7 @@ export const SmartAnalysisModal: React.FC<SmartAnalysisModalProps> = ({
                    onClick={handleAnalyze}
                    className="flex items-center gap-2 px-5 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-2xl text-[10px] font-mono font-bold uppercase tracking-widest hover:bg-slate-200 transition-colors"
                  >
-                   Refine Perspective
+                   {language === "en" ? "Refine Perspective" : "重塑分析视角"}
                  </motion.button>
                  <motion.button
                    whileHover={{ scale: 1.05 }}
@@ -211,7 +211,7 @@ export const SmartAnalysisModal: React.FC<SmartAnalysisModalProps> = ({
                    onClick={onClose}
                    className="px-8 py-2 bg-slate-950 dark:bg-white text-white dark:text-slate-900 rounded-2xl text-[10px] font-mono font-bold uppercase tracking-widest shadow-xl shadow-slate-900/10"
                  >
-                   Close Insights
+                   {language === "en" ? "Close Insights" : "关闭洞察"}
                  </motion.button>
                </div>
             </div>

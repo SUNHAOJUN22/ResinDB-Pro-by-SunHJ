@@ -41,7 +41,8 @@ export const DashboardAiCard: React.FC<DashboardAiCardProps> = ({ data }) => {
   }, [data]);
 
   useEffect(() => {
-    fetchInsight();
+    // Disabled auto-fetch on mount so it doesn't prompt for API key on load
+    // fetchInsight();
   }, [fetchInsight]);
 
   return (

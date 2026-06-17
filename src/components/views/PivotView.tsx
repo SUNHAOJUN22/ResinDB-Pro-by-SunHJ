@@ -9,7 +9,7 @@ import {
   Rows,
   Sigma
 } from "lucide-react";
-import { Product, ColumnConfig } from '@/types/index';
+import { Product, ColumnConfig, FormulaConfig } from '@/types/index';
 import { formulaEngine } from "@/lib/formulaParser";
 import { useLanguage } from "@/contexts/LanguageContext";
 import groupBy from "lodash/groupBy";
@@ -36,11 +36,11 @@ interface PivotRow {
 interface PivotViewProps {
   data: Product[];
   columns: ColumnConfig[];
-  formulas: import("@/types").FormulaConfig[];
+  formulas: FormulaConfig[];
 }
 
 export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, formulas }) => {
-  const { tProp } = useLanguage();
+    const { tProp, language } = useLanguage();
   
   // Pivot Configuration State
   const [rowGroups, setRowGroups] = useState<string[]>(["gradeName"]);
@@ -139,20 +139,20 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
   return (
     <div className="flex h-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
       {/* Configuration Sidebar */}
-      <div className="w-80 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-6 overflow-y-auto custom-scrollbar">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="p-2 bg-primary-100 dark:bg-primary-900/30 text-primary-600 rounded-xl">
-            <Settings2 size={20} />
+      <div className="w-72 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 overflow-y-auto custom-scrollbar">
+        <div className="flex items-center gap-2.5 mb-5 shrink-0">
+          <div className="p-1.5 bg-primary-100 dark:bg-primary-900/30 text-primary-600 rounded-lg">
+            <Settings2 size={16} />
           </div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Pivot Settings</h2>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white">{language === "en" ? "Pivot Settings" : "透视表设置"}</h2>
         </div>
 
-        <div className="space-y-8">
+        <div className="space-y-5">
           {/* Rows */}
           <div className="space-y-3">
             <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
               <Rows size={12} />
-              Row Groups
+              {language === "en" ? "Row Groups" : "行分组"}
             </label>
             <div className="space-y-2">
               {availableCols.map(col => (
@@ -184,18 +184,18 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
           <div className="space-y-3">
             <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
               <Sigma size={12} />
-              Aggregation Values
+              {language === "en" ? "Aggregation Values" : "聚合运算"}
             </label>
             <select 
               value={aggType}
               onChange={(e) => setAggType(e.target.value as "avg" | "sum" | "count" | "min" | "max")}
               className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-500/20"
             >
-              <option value="avg">Average</option>
-              <option value="sum">Sum</option>
-              <option value="min">Min</option>
-              <option value="max">Max</option>
-              <option value="count">Count</option>
+              <option value="avg">{language === "en" ? "Average" : "平均值 (Avg)"}</option>
+              <option value="sum">{language === "en" ? "Sum" : "求和 (Sum)"}</option>
+              <option value="min">{language === "en" ? "Min" : "最小值 (Min)"}</option>
+              <option value="max">{language === "en" ? "Max" : "最大值 (Max)"}</option>
+              <option value="count">{language === "en" ? "Count" : "计数 (Count)"}</option>
             </select>
             <div className="space-y-2 pt-2">
               {numericCols.map(col => (
@@ -221,17 +221,17 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
       </div>
 
       {/* Main View Area */}
-      <div className="flex-1 flex flex-col p-8 overflow-hidden">
-        <div className="flex items-center justify-between mb-8">
+      <div className="flex-1 flex flex-col p-4 sm:p-5 md:p-6 pb-4 overflow-hidden">
+        <div className="flex items-center justify-between mb-5 shrink-0">
           <div>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
-              Pivot Table
+            <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2.5">
+              {language === "en" ? "Pivot Table" : "数据透视表"}
               <span className="px-3 py-1 bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400 text-xs rounded-full">
-                {pivotData.length} Root Groups
+                {language === "en" ? `${pivotData.length} Root Groups` : `${pivotData.length} 根分组`}
               </span>
             </h1>
             <p className="text-slate-500 text-sm mt-1">
-              Analyzing {data.length} records through {rowGroups.length} groupings
+              {language === "en" ? `Analyzing ${data.length} records through ${rowGroups.length} groupings` : `正在通过 ${rowGroups.length} 级分组分析 ${data.length} 条记录`}
             </p>
           </div>
           
@@ -240,13 +240,13 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
               onClick={() => setViewMode("table")}
               className={`px-4 py-2 ${viewMode === "table" ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"} rounded-xl text-sm font-bold flex items-center gap-2 transition-all`}
             >
-              <TableIcon size={16} /> Table
+              <TableIcon size={16} /> {language === "en" ? "Table" : "表格"}
             </button>
             <button 
               onClick={() => setViewMode("chart")}
               className={`px-4 py-2 ${viewMode === "chart" ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"} rounded-xl text-sm font-bold flex items-center gap-2 transition-all`}
             >
-              <BarChart3 size={16} /> Chart
+              <BarChart3 size={16} /> {language === "en" ? "Chart" : "图表"}
             </button>
           </div>
         </div>

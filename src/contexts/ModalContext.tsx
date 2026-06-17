@@ -14,7 +14,13 @@ export type ModalType =
   | "comparison"
   | "addProduct"
   | "smartAnalysis"
-  | "formulaEditor";
+  | "databaseSync"
+  | "formulaEditor"
+  | "qaReport"
+  | "bulkReorder"
+  | "bulkTagging"
+  | "dataQualityAudit"
+  | "smartExport";
 
 interface ModalContextType {
   openModals: Set<ModalType>;
@@ -50,6 +56,8 @@ export const ModalProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const closeAllModals = useCallback(() => {
     setOpenModals(new Set());
+    setViewingProduct(null);
+    setAnalyzingProduct(null);
   }, []);
 
   const closeDetail = useCallback(() => {

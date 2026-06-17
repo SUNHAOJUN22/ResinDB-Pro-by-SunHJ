@@ -2,7 +2,12 @@ import { useState, useCallback, useEffect } from 'react';
 
 export function useColumnResizing(defaultWidths: Record<string, number>) {
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem('resindb-column-widths');
+    let saved = null;
+    try {
+      saved = localStorage.getItem('resindb-column-widths');
+    } catch {
+      // Ignore
+    }
     if (saved) {
       try {
         return { ...defaultWidths, ...JSON.parse(saved) };
@@ -15,7 +20,11 @@ export function useColumnResizing(defaultWidths: Record<string, number>) {
 
   useEffect(() => {
     const handler = setTimeout(() => {
-        localStorage.setItem('resindb-column-widths', JSON.stringify(columnWidths));
+        try {
+          localStorage.setItem('resindb-column-widths', JSON.stringify(columnWidths));
+        } catch {
+          // Ignore
+        }
     }, 500);
     return () => clearTimeout(handler);
   }, [columnWidths]);

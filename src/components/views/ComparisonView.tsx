@@ -12,6 +12,7 @@ import {
   Target,
 } from "lucide-react";
 import { Product } from '@/types/index';
+import { UniversalStorageBridge } from "@/lib/adapters/UniversalStorageBridge";
 import { PROPERTY_GROUPS } from '@/config/constants';
 import { RADAR_KEYS, isLowBest } from '@/utils/productUtils';
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -31,17 +32,21 @@ const KEY_SPECS = [
 interface ComparisonViewProps {
   isOpen: boolean;
   products: Product[];
+  allProducts?: Product[];
   onClose: () => void;
   onRemoveProduct: (id: string) => void;
+  onAddProduct?: (id: string) => void;
 }
 
 export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
   isOpen,
   products,
+  allProducts = [],
   onClose,
   onRemoveProduct,
+  onAddProduct,
 }) => {
-  const { t, tProp } = useLanguage();
+  const { language, t, tProp } = useLanguage();
   const { theme } = useTheme();
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
@@ -82,6 +87,187 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
     () => displayProducts.find((p) => p.id === baselineId),
     [displayProducts, baselineId],
   );
+
+  // Find experimental and standard products for side-by-side diagnostic benchmark
+  const diagnosticReport = useMemo(() => {
+    const expProducts = displayProducts.filter(p => p.isExperimental);
+    // Standard product is baselineProduct if selected (and not experimental),
+    // otherwise the first non-experimental product
+    const stdProduct = baselineProduct && !baselineProduct.isExperimental
+      ? baselineProduct
+      : displayProducts.find(p => !p.isExperimental);
+
+    if (expProducts.length === 0 || !stdProduct) return null;
+
+    // We do reporting for the first experimental product
+    const expProduct = expProducts[0];
+
+    const targetProps = ["密度", "熔体质量流动速率", "拉伸屈服应力", "弯曲模量"];
+    const deviations: {
+      propKey: string;
+      expName: string;
+      stdName: string;
+      expVal: number | string;
+      stdVal: number | string;
+      diffPercent: number | null;
+      status: "consistent" | "warning" | "danger" | "unknown";
+      unit: string;
+    }[] = [];
+
+    let totalScoreDeduction = 0;
+    let scoredPropsCount = 0;
+
+    targetProps.forEach(propKey => {
+      const expProp = expProduct.properties[propKey] || expProduct.properties[Object.keys(expProduct.properties).find(k => k.includes(propKey)) || ""];
+      const stdProp = stdProduct.properties[propKey] || stdProduct.properties[Object.keys(stdProduct.properties).find(k => k.includes(propKey)) || ""];
+
+      const expVal = expProp ? Number(expProp.value) : NaN;
+      const stdVal = stdProp ? Number(stdProp.value) : NaN;
+      const unit = expProp?.unit || stdProp?.unit || "";
+
+      if (!isNaN(expVal) && !isNaN(stdVal) && stdVal !== 0) {
+        const diff = ((expVal - stdVal) / stdVal) * 100;
+        const absDiff = Math.abs(diff);
+
+        let status: "consistent" | "warning" | "danger" = "consistent";
+        if (absDiff > 15) {
+          status = "danger";
+        } else if (absDiff > 5) {
+          status = "warning";
+        }
+
+        deviations.push({
+          propKey,
+          expName: expProduct.gradeName,
+          stdName: stdProduct.gradeName,
+          expVal: expProp.value,
+          stdVal: stdProp.value,
+          diffPercent: diff,
+          status,
+          unit,
+        });
+
+        totalScoreDeduction += absDiff * 1.5;
+        scoredPropsCount++;
+      } else if (expProp || stdProp) {
+        deviations.push({
+          propKey,
+          expName: expProduct.gradeName,
+          stdName: stdProduct.gradeName,
+          expVal: expProp?.value ?? "-",
+          stdVal: stdProp?.value ?? "-",
+          diffPercent: null,
+          status: "unknown",
+          unit,
+        });
+      }
+    });
+
+    const complianceScore = scoredPropsCount > 0
+      ? Math.max(10, Math.min(100, Math.round(100 - totalScoreDeduction)))
+      : null;
+
+    // Generate diagnostic comments
+    const suggestions: string[] = [];
+    const isEn = language === "en";
+    deviations.forEach(d => {
+      if (d.diffPercent !== null) {
+        const diff = d.diffPercent;
+        if (d.propKey === "密度") {
+          if (diff > 0.5) {
+            suggestions.push(
+              isEn
+                ? "Measured density is slightly high; inorganic impurities/fillers might have been introduced, or filler content in the formula exceeds specifications. While tensile strength may increase, toughness could decrease."
+                : "实测密度略高，可能混入无机杂质/填料，也可能表明改性配方中填料含量超标。拉伸强度虽有增益，但冲击韧性可能削弱。"
+            );
+          } else if (diff < -0.5) {
+            suggestions.push(
+              isEn
+                ? "Measured density is lower than standard; please check molecular chain branching. Possible micro-voids in the sample, or slow crystallization during processing resulting in a less dense structure."
+                : "实测密度低于标准，请检查分子链支化度。可能由于样品存在微小气孔、或加工结晶速度太慢导致结构不够致密。"
+            );
+          }
+        }
+        if (d.propKey === "熔体质量流动速率") {
+          if (diff > 15) {
+            suggestions.push(
+              isEn
+                ? "Melt flow rate (MFR) is significantly high (>15% increase), indicating a sharp decline in melt viscosity and extremely high fluidity. Beware of thermal degradation of resin due to shear heating in the extruder."
+                : "熔融指数(MFR)显著偏高(增幅超15%)，说明物料粘度严重下降，流动极快。请警惕螺杆中剪切发热导致树脂热分解。"
+            );
+          } else if (diff < -15) {
+            suggestions.push(
+              isEn
+                ? "MFR is significantly low, indicating high viscosity. This may cause high pressure during molding and rough surface appearance; suggest checking melt temp or heater calibration."
+                : "MFR显著偏低，粘度过大，可能造成加工成型时压力陡增、产品表观粗糙，建议复核熔体温度或熔体加热器校准。"
+            );
+          }
+        }
+        if (d.propKey === "拉伸屈服应力") {
+          if (diff < -5) {
+            suggestions.push(
+              isEn
+                ? "Tensile yield stress did not meet the standard. This might be due to poor crystalline orientation in the injection-molded sample or presence of recycled pellets; suggest checking molecular orientation."
+                : "抗拉屈服应力未达标。可能是由于注塑样品结晶取向不良或原料含有回收颗粒。建议排查分子取向分布。"
+            );
+          }
+        }
+        if (d.propKey === "弯曲模量") {
+          if (diff < -8) {
+            suggestions.push(
+              isEn
+                ? "Flexural stiffness (modulus) is low, indicating insufficient rigidity. Suggest blending reinforcing agents in formula or adjusting compounding temperatures."
+                : "弯曲刚性(模量)偏低，刚性不足。建议在材料配方中复配固相增强因子，或者适当调整混炼加热段。"
+            );
+          }
+        }
+      }
+    });
+
+    if (suggestions.length === 0 && scoredPropsCount > 0) {
+      suggestions.push(
+        isEn
+          ? "The main physical properties of this experimental batch are close to the standard, showing perfect consistency profile."
+          : "该实验批次的主要物理性能参数与国家/大盘标准极其接近，表现完美，一致性等级优越。"
+      );
+    }
+
+    return {
+      expProduct,
+      stdProduct,
+      deviations,
+      complianceScore,
+      suggestions,
+    };
+  }, [displayProducts, baselineProduct, language]);
+
+  // Recommended standard products for quick alignment when only experimental are selected
+  const recommendedStandards = useMemo(() => {
+    const expProducts = displayProducts.filter(p => p.isExperimental);
+    if (expProducts.length === 0) return [];
+    
+    // Check if we already have a standard reference in comparison list to avoid double recommendation
+    const hasStandard = displayProducts.some(p => !p.isExperimental);
+    if (hasStandard) return [];
+
+    const expProduct = expProducts[0];
+    const openRecords = UniversalStorageBridge.getOpenMarketRecords();
+    const openProducts = openRecords.map(r => UniversalStorageBridge.recordToProduct(r));
+    
+    // Filter out already selected products
+    const unselected = openProducts.filter(op => !displayProducts.some(dp => dp.id === op.id));
+    
+    // Match by category or grade keywords
+    const expCatIds = expProduct.categoryIds || [];
+    const matched = unselected.filter(op => {
+      const overlap = op.categoryIds?.some(cid => expCatIds.includes(cid));
+      if (overlap) return true;
+      const gradeWords = expProduct.gradeName.toUpperCase().replace(/[^A-Z0-9]/g, " ").split(" ").filter(w => w.length > 1);
+      return gradeWords.some(w => op.gradeName.toUpperCase().includes(w));
+    });
+
+    return matched.length > 0 ? matched : unselected.slice(0, 2);
+  }, [displayProducts]);
 
   // Tech Blue Palette
   const colors = useMemo(
@@ -324,12 +510,11 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
 
             <div className="flex-1 overflow-auto md:overflow-hidden flex flex-col md:flex-row">
               {/* Radar Chart Section */}
-              <div className="h-[300px] md:h-full md:w-2/5 bg-slate-50 dark:bg-slate-900/50 border-b md:border-b-0 md:border-r border-slate-300 dark:border-slate-700 p-4 md:p-6 flex flex-col relative overflow-hidden shrink-0">
+              <div className="h-auto md:h-full md:w-2/5 bg-slate-50 dark:bg-slate-900/50 border-b md:border-b-0 md:border-r border-slate-300 dark:border-slate-700 p-4 md:p-6 flex flex-col relative overflow-y-auto custom-scrollbar shrink-0">
                 <h3 className="text-[9px] font-mono text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2 relative z-10">
-                  <Radar size={12} className="text-primary-500" /> Property
-                  Overlap Analysis
+                  <Radar size={12} className="text-primary-500" /> Property Overlap Analysis
                 </h3>
-                <div className="flex-1 w-full min-h-0 relative bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 group/radar">
+                <div className="h-[260px] md:h-[280px] w-full shrink-0 relative bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 group/radar">
                   {displayProducts.length > 0 ? (
                     <div ref={chartRef} className="w-full h-full" />
                   ) : (
@@ -346,19 +531,143 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
                     </div>
                   )}
                 </div>
-                <div className="mt-4 p-4 bg-primary-50 dark:bg-primary-900/10 border border-primary-200 dark:border-primary-800/30 text-[10px] font-mono text-slate-600 dark:text-slate-400 leading-relaxed flex gap-3 relative z-10">
-                  <div className="p-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shrink-0 h-fit">
-                    <Info size={12} className="text-primary-500" />
+
+                {diagnosticReport ? (
+                  <div className="space-y-4 relative z-10 shrink-0 mt-4 text-left">
+                    <div className="p-4 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-250 dark:border-emerald-800/50 rounded-xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-emerald-850 dark:text-emerald-400 flex items-center gap-1.5">
+                          {language === "en" ? "🔬 Material Properties Consistency Diagnostic Report" : "🔬 材料物性一致性诊断报告"}
+                        </span>
+                        {diagnosticReport.complianceScore !== null && (
+                          <div className="text-right">
+                            <span className="text-[8px] font-mono text-slate-400 block uppercase leading-none">
+                              {language === "en" ? "Baseline Fit" : "基准拟合度"}
+                            </span>
+                            <span className={`text-[13px] font-mono font-bold ${diagnosticReport.complianceScore > 85 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
+                              {diagnosticReport.complianceScore}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed font-mono">
+                        {language === "en" ? (
+                          <>
+                            Auditing physical deviations between experimental sample <strong className="text-slate-700 dark:text-slate-200">{diagnosticReport.expProduct.gradeName}</strong> and baseline standard grade <strong className="text-slate-700 dark:text-slate-200">{diagnosticReport.stdProduct.gradeName}</strong>:
+                          </>
+                        ) : (
+                          <>
+                            正在将自测实验样 <strong className="text-slate-700 dark:text-slate-200">{diagnosticReport.expProduct.gradeName}</strong> 与标准基准牌号 <strong className="text-slate-700 dark:text-slate-200">{diagnosticReport.stdProduct.gradeName}</strong> 进行高逼物理性能偏差审计：
+                          </>
+                        )}
+                      </div>
+
+                      {/* Deviation metrics */}
+                      <div className="space-y-2 pt-1 border-t border-dashed border-slate-200 dark:border-slate-800">
+                        {diagnosticReport.deviations.map((dev) => (
+                          <div key={dev.propKey} className="flex justify-between items-center text-[10px] font-mono py-0.5">
+                            <span className="text-slate-500 dark:text-slate-400">{tProp(dev.propKey)}:</span>
+                            <div className="flex items-center gap-2">
+                              {dev.diffPercent !== null ? (
+                                <>
+                                  <span className="text-slate-400 text-[9px]">({dev.stdVal} → {dev.expVal} {dev.unit})</span>
+                                  <span className={`font-bold px-1 rounded text-[9px] ${
+                                    dev.status === "consistent" ? "text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30" : 
+                                    dev.status === "warning" ? "text-amber-600 bg-amber-100 dark:bg-amber-900/30" : 
+                                    "text-rose-600 bg-rose-100 dark:bg-rose-900/40"
+                                  }`}>
+                                    {dev.diffPercent > 0 ? `+${dev.diffPercent.toFixed(1)}%` : `${dev.diffPercent.toFixed(1)}%`}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-slate-400">({dev.stdVal} | {dev.expVal}) {language === "en" ? "No comparison" : "无偏差比"}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Automated diagnostic comments */}
+                      <div className="pt-2.5 border-t border-dashed border-slate-200 dark:border-slate-800 space-y-1">
+                        <span className="text-[9px] font-mono font-bold text-slate-400 block uppercase">
+                          {language === "en" ? "Aligned Diagnostic Strategy Suggestions:" : "拟合诊断策略建议:"}
+                        </span>
+                        <div className="space-y-1.5 text-[10px] text-slate-650 dark:text-slate-350 leading-relaxed">
+                          {diagnosticReport.suggestions.map((s, sIdx) => (
+                            <p key={sIdx} className="flex items-start gap-1">
+                              <span className="text-emerald-500 select-none">•</span>
+                              <span>{s}</span>
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <p>
-                    <span className="font-bold text-primary-600 dark:text-primary-400 uppercase">
-                      Expert Insight:
-                    </span>{" "}
-                    Areas of intersection indicate competitive equivalence.
-                    Outer spikes represent superior performance in specific
-                    domains.
-                  </p>
-                </div>
+                ) : (
+                  <div className="space-y-4">
+                    {recommendedStandards.length > 0 && (
+                      <div className="mt-4 p-4 bg-sky-50 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-800/45 rounded-xl space-y-3 relative z-10 text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="p-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-sky-500 font-mono text-[10px] font-bold shrink-0 leading-none">
+                            {language === "en" ? "💡 Alignment Option" : "💡 对齐建议"}
+                          </span>
+                          <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                            {language === "en" ? "Experimental Self-Test Sample Detected" : "检测到实验室自测样本状态"}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono leading-relaxed">
+                          {language === "en" 
+                            ? "The system automatically matched compatible standard open market records for analysis. Align with one click to easily inspect tensile, modulus, and flow deviations:"
+                            : "系统自动通过数据桥梁匹配到该自测样类别对应的开源大盘标准物性数据。一键追加对齐，即刻比照拉伸、刚度、流动等高逼偏差："}
+                        </p>
+                        <div className="space-y-2 pt-1">
+                          {recommendedStandards.map(rec => (
+                            <div key={rec.id} className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
+                              <div className="min-w-0 flex-1">
+                                <span className="text-[10px] font-mono font-bold text-slate-800 dark:text-slate-100 block truncate">
+                                  {rec.gradeName}
+                                </span>
+                                <span className="text-[9px] font-mono text-slate-400 block truncate">
+                                  {rec.manufacturer}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  if (onAddProduct) {
+                                    onAddProduct(rec.id);
+                                    setBaselineId(rec.id);
+                                  }
+                                }}
+                                className="px-2.5 py-1.5 text-[9px] font-mono font-bold bg-sky-600 hover:bg-sky-500 text-white border border-sky-700 rounded-md shadow-sm select-none transition-all cursor-pointer whitespace-nowrap"
+                              >
+                                {language === "en" ? "➕ Align Instantly" : "➕ 一键对齐"}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-4 p-4 bg-primary-50 dark:bg-primary-900/10 border border-primary-200 dark:border-primary-800/30 text-[10px] font-mono text-slate-600 dark:text-slate-400 leading-relaxed flex gap-3 relative z-10">
+                      <div className="p-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shrink-0 h-fit">
+                        <Info size={12} className="text-primary-500" />
+                      </div>
+                      <p>
+                        <span className="font-bold text-primary-600 dark:text-primary-400 uppercase">
+                          Expert Insight:
+                        </span>{" "}
+                        Areas of intersection indicate competitive equivalence.
+                        Outer spikes represent superior performance in specific
+                        domains. <strong>
+                          {language === "en" 
+                            ? "Tip: Use 'Import' menu to enter physical testing log metrics and enable diagnostics." 
+                            : "提示：可以利用“导入”录入批次自测实验数据，即可开启多维偏差比对。"}
+                        </strong>
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Comparison Table Section */}
@@ -390,7 +699,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
                                 {p.gradeName}
                               </div>
                               <div
-                                className="flex items-center gap-1.5 text-[8px] md:text-[9px] font-mono text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 md:px-2 py-0.5 border border-slate-200 dark:border-slate-700 w-fit mb-2 md:mb-3 truncate max-w-full uppercase tracking-widest"
+                                className="flex items-center gap-1.5 text-[8px] md:text-[9px] font-mono text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 md:px-2 py-0.5 border border-slate-200 dark:border-slate-700 w-fit mb-1 md:mb-1.5 truncate max-w-full uppercase tracking-widest"
                                 title={p.manufacturer}
                               >
                                 <Factory size={10} className="shrink-0" />{" "}
@@ -398,6 +707,15 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
                                   {p.manufacturer}
                                 </span>
                               </div>
+                              {p.isExperimental ? (
+                                <div className="flex items-center gap-1 text-[8px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/45 border border-emerald-250 dark:border-emerald-800/60 px-1.5 py-0.5 uppercase tracking-wider mb-2 w-fit">
+                                  <span>🔬 实验自测数据</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 text-[8px] font-mono font-bold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/45 border border-sky-250 dark:border-sky-800/60 px-1.5 py-0.5 uppercase tracking-wider mb-2 w-fit">
+                                  <span>🏛️ 标准大盘数据</span>
+                                </div>
+                              )}
                               <div className="flex items-center gap-1.5 md:gap-2">
                                 <motion.button
                                   whileHover={{ scale: 1.05 }}
@@ -443,6 +761,64 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
                           </div>
                         </th>
                       ))}
+                      {allProducts && displayProducts.length < 5 && (
+                        <th className="px-4 md:px-6 py-3 md:py-4 border-b border-r border-slate-300 dark:border-slate-700 min-w-[200px] md:min-w-[250px] bg-slate-50/50 dark:bg-slate-900/30 sticky top-0 relative">
+                          <div className="flex flex-col h-full justify-between gap-2">
+                            <div>
+                              <span className="text-[10px] font-mono leading-none tracking-wider font-bold text-primary-600 dark:text-primary-400 block uppercase mb-1">
+                                ➕ 加载标准/库内对照牌号
+                              </span>
+                              <span className="text-[9px] text-slate-500 dark:text-slate-400 font-mono block">
+                                快速搜录标准物性大盘规范与您的实验数据进行同屏校准对照
+                              </span>
+                            </div>
+                            <div className="relative pt-1.5">
+                              <select
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val && onAddProduct) {
+                                    onAddProduct(val);
+                                    // Set as baseline automatically if there's only 1 experimental item
+                                    if (displayProducts.length === 1 && displayProducts[0].isExperimental) {
+                                      setBaselineId(val);
+                                    }
+                                    e.target.value = "";
+                                  }
+                                }}
+                                className="w-full px-2.5 py-1.5 text-[10px] font-mono font-medium border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-800 dark:text-slate-100 rounded focus:ring-1 focus:ring-primary-500 outline-none cursor-pointer"
+                                defaultValue=""
+                              >
+                                <option value="" disabled>
+                                  -- 选择标准对照牌号 --
+                                </option>
+                                {(() => {
+                                  const categoryWords = displayProducts.length > 0 
+                                    ? displayProducts[0].gradeName.toUpperCase().replace(/[^A-Z]/g, " ").split(" ").filter(w => w.length > 1)
+                                    : [];
+                                  
+                                  const matchesCategory = (name: string) => {
+                                    return categoryWords.some(w => name.toUpperCase().includes(w));
+                                  };
+
+                                  const filtered = allProducts.filter(p => !displayProducts.some(dp => dp.id === p.id));
+                                  const sorted = [...filtered].sort((a, b) => {
+                                    const aMatch = matchesCategory(a.gradeName) ? 1 : 0;
+                                    const bMatch = matchesCategory(b.gradeName) ? 1 : 0;
+                                    if (aMatch !== bMatch) return bMatch - aMatch;
+                                    return (a.isExperimental ? 1 : 0) - (b.isExperimental ? 1 : 0);
+                                  });
+
+                                  return sorted.map(p => (
+                                    <option key={p.id} value={p.id}>
+                                      [{p.isExperimental ? "自测" : "标准"}] {p.gradeName} - {p.manufacturer}
+                                    </option>
+                                  ));
+                                })()}
+                              </select>
+                            </div>
+                          </div>
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-300 dark:divide-slate-700">
@@ -452,7 +828,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
                     ) && (
                       <tr className="bg-slate-50 dark:bg-slate-900">
                         <td
-                          colSpan={displayProducts.length + 1}
+                          colSpan={displayProducts.length + (allProducts && displayProducts.length < 5 ? 2 : 1)}
                           className="px-6 py-2 text-[9px] font-mono font-bold uppercase tracking-widest text-slate-500 sticky left-0 z-20 bg-slate-50 dark:bg-slate-900 border-y border-slate-300 dark:border-slate-700"
                         >
                           Key Specifications / 核心参数
@@ -479,6 +855,9 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
                             </span>
                           </td>
                         ))}
+                        {allProducts && displayProducts.length < 5 && (
+                          <td className="px-6 py-3 border-r border-slate-300 dark:border-slate-700 bg-slate-50/10 dark:bg-slate-900/10" />
+                        )}
                       </tr>
                     ))}
 
@@ -486,7 +865,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
                       <React.Fragment key={group}>
                         <tr className="bg-slate-50 dark:bg-slate-900">
                           <td
-                            colSpan={displayProducts.length + 1}
+                            colSpan={displayProducts.length + (allProducts && displayProducts.length < 5 ? 2 : 1)}
                             className="px-6 py-2 text-[9px] font-mono font-bold uppercase tracking-widest text-slate-500 sticky left-0 z-20 bg-slate-50 dark:bg-slate-900 border-y border-slate-300 dark:border-slate-700"
                           >
                             {t(`group_${group}` as Parameters<typeof t>[0])}{" "}
@@ -572,6 +951,9 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
                                 </td>
                               );
                             })}
+                            {allProducts && displayProducts.length < 5 && (
+                              <td className="px-6 py-3 border-r border-slate-300 dark:border-slate-700 bg-slate-50/10 dark:bg-slate-900/10" />
+                            )}
                           </motion.tr>
                         ))}
                       </React.Fragment>

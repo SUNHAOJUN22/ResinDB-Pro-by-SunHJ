@@ -279,10 +279,10 @@ export const TreeSidebar: React.FC<TreeSidebarProps> = ({
               />
             </div>
             <p className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-1">
-              未找到分类
+              {language === "en" ? "No categories found" : "未找到分类"}
             </p>
             <p className="text-xs text-slate-400 dark:text-slate-500">
-              尝试使用其他关键词搜索
+              {language === "en" ? "Try searching with other keywords" : "尝试使用其他关键词搜索"}
             </p>
           </motion.div>
         )}

@@ -1,5 +1,6 @@
 {
   "name": "ResinDB Pro by SunHJ",
   "description": "A high-fidelity prototype for a Petrochemical Synthetic Resin Database. Features multi-path classification, dynamic JSONB attribute columns, and Gemini-powered AI assistance for data analysis and image understanding.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

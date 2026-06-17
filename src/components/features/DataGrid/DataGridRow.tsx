@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { QuickEditOverlay } from "./QuickEditOverlay";
 
 const renderCellContent = (
   val: unknown,
@@ -35,9 +36,8 @@ const renderCellContent = (
         <span className="text-slate-300 dark:text-slate-700 font-mono">-</span>
       );
     return (
-      <motion.div
-        whileHover={{ scale: 1.05, y: -1 }}
-        className={`flex items-baseline gap-1 ${isBest ? "bg-emerald-100/50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-md -ml-2 border border-emerald-200/50 dark:border-emerald-800/50 w-fit drop-shadow-sm" : isAnomaly ? "bg-rose-100/80 dark:bg-rose-900/40 px-2 py-0.5 rounded-md -ml-2 border border-rose-300 dark:border-rose-700 w-fit drop-shadow-sm" : ""}`}
+      <div
+        className={`flex items-baseline gap-1 transition-all duration-150 hover:scale-105 hover:-translate-y-0.5 transform-gpu cursor-pointer ${isBest ? "bg-emerald-100/50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-md -ml-2 border border-emerald-200/50 dark:border-emerald-800/50 w-fit drop-shadow-sm" : isAnomaly ? "bg-rose-100/80 dark:bg-rose-900/40 px-2 py-0.5 rounded-md -ml-2 border border-rose-300 dark:border-rose-700 w-fit drop-shadow-sm" : ""}`}
       >
         <span
           className={`font-mono font-bold tracking-tight ${isBest ? "text-emerald-700 dark:text-emerald-400" : isAnomaly ? "text-rose-700 dark:text-rose-400" : "text-primary-600 dark:text-primary-400"} ${isCompact ? "text-[11px]" : "text-xs"}`}
@@ -51,7 +51,7 @@ const renderCellContent = (
             {unit}
           </span>
         )}
-      </motion.div>
+      </div>
     );
   }
 
@@ -75,6 +75,7 @@ export interface DataGridRowProps {
   isCompact: boolean;
   isSelected: boolean;
   isFocused: boolean;
+  isHighlighted?: boolean;
   score: number;
   columnExtremes: Record<string, number>;
   toggleSelection: (id: string) => void;
@@ -114,6 +115,7 @@ export const DataGridRow = React.memo(
     isCompact,
     isSelected,
     isFocused,
+    isHighlighted = false,
     score,
     columnExtremes,
     toggleSelection,
@@ -135,6 +137,7 @@ export const DataGridRow = React.memo(
   }: DataGridRowProps) => {
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [editingCell, setEditingCell] = useState<{ colKey: string; tempValue: string } | null>(null);
+    const [quickEditColKey, setQuickEditColKey] = useState<string | null>(null);
     const { t, tProp } = useLanguage();
 
     const handleCopy = useCallback(
@@ -190,7 +193,7 @@ export const DataGridRow = React.memo(
       <motion.tr
         style={{ height: isCompact ? 35 : 55 }}
         data-index={index}
-        className={`group transition-all duration-200 cursor-pointer relative bg-white dark:bg-slate-950 ${isSelected ? "bg-primary-50/80 dark:bg-primary-900/20" : "hover:bg-slate-50 dark:hover:bg-slate-900"} ${isFocused ? "ring-2 ring-primary-500 ring-inset z-20 bg-primary-500/5 dark:bg-primary-500/10" : ""} ${topsisStyles} ${anomalyStyles}`}
+        className={`group transition-all duration-200 cursor-pointer relative bg-white dark:bg-slate-950 ${isSelected ? "bg-primary-50/80 dark:bg-primary-900/20" : "hover:bg-slate-50 dark:hover:bg-slate-900"} ${isFocused ? "ring-2 ring-primary-500 ring-inset z-20 bg-primary-500/5 dark:bg-primary-500/10" : ""} ${topsisStyles} ${anomalyStyles} ${isHighlighted ? "ring-4 ring-amber-500 bg-amber-500/10 dark:bg-amber-500/20 z-30 shadow-[0_0_20px_rgba(245,158,11,0.25)]" : ""}`}
         onClick={handleRowClick}
         onDoubleClick={handleDblClick}
         onContextMenu={handleContextMenu}
@@ -271,12 +274,11 @@ export const DataGridRow = React.memo(
             <td
               key={col.key}
               style={{ left: isSticky ? stickyLeft : undefined }}
-              className={`px-4 border-b border-slate-200/50 dark:border-slate-800/50 font-mono ${isCompact ? "py-2.5" : "py-4"} align-middle relative ${isSticky ? "sticky z-10 bg-white dark:bg-slate-950 transition-colors shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]" : ""} ${isAnomaly ? "bg-rose-50 dark:bg-rose-900/10 group-hover:bg-rose-100 dark:group-hover:bg-rose-900/20" : isSticky ? "group-hover:bg-slate-50 dark:group-hover:bg-slate-900" : ""}`}
+              className={`px-4 border-b border-slate-200/50 dark:border-slate-800/50 font-mono ${isCompact ? "py-2.5" : "py-4"} align-middle relative group/cell ${isSticky ? "sticky z-10 bg-white dark:bg-slate-950 transition-colors shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]" : ""} ${isAnomaly ? "bg-rose-50 dark:bg-rose-900/10 group-hover:bg-rose-100 dark:group-hover:bg-rose-900/20" : isSticky ? "group-hover:bg-slate-50 dark:group-hover:bg-slate-900" : ""}`}
               onDoubleClick={(e) => {
-                if (col.isSystem || col.isComputed) return;
+                if (col.isComputed) return;
                 e.stopPropagation();
-                const currentVal = String(p.properties?.[col.key]?.value ?? "");
-                setEditingCell({ colKey: col.key, tempValue: currentVal });
+                setQuickEditColKey(col.key);
               }}
               onContextMenu={(e) => {
                 e.stopPropagation();
@@ -301,53 +303,67 @@ export const DataGridRow = React.memo(
                 />
               )}
               {col.key === "gradeName" ? (
-                <div className="flex items-center gap-2 group/cell">
-                  {isTopTopsis && (
-                    <span 
-                      className={`flex flex-shrink-0 items-center justify-center w-5 h-5 rounded-full text-[10px] font-black shadow-sm ${
-                        topsisRank === 1 
-                          ? 'bg-amber-400 text-amber-900 ring-2 ring-amber-200 dark:ring-amber-800' 
-                          : topsisRank === 2 
-                             ? 'bg-slate-300 text-slate-700 ring-2 ring-slate-200 dark:ring-slate-600' 
-                             : 'bg-orange-300 text-orange-900 ring-2 ring-orange-200 dark:ring-orange-800'
-                      }`}
+                <div className="flex flex-col gap-1 items-start py-0.5 justify-center">
+                  <div className="flex items-center gap-2 group/cell">
+                    {isTopTopsis && (
+                      <span 
+                        className={`flex flex-shrink-0 items-center justify-center w-5 h-5 rounded-full text-[10px] font-black shadow-sm ${
+                          topsisRank === 1 
+                            ? 'bg-amber-400 text-amber-900 ring-2 ring-amber-200 dark:ring-amber-800' 
+                            : topsisRank === 2 
+                               ? 'bg-slate-300 text-slate-700 ring-2 ring-slate-200 dark:ring-slate-600' 
+                               : 'bg-orange-300 text-orange-900 ring-2 ring-orange-200 dark:ring-orange-800'
+                        }`}
+                      >
+                        #{topsisRank}
+                      </span>
+                    )}
+                    <span
+                      className={`font-bold transition-colors truncate ${isCompact ? "text-xs" : "text-sm"} ${isTopTopsis ? (topsisRank === 1 ? 'text-amber-700 dark:text-amber-400' : 'text-slate-800 dark:text-slate-300') : ''}`}
                     >
-                      #{topsisRank}
+                      {p.gradeName}
                     </span>
-                  )}
-                  <span
-                    className={`font-bold transition-colors truncate ${isCompact ? "text-xs" : "text-sm"} ${isTopTopsis ? (topsisRank === 1 ? 'text-amber-700 dark:text-amber-400' : 'text-slate-800 dark:text-slate-300') : ''}`}
-                  >
-                    {p.gradeName}
-                  </span>
-                  <div className="flex items-center gap-1 opacity-0 group-hover/cell:opacity-100 transition-all">
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={(e) => handleCopy(e, p.gradeName, p.id)}
-                      className={`p-1.5 rounded-lg shadow-sm border transition-all active:scale-90 ${copiedId === p.id ? "text-emerald-500 bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800" : "text-slate-400 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:text-slate-600 hover:border-slate-300 dark:hover:text-slate-200 dark:hover:border-slate-600"}`}
-                    >
-                      {copiedId === p.id ? (
-                        <Check size={12} />
-                      ) : (
-                        <Copy size={12} />
-                      )}
-                    </motion.button>
-                    <div
-                      onMouseEnter={(e) => {
-                        e.stopPropagation();
-                        setHoveredProduct({
-                          product: p,
-                          x: e.clientX,
-                          y: e.clientY,
-                        });
-                      }}
-                      onMouseLeave={() => setHoveredProduct(null)}
-                      className="cursor-help text-indigo-500 scale-75 group-hover:scale-100 shrink-0 p-1"
-                    >
-                      <Radar size={14} />
+                    <div className="flex items-center gap-1 opacity-0 group-hover/cell:opacity-100 transition-all">
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={(e) => handleCopy(e, p.gradeName, p.id)}
+                        className={`p-1.5 rounded-lg shadow-sm border transition-all active:scale-90 ${copiedId === p.id ? "text-emerald-500 bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800" : "text-slate-400 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:text-slate-600 hover:border-slate-300 dark:hover:text-slate-200 dark:hover:border-slate-600"}`}
+                      >
+                        {copiedId === p.id ? (
+                          <Check size={12} />
+                        ) : (
+                          <Copy size={12} />
+                        )}
+                      </motion.button>
+                      <div
+                        onMouseEnter={(e) => {
+                          e.stopPropagation();
+                          setHoveredProduct({
+                            product: p,
+                            x: e.clientX,
+                            y: e.clientY,
+                          });
+                        }}
+                        onMouseLeave={() => setHoveredProduct(null)}
+                        className="cursor-help text-indigo-500 scale-75 group-hover:scale-100 shrink-0 p-1"
+                      >
+                        <Radar size={14} />
+                      </div>
                     </div>
                   </div>
+                  {p.tags && p.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {p.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-indigo-50/80 text-indigo-600 border border-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-900/30 whitespace-nowrap leading-none"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : col.key === "manufacturer" ? (
                 <div className="flex flex-col gap-1 items-start">
@@ -437,6 +453,53 @@ export const DataGridRow = React.memo(
                   isCompact,
                   isAnomaly
                 )
+              )}
+
+              {!col.isComputed && (
+                <div className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-0 group-hover/cell:opacity-100 transition-all z-20">
+                  <motion.button
+                    whileHover={{ scale: 1.15, rotate: 10 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setQuickEditColKey(col.key);
+                    }}
+                    className="p-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-primary-600 dark:hover:text-primary-400 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors outline-none cursor-pointer"
+                    title={t("快速编辑", "Quick Edit")}
+                  >
+                    <Edit size={10} />
+                  </motion.button>
+                </div>
+              )}
+
+              {quickEditColKey === col.key && (
+                <QuickEditOverlay
+                  colKey={col.key}
+                  colLabel={
+                    col.key === "gradeName"
+                      ? t("牌号名称", "Grade Name")
+                      : col.key === "manufacturer"
+                        ? t("生产厂家", "Manufacturer")
+                        : tProp(col.key)
+                  }
+                  initialValue={
+                    col.key === "gradeName"
+                      ? p.gradeName
+                      : col.key === "manufacturer"
+                        ? p.manufacturer
+                        : (p.properties?.[col.key]?.value ?? "")
+                  }
+                  unit={
+                    col.key === "gradeName" || col.key === "manufacturer"
+                      ? undefined
+                      : p.properties?.[col.key]?.unit
+                  }
+                  onSave={(newValue) => {
+                    onCellEdit?.(p, col.key, newValue);
+                    setQuickEditColKey(null);
+                  }}
+                  onClose={() => setQuickEditColKey(null)}
+                />
               )}
             </td>
           );

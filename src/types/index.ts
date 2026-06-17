@@ -58,12 +58,23 @@ export interface Product {
   properties: Record<string, PropertyValue>;
   createdAt: string;
   updatedAt: string;
+  isExperimental?: boolean; // Label for self-tested custom experimental data
+  tags?: string[];
+  priority?: number;
 }
 
 export type ViewMode = 'grid' | 'chart';
-export type AppView = 'dashboard' | 'analytics' | 'pivot' | 'settings';
+export type AppView = 'dashboard' | 'analytics' | 'pivot' | 'dependencies' | 'settings' | 'beta-sandbox';
 
 export interface Toast { id: string; type: 'success' | 'error' | 'info'; message: string; }
+
+export interface FormulaHistory {
+  date: string;
+  expression: string;
+  name: string;
+  unit?: string;
+  description?: string;
+}
 
 export interface FormulaConfig {
   id: string;
@@ -71,6 +82,29 @@ export interface FormulaConfig {
   expression: string; // e.g., "props['Density'] * props['Tensile']"
   unit?: string;
   description?: string;
+  history?: FormulaHistory[];
+}
+
+export interface TemplateParameter {
+  key: string;
+  label: string;
+  type: 'number' | 'text';
+  defaultValue: any;
+  placeholder?: string;
+  unit?: string;
+  description?: string;
+}
+
+export interface FormulaTemplate {
+  id: string;
+  name: string;
+  description: string;
+  unit: string;
+  baseExpression: string;
+  parameters: TemplateParameter[];
+  category: string;
+  isCustom?: boolean;
+  createdAt?: string;
 }
 
 export interface ColumnConfig {

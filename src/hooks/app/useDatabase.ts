@@ -8,6 +8,13 @@ import { api } from '@/services/api';
 import { useColumns } from '@/hooks/datagrid/useColumns';
 import { propertyMap } from '@/config/i18n';
 
+export interface SyncEvent {
+  id: string;
+  timestamp: number;
+  status: 'success' | 'error';
+  message: string;
+}
+
 // Module-level WeakMap: Provides O(1) GC-safe caching for massive product tokens.
 // Avoids regenerating strings per object across 2.5 MILLION deep iterations per keystroke!
 const __globalProductTextIndex = new WeakMap<Product, string>();
@@ -21,6 +28,30 @@ export function useDatabase(
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [syncEvents, setSyncEvents] = useState<SyncEvent[]>(() => {
+    try {
+      const saved = localStorage.getItem('resindb-sync-events');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return [];
+  });
+
+  const addSyncEvent = useCallback((event: Omit<SyncEvent, 'id' | 'timestamp'>) => {
+    setSyncEvents(prev => {
+      const newEvents = [
+        { ...event, id: Date.now().toString(), timestamp: Date.now() },
+        ...prev
+      ].slice(0, 50); // Keep last 50 events
+      try {
+        localStorage.setItem('resindb-sync-events', JSON.stringify(newEvents));
+      } catch {
+        // ignore
+      }
+      return newEvents;
+    });
+  }, []);
 
   const columnManagement = useColumns(allProducts);
   const { columns } = columnManagement;
@@ -72,10 +103,16 @@ export function useDatabase(
 
   const refreshData = useCallback(async () => {
     setIsRefreshing(true);
-    await fetchProducts("", null, true);
-    setIsRefreshing(false);
-    addToast("success", t("dataRefreshed"));
-  }, [fetchProducts, addToast, t]);
+    try {
+      await fetchProducts("", null, true);
+      addToast("success", t("dataRefreshed"));
+      addSyncEvent({ status: 'success', message: t("dataRefreshed", "Data refreshed successfully") });
+    } catch (error) {
+      addSyncEvent({ status: 'error', message: error instanceof Error ? error.message : "Unknown error during sync" });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [fetchProducts, addToast, t, addSyncEvent]);
 
   useEffect(() => {
     fetchProducts();
@@ -355,6 +392,8 @@ export function useDatabase(
     isLoading,
     isRefreshing,
     refreshData,
+    syncEvents,
+    addSyncEvent,
     resolvePropKey,
     ...columnManagement
   }), [
@@ -368,6 +407,8 @@ export function useDatabase(
     isLoading,
     isRefreshing,
     refreshData,
+    syncEvents,
+    addSyncEvent,
     resolvePropKey,
     columnManagement
   ]);

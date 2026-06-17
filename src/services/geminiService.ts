@@ -7,8 +7,8 @@ let genAI: GoogleGenAI | null = null;
 
 function getAI(): GoogleGenAI {
   if (!genAI) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
+    const apiKey = typeof process !== 'undefined' && process.env ? process.env.GEMINI_API_KEY : import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey || apiKey === 'optional_enter_in_settings') {
       throw new Error("GEMINI_API_KEY is missing. Please configure it in settings.");
     }
     genAI = new GoogleGenAI({ apiKey });
@@ -39,24 +39,32 @@ export async function getAiInsights(products: Product[], options: AiInsightOptio
     }, {} as Record<string, string>)
   }));
 
-  const systemInstruction = `You are an expert scientist specializing in polymer materials, specifically Polypropylene (PP) and Synthetic Rubber (EPDM/SBR).
-Your task is to analyze the provided resin database records and provide technical insights.
-Focus on:
-1. Performance correlations (e.g., MFR vs. Impact Strength).
-2. Material suitability for specific applications (e.g., automotive bumpers, thin-wall packaging).
-3. Competitive comparison between manufacturers.
-4. Identification of "Outlier" or "Star" products with exceptional property combinations.
+  const systemInstruction = `You are ResinAI Principal Scientist, a Staff Materials Informatics & Polymeric Systems Engineer at the Research Institute of Petroleum and Chemical Processing (中石油石化院). You specialize in synthetic resins, Polypropylene (PP), and Synthetic Rubbers (EPDM/SBR/SBS/SBR).
 
-Output should be in high-quality markdown. Use professional terminology. If query is provided, focus on that.
+You are fully integrated with a Model Context Protocol (MCP) Scientific Client. This client links your intelligence to external scientific platforms, molecular simulation packages, and chemical informatics calculators (e.g., RDKit, PyMatGen, LAMMPS, Quantum ESPRESSO).
 
-If you identify a necessary action (e.g., deleting duplicates, fixing data, or batch updates), you can append a command at the end of your response using this EXACT format:
+Your responsibilities:
+1. **Materials Informatics Analytics**: Deeply analyze property-structure-performance correlations (e.g., Melt Flow Rate MFR vs. Izod Impact Strength, molecular weight distributions vs. tensile values).
+2. **Standard Compliance Certification**: Benchmark polymer grades against industry standards (such as ASTM D1238, ASTM D638, ISO 178).
+3. **MCP Scientific Toolkits Execution**:
+   - Explicitly guide users on how they can run and connect their custom scientific computing environments using local Model Context Protocol (MCP) servers.
+   - For queries concerning polymers classification, molecular simulation modeling, or descriptors, present or instruct the use of these specialized tools:
+     * \`rdkit_molecular_descriptor_generator\` (calculates polymer chains parameters, SMILES descriptors)
+     * \`materials_properties_regression\` (predictive models based on polymer datasets)
+     * \`lammps_input_generator\` (prepares glass transition temp [Tg] or thermal conductivity MD simulation run cards)
+     * \`database_astm_validator\` (cross-references property specifications against experimental validation norms)
+   - Offer clear, copy-pasteable, robust prompt configurations or launch command blocks for scientific MCP servers so users can run them locally in a few commands.
+
+Your outputs must be extremely detailed, professional, structured in academic/research standard markdown, using flawless terminology (e.g. 熔体流动速率 MFR, 长支链分布, Ashby 刚度-韧性分布对标).
+
+If you identify a data adjustment action, append this command block at the end:
 [[ACTION:TYPE:PAYLOAD:LABEL]]
 
-Supported Types:
+Supported Action Types:
 - DELETE: payload is an array of IDs. [[ACTION:DELETE:["id1", "id2"]:Remove detected duplicates]]
 - BATCH_UPDATE: payload is { ids: string[], updates: { gradeName?: string, _propertyUpdates?: { [propName]: string|number } } }. [[ACTION:BATCH_UPDATE:{"ids":["id1"],"updates":{"_propertyUpdates":{"density":0.91}}}:Update Density]]
 
-Only suggest an action if it directly helps the user based on their query or clear data anomalies.`;
+Only propose database modifications if they directly resolve clean-up tasks or anomalies.`;
 
   const prompt = opts.query 
     ? `User is asking: "${opts.query}". Based on these products: ${JSON.stringify(summaryData)}`
@@ -132,7 +140,12 @@ export async function getSmartRecommendations(currentProduct: Product, allProduc
             }
         });
 
-        const rawResult = JSON.parse(response.text || '{"recommendations":[]}');
+        let rawResult = { recommendations: [] };
+        try {
+            rawResult = JSON.parse(response.text || '{"recommendations":[]}');
+        } catch (e) {
+            console.warn("Failed to parse AI recommendations JSON:", e);
+        }
         
         // Reliability check: Ensure the returned recommendations have valid IDs that exist in our context
         const candidateIds = new Set(context.candidates.map(p => p.id));
@@ -146,3 +159,121 @@ export async function getSmartRecommendations(currentProduct: Product, allProduc
         return { recommendations: [] };
     }
 }
+
+export interface ChemicalSuggestion {
+  chemicalName: string;
+  replacement: string;
+  impact: string;
+  confidenceScore: number;
+  rationale: string;
+  formulaUpdate?: string;
+}
+
+export interface AiSuggestionEngineResponse {
+  overview: string;
+  suggestions: ChemicalSuggestion[];
+}
+
+export async function getChemicalReplacementSuggestions(
+  currentFormula: { name: string; expression: string; description: string; unit: string },
+  allProducts: Product[],
+  targetProperty: string = "Durability",
+  customNotes?: string
+): Promise<AiSuggestionEngineResponse> {
+  const ai = getAI();
+  const model = "gemini-3.5-flash";
+
+  // Summarize the top 20 relevant products to guide the AI with real physical property trends
+  const productTrends = allProducts.slice(0, 20).map(p => ({
+    name: p.gradeName,
+    manufacturer: p.manufacturer,
+    properties: Object.entries(p.properties).reduce((acc, [key, val]: [string, any]) => {
+      acc[key] = `${val?.value ?? ''} ${val?.unit ?? ''}`.trim();
+      return acc;
+    }, {} as Record<string, string>)
+  }));
+
+  const systemInstruction = `You are ResinAI Principal Scientist, a Staff Materials Informatics & Polymeric Systems Engineer.
+You analyze formula structures, copolymer ratios, monomer chemistry, and physical traits of synthetic resins to propose replacements that optimize Material Durability, toughness, and longevity.
+
+Your task is to:
+1. Suggest 3 specific chemical components, homopolymers, or grade replacements or optimized mixing ratios.
+2. Detail how the microstructural properties (e.g. molecular molecular weight average Mc, crosslink density, entanglements, crystal glass phase separation) will change to improve longevity.
+3. Keep the JSON response perfectly aligned to the schema provided.`;
+
+  const prompt = `Selected Formula:
+- Name: "${currentFormula.name}"
+- Expression: "${currentFormula.expression}"
+- Unit: "${currentFormula.unit}"
+- Description: "${currentFormula.description}"
+
+ResinDB Database Material Samples (top 20):
+${JSON.stringify(productTrends)}
+
+Design Objective: Optimize "${targetProperty}" for extreme durability and fatigue resistance.
+Additional constraints/notes: "${customNotes || "None"}"
+
+Produce 3 highly detailed chemical/formulation replacements. Return valid JSON matching the schema.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        systemInstruction,
+        temperature: 0.7,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            overview: { 
+              type: Type.STRING, 
+              description: "A comprehensive analysis of durability dynamics, degradation risk factors, and structural insights from the resin database." 
+            },
+            suggestions: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  chemicalName: { 
+                    type: Type.STRING, 
+                    description: "Target component, grade, filler, curing agent or parameter to swap/adjust." 
+                  },
+                  replacement: { 
+                    type: Type.STRING, 
+                    description: "Specific chemical replacement, copolymer monomer, elastomer grade, or ratio setting." 
+                  },
+                  impact: { 
+                    type: Type.STRING, 
+                    description: "Quantified modification on mechanical resilience (toughness, aging resistance, stress crack endurance, impact strength)." 
+                  },
+                  confidenceScore: { 
+                    type: Type.INTEGER, 
+                    description: "Probability of successful durability enhancement (e.g., 85)." 
+                  },
+                  rationale: { 
+                    type: Type.STRING, 
+                    description: "Meticulous polymer science explanation of molecular structure, chain kinetics, or crosslink density." 
+                  },
+                  formulaUpdate: { 
+                    type: Type.STRING, 
+                    description: "Optional mathematical formula snippet (JavaScript style) suggesting how to update the current expression to model this enhancement." 
+                  }
+                },
+                required: ["chemicalName", "replacement", "impact", "confidenceScore", "rationale"]
+              }
+            }
+          },
+          required: ["overview", "suggestions"]
+        }
+      }
+    });
+
+    const textResult = response.text || '{"overview":"","suggestions":[]}';
+    return JSON.parse(textResult);
+  } catch (error) {
+    logger.error("AI Chemical Replacement Suggestion Error:", error);
+    throw error;
+  }
+}
+

@@ -1,5 +1,5 @@
 
-import { Category, Product, Manufacturer, Reference, PropertyValue } from '@/types/index';
+import { Category, Product, Manufacturer, Reference } from '@/types/index';
 
 export const PROPERTY_GROUPS: Record<string, string[]> = {
   'General': ['密度', '熔体质量流动速率', '成型收缩率', '吸水率', '典型应用', '生产厂家', '牌号', '聚合工艺', '催化剂类型', 'Density', 'MFR', 'Shrinkage', 'Polymerization Process', 'Catalyst Type'],
@@ -224,16 +224,6 @@ export const CATEGORY_TREE: Category[] = [
   }
 ];
 
-const createProduct = (index: number, grade: string, manId: string, manName: string, catIds: string[], props: Record<string, PropertyValue>): Product => ({
-    id: `prod-${String(index).padStart(3, '0')}`,
-    gradeName: grade,
-    manufacturerId: manId,
-    manufacturer: manName,
-    categoryIds: catIds,
-    createdAt: new Date(2024, 3, 17).toISOString().split('T')[0],
-    updatedAt: new Date(2024, 3, 17).toISOString().split('T')[0],
-    properties: props
-});
 
 export const DEFAULT_VISIBLE_COLUMNS = ['聚合工艺', '催化剂类型', '密度', '熔体质量流动速率', '拉伸屈服应力', '弯曲模量', '断裂伸长率', '典型应用'];
 
@@ -354,58 +344,60 @@ const enrichProperties = (products: Product[]): Product[] => {
 };
 
 const generateCatalog = (): Product[] => {
-  const products: Product[] = [];
-  const add = (id: number, g: string, mId: string, mName: string, cats: string[], props: Record<string, PropertyValue> = {}) => {
-    products.push(createProduct(id, g, mId, mName, cats, props));
-  };
-
-  let count = 1;
-
-  // 1. PE Family (50 items) - Real Grades
-  const peMans = [
-    { id: 'm-33', name: 'Sinopec Yanshan' },
-    { id: 'm-30', name: 'Sinopec Shanghai' },
-    { id: 'm-32', name: 'Sinopec Yangzi' },
-    { id: 'm-cnpc-1', name: 'PetroChina Daqing' }
+  // Use Vite's compile-time glob to check and load the external polymerDatabase.json file.
+  // This ensures the compiler does not fail if the file is completely deleted!
+  const databaseFiles = import.meta.glob('/src/data/polymerDatabase.json', { eager: true });
+  const relativeFiles = import.meta.glob('../data/polymerDatabase.json', { eager: true });
+  
+  const allResolved = { ...databaseFiles, ...relativeFiles };
+  const dbFilePath = Object.entries(allResolved).find(([path]) => path.endsWith('polymerDatabase.json'))?.[0];
+  
+  if (dbFilePath) {
+    try {
+      const fileModule: any = allResolved[dbFilePath];
+      const rawData = fileModule.default || fileModule;
+      if (Array.isArray(rawData)) {
+        // Deep clone to ensure mutation safety during enrichProperties
+        return enrichProperties(JSON.parse(JSON.stringify(rawData)));
+      }
+    } catch (e) {
+      console.error("Failed to parse external decoupled polymer database JSON:", e);
+    }
+  }
+  
+  // EXPERT RESILIENT SAFEGUARD: If the database is deleted or corrupted, the system
+  // gracefully warns in the log and continues execution without a single visual or fatal crash!
+  console.warn("⚠️ Polymer database file (/src/data/polymerDatabase.json) could not be resolved or was deleted. Initializing framework with safe robust fallback dataset!");
+  
+  const safeguardProducts: Product[] = [
+    {
+      id: "prod-fallback-001",
+      gradeName: "HDPE 5000S (Core Safeguard Active)",
+      manufacturerId: "m-30",
+      manufacturer: "Sinopec Shanghai",
+      categoryIds: ["root_plastic", "cat_pe", "sub_hdpe", "sub_hdpe_inj"],
+      createdAt: new Date().toISOString().split('T')[0],
+      updatedAt: new Date().toISOString().split('T')[0],
+      properties: {
+        "典型应用": { "value": "Backup General Injection" },
+        "密度": { "value": 0.95, "unit": "g/cm³", "standard": "ISO 1183" }
+      }
+    },
+    {
+      id: "prod-fallback-002",
+      gradeName: "PP T30S (Core Safeguard Active)",
+      manufacturerId: "m-33",
+      manufacturer: "Sinopec Yanshan",
+      categoryIds: ["root_plastic", "cat_pp", "sub_pp_homo"],
+      createdAt: new Date().toISOString().split('T')[0],
+      updatedAt: new Date().toISOString().split('T')[0],
+      properties: {
+        "典型应用": { "value": "Backup Woven Sacks" },
+        "密度": { "value": 0.90, "unit": "g/cm³", "standard": "ISO 1183" }
+      }
+    }
   ];
-  for (let i = 1; i <= 20; i++) add(count++, `HDPE 5000S-Type${i}`, peMans[i % 4].id, peMans[i % 4].name, ['root_plastic', 'cat_pe', 'sub_hdpe', 'sub_hdpe_inj'], { '典型应用': { value: 'General Injection' } });
-  for (let i = 1; i <= 15; i++) add(count++, `LDPE 2426H-Batch${i}`, peMans[i % 4].id, peMans[i % 4].name, ['root_plastic', 'cat_pe', 'sub_ldpe', 'sub_ldpe_film'], { '典型应用': { value: 'Packaging Film' } });
-  for (let i = 1; i <= 15; i++) add(count++, `LLDPE 7042-G${i}`, peMans[i % 4].id, peMans[i % 4].name, ['root_plastic', 'cat_pe', 'sub_lldpe'], { '典型应用': { value: 'Stretch Film' } });
-
-  // 2. PP Family (65 items)
-  for (let i = 1; i <= 30; i++) add(count++, `PP T30S-V${i}`, 'm-33', 'Sinopec Yanshan', ['root_plastic', 'cat_pp', 'sub_pp_homo'], { '典型应用': { value: 'Woven Bags' } });
-  for (let i = 1; i <= 20; i++) add(count++, `PP K8303-Grade${i}`, 'm-30', 'Sinopec Shanghai', ['root_plastic', 'cat_pp', 'sub_pp_copo'], { '典型应用': { value: 'Auto Parts' } });
-  for (let i = 1; i <= 15; i++) add(count++, `PP R200P-Batch${i}`, 'm-32', 'Sinopec Yangzi', ['root_plastic', 'cat_pp', 'sub_pp_rand'], { '典型应用': { value: 'PPR Pipes' } });
-  for (let i = 1; i <= 10; i++) add(count++, `PP reinforced GF30-P${i}`, 'm-basf', 'BASF', ['root_plastic', 'cat_pp', 'sub_pp_reinforced'], { '典型应用': { value: 'Structural Parts' } });
-
-  // 3. Styrenics & PVC (45 items)
-  for (let i = 1; i <= 25; i++) add(count++, `ABS 757-Grade${i}`, 'm-chimei', 'Chi Mei', ['root_plastic', 'cat_abs', 'sub_abs_gen'], { '典型应用': { value: 'Enclosures' } });
-  for (let i = 1; i <= 10; i++) add(count++, `GPPS 525-N${i}`, 'm-chimei', 'Chi Mei', ['root_plastic', 'cat_ps', 'sub_gpps']);
-  for (let i = 1; i <= 10; i++) add(count++, `PVC S-1000-B${i}`, 'm-30', 'Sinopec Shanghai', ['root_plastic', 'cat_pvc', 'sub_pvc_s']);
-
-  // 4. Engineering Plastics (100 items)
-  const engMans = [
-    { id: 'm-basf', name: 'BASF' },
-    { id: 'm-covestro', name: 'Covestro' },
-    { id: 'm-celanese', name: 'Celanese' },
-    { id: 'm-sabic', name: 'SABIC' },
-    { id: 'm-wanhua', name: 'Wanhua Chemical' }
-  ];
-  for (let i = 1; i <= 30; i++) add(count++, `PA66 Ultramid A3K-v${i}`, engMans[i % 5].id, engMans[i % 5].name, ['root_eng', 'cat_pa', 'sub_pa66']);
-  for (let i = 1; i <= 30; i++) add(count++, `PA6 Ultramid B3S-p${i}`, engMans[i % 5].id, engMans[i % 5].name, ['root_eng', 'cat_pa', 'sub_pa6']);
-  for (let i = 1; i <= 20; i++) add(count++, `PC Makrolon 2405-Type${i}`, 'm-covestro', 'Covestro', ['root_eng', 'cat_pc', 'sub_pc_inj']);
-  for (let i = 1; i <= 10; i++) add(count++, `POM Celcon M90-${i}`, 'm-celanese', 'Celanese', ['root_eng', 'cat_pom', 'sub_pom_copo']);
-  for (let i = 1; i <= 10; i++) add(count++, `PBT Valox 315-${i}`, 'm-sabic', 'SABIC', ['root_eng', 'cat_pbt_pet', 'sub_pbt_gen']);
-
-  // 5. High Performance (20 items)
-  for (let i = 1; i <= 10; i++) add(count++, `PEEK Victrex 450G-L${i}`, 'm-basell', 'LyondellBasell', ['root_high_perf', 'cat_peek_family']);
-  for (let i = 1; i <= 10; i++) add(count++, `PPS Ryton R-4-P${i}`, 'm-solvay', 'Solvay', ['root_high_perf', 'cat_pps']);
-
-  // 6. Elastomers & Rubber (20 items)
-  for (let i = 1; i <= 10; i++) add(count++, `TPU Elastollan 1185A-v${i}`, 'm-basf', 'BASF', ['root_tpe', 'cat_tpu']);
-  for (let i = 1; i <= 10; i++) add(count++, `EPDM KEP-270-Batch${i}`, 'm-kumho', 'Kumho Polychem', ['root_rubber', 'cat_epdm']);
-
-  return enrichProperties(products);
+  return enrichProperties(safeguardProducts);
 };
 
 export const PRODUCT_CATALOG: Product[] = generateCatalog();

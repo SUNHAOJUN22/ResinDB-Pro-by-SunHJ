@@ -82,7 +82,11 @@ export function useSavedViews(
     (id: string) => {
       const updated = savedViews.filter((v) => v.id !== id);
       setSavedViews(updated);
-      localStorage.setItem("resindb-saved-views", JSON.stringify(updated));
+      try {
+        localStorage.setItem("resindb-saved-views", JSON.stringify(updated));
+      } catch {
+        // Ignore
+      }
     },
     [savedViews]
   );

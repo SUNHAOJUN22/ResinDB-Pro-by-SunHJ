@@ -28,8 +28,6 @@ import { SystemStatusIndicator } from '@/components/ui/SystemStatusIndicator';
 import { SavedView } from '@/types/index';
 
 interface TopBarProps {
-  onExport: () => void;
-  onExportPdf?: () => void;
   isExporting: boolean;
   savedViews: SavedView[];
   onSaveView: (name: string) => void;
@@ -39,8 +37,6 @@ interface TopBarProps {
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
-  onExport,
-  onExportPdf,
   isExporting,
   savedViews,
   onSaveView,
@@ -48,7 +44,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onDeleteView,
   lastSyncTime,
 }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { currentUser, logout } = useAuth();
   const {
     systemStatus,
@@ -111,14 +107,14 @@ export const TopBar: React.FC<TopBarProps> = ({
               whileTap={{ scale: 0.95 }}
               onClick={() => openModal("formulaEditor")}
               className={`h-10 px-3 md:px-4 hidden md:flex items-center gap-2 border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 rounded-lg shadow-sm bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800/80 text-primary-600 hover:border-primary-400 group relative overflow-hidden`}
-              title="Performance Index Engine"
+              title={language === 'zh' ? "性能指数引擎" : "Performance Index Engine"}
             >
               <Calculator
                 size={14}
                 className="shrink-0 group-hover:scale-110 transition-transform"
               />
               <span className="hidden lg:inline text-xs font-mono tracking-widest uppercase whitespace-nowrap">
-                Formula
+                {language === 'zh' ? "指标公式" : "Formula"}
               </span>
               <div className="absolute inset-0 bg-primary-500/5 translate-y-full group-hover:translate-y-0 transition-transform" />
             </motion.button>
@@ -128,11 +124,11 @@ export const TopBar: React.FC<TopBarProps> = ({
               whileTap={{ scale: 0.95 }}
               onClick={() => setHistoryOpen(true)}
               className="h-10 px-3 md:px-4 hidden md:flex items-center gap-2 border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 rounded-lg shadow-sm bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800/80 text-amber-600 hover:border-amber-400 group relative overflow-hidden"
-              title="Show Version History"
+              title={language === 'zh' ? "显示版本历史" : "Show Version History"}
             >
               <History size={14} className="shrink-0 group-hover:-rotate-45 transition-transform" />
               <span className="hidden xl:inline text-xs font-mono tracking-widest uppercase whitespace-nowrap">
-                History
+                {language === 'zh' ? "变更历史" : "History"}
               </span>
             </motion.button>
 
@@ -145,10 +141,10 @@ export const TopBar: React.FC<TopBarProps> = ({
 
             <QuickActionMenu
               onOpenImport={() => openModal("import")}
-              onExport={onExport}
-              onExportPdf={onExportPdf}
+              onOpenSmartExport={() => openModal("smartExport")}
               isExporting={isExporting}
               onOpenAdmin={() => openModal("admin")}
+              onOpenQualityAudit={() => openModal("dataQualityAudit")}
             />
 
             <ColumnVisibilityMenu
@@ -212,12 +208,12 @@ export const TopBar: React.FC<TopBarProps> = ({
 
               <NotificationMenu t={t} />
 
-              <motion.button
+               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={() => openModal("shortcuts")}
                 className="flex p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900 border border-transparent hover:border-slate-200 dark:hover:border-slate-800 transition-all relative group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 rounded-lg"
-                title="Keyboard Shortcuts"
+                title={t("keyboardShortcuts")}
               >
                 <Keyboard size={18} />
                 <span className="absolute -bottom-10 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-slate-900 text-white text-[10px] font-mono tracking-widest rounded opacity-0 group-hover:opacity-100 transition-all pointer-events-none shadow-xl uppercase whitespace-nowrap">
@@ -230,7 +226,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                 whileTap={{ scale: 0.9 }}
                 onClick={() => openModal("help")}
                 className="flex p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900 border border-transparent hover:border-slate-200 dark:hover:border-slate-800 transition-all relative group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 rounded-lg"
-                title="Help Center"
+                title={t("helpCenter")}
               >
                 <HelpCircle size={18} />
                 <span className="absolute -bottom-10 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-slate-900 text-white text-[10px] font-mono tracking-widest rounded opacity-0 group-hover:opacity-100 transition-all pointer-events-none shadow-xl uppercase whitespace-nowrap">
@@ -242,7 +238,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                 whileTap={{ scale: 0.9 }}
                 onClick={() => openModal("feedback")}
                 className="flex p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900 border border-transparent hover:border-slate-200 dark:hover:border-slate-800 transition-all relative group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 rounded-lg"
-                title="Send Feedback"
+                title={t("sendFeedback")}
               >
                 <MessageSquare size={18} />
                 <span className="absolute -bottom-10 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-slate-900 text-white text-[10px] font-mono tracking-widest rounded opacity-0 group-hover:opacity-100 transition-all pointer-events-none shadow-xl uppercase whitespace-nowrap">

@@ -11,9 +11,13 @@ import {
   Loader2,
   ShieldCheck,
   RotateCcw,
+  Palette,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { User as UserType } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useTheme, ColorTheme } from "@/contexts/ThemeContext";
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -31,6 +35,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onAddToast,
 }) => {
   const { t } = useLanguage();
+  const { colorTheme, setColorTheme, theme, toggleTheme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
@@ -300,6 +305,47 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         placeholder={t("keepEmpty")}
                         className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono font-bold outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/5 transition-all dark:text-slate-200"
                       />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+                    <div className="flex items-center gap-2 mb-2">
+                       <Palette size={14} className="text-slate-400" />
+                       <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
+                         Appearance Settings
+                       </label>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
+                      <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
+                        Color Theme (Real-time)
+                      </span>
+                      <select 
+                        value={colorTheme}
+                        onChange={(e) => setColorTheme(e.target.value as ColorTheme)}
+                        className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-mono font-bold uppercase tracking-widest pl-3 pr-8 py-1.5 outline-none focus:border-primary-500 transition-all cursor-pointer shadow-sm text-slate-700 dark:text-slate-300"
+                      >
+                        <option value="indigo">Industrial (Default)</option>
+                        <option value="high-contrast">High Contrast</option>
+                        <option value="emerald">Emerald</option>
+                        <option value="rose">Rose</option>
+                        <option value="blue">Blue</option>
+                        <option value="amber">Amber</option>
+                        <option value="violet">Violet</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
+                      <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
+                        Dark Mode
+                      </span>
+                      <button
+                        type="button"
+                        onClick={toggleTheme}
+                        className="p-1.5 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-primary-500 transition-colors shadow-sm"
+                      >
+                         {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
+                      </button>
                     </div>
                   </div>
 

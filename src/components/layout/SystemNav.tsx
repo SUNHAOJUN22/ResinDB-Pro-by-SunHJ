@@ -8,6 +8,8 @@ import {
   PieChart,
   ShieldCheck,
   TableProperties,
+  Network,
+  Cpu
 } from "lucide-react";
 import { AppView } from '@/types/index';
 import { ModalType } from '@/contexts/ModalContext';
@@ -158,7 +160,17 @@ export const SystemNav: React.FC<{
           {
             id: "pivot",
             icon: TableProperties,
-            label: "Data Pivot",
+            label: t("dataPivot", "数据透视"),
+          },
+          {
+            id: "dependencies",
+            icon: Network,
+            label: t("dependencyMap", "依赖网络谱图"),
+          },
+          {
+            id: "beta-sandbox",
+            icon: Cpu,
+            label: "v3.1 Beta Sandbox (智能实验室入口)",
           },
         ].map((btn) => (
           <motion.button

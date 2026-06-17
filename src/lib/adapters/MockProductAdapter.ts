@@ -121,12 +121,40 @@ export class MockProductAdapter implements IProductAdapter {
     this.products = this.products.filter(p => !ids.includes(p.id));
   }
 
-  async exportReport(products: Product[], _format: 'csv' | 'xlsx'): Promise<Blob> {
+  async exportReport(products: Product[], format: 'csv' | 'xlsx' | 'json' | 'xml'): Promise<Blob> {
     await this.simulateLatency(1500);
     this.simulateNetworkCondition();
 
     if (products.length === 0) {
       throw new Error("400 Bad Request: No data to export");
+    }
+
+    if (format === 'json') {
+      const jsonContent = JSON.stringify(products, null, 2);
+      return new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+    }
+
+    if (format === 'xml') {
+      const xmlContent = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<Products>',
+        ...products.map(p => {
+          const props = Object.entries(p.properties)
+            .map(([k, v]) => `      <Property name="${k}" value="${v.value}" unit="${v.unit || ''}"/>`)
+            .join('\n');
+          return `  <Product id="${p.id}">
+    <GradeName>${p.gradeName}</GradeName>
+    <Manufacturer>${p.manufacturer}</Manufacturer>
+    <Categories>${p.categoryIds.join(',')}</Categories>
+    <UpdatedAt>${p.updatedAt}</UpdatedAt>
+    <Properties>
+${props}
+    </Properties>
+  </Product>`;
+        }),
+        '</Products>'
+      ].join('\n');
+      return new Blob([xmlContent], { type: 'application/xml;charset=utf-8;' });
     }
 
     const headers = ['ID', 'Grade', 'Manufacturer', 'Category', 'Updated'];
