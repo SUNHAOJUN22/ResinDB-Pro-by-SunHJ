@@ -3,6 +3,8 @@ import { PolymerDataValidator } from '../../src/lib/adapters/PolymerDataValidato
 import { MaterialRecord } from '../../src/lib/adapters/types';
 import { calculateTopsis } from '../../src/lib/topsisAnalyzer';
 import { materialEngine } from '../../src/lib/materialScience';
+import { auditASTMStandards } from '../../src/utils/polymerPhysics';
+
 
 describe('🧪 PRO RIGOROUS POLYMER SCIENCE & MECHANICAL VALIDATION SUITE', () => {
 
@@ -207,4 +209,55 @@ describe('🧪 PRO RIGOROUS POLYMER SCIENCE & MECHANICAL VALIDATION SUITE', () =
       }
     });
   });
+
+  describe('7. ASTM Standards Audit - Chinese/English Key & CategoryId Compatibility', () => {
+    test('Should successfully audit database products with Chinese properties and category list', () => {
+      const dbProduct: any = {
+        id: 'db-pp-test',
+        gradeName: 'PP-MockGrade',
+        manufacturer: 'Sinopec',
+        categoryIds: ['root_plastic', 'cat_pp'],
+        createdAt: '2026-06-18',
+        updatedAt: '2026-06-18',
+        properties: {
+          '密度': { value: 0.905, unit: 'g/cm³', standard: 'ISO 1183' },
+          '熔体质量流动速率': { value: 3.5, unit: 'g/10min', standard: 'ISO 1133' },
+          '拉伸屈服应力': { value: 34.0, unit: 'MPa', standard: 'ISO 527' },
+          '弯曲模量': { value: 1450.0, unit: 'MPa', standard: 'ISO 178' }
+        }
+      };
+
+      const results = auditASTMStandards([dbProduct]);
+      expect(results.length).toBe(1);
+      const res = results[0];
+      expect(res.gradeName).toBe('PP-MockGrade');
+      expect(res.category).toBe('PP');
+      expect(res.status).toBe('PASSED');
+      expect(res.findings[0]).toContain('All physical telemetry vectors compile successfully');
+    });
+
+    test('Should successfully audit lab products with English properties and direct category', () => {
+      const labProduct: any = {
+        id: 'lab-pp-test',
+        gradeName: 'PP-LabMock',
+        manufacturer: 'Lab',
+        category: 'PP',
+        createdAt: '2026-06-18',
+        updatedAt: '2026-06-18',
+        properties: {
+          'density': { value: 0.85, unit: 'g/cm³', standard: 'ISO 1183' }, // Out of bounds warning
+          'mfr': { value: 3.5, unit: 'g/10min', standard: 'ISO 1133' }
+        }
+      };
+
+      const results = auditASTMStandards([labProduct]);
+      expect(results.length).toBe(1);
+      const res = results[0];
+      expect(res.gradeName).toBe('PP-LabMock');
+      expect(res.category).toBe('PP');
+      expect(res.status).toBe('WARNING');
+      expect(res.findings[0]).toContain('Density [0.85 g/cm³] deviates from typical Polypropylene boundaries');
+    });
+  });
 });
+
