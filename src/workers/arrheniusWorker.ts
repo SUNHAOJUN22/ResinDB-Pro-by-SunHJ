@@ -20,11 +20,16 @@ export interface ArrheniusResponse {
 self.onmessage = (e: MessageEvent<ArrheniusMessage>) => {
   try {
     const { points } = e.data.payload;
-    if (points.length < 2) {
-      throw new Error("Arrhenius analysis requires at least 2 data points.");
+    const validPoints = (points || []).filter(p => {
+      const tK = p.tempC + 273.15;
+      return tK > 0 && p.time > 0;
+    });
+
+    if (validPoints.length < 2) {
+      throw new Error("Arrhenius analysis requires at least 2 valid data points (time > 0 and tempC > -273.15C).");
     }
 
-    const mappedPoints = points.map(p => {
+    const mappedPoints = validPoints.map(p => {
       const tK = p.tempC + 273.15;
       return {
         tempC: p.tempC,
@@ -49,12 +54,13 @@ self.onmessage = (e: MessageEvent<ArrheniusMessage>) => {
        throw new Error("Invalid data for linear regression (denominator too close to 0).");
     }
 
+    const safeN = n > 0 ? n : 1;
     const m = (n * sumXY - sumX * sumY) / denominator;
-    const b = (sumY - m * sumX) / n;
+    const b = (sumY - m * sumX) / safeN;
 
     // R squared calculation
     
-    const meanY = sumY / n;
+    const meanY = sumY / safeN;
     let ssTot = 0;
     let ssRes = 0;
     for (const pt of mappedPoints) {

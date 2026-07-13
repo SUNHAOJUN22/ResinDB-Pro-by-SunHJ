@@ -148,7 +148,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
     setIsEvaluating(true);
     setTimeout(() => {
       setIsEvaluating(false);
-      addToast("success", t("批处理阈值及公式合规性校验完成！", "Bulk formulation and safety threshold verification completed!"));
+      addToast("success", t("bulkValidateComplete"));
     }, 850);
   };
 
@@ -351,17 +351,14 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
               <ShieldAlert size={16} />
             </div>
             <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight flex items-center gap-1.5">
-              {t("配方计算及物性安全阈值批检验仪器", "Bulk Formula Verification & Safety Check")}
+              {t("bulkValidateTitle")}
               <span className="text-[10px] bg-emerald-500/10 text-emerald-650 dark:text-emerald-400 px-1.5 py-0.5 rounded font-black tracking-widest uppercase">
-                {t("新功能", "PRO")}
+                {t("bulkValidateProLabel")}
               </span>
             </h3>
           </div>
           <p className="text-[11px] text-slate-500 dark:text-slate-450 font-medium">
-            {t(
-              "集中式一键筛查全部选定复杂物理公式，交叉质控检测配方的反应方程质量守恒及物性安全偏离风险点。",
-              "One-click batch compiler checks formula parameters and alerts physical formulation safety boundaries."
-            )}
+            {t("bulkValidateDescription")}
           </p>
         </div>
 
@@ -376,7 +373,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
             }`}
           >
             <Settings size={13} className={showConfig ? "animate-spin text-primary-500" : ""} />
-            {t("阀值安全配置", "Configure Thresholds Limits")}
+            {t("bulkValidateThresholdConfig")}
           </button>
           
           <button
@@ -387,12 +384,12 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
             {isEvaluating ? (
               <>
                 <RefreshCw size={13} className="animate-spin" />
-                {t("正在解析...", "Verifying...")}
+                {t("bulkValidateRunning")}
               </>
             ) : (
               <>
                 <Play size={12} className="fill-current text-white" />
-                {t("执行批分析", "Run Bulk Scan")}
+                {t("bulkValidateRunScan")}
               </>
             )}
           </button>

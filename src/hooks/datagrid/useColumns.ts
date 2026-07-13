@@ -4,6 +4,7 @@ import { ColumnConfig, Product } from '@/types/index';
 import { getDynamicColumns } from '@/utils/productUtils';
 import { logger } from '@/lib/logger';
 import { useFormulas } from '@/hooks/math/useFormulas';
+import { safeStorage } from '@/lib/utils';
 
 export function useColumns(allProducts: Product[]) {
   const { formulas, addFormula, updateFormula, removeFormula } = useFormulas();
@@ -57,14 +58,8 @@ export function useColumns(allProducts: Product[]) {
       isInitialized.current = true;
       let baseCols = [...getDynamicColumns(allProducts), ...computedColumns];
       
-      let savedVisibility = null;
-      let savedOrder = null;
-      try {
-        savedVisibility = localStorage.getItem('resindb-visible-columns-v2');
-        savedOrder = localStorage.getItem('resindb-column-order');
-      } catch {
-        // Ignore
-      }
+      const savedVisibility = safeStorage.local.getItem('resindb-visible-columns-v2');
+      const savedOrder = safeStorage.local.getItem('resindb-column-order');
 
       // Apply visibility
       if (savedVisibility) {
@@ -110,12 +105,8 @@ export function useColumns(allProducts: Product[]) {
     if (columns.length > 0) {
       const visibleKeys = columns.filter(c => c.visible).map(c => c.key);
       const orderKeys = columns.map(c => c.key);
-      try {
-        localStorage.setItem('resindb-visible-columns-v2', JSON.stringify(visibleKeys));
-        localStorage.setItem('resindb-column-order', JSON.stringify(orderKeys));
-      } catch {
-        // Ignore security error inside sandboxed iframe
-      }
+      safeStorage.local.setItem('resindb-visible-columns-v2', JSON.stringify(visibleKeys));
+      safeStorage.local.setItem('resindb-column-order', JSON.stringify(orderKeys));
     }
   }, [columns]);
 

@@ -37,8 +37,10 @@ self.onmessage = (e: MessageEvent<KineticsMessage>) => {
         for (const row of data) {
             if (row.beta <= 0) throw new Error("Heating rate must be strictly positive.");
             const tK = row.tp + 273.15; // C to K
-            const x = 1 / tK;
-            const y = Math.log(row.beta / (tK * tK));
+            const safeTK = Math.abs(tK) > 1e-15 ? tK : 1e-15;
+            const x = 1 / safeTK;
+            const logArg = row.beta / (safeTK * safeTK);
+            const y = Math.log(Math.max(logArg, 1e-15));
             X.push(x);
             Y.push(y);
             points.push({ x, y });
@@ -55,8 +57,9 @@ self.onmessage = (e: MessageEvent<KineticsMessage>) => {
             sumY2 += Y[i] * Y[i];
         }
 
-        const xMean = sumX / n;
-        const yMean = sumY / n;
+        const safeN = n > 0 ? n : 1;
+        const xMean = sumX / safeN;
+        const yMean = sumY / safeN;
 
         const numerator = sumXY - n * xMean * yMean;
         const denominator = sumX2 - n * xMean * xMean;
@@ -71,7 +74,8 @@ self.onmessage = (e: MessageEvent<KineticsMessage>) => {
         // Calculate R^2
         const ssTot = sumY2 - n * yMean * yMean;
         const ssRes = sumY2 - intercept * sumY - slope * sumXY;
-        const r2 = 1 - (ssRes / ssTot);
+        const safeSsTot = Math.abs(ssTot) > 1e-15 ? ssTot : 1e-15;
+        const r2 = 1 - (ssRes / safeSsTot);
 
         // Calculate E and A
         // slope = -E/R => E = -slope * R
@@ -104,11 +108,12 @@ self.onmessage = (e: MessageEvent<KineticsMessage>) => {
         
         // Let's predict until conversion (alpha) is 99%
         // alpha(t) = 1 - exp(-kt) => t = -ln(1-alpha)/k
-        const t99 = -Math.log(1 - 0.99) / k;
+        const safeK = Math.abs(k) > 1e-15 ? k : 1e-15;
+        const t99 = -Math.log(1 - 0.99) / safeK;
         
         // Generate 100 points
         const steps = 100;
-        const dt = t99 / steps;
+        const dt = t99 / (steps > 0 ? steps : 1);
         for(let i=0; i<=steps; i++) {
             const t = i * dt;
             const alpha = 1 - Math.exp(-k * t);

@@ -2,7 +2,7 @@ import { logger } from '@/lib/logger';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Product } from '@/types/index';
 import { HistoryRecord } from '@/lib/adapters/types';
-import { api } from '@/services/api';
+import api from '@/lib/adapters';
 import { useToasts } from '@/contexts/ToastContext';
 import type { HistoryWorkerMessage, HistoryWorkerResponse } from '@/workers/historyWorker';
 
@@ -13,6 +13,12 @@ export function useHistory(
   const [history, setHistory] = useState<Omit<HistoryRecord, 'snapshot'>[]>([]);
   const { addToast } = useToasts();
   const workerRef = useRef<Worker | null>(null);
+
+  // Update a ref to always point to the latest products array without re-triggering effects
+  const allProductsRef = useRef(allProducts);
+  useEffect(() => {
+    allProductsRef.current = allProducts;
+  }, [allProducts]);
 
   useEffect(() => {
     const worker = new Worker(new URL('../../workers/historyWorker.ts', import.meta.url), { type: 'module' });
@@ -31,7 +37,7 @@ export function useHistory(
             payload: {
                description: `Undo to: previous state`,
                // using the current array directly (will be structurally cloned in worker)
-               snapshot: [...allProducts]
+               snapshot: [...allProductsRef.current]
             }
           } as HistoryWorkerMessage);
 
@@ -54,7 +60,7 @@ export function useHistory(
     return () => {
       worker.terminate();
     };
-  }, [addToast, setAllProducts, allProducts]);
+  }, [addToast, setAllProducts]);
 
   const pushToHistory = useCallback((description: string, currentSnapshot: Product[]) => {
     if (workerRef.current) {

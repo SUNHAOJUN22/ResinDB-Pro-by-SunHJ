@@ -4,6 +4,8 @@ import React, {
   useRef,
   useEffect,
   useCallback,
+  Suspense,
+  lazy,
 } from "react";
 import { motion } from "motion/react";
 import {
@@ -42,10 +44,12 @@ import { Product, FormulaConfig } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { logger } from "@/lib/logger";
 import { ScientificChart, ChartType as SCChartType } from '@/components/charts/ScientificChart';
-import { CanvasScatterGraph } from "@/components/charts/CanvasScatterGraph";
-import { CorrelationMatrix } from "@/components/charts/CorrelationMatrix";
-import { SimilarityGraph } from "@/components/charts/SimilarityGraph";
-import { RheologyGraph } from "@/components/charts/RheologyGraph";
+
+const CanvasScatterGraph = lazy(() => import("@/components/charts/CanvasScatterGraph").then((m) => ({ default: m.CanvasScatterGraph })));
+const CorrelationMatrix = lazy(() => import("@/components/charts/CorrelationMatrix").then((m) => ({ default: m.CorrelationMatrix })));
+const SimilarityGraph = lazy(() => import("@/components/charts/SimilarityGraph").then((m) => ({ default: m.SimilarityGraph })));
+const RheologyGraph = lazy(() => import("@/components/charts/RheologyGraph").then((m) => ({ default: m.RheologyGraph })));
+
 import { useSimilarityWorker } from '@/hooks/math/useSimilarity';
 import { useRsmWorker } from '@/hooks/workers/useRsmWorker';
 import { useParetoWorker } from '@/hooks/workers/useParetoWorker';
@@ -56,11 +60,17 @@ import { useWeibullWorker } from '@/hooks/workers/useWeibullWorker';
 import { useWlfWorker } from '@/hooks/workers/useWlfWorker';
 import { useCopulaWorker } from '@/hooks/workers/useCopulaWorker';
 import { useArrheniusWorker } from '@/hooks/workers/useArrheniusWorker';
-import { ArrheniusChart } from "@/components/charts/ArrheniusChart";
+
+const ArrheniusChart = lazy(() => import("@/components/charts/ArrheniusChart").then((m) => ({ default: m.ArrheniusChart })));
+
 import { useSobolWorker } from '@/hooks/workers/useSobolWorker';
-import { SobolChart } from "@/components/charts/SobolChart";
+
+const SobolChart = lazy(() => import("@/components/charts/SobolChart").then((m) => ({ default: m.SobolChart })));
+
 import { useSpcWorker } from '@/hooks/workers/useSpcWorker';
-import { SpcChart } from "@/components/charts/SpcChart";
+
+const SpcChart = lazy(() => import("@/components/charts/SpcChart").then((m) => ({ default: m.SpcChart })));
+
 import { RADAR_KEYS, getPerformanceFingerprint } from '@/utils/productUtils';
 
 export type ViewChartType = SCChartType | "canvas_scatter" | "correlation" | "similarity_graph" | "rsm" | "feature_importance" | "kde_topology" | "weibull" | "wlf_tts" | "copula" | "arrhenius" | "sobol" | "spc" | "bayes" | "mahalanobis" | "kinetics" | "prony" | "moo";
@@ -68,24 +78,34 @@ import { PCA } from "@/lib/math/pca";
 import { useKMeansWorker } from '@/hooks/workers/useKMeansWorker';
 import { materialEngine } from "@/lib/materialScience";
 import { useBayesWorker } from '@/hooks/workers/useBayesWorker';
-import { BayesChart } from "@/components/charts/BayesChart";
+
+const BayesChart = lazy(() => import("@/components/charts/BayesChart").then((m) => ({ default: m.BayesChart })));
+
 import { useMooWorker } from '@/hooks/workers/useMooWorker';
-import { MooChart } from "@/components/charts/MooChart";
+
+const MooChart = lazy(() => import("@/components/charts/MooChart").then((m) => ({ default: m.MooChart })));
+
 import { useMahalanobisWorker } from '@/hooks/workers/useMahalanobisWorker';
 
-import { MahalanobisChart } from "@/components/charts/MahalanobisChart";
+const MahalanobisChart = lazy(() => import("@/components/charts/MahalanobisChart").then((m) => ({ default: m.MahalanobisChart })));
+
 import { useKineticsWorker } from '@/hooks/workers/useKineticsWorker';
-import { KineticsChart } from "@/components/charts/KineticsChart";
+
+const KineticsChart = lazy(() => import("@/components/charts/KineticsChart").then((m) => ({ default: m.KineticsChart })));
+
 import { usePronyWorker } from '@/hooks/workers/usePronyWorker';
-import { PronyChart } from "@/components/charts/PronyChart";
+
+const PronyChart = lazy(() => import("@/components/charts/PronyChart").then((m) => ({ default: m.PronyChart })));
+
 import { formulaEngine } from "@/lib/formulaParser";
 import { useFormulas } from '@/hooks/math/useFormulas';
-import { RsmHeatmapChart } from "@/components/charts/RsmHeatmapChart";
-import { FeatureImportanceChart } from "@/components/charts/FeatureImportanceChart";
-import { KdeTopologyChart } from "@/components/charts/KdeTopologyChart";
-import { WeibullChart } from "@/components/charts/WeibullChart";
-import { WlfTtsChart } from "@/components/charts/WlfTtsChart";
-import { CopulaChart } from "@/components/charts/CopulaChart";
+
+const RsmHeatmapChart = lazy(() => import("@/components/charts/RsmHeatmapChart").then((m) => ({ default: m.RsmHeatmapChart })));
+const FeatureImportanceChart = lazy(() => import("@/components/charts/FeatureImportanceChart").then((m) => ({ default: m.FeatureImportanceChart })));
+const KdeTopologyChart = lazy(() => import("@/components/charts/KdeTopologyChart").then((m) => ({ default: m.KdeTopologyChart })));
+const WeibullChart = lazy(() => import("@/components/charts/WeibullChart").then((m) => ({ default: m.WeibullChart })));
+const WlfTtsChart = lazy(() => import("@/components/charts/WlfTtsChart").then((m) => ({ default: m.WlfTtsChart })));
+const CopulaChart = lazy(() => import("@/components/charts/CopulaChart").then((m) => ({ default: m.CopulaChart })));
 
 interface DataVisualizerProps {
   data: Product[];
@@ -651,10 +671,24 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
       mfr_density: t("desc_mfr_density"),
       gpc: t("desc_gpc"),
       rheology: t("desc_rheology"),
-      parallel: t(
-        "desc_parallel",
-        "多维属性坐标展示，对比多个物料在不同性能指标下的整体表现模式。",
-      ),
+      parallel: t("desc_parallel"),
+      canvas_scatter: t("desc_canvas_scatter"),
+      correlation: t("desc_correlation"),
+      similarity_graph: t("desc_similarity_graph"),
+      rsm: t("desc_rsm"),
+      feature_importance: t("desc_feature_importance"),
+      kde_topology: t("desc_kde_topology"),
+      weibull: t("desc_weibull"),
+      wlf_tts: language === "en" ? "WLF TTS master curve fitting." : "时温等效主曲线 (WLF TTS) 拟合计算。",
+      copula: language === "en" ? "Copula joint failure probability." : "双变量相依失效相关性及联合失效概率计算。",
+      arrhenius: language === "en" ? "Arrhenius thermal oxidation lifetime prediction." : "热氧老化寿命预测 (Arrhenius) 拟合计算与寿命推导。",
+      sobol: language === "en" ? "Sobol variance decomposition sensitivity analysis." : "基于蒙特卡洛方差分解的 Sobol 全局敏感度分析。",
+      spc: language === "en" ? "Statistical process control and capability analysis." : "制程能力指数计算与控制图 (Xbar-R / Xbar-S)。",
+      bayes: language === "en" ? "Bayesian inverse optimization for polymer formulation." : "基于高斯过程代理模型的贝叶斯主动学习逆向配方设计。",
+      moo: language === "en" ? "Multi-objective Pareto optimization." : "多目标优化与 Pareto 前沿解集筛选。",
+      mahalanobis: language === "en" ? "Mahalanobis multivariate outlier detection." : "基于协方差矩阵的马氏距离多维联合异常检测。",
+      kinetics: language === "en" ? "Curing kinetics parameter fitting." : "Kissinger 固化动力学参数拟合与等温固化预测。",
+      prony: language === "en" ? "Prony series viscoelastic constitutive model." : "Prony 级数粘弹性本构参数提取与仿真卡片生成。"
     };
 
     const toggleRheologyTemp = (temp: number) => {
@@ -719,43 +753,83 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
             const spearman = materialEngine.calculateSpearman(allPoints);
             const integrity = materialEngine.analyzeDatalineIntegrity(allPoints, corr.slope, corr.intercept);
             
-            insight.content += `\n\n[高阶数理统计报告]`;
-            insight.content += `\n- 线性关联 (Pearson r): ${pearson.toFixed(4)}`;
-            insight.content += `\n- 单调关联 (Spearman ρ): ${spearman.toFixed(4)}`;
-            insight.content += `\n- 统计显著性 (P-Value): ${pValue < 0.001 ? "< 0.001" : pValue.toFixed(4)}`;
-            insight.content += `\n- 拟合置信度 (R²): ${(corr.r2 * 100).toFixed(1)}%`;
-            
-            if (pValue < 0.05) {
-              const relType = Math.abs(pearson - spearman) > 0.2 ? "非线性单调" : "高度线性";
-              insight.content += `\n- 物理逻辑判定: 存在${relType}正相关`;
+            if (language === 'en') {
+              insight.content += `\n\n[Advanced Mathematical Statistics Report]`;
+              insight.content += `\n- Linear Correlation (Pearson r): ${pearson.toFixed(4)}`;
+              insight.content += `\n- Monotonic Correlation (Spearman ρ): ${spearman.toFixed(4)}`;
+              insight.content += `\n- Statistical Significance (P-Value): ${pValue < 0.001 ? "< 0.001" : pValue.toFixed(4)}`;
+              insight.content += `\n- Goodness of Fit (R²): ${(corr.r2 * 100).toFixed(1)}%`;
+              
+              if (pValue < 0.05) {
+                const relType = Math.abs(pearson - spearman) > 0.2 ? "Non-linear Monotonic" : "Highly Linear";
+                insight.content += `\n- Physical Logic: There is a ${relType} positive correlation`;
+              } else {
+                insight.content += `\n- Strength of Conclusion: Statistically insignificant (data may be dominated by experimental error)`;
+              }
+
+              if (ci) {
+                insight.content += `\n- Slope 95% Confidence Interval: [${ci.lower.toFixed(2)}, ${ci.upper.toFixed(2)}]`;
+              }
+
+              if (integrity.healthScore < 80) {
+                insight.content += `\n- ⚠️ Robustness Notice: Model is dominated by ${integrity.influentialPointsCount} high-leverage feature points, limiting confidence.`;
+              }
+              
+              // Robust Outlier Detection
+              const xValues = allPoints.map(p => p[0]);
+              const iqrOutliers = materialEngine.findOutliersIQR(xValues);
+              if (iqrOutliers.length > 0) {
+                insight.content += `\n- Outlier Screening: Detected ${iqrOutliers.length} experimental outlier(s) flagged via IQR.`;
+              }
+
+              // Enhanced Distribution Analysis
+              const stats = materialEngine.getStats(xValues);
+              if (stats) {
+                const momentsX = materialEngine.calculateDistributionMoments(xValues);
+                const isNormal = Math.abs(momentsX?.skewness || 0) < 0.5;
+                insight.content += `\n- Sample Normality: ${isNormal ? "Conforms to Normal Distribution" : "Presents Skewed Distribution"}${!isNormal ? ` (SK: ${momentsX?.skewness.toFixed(2)})` : ""}`;
+              }
+
+              insight.content += `\n- Decision Suggestion: ${pearson > 0.7 && pValue < 0.05 ? "The model possesses high physical predictive capability and can be directly used for backing out formulations." : "Weak mathematical correlation, recommended to exclude disturbances or increase sample size."}`;
             } else {
-              insight.content += `\n- 结论强度: 统计不显著 (数据可能受实验误差主导)`;
-            }
+              insight.content += `\n\n[高阶数理统计报告]`;
+              insight.content += `\n- 线性关联 (Pearson r): ${pearson.toFixed(4)}`;
+              insight.content += `\n- 单调关联 (Spearman ρ): ${spearman.toFixed(4)}`;
+              insight.content += `\n- 统计显著性 (P-Value): ${pValue < 0.001 ? "< 0.001" : pValue.toFixed(4)}`;
+              insight.content += `\n- 拟合置信度 (R²): ${(corr.r2 * 100).toFixed(1)}%`;
+              
+              if (pValue < 0.05) {
+                const relType = Math.abs(pearson - spearman) > 0.2 ? "非线性单调" : "高度线性";
+                insight.content += `\n- 物理逻辑判定: 存在${relType}正相关`;
+              } else {
+                insight.content += `\n- 结论强度: 统计不显著 (数据可能受实验误差主导)`;
+              }
 
-            if (ci) {
-              insight.content += `\n- 斜率置信区间 (95%): [${ci.lower.toFixed(2)}, ${ci.upper.toFixed(2)}]`;
-            }
+              if (ci) {
+                insight.content += `\n- 斜率置信区间 (95%): [${ci.lower.toFixed(2)}, ${ci.upper.toFixed(2)}]`;
+              }
 
-            if (integrity.healthScore < 80) {
-              insight.content += `\n- ⚠️ 稳健性提示: 模型受 ${integrity.influentialPointsCount} 个高槓杆特征点主导，置信度受限。`;
-            }
-            
-            // Robust Outlier Detection
-            const xValues = allPoints.map(p => p[0]);
-            const iqrOutliers = materialEngine.findOutliersIQR(xValues);
-            if (iqrOutliers.length > 0) {
-              insight.content += `\n- 离群值排查: 检测到 ${iqrOutliers.length} 个实验偏离点，已通过 IQR 算法标记。`;
-            }
+              if (integrity.healthScore < 80) {
+                insight.content += `\n- ⚠️ 稳健性提示: 模型受 ${integrity.influentialPointsCount} 个高槓杆特征点主导，置信度受限。`;
+              }
+              
+              // Robust Outlier Detection
+              const xValues = allPoints.map(p => p[0]);
+              const iqrOutliers = materialEngine.findOutliersIQR(xValues);
+              if (iqrOutliers.length > 0) {
+                insight.content += `\n- 离群值排查: 检测到 ${iqrOutliers.length} 个实验偏离点，已通过 IQR 算法标记。`;
+              }
 
-            // Enhanced Distribution Analysis
-            const stats = materialEngine.getStats(xValues);
-            if (stats) {
-              const momentsX = materialEngine.calculateDistributionMoments(xValues);
-              const isNormal = Math.abs(momentsX?.skewness || 0) < 0.5;
-              insight.content += `\n- 样本数理性: ${isNormal ? "符合正态分布" : "呈现偏态分布"}${!isNormal ? ` (SK: ${momentsX?.skewness.toFixed(2)})` : ""}`;
-            }
+              // Enhanced Distribution Analysis
+              const stats = materialEngine.getStats(xValues);
+              if (stats) {
+                const momentsX = materialEngine.calculateDistributionMoments(xValues);
+                const isNormal = Math.abs(momentsX?.skewness || 0) < 0.5;
+                insight.content += `\n- 样本数理性: ${isNormal ? "符合正态分布" : "呈现偏态分布"}${!isNormal ? ` (SK: ${momentsX?.skewness.toFixed(2)})` : ""}`;
+              }
 
-            insight.content += `\n- 决策建议: ${pearson > 0.7 && pValue < 0.05 ? "模型具备高度物理预测力，可直接用于牌号配方反推。" : "数理关联一般，建议排除干扰项或增加样本量。"}`;
+              insight.content += `\n- 决策建议: ${pearson > 0.7 && pValue < 0.05 ? "模型具备高度物理预测力，可直接用于牌号配方反推。" : "数理关联一般，建议排除干扰项或增加样本量。"}`;
+            }
           }
         }
       }
@@ -764,17 +838,28 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
       const chartObj = currentChartData as { series?: { name: string; value: number[] }[] };
       if (activeChart === 'radar' && chartObj?.series) {
         const series = chartObj.series;
-        insight.content += `\n\n[材料性能均衡性评价]`;
-        series.forEach((s) => {
-          if (Array.isArray(s.value)) {
-            const pi = materialEngine.calculatePerformanceIndex(s.value);
-            insight.content += `\n- ${s.name}: 均衡分 ${pi.toFixed(1)} ${pi > 80 ? "(全能型)" : pi > 50 ? "(平衡型)" : "(专业/偏科型)"}`;
-          }
-        });
+        if (language === 'en') {
+          insight.content += `\n\n[Material Performance Balance Evaluation]`;
+          series.forEach((s) => {
+            if (Array.isArray(s.value)) {
+              const pi = materialEngine.calculatePerformanceIndex(s.value);
+              const typeLabel = pi > 80 ? "(All-rounder)" : pi > 50 ? "(Balanced)" : "(Specialized)";
+              insight.content += `\n- ${s.name}: Balance Score ${pi.toFixed(1)} ${typeLabel}`;
+            }
+          });
+        } else {
+          insight.content += `\n\n[材料性能均衡性评价]`;
+          series.forEach((s) => {
+            if (Array.isArray(s.value)) {
+              const pi = materialEngine.calculatePerformanceIndex(s.value);
+              insight.content += `\n- ${s.name}: 均衡分 ${pi.toFixed(1)} ${pi > 80 ? "(全能型)" : pi > 50 ? "(平衡型)" : "(专业/偏科型)"}`;
+            }
+          });
+        }
       }
       
       return insight;
-    }, [activeChart, currentChartData]);
+    }, [activeChart, currentChartData, language]);
 
     return (
       <div className="flex flex-col lg:flex-row h-full gap-4 overflow-y-auto lg:overflow-hidden custom-scrollbar">
@@ -808,13 +893,13 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                 },
                 {
                   id: "canvas_scatter",
-                  label: language === "en" ? "Canvas Heatmap/Scatter" : "Canvas 热力散点图",
+                  label: t("chart_canvas_scatter"),
                   icon: Layers,
                   color: "text-purple-500",
                 },
                 {
                   id: "correlation",
-                  label: language === "en" ? "Correlation Matrix" : "Spearman 相关矩阵",
+                  label: t("chart_correlation"),
                   icon: Target,
                   color: "text-rose-500",
                 },
@@ -844,97 +929,97 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                 },
                 {
                   id: "parallel",
-                  label: language === "en" ? "Parallel Coordinates" : "平行坐标分析",
+                  label: t("chart_parallel"),
                   icon: Layers,
                   color: "text-emerald-500",
                 },
                 {
                   id: "similarity_graph",
-                  label: language === "en" ? "Similarity Network" : "相似度网络 (Similarity Network)",
+                  label: t("chart_similarity_graph"),
                   icon: Network,
                   color: "text-purple-500",
                 },
                 {
                    id: "rsm",
-                   label: language === "en" ? "RSM Optimization" : "响应面分析 (RSM)",
+                   label: t("chart_rsm"),
                    icon: Calculator,
                    color: "text-indigo-500"
                 },
                 {
                    id: "feature_importance",
-                   label: language === "en" ? "Feature Importance" : "特征敏感度归因 (SHAP / LASSO)",
+                   label: t("chart_feature_importance"),
                    icon: BarChart3,
                    color: "text-rose-500"
                 },
                 {
                    id: "kde_topology",
-                   label: language === "en" ? "2D KDE Contour" : "平滑拓扑/热力 (2D KDE)",
+                   label: t("chart_kde_topology"),
                    icon: Map,
                    color: "text-orange-500"
                 },
                 {
                    id: "weibull",
-                   label: language === "en" ? "Weibull Reliability" : "批次可靠性评估 (Weibull)",
+                   label: t("chart_weibull"),
                    icon: ShieldAlert,
                    color: "text-cyan-500"
                 },
                 {
                    id: "wlf_tts",
-                   label: language === "en" ? "WLF TTS Master Curve" : "时温等效主曲线 (WLF TTS)",
+                   label: t("chart_wlf_tts"),
                    icon: ThermometerSnowflake,
                    color: "text-blue-500"
                 },
                 {
                    id: "copula",
-                   label: language === "en" ? "Copula Joint Failure" : "双变量相依失效 (Copula)",
+                   label: t("chart_copula"),
                    icon: Combine,
                    color: "text-fuchsia-500"
                 },
                 {
                    id: "arrhenius",
-                   label: language === "en" ? "Arrhenius Extrapolation" : "热氧老化寿命预测 (Arrhenius)",
+                   label: t("chart_arrhenius"),
                    icon: Flame,
                    color: "text-orange-600"
                 },
                 {
                    id: "sobol",
-                   label: language === "en" ? "Sobol Decomposition" : "方差分解敏感度 (Sobol)",
+                   label: t("chart_sobol"),
                    icon: BarChart3,
                    color: "text-indigo-500"
                 },
                 {
                    id: "spc",
-                   label: language === "en" ? "SPC Process Capability" : "SPC 制程能力分析",
+                   label: t("chart_spc"),
                    icon: Factory,
                    color: "text-emerald-600"
                 },
                 {
                    id: "bayes",
-                   label: language === "en" ? "Bayesian Inverse Design" : "Bayesian 逆向设计",
+                   label: t("chart_bayes"),
                    icon: BrainCircuit,
                    color: "text-pink-500"
                 },
                 {
                    id: "moo",
-                   label: language === "en" ? "Pareto MOO" : "多目标帕累托优化 (Pareto MOO)",
+                   label: t("chart_moo"),
                    icon: GitMerge,
                    color: "text-orange-500"
                 },
                 {
                    id: "mahalanobis",
-                   label: language === "en" ? "Mahalanobis Outliers" : "马氏距离异常检测",
+                   label: t("chart_mahalanobis"),
                    icon: Target,
                    color: "text-rose-600"
                 },
                 {
                    id: "kinetics",
-                   label: language === "en" ? "Kissinger Kinetics" : "Kissinger 固化动力学",
+                   label: t("chart_kinetics"),
                    icon: Zap,
                    color: "text-teal-500"
                 },
                 {
                    id: "prony",
-                   label: language === "en" ? "Prony Viscoelasticity" : "Prony 级数本构提取",
+                   label: t("chart_prony"),
                    icon: Activity,
                    color: "text-purple-500"
                 }
@@ -1902,7 +1987,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                         </div>
                         <div className="space-y-3">
                             <div>
-                                <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">设计自变量 (X Features)</label>
+                                <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
+                                    {language === "en" ? "Design Variables (X Features)" : "设计自变量 (X Features)"}
+                                </label>
                                 <div className="max-h-32 overflow-y-auto custom-scrollbar border border-slate-200 dark:border-slate-700 rounded p-2 bg-slate-50 dark:bg-slate-800/50 space-y-1">
                                     {numericProperties.map(key => (
                                         <label key={key} className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
@@ -1922,11 +2009,13 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                             </div>
 
                             <div>
-                                <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">多重优化目标 (Y Targets & Priorities)</label>
+                                <label className="text-[10px] uppercase font-bold text-slate-500 block mb-1">
+                                    {language === "en" ? "Multi-Objective Optimization (Y Targets & Priorities)" : "多重优化目标 (Y Targets & Priorities)"}
+                                </label>
                                 <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar border border-slate-200 dark:border-slate-700 rounded p-2 bg-slate-50 dark:bg-slate-800/50">
                                     <div className="flex items-center gap-2 text-[10px] uppercase font-bold text-slate-400 px-1 border-b border-slate-200 dark:border-slate-700 pb-1">
-                                         <div className="flex-1">特征名称</div>
-                                         <div className="w-20 text-center">方向</div>
+                                         <div className="flex-1">{language === "en" ? "Feature" : "特征名称"}</div>
+                                         <div className="w-20 text-center">{language === "en" ? "Direction" : "方向"}</div>
                                          <div className="w-6"></div>
                                     </div>
                                     {mooTargets.map((t, idx) => (
@@ -1940,7 +2029,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                                  }}
                                                  className="flex-1 w-full text-xs bg-transparent outline-none truncate"
                                             >
-                                                <option value="" disabled>选择特征...</option>
+                                                <option value="" disabled>{language === "en" ? "Select feature..." : "选择特征..."}</option>
                                                 {numericProperties.map(k => <option key={k} value={k}>{k}</option>)}
                                             </select>
                                             <button 
@@ -1951,7 +2040,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                                 }}
                                                 className={`w-16 text-[10px] py-1 rounded font-bold ${t.maximize ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/50 dark:text-pink-400' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-400'}`}
                                             >
-                                                {t.maximize ? "最大化" : "最小化"}
+                                                {t.maximize ? (language === "en" ? "Maximize" : "最大化") : (language === "en" ? "Minimize" : "最小化")}
                                             </button>
                                             <button 
                                                 onClick={() => {
@@ -1965,19 +2054,21 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                          <button 
                                             onClick={() => setMooTargets([...mooTargets, { name: "", maximize: true }])}
                                             className="w-full py-1 border border-dashed border-orange-300 dark:border-orange-800 text-orange-600 dark:text-orange-400 text-xs rounded hover:bg-orange-50 dark:hover:bg-orange-900/30"
-                                         >+ 添加子目标</button>
+                                         >{language === "en" ? "+ Add Sub-Target" : "+ 添加子目标"}</button>
                                     )}
                                     {mooTargets.length === 2 && (
-                                         <div className="text-[10px] text-slate-400 text-center py-1">目前最多支持双目标帕累托可视化展开。</div>
+                                         <div className="text-[10px] text-slate-400 text-center py-1">
+                                             {language === "en" ? "Currently supports up to dual-objective Pareto visualization." : "目前最多支持双目标帕累托可视化展开。"}
+                                         </div>
                                     )}
                                 </div>
                             </div>
                             
                             <button
                                 onClick={() => {
-                                    if(mooFeatures.length === 0) return alert("请至少选择一个设计自变量(X)");
-                                    if(mooTargets.length < 2) return alert("MOO 帕累托优化至少需要 2 个目标成分！");
-                                    for(const t of mooTargets) if(!t.name) return alert("目标不能为空！");
+                                    if(mooFeatures.length === 0) return alert(language === "en" ? "Please select at least one design variable (X)" : "请至少选择一个设计自变量(X)");
+                                    if(mooTargets.length < 2) return alert(language === "en" ? "MOO Pareto optimization requires at least 2 target criteria!" : "MOO 帕累托优化至少需要 2 个目标成分！");
+                                    for(const t of mooTargets) if(!t.name) return alert(language === "en" ? "Targets cannot be empty!" : "目标不能为空！");
                                     
                                     const dataRecord: Record<string, number>[] = [];
                                     for (const p of filteredData) {
@@ -1997,13 +2088,13 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                         if (validRow) dataRecord.push(r);
                                     }
 
-                                    if (dataRecord.length < 3) return alert("可用数据量不足。用于高斯过程回归的历史完整记录（特征和目标均无空值）必须≥3条，当前为: " + dataRecord.length);
+                                    if (dataRecord.length < 3) return alert(language === "en" ? "Insufficient data. Complete historical records for Gaussian process regression must be >= 3. Currently: " + dataRecord.length : "可用数据量不足。用于高斯过程回归的历史完整记录（特征和目标均无空值）必须≥3条，当前为: " + dataRecord.length);
                                     runMooOpt(dataRecord, mooFeatures, mooTargets);
                                 }}
                                 disabled={isCalculatingMoo}
                                 className="w-full py-2 bg-orange-600 text-white rounded font-bold text-xs hover:bg-orange-700 transition-colors disabled:opacity-50 mt-2 block"
                             >
-                                {isCalculatingMoo ? '构建并行 GP 与寻找帕累托边界中...' : '生成多目标妥协前沿'}
+                                {isCalculatingMoo ? (language === "en" ? "Constructing parallel GP models..." : "构建并行 GP 与寻找帕累托边界中...") : (language === "en" ? "Generate Pareto Frontier" : "生成多目标妥协前沿")}
                             </button>
                         </div>
                     </div>
@@ -2516,6 +2607,14 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
               </motion.div>
             </div>
 
+            <Suspense fallback={
+              <div className="absolute inset-0 flex items-center justify-center bg-white/30 dark:bg-slate-950/30 backdrop-blur-xs">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">Loading Scientific Engine...</span>
+                </div>
+              </div>
+            }>
             {activeChart === "correlation" ? (
                 <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
                    <div className="mb-4">
@@ -3512,6 +3611,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                 loading={false}
               />
             )}
+            </Suspense>
 
             {/* Watermark */}
             <div className="absolute bottom-6 right-6 pointer-events-none opacity-10 flex flex-col items-end z-0">

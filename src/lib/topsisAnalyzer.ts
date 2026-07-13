@@ -23,8 +23,13 @@ export function calculateTopsis<T extends { id: string }>(
   const normMatrix: number[][] = Array.from({ length: n }, () => Array(m).fill(0));
   for (let j = 0; j < m; j++) {
     const colValues = rawMatrix.map(row => row[j]);
-    const maxVal = Math.max(...colValues);
-    const minVal = Math.min(...colValues);
+    let maxVal = colValues[0] !== undefined ? colValues[0] : 0;
+    let minVal = colValues[0] !== undefined ? colValues[0] : 0;
+    for (let i = 1; i < colValues.length; i++) {
+      const v = colValues[i];
+      if (v > maxVal) maxVal = v;
+      if (v < minVal) minVal = v;
+    }
     const range = maxVal - minVal;
 
     for (let i = 0; i < n; i++) {

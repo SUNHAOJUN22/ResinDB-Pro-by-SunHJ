@@ -1,48 +1,32 @@
-import { logger } from '@/lib/logger';
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useWorkerManager } from '@/hooks/workers/useWorkerManager';
 import { Product } from '@/types/index';
-import type { SimilarityMessage, SimilarityResponse, SimilarityNode, SimilarityEdge } from '@/workers/similarityWorker';
+import type { SimilarityMessage, SimilarityResponse } from '@/workers/similarityWorker';
 
 export function useSimilarityWorker() {
-  const [nodes, setNodes] = useState<SimilarityNode[]>([]);
-  const [edges, setEdges] = useState<SimilarityEdge[]>([]);
-  const [isCalculating, setIsCalculating] = useState(false);
-  const workerRef = useRef<Worker | null>(null);
-
-  useEffect(() => {
-    const worker = new Worker(new URL('../../workers/similarityWorker.ts', import.meta.url), { type: 'module' });
-    
-    worker.onmessage = (e: MessageEvent<SimilarityResponse>) => {
-      const res = e.data;
-      if (res.type === 'SIMILARITY_CALCULATED' && res.payload) {
-        setNodes(res.payload.nodes);
-        setEdges(res.payload.edges);
-        setIsCalculating(false);
-      } else if (res.type === 'ERROR') {
-        setIsCalculating(false);
-        logger.error("SimilarityWorker Error:", res.error);
-      }
-    };
-
-    workerRef.current = worker;
-
-    return () => {
-      worker.terminate();
-    };
-  }, []);
+  const {
+    isCalculating,
+    result,
+    setResult,
+    postMessage
+  } = useWorkerManager<SimilarityMessage, NonNullable<SimilarityResponse['payload']>>(
+    useCallback(() => new Worker(new URL('../../workers/similarityWorker.ts', import.meta.url), { type: 'module' }), []),
+    'SIMILARITY_CALCULATED'
+  );
 
   const calculateSimilarity = useCallback((products: Product[], features: string[], threshold: number) => {
-    if (workerRef.current && products.length > 0 && features.length >= 2) {
-      setIsCalculating(true);
-      workerRef.current.postMessage({
+    if (products.length > 0 && features.length >= 2) {
+      postMessage({
         type: 'CALCULATE_SIMILARITY',
         payload: { products, features, threshold }
-      } as SimilarityMessage);
+      });
     } else {
-        setNodes([]);
-        setEdges([]);
+      setResult(null);
     }
-  }, []);
+  }, [postMessage, setResult]);
+
+  const nodes = useMemo(() => result?.nodes || [], [result]);
+  const edges = useMemo(() => result?.edges || [], [result]);
 
   return {
     nodes,
@@ -51,3 +35,4 @@ export function useSimilarityWorker() {
     calculateSimilarity
   };
 }
+

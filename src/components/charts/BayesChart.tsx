@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import * as echarts from "echarts";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface BayesChartProps {
   historical: { index: number; y: number; y_pred: number; y_std: number }[];
@@ -12,6 +13,7 @@ interface BayesChartProps {
 export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, suggestions, targetName, maximize, theme }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -40,7 +42,7 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
 
     const option: echarts.EChartsOption = {
       title: {
-         text: '高斯过程近似面与逆向探索 (Gaussian Process)',
+         text: t("bayesChartTitle"),
          left: 'center',
          textStyle: { color: textColor, fontSize: 13 }
       },
@@ -52,17 +54,17 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
             const dataIndex = params[0].dataIndex;
             if (dataIndex === historical.length) {
                 // This is the prediction
-                return `<strong>💡 推荐最优突破点</strong><br/>
-                        预期均值 (Mean): ${bestNext.mean.toFixed(3)}<br/>
-                        不确定度 (Std): ${bestNext.std.toFixed(3)}<br/>
-                        EI 收益预期: ${(bestNext.ei).toExponential(2)}`;
+                return `<strong>💡 ${t("bayesChartTooltipBest")}</strong><br/>
+                        ${t("bayesChartTooltipMean")} (Mean): ${bestNext.mean.toFixed(3)}<br/>
+                        ${t("bayesChartTooltipStd")} (Std): ${bestNext.std.toFixed(3)}<br/>
+                        ${t("bayesChartTooltipEi")}: ${(bestNext.ei).toExponential(2)}`;
             } else {
                 const h = historical[dataIndex];
                 if (!h) return '';
-                return `<strong>历史批次拟合反馈</strong><br/>
-                        实测值 ${targetName}: ${h.y.toFixed(3)}<br/>
-                        GP 曲面均值: ${h.y_pred.toFixed(3)}<br/>
-                        GP 方差 Std: ${h.y_std.toFixed(3)}`;
+                return `<strong>${t("bayesChartTooltipFeedback")}</strong><br/>
+                        ${t("bayesChartTooltipActual")} ${targetName}: ${h.y.toFixed(3)}<br/>
+                        ${t("bayesChartTooltipGpMean")}: ${h.y_pred.toFixed(3)}<br/>
+                        ${t("bayesChartTooltipGpStd")}: ${h.y_std.toFixed(3)}`;
             }
         }
       },
@@ -74,7 +76,7 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
       xAxis: {
         type: 'category',
         data: xAxisData,
-        name: '排序样本序列 / 探索推荐空间',
+        name: t("bayesChartXAxis"),
         nameLocation: 'middle',
         nameGap: 30,
         axisLabel: { show: false }, // hide abstract indices
@@ -91,7 +93,7 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
       },
       series: [
         {
-          name: '实测真实值 (Ground Truth)',
+          name: t("bayesChartGroundTruth"),
           type: 'line',
           data: trueY,
           itemStyle: { color: '#64748b' },
@@ -100,7 +102,7 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
           symbolSize: 6
         },
         {
-          name: 'GP 预测均值 (Mean Surface)',
+          name: t("bayesChartMean"),
           type: 'scatter',
           data: predScatterData,
           itemStyle: { color: '#8b5cf6' }, // violet-500
@@ -109,7 +111,7 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
           z: 3
         },
         {
-            name: '预测置信下界 (-2σ)',
+            name: t("bayesChartLowerConfidence"),
             type: 'line',
             data: lbound,
             itemStyle: { color: '#a78bfa' },
@@ -118,7 +120,7 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
             stack: 'confidence' // use stack internally but not effectively for fill here, wait echarts band fill
         },
         {
-            name: '预测置信区间 (±2σ)',
+            name: t("bayesChartConfidenceInterval"),
             type: 'line',
             data: ubound.map((u, i) => u - lbound[i]),
             itemStyle: { color: 'rgba(139, 92, 246, 0.2)' },
@@ -129,7 +131,7 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
         },
         // Highlight the new suggested point
         {
-           name: 'EI 期望提升采集区 (Next Best)',
+           name: t("bayesChartNextBest"),
            type: 'effectScatter',
            data: [[historical.length + 2, bestNext.mean]],
            itemStyle: { color: '#ec4899' }, // pink-500
@@ -144,8 +146,10 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
     
     const ro = new ResizeObserver(() => { if(chartInstance.current) chartInstance.current.resize(); });
     if (chartRef.current) ro.observe(chartRef.current);
-    return () => ro.disconnect();
-  }, [historical, suggestions, targetName, maximize, theme]);
+    return () => {
+      ro.disconnect();
+    };
+  }, [historical, suggestions, targetName, maximize, theme, t]);
 
   return <div ref={chartRef} className="w-full h-full" />;
 });

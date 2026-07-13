@@ -1,15 +1,11 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { FormulaConfig } from '@/types/index';
+import { safeStorage } from '@/lib/utils';
 
 export function useFormulas() {
   const [formulas, setFormulas] = useState<FormulaConfig[]>(() => {
-    let saved = null;
-    try {
-      saved = localStorage.getItem('resindb-formulas');
-    } catch {
-      // Ignore
-    }
+    const saved = safeStorage.local.getItem('resindb-formulas');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -46,11 +42,7 @@ export function useFormulas() {
   });
 
   useEffect(() => {
-    try {
-      localStorage.setItem('resindb-formulas', JSON.stringify(formulas));
-    } catch {
-      // Ignore
-    }
+    safeStorage.local.setItem('resindb-formulas', JSON.stringify(formulas));
   }, [formulas]);
 
   const addFormula = useCallback((formula: Omit<FormulaConfig, 'id'>) => {

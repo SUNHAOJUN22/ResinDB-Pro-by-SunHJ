@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { logger } from "@/lib/logger";
 import { motion, AnimatePresence } from "motion/react";
+import { safeStorage } from "@/lib/utils";
 
 interface Props {
   children: ReactNode;
@@ -61,9 +62,12 @@ const ErrorFallback: React.FC<{
 
   const handleFactoryReset = () => {
     if (window.confirm("This will clear all local settings, saved views, and data. Continue?")) {
-      localStorage.clear();
-      // indexedDB.deleteDatabase is async but we'll reload anyway
+      safeStorage.local.clear();
+      // Clear all historical versions of IndexedDB databases to ensure a clean state
       window.indexedDB.deleteDatabase('resin-db');
+      window.indexedDB.deleteDatabase('resin-db-v2');
+      window.indexedDB.deleteDatabase('resin-db-v3');
+      window.indexedDB.deleteDatabase('resin-history-db');
       window.location.reload();
     }
   };

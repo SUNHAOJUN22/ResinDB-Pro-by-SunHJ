@@ -11,7 +11,7 @@ import {
 import { Product } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { motion, AnimatePresence } from "motion/react";
-import { aiService } from "@/services/aiService";
+import { aiService } from "@/services/geminiService";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 

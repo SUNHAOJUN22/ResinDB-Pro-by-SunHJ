@@ -1,51 +1,34 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useCallback } from 'react';
+import { useWorkerManager } from './useWorkerManager';
 import type { ArrheniusMessage, ArrheniusResponse } from '@/workers/arrheniusWorker';
 
 export function useArrheniusWorker() {
-  const [isCalculating, setIsCalculating] = useState(false);
-  const [arrheniusResult, setArrheniusResult] = useState<ArrheniusResponse['payload'] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const workerRef = useRef<Worker | null>(null);
-
-  useEffect(() => {
-    workerRef.current = new Worker(new URL('../../workers/arrheniusWorker.ts', import.meta.url), {
-      type: 'module'
-    });
-
-    workerRef.current.onmessage = (e: MessageEvent<ArrheniusResponse>) => {
-      const res = e.data;
-      if (res.type === 'ARRHENIUS_RESULT') {
-        setArrheniusResult(res.payload || null);
-        setError(null);
-        setIsCalculating(false);
-      } else if (res.type === 'ERROR') {
-        setError(res.error || 'Unknown error');
-        setIsCalculating(false);
-      }
-    };
-
-    return () => {
-      workerRef.current?.terminate();
-    };
-  }, []);
+  const {
+    isCalculating,
+    result: arrheniusResult,
+    error,
+    postMessage
+  } = useWorkerManager<ArrheniusMessage, ArrheniusResponse['payload']>(
+    useCallback(() => new Worker(new URL('../../workers/arrheniusWorker.ts', import.meta.url), { type: 'module' }), []),
+    'ARRHENIUS_RESULT'
+  );
 
   const calculateArrhenius = useCallback((points: { tempC: number; time: number }[]) => {
-    if (!workerRef.current) return;
-    setIsCalculating(true);
-    setError(null);
-    workerRef.current.postMessage({
+    postMessage({
       type: 'CALCULATE_ARRHENIUS',
       payload: { points }
-    } as ArrheniusMessage);
-  }, []);
+    });
+  }, [postMessage]);
 
   const getPredictedLife = useCallback((tempC: number) => {
      if (!arrheniusResult) return null;
      const { m, b } = arrheniusResult.equation;
      const tk = tempC + 273.15;
+     if (Math.abs(tk) < 1e-6) return null;
      const lnTime = m * (1 / tk) + b;
      return Math.exp(lnTime);
   }, [arrheniusResult]);
 
   return { isCalculating, arrheniusResult, error, calculateArrhenius, getPredictedLife };
 }
+

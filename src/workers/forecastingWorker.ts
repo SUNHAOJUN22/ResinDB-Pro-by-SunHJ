@@ -163,8 +163,10 @@ self.onmessage = (e: MessageEvent<ForecastingWorkerMessage>) => {
         sumXX += histX[i] * histX[i];
       }
 
-      const slope = (nHist * sumXY - sumX * sumY) / (nHist * sumXX - sumX * sumX);
-      const intercept = (sumY - slope * sumX) / nHist;
+      const slopeDenom = nHist * sumXX - sumX * sumX;
+      const slope = (nHist * sumXY - sumX * sumY) / (Math.abs(slopeDenom) > 1e-15 ? slopeDenom : 1e-15);
+      const safeNHist = nHist > 0 ? nHist : 1;
+      const intercept = (sumY - slope * sumX) / safeNHist;
 
       // Fit residual sum of squares to estimate standard error of forecasting
       let sumResidualSquares = 0;
@@ -172,12 +174,14 @@ self.onmessage = (e: MessageEvent<ForecastingWorkerMessage>) => {
         const predictedVal = slope * histX[i] + intercept;
         sumResidualSquares += Math.pow(histY[i] - predictedVal, 2);
       }
-      const residualStdDev = Math.sqrt(sumResidualSquares / (nHist - 2)) || (baselineValue * 0.02);
+      const residualStdDev = Math.sqrt(Math.max(0, sumResidualSquares / (nHist > 2 ? nHist - 2 : 1))) || (baselineValue * 0.02);
 
       futureMonths.forEach(m => {
         const predicted = slope * m + intercept;
         // Forecasting error expands as we move further into the future
-        const sError = residualStdDev * Math.sqrt(1 + 1 / nHist + Math.pow(m, 2) / (sumXX - (sumX * sumX) / nHist));
+        const safeNHistSE = nHist > 0 ? nHist : 1;
+        const seDenom = sumXX - (sumX * sumX) / safeNHistSE;
+        const sError = residualStdDev * Math.sqrt(Math.max(0, 1 + 1 / safeNHistSE + Math.pow(m, 2) / (Math.abs(seDenom) > 1e-15 ? seDenom : 1e-15)));
         forecastPoints.push({ month: m, predicted, sError });
       });
 
@@ -206,8 +210,10 @@ self.onmessage = (e: MessageEvent<ForecastingWorkerMessage>) => {
           forecastPoints.push({ month: m, predicted, sError });
         });
       } else {
-        const b = (validHistPointsCount * sumXLnY - sumX * sumLnY) / (validHistPointsCount * sumXX - sumX * sumX);
-        const lnA = (sumLnY - b * sumX) / validHistPointsCount;
+        const expDenom = validHistPointsCount * sumXX - sumX * sumX;
+        const b = (validHistPointsCount * sumXLnY - sumX * sumLnY) / (Math.abs(expDenom) > 1e-15 ? expDenom : 1e-15);
+        const safeVHPC = validHistPointsCount > 0 ? validHistPointsCount : 1;
+        const lnA = (sumLnY - b * sumX) / safeVHPC;
         const a = Math.exp(lnA);
 
         let sumResSquares = 0;
@@ -215,7 +221,7 @@ self.onmessage = (e: MessageEvent<ForecastingWorkerMessage>) => {
           const predictedExp = a * Math.exp(b * histX[i]);
           sumResSquares += Math.pow(histY[i] - predictedExp, 2);
         }
-        const residualStdDev = Math.sqrt(sumResSquares / (validHistPointsCount - 2)) || (baselineValue * 0.03);
+        const residualStdDev = Math.sqrt(Math.max(0, sumResSquares / (validHistPointsCount > 2 ? validHistPointsCount - 2 : 1))) || (baselineValue * 0.03);
 
         futureMonths.forEach(m => {
           const predicted = a * Math.exp(b * m);
@@ -284,8 +290,9 @@ self.onmessage = (e: MessageEvent<ForecastingWorkerMessage>) => {
 
     // 5. Compute performance diagnostics and metrics
     const projectedValue12m = forecastPoints[forecastPoints.length - 1].predicted;
-    const retentionPercent = Math.max(0, Math.min(100, (projectedValue12m / baselineValue) * 100));
-    const degradationRatePercent = ((baselineValue - projectedValue12m) / baselineValue) * 100;
+    const safeBaseline = Math.abs(baselineValue) > 1e-15 ? baselineValue : 1e-15;
+    const retentionPercent = Math.max(0, Math.min(100, (projectedValue12m / safeBaseline) * 100));
+    const degradationRatePercent = ((baselineValue - projectedValue12m) / safeBaseline) * 100;
 
     // Estimate T50 Half-Life
     let halfLifeMonths: number | string = 'N/A';
@@ -305,15 +312,16 @@ self.onmessage = (e: MessageEvent<ForecastingWorkerMessage>) => {
               sumXX += histX[i] * histX[i];
             }
           }
-          const b = (validHistPointsCount * sumXLnY - sumX * sumLnY) / (validHistPointsCount * sumXX - sumX * sumX);
-          if (b < 0) {
+          const hlDenom = validHistPointsCount * sumXX - sumX * sumX;
+          const b = (validHistPointsCount * sumXLnY - sumX * sumLnY) / (Math.abs(hlDenom) > 1e-15 ? hlDenom : 1e-15);
+          if (b < -1e-15) {
             halfLifeMonths = Math.round(-Math.log(2) / b);
           }
         }
       } else {
         // Linearly or through step scan
         const slope = (projectedValue12m - baselineValue) / 12;
-        if (slope < 0) {
+        if (slope < -1e-15) {
           halfLifeMonths = Math.round((baselineValue * 0.5 - baselineValue) / slope);
         }
       }

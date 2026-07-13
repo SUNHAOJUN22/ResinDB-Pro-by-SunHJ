@@ -66,7 +66,8 @@ function cholesky(A: number[][], maxJitter = 1.0): number[][] {
                     }
                     L[i][j] = Math.sqrt(val);
                 } else {
-                    L[i][j] = (1.0 / L[j][j]) * (A[i][j] - sum);
+                    const safeLjj = Math.abs(L[j][j]) > 1e-15 ? L[j][j] : 1e-15;
+                    L[i][j] = (1.0 / safeLjj) * (A[i][j] - sum);
                 }
             }
             if (!success) break;
@@ -83,7 +84,8 @@ function forwardSolve(L: number[][], B: number[]): number[] {
     for (let i = 0; i < n; i++) {
         let sum = 0;
         for (let j = 0; j < i; j++) sum += L[i][j] * Y[j];
-        Y[i] = (B[i] - sum) / L[i][i];
+        const safeLii = Math.abs(L[i][i]) > 1e-15 ? L[i][i] : 1e-15;
+        Y[i] = (B[i] - sum) / safeLii;
     }
     return Y;
 }
@@ -94,7 +96,8 @@ function backwardSolve(L: number[][], Y: number[]): number[] {
     for (let i = n - 1; i >= 0; i--) {
         let sum = 0;
         for (let j = i + 1; j < n; j++) sum += L[j][i] * X[j];
-        X[i] = (Y[i] - sum) / L[i][i];
+        const safeLii = Math.abs(L[i][i]) > 1e-15 ? L[i][i] : 1e-15;
+        X[i] = (Y[i] - sum) / safeLii;
     }
     return X;
 }
@@ -108,22 +111,27 @@ function rbf(x1: number[], x2: number[], l: number): number {
 self.onmessage = (e: MessageEvent<BayesMessage>) => {
     try {
         const { data, features, target, maximize, iterations = 10000 } = e.data.payload;
+        const safeIterations = Math.max(10, Math.min(20000, Number(iterations) || 10000));
         
         if (features.length === 0) throw new Error("No features selected for Bayesian Optimization.");
         if (!target) throw new Error("No target selected.");
-        if (data.length < 3) throw new Error("At least 3 valid data points are required to build GP.");
 
-        const n = data.length;
         const d = features.length;
-        
         const X: number[][] = [];
         const Y: number[] = [];
         
-        for (const row of data) {
-            const xRow = features.map(f => row[f]);
-            X.push(xRow);
-            Y.push(row[target]);
+        for (const row of data || []) {
+            if (!row) continue;
+            const xRow = features.map(f => Number(row[f]));
+            const yVal = Number(row[target]);
+            if (xRow.every(v => Number.isFinite(v)) && Number.isFinite(yVal)) {
+                X.push(xRow);
+                Y.push(yVal);
+            }
         }
+        
+        const n = Y.length;
+        if (n < 3) throw new Error("At least 3 valid data points with numeric features and target are required to build GP.");
         
         // Normalize X
         const xMin = new Array(d).fill(Infinity);
@@ -143,8 +151,9 @@ self.onmessage = (e: MessageEvent<BayesMessage>) => {
         );
         
         // Standardize Y
-        const yMean = Y.reduce((a, b) => a + b, 0) / n;
-        let yStd = Math.sqrt(Y.reduce((sum, y) => sum + Math.pow(y - yMean, 2), 0) / n);
+        const safeN = n > 0 ? n : 1;
+        const yMean = Y.reduce((a, b) => a + b, 0) / safeN;
+        let yStd = Math.sqrt(Math.max(0, Y.reduce((sum, y) => sum + Math.pow(y - yMean, 2), 0) / safeN));
         if (yStd === 0) yStd = 1;
         
         const Y_norm = Y.map(y => (y - yMean) / yStd);
@@ -172,7 +181,7 @@ self.onmessage = (e: MessageEvent<BayesMessage>) => {
         // Random Search for EI
         const suggestions: { params: Record<string, number>; mean: number; std: number; ei: number }[] = [];
         
-        for (let i = 0; i < iterations; i++) {
+        for (let i = 0; i < safeIterations; i++) {
             const xStarNorm = new Array(d).fill(0).map(() => Math.random());
             const kStar = X_norm.map(x => rbf(x, xStarNorm, l));
             

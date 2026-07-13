@@ -84,7 +84,7 @@ self.onmessage = (e: MessageEvent<SimilarityMessage>) => {
     const nodes: SimilarityNode[] = products.map(p => ({
         id: p.id,
         name: p.gradeName,
-        category: p.categoryIds[p.categoryIds.length - 1] || 'Unknown',
+        category: (p.categoryIds && p.categoryIds.length > 0) ? p.categoryIds[p.categoryIds.length - 1] : 'Unknown',
         value: 1
     }));
 

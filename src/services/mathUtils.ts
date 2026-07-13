@@ -49,7 +49,7 @@ export function euclideanDistance(vecA: number[], vecB: number[]): number {
   for (let i = 0; i < vecA.length; i++) {
     sum += Math.pow(vecA[i] - vecB[i], 2);
   }
-  return Math.sqrt(sum);
+  return Math.sqrt(Math.max(0, sum));
 }
 
 export function findSimilarProducts(
@@ -99,7 +99,7 @@ export function findSimilarProducts(
       const distance = Math.sqrt(sumSq);
       // Normalize distance by the number of valid keys
       const maxDist = Math.sqrt(validKeys); // since each dimension diff is max 1
-      const similarity = Math.max(0, Math.round((1 - distance / maxDist) * 100));
+      const similarity = maxDist > 0 ? Math.max(0, Math.round((1 - distance / maxDist) * 100)) : 0;
       results.push({ product: p, distance, score: similarity });
     }
   });

@@ -16,9 +16,18 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>('zh');
 
+  React.useEffect(() => {
+    document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
+  }, [language]);
+
   const t = React.useCallback((key: string, fallback?: string) => {
     const translationMap = translations[language];
-    return translationMap[key as keyof typeof translationMap] || fallback || key;
+    const val = translationMap[key as keyof typeof translationMap];
+    if (val !== undefined) return val;
+    if (language === 'zh' && /[\u4e00-\u9fa5]/.test(key)) {
+      return key;
+    }
+    return fallback || key;
   }, [language]);
 
   const tProp = React.useCallback((key: string) => {

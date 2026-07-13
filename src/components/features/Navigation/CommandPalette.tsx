@@ -18,6 +18,7 @@ import { AppView, Product, Manufacturer } from '@/types/index';
 import { motion, AnimatePresence } from "motion/react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useData } from "@/contexts/DataContext";
+import { useUI } from "@/contexts/UIContext";
 import { History } from "lucide-react";
 
 interface CommandPaletteProps {
@@ -49,6 +50,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = React.memo(({
 }) => {
   const { t } = useLanguage();
   const { recentSearches, setSearchQuery, setAdvancedFilterGroup, setSelectedCategoryIds } = useData();
+  const { clickFeedbackEnabled, setClickFeedbackEnabled } = useUI();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -90,6 +92,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = React.memo(({
         icon: Moon,
         category: t("categoryPrefs"),
         action: onToggleTheme,
+      },
+      {
+        id: "clickFeedback",
+        label: clickFeedbackEnabled ? t("disableClickFeedback") : t("enableClickFeedback"),
+        icon: Zap,
+        category: t("categoryPrefs"),
+        action: () => setClickFeedbackEnabled(!clickFeedbackEnabled),
       },
       {
         id: "help",
@@ -189,6 +198,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = React.memo(({
     onOpenHelp,
     onOpenFeedback,
     t,
+    clickFeedbackEnabled,
+    setClickFeedbackEnabled,
   ]);
 
   useEffect(() => {

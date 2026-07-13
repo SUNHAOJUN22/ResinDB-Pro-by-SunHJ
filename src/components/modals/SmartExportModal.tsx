@@ -19,7 +19,7 @@ export const SmartExportModal: React.FC<SmartExportModalProps> = ({
   handleExport,
   handleExportPdf
 }) => {
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   
   // Extract all unique attribute properties from the filtered data
   const availableColumns = useMemo(() => {
@@ -91,10 +91,10 @@ export const SmartExportModal: React.FC<SmartExportModalProps> = ({
               </div>
               <div>
                 <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">
-                  {language === 'zh' ? '智能导出' : 'Smart Export'}
+                  {t('smartExport')}
                 </h2>
                 <p className="text-xs text-slate-500 mt-1">
-                  {language === 'zh' ? `已过滤 ${filteredData.length} 条数据` : `${filteredData.length} items filtered for export`}
+                  {t('itemsFilteredForExport').replace('{count}', filteredData.length.toString())}
                 </p>
               </div>
             </div>
@@ -111,7 +111,7 @@ export const SmartExportModal: React.FC<SmartExportModalProps> = ({
             {/* Format Selection */}
             <div>
               <h3 className="text-sm font-semibold mb-3 text-slate-700 dark:text-slate-300">
-                {language === 'zh' ? '选择导出格式' : 'Select Export Format'}
+                {t('selectExportFormat')}
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <FormatCard 
@@ -145,7 +145,7 @@ export const SmartExportModal: React.FC<SmartExportModalProps> = ({
             <div className={`transition-opacity ${exportFormat === 'pdf' ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
               <div className="flex items-center justify-between mb-3 border-b border-slate-200 dark:border-slate-800 pb-2">
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  {language === 'zh' ? '选择要导出的属性列' : 'Select Attribute Columns to Export'}
+                  {t('selectExportColumns')}
                 </h3>
                 <button 
                   onClick={handleToggleAll}
@@ -160,14 +160,14 @@ export const SmartExportModal: React.FC<SmartExportModalProps> = ({
                   ) : (
                     <Square size={14} />
                   )}
-                  {language === 'zh' ? '全选/取消' : 'Select All / None'}
+                  {t('selectAllNone')}
                 </button>
               </div>
 
               <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border border-slate-200 dark:border-slate-800 max-h-[250px] overflow-y-auto">
                 {availableColumns.length === 0 ? (
                    <p className="text-sm text-slate-500 text-center py-4">
-                      {language === 'zh' ? '此数据集中没有可选的属性列' : 'No attribute columns available in this dataset.'}
+                      {t('noAttributesAvailable')}
                    </p>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
@@ -201,7 +201,7 @@ export const SmartExportModal: React.FC<SmartExportModalProps> = ({
               {exportFormat !== 'pdf' && (
                 <p className="text-xs text-slate-500 mt-2">
                   <span className="font-semibold text-slate-600 dark:text-slate-400">Note:</span> 
-                  {language === 'zh' ? ' 基础字段（如 ID、名称、厂商）将始终被导出。' : ' Base fields (e.g., ID, Grade, Manufacturer) will always be exported.'}
+                  {t('baseFieldsExportNotice')}
                 </p>
               )}
             </div>
@@ -213,7 +213,7 @@ export const SmartExportModal: React.FC<SmartExportModalProps> = ({
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
             >
-              {language === 'zh' ? '取消' : 'Cancel'}
+              {t('cancel')}
             </button>
             <button
               onClick={onExportSubmit}
@@ -221,7 +221,7 @@ export const SmartExportModal: React.FC<SmartExportModalProps> = ({
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Download size={16} />
-              {language === 'zh' ? '开始导出' : 'Start Export'}
+              {t('startExport')}
             </button>
           </div>
         </motion.div>

@@ -230,14 +230,18 @@ unfix           cooling_npt
 # Set temperature to critical -30 °C for sub-ambient mechanical performance assessment
 fix             deform_npt all npt temp 243.15 243.15 100.0 y 1.0 1.0 1000.0 z 1.0 1.0 1000.0
 
+# Capture initial box length BEFORE deformation begins (critical for strain calculation)
+variable        L0 equal lx
+
 # Apply a constant engineering strain rate of 1e-5 fs^-1 along X-direction
 variable        strain_rate equal 1.0e-5
 fix             tensile_deform all deform 1 x erate \${strain_rate} remap v
 
 # Define custom mechanical stress/strain calculators
-variable        strainX equal (lx-v_strain_rate)/v_strain_rate
+# Engineering strain: ε = (L - L₀) / L₀
+variable        strainX equal (lx-v_L0)/v_L0
 variable        stressX equal -press
-thermo_style    custom step temp vol density lx v_strain_rate v_stressX pe etotal
+thermo_style    custom step temp vol density lx v_strainX v_stressX pe etotal
 run             150000 # Execute tensile strain elongation to fracture
 
 `;
@@ -290,7 +294,7 @@ export function predictPropertiesQSPR(
 
   // 6. Polymeric molar volume calculations
   const monomerMassAverage = 42.08; // propylene average weights
-  const molarVolume = monomerMassAverage / density;
+  const molarVolume = monomerMassAverage / Math.max(density, 1e-6);
 
   // 7. Rubber swelling ratio parameters (Flory-Huggins thermodynamic parameter)
   // Elastomer-only Swelling ratio estimate (for EPDM, etc. density < 0.88)
@@ -321,27 +325,43 @@ export interface ASTMValidationResult {
  */
 export function auditASTMStandards(products: Product[]): ASTMValidationResult[] {
   return products.map((item) => {
-    const category = (item.categoryIds && item.categoryIds[0]) || "Unknown";
+    const isCategory = (name: string): boolean => {
+      const lowerName = name.toLowerCase();
+      const idsMatch = (item.categoryIds || []).some(id => id.toLowerCase().includes(lowerName));
+      const directMatch = ((item as Product & { category?: string }).category || "").toLowerCase().includes(lowerName);
+      return idsMatch || directMatch;
+    };
+
+    const isPP = isCategory("pp");
+    const isHDPE = isCategory("hdpe");
+
+    const category = isPP ? "PP" : isHDPE ? "HDPE" : ((item as Product & { category?: string }).category || "Unknown");
     const gradeName = item.gradeName || "Unnamed Grade";
     const findings: string[] = [];
     const standardsTested: string[] = ["ASTM D792 (Density)"];
     let status: "PASSED" | "WARNING" | "CRITICAL" = "PASSED";
 
-    // Extract property keys safely
     const props = item.properties || {};
-    const densityVal = props.density?.value !== undefined ? Number(props.density.value) : undefined;
-    const mfrVal = props.mfr?.value !== undefined ? Number(props.mfr.value) : undefined;
-    const tensileVal = (props.tensileYield?.value !== undefined ? Number(props.tensileYield.value) : undefined) || 
-                       (props.tensileStrength?.value !== undefined ? Number(props.tensileStrength.value) : undefined);
-    const flexModVal = props.flexuralModulus?.value !== undefined ? Number(props.flexuralModulus.value) : undefined;
+    const getVal = (keys: string[]): number | undefined => {
+      for (const k of keys) {
+        const v = props[k]?.value;
+        if (v !== undefined && v !== null && !isNaN(Number(v))) return Number(v);
+      }
+      return undefined;
+    };
+
+    const densityVal = getVal(["密度", "density", "Density"]);
+    const mfrVal = getVal(["熔体质量流动速率", "mfr", "mfi", "MFR", "MFI", "熔融指数", "流动速率"]);
+    const tensileVal = getVal(["拉伸屈服应力", "tensileYield", "tensileStrength", "拉伸强度", "Tensile Strength", "拉伸断裂应力"]);
+    const flexModVal = getVal(["弯曲模量", "flexuralModulus", "Flexural Modulus"]);
 
     // Validate Density D792 / ISO 1183
     if (densityVal !== undefined) {
-      if (category === "PP" && (densityVal < 0.890 || densityVal > 0.920)) {
+      if (isPP && (densityVal < 0.890 || densityVal > 0.920)) {
         findings.push(`Density [${densityVal} g/cm³] deviates from typical Polypropylene boundaries (0.890 - 0.920 g/cm³). Possible severe compounding error.`);
         status = "WARNING";
       }
-      if (category === "HDPE" && (densityVal < 0.940 || densityVal > 0.970)) {
+      if (isHDPE && (densityVal < 0.940 || densityVal > 0.970)) {
         findings.push(`Density [${densityVal} g/cm³] deviates from ASTM D1248 High-Density Polyethylene baseline (0.940 - 0.970 g/cm³). Classified as LDPE/LLDPE compound.`);
         status = "WARNING";
       }
@@ -362,7 +382,7 @@ export function auditASTMStandards(products: Product[]): ASTMValidationResult[] 
     // Validate Tensile Performance ASTM D638 / ISO 527
     if (tensileVal !== undefined) {
       standardsTested.push("ASTM D638 (Tensile Strength)");
-      if (category === "PP" && tensileVal < 15) {
+      if (isPP && tensileVal < 15) {
         findings.push(`Tensile Yield strength is abnormally depressed [${tensileVal} MPa]. Check structural crystallinity. Elastomer saturation index might be too high.`);
         status = "WARNING";
       }
@@ -371,10 +391,10 @@ export function auditASTMStandards(products: Product[]): ASTMValidationResult[] 
     // Validate Flexural Modulus ASTM D790
     if (flexModVal !== undefined) {
       standardsTested.push("ASTM D790 (Flexural Modulus)");
-      if (category === "PP" && flexModVal < 600) {
+      if (isPP && flexModVal < 600) {
         findings.push(`Flexural elasticity modulus is critically low [${flexModVal} MPa]. Severe stiffness collapse.`);
         status = "WARNING";
-      } else if (category === "PP" && flexModVal > 2800) {
+      } else if (isPP && flexModVal > 2800) {
         findings.push(`Flexural modulus [${flexModVal} MPa] exceeds typical virgin resin boundaries. Highly likely reinforced with glass fibers or talc mineral powders.`);
         status = "WARNING";
       }

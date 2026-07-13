@@ -19,8 +19,9 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { User as UserType } from '@/types/index';
-import { api } from '@/services/api';
+import api from '@/lib/adapters';
 import { PRODUCT_CATALOG } from '@/config/constants';
+import { safeStorage } from "@/lib/utils";
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -58,12 +59,12 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
       setTimeout(() => {
         setIsSeeding(false);
         setSeedProgress(0);
-        alert("Database seeded successfully!");
+        alert(t("dbSeedSuccess"));
         window.location.reload();
       }, 1000);
     } catch (e) {
       logger.error(e);
-      alert("Failed to seed database.");
+      alert(t("dbSeedError"));
       setIsSeeding(false);
       setSeedProgress(0);
     }
@@ -71,7 +72,7 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
 
   const loadUsers = useCallback(() => {
     try {
-      const saved = localStorage.getItem("resindb-users");
+      const saved = safeStorage.local.getItem("resindb-users");
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -86,7 +87,7 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
                 role: "admin" as const,
                 avatar: `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="8" fill="%234f46e5"/><ellipse cx="50" cy="50" rx="40" ry="12" stroke="%236366f1" stroke-width="2.5" transform="rotate(0 50 50)"/><ellipse cx="50" cy="50" rx="40" ry="12" stroke="%233b82f6" stroke-width="2.5" transform="rotate(60 50 50)"/><ellipse cx="50" cy="50" rx="40" ry="12" stroke="%238b5cf6" stroke-width="2.5" transform="rotate(120 50 50)"/><circle cx="90" cy="50" r="4" fill="%236366f1" /><circle cx="70" cy="84" r="4" fill="%233b82f6" /><circle cx="30" cy="16" r="4" fill="%238b5cf6" /></svg>`
              }, ...parsed.filter(p => p.id !== 'user-001')];
-             localStorage.setItem("resindb-users", JSON.stringify(finalUsers));
+             safeStorage.local.setItem("resindb-users", JSON.stringify(finalUsers));
           }
           setUsers(finalUsers);
           setStats((prev) => ({ ...prev, totalRecords: finalUsers.length * 10 + 42 }));
@@ -118,7 +119,7 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
         }
       ];
       setUsers(defaultUsers);
-      localStorage.setItem("resindb-users", JSON.stringify(defaultUsers));
+      safeStorage.local.setItem("resindb-users", JSON.stringify(defaultUsers));
       setStats((prev) => ({ ...prev, totalRecords: defaultUsers.length * 10 + 42 }));
     } catch (e) {
       logger.error("Failed to load users:", e);
@@ -134,7 +135,7 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
     const updated = users.filter((u) => u.id !== id);
     setUsers(updated);
     try {
-      localStorage.setItem("resindb-users", JSON.stringify(updated));
+      safeStorage.local.setItem("resindb-users", JSON.stringify(updated));
     } catch (e) {
       logger.error("Failed to persist user deletion:", e);
     }
@@ -144,7 +145,7 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
     const updated = users.map((u) => (u.id === id ? { ...u, role } : u));
     setUsers(updated);
     try {
-      localStorage.setItem("resindb-users", JSON.stringify(updated));
+      safeStorage.local.setItem("resindb-users", JSON.stringify(updated));
     } catch (e) {
       logger.error("Failed to persist role update:", e);
     }
@@ -153,22 +154,22 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
   const mockProjects = [
     {
       id: 1,
-      name: "高性能聚乙烯薄膜研发",
-      lead: "张研发",
+      name: t("projName1"),
+      lead: t("projLead1"),
       progress: 75,
       status: "Active",
     },
     {
       id: 2,
-      name: "汽车轻量化ABS材料测试",
-      lead: "李高级",
+      name: t("projName2"),
+      lead: t("projLead2"),
       progress: 40,
       status: "Active",
     },
     {
       id: 3,
-      name: "国产催化剂效能数据库对齐",
-      lead: "王工",
+      name: t("projName3"),
+      lead: t("projLead3"),
       progress: 100,
       status: "Completed",
     },
@@ -177,17 +178,17 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
   const mockDocs = [
     {
       id: 1,
-      title: "ResinDB 操作说明手册 v2.0",
+      title: t("adminDocTitleManual"),
       type: "PDF",
       date: "2024-01-10",
     },
     {
       id: 2,
-      title: "关于规范实验数据入库的通知",
+      title: t("adminDocTitleRegulation"),
       type: "DOC",
       date: "2023-12-20",
     },
-    { id: 3, title: "系统安全等级保护声明", type: "PDF", date: "2023-11-15" },
+    { id: 3, title: t("adminDocTitleSecurity"), type: "PDF", date: "2023-11-15" },
   ];
 
   return (
@@ -288,10 +289,10 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
                   <div className="space-y-3">
                     <div className="p-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm relative overflow-hidden group">
                       <p className="text-[10px] font-mono font-bold text-slate-800 dark:text-white relative z-10">
-                        周末维护通知
+                        {t("announcementTitle")}
                       </p>
                       <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400 mt-1 leading-relaxed relative z-10">
-                        系统将于周六凌晨2点进行备份，届时可能出现短暂延迟。
+                        {t("announcementContent")}
                       </p>
                     </div>
                   </div>
@@ -416,7 +417,7 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
                                 <div className="flex items-center gap-2">
                                   <div className="w-1.5 h-1.5 rounded-full bg-primary-500" />
                                   <p className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest">
-                                    负责人: {p.lead}
+                                    {t("projectLead")}: {p.lead}
                                   </p>
                                 </div>
                               </div>
@@ -523,7 +524,7 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
                               <Database size={14} />
                             </div>
                             <span className="text-[9px] font-mono font-bold uppercase tracking-widest">
-                              Database Size
+                              {t("databaseSize")}
                             </span>
                           </div>
                           <p className="text-2xl font-mono font-bold text-slate-900 dark:text-white tracking-tighter">
@@ -539,7 +540,7 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
                               <Activity size={14} />
                             </div>
                             <span className="text-[9px] font-mono font-bold uppercase tracking-widest">
-                              Uptime
+                              {t("uptime")}
                             </span>
                           </div>
                           <p className="text-2xl font-mono font-bold text-slate-900 dark:text-white tracking-tighter">
@@ -556,7 +557,7 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
                                 <Users size={14} />
                               </div>
                               <span className="text-[9px] font-mono font-bold uppercase tracking-widest">
-                                System Admin
+                                {t("systemAdmin")}
                               </span>
                             </div>
                             <span className="text-[8px] font-mono font-bold uppercase text-primary-500 tracking-widest px-2 py-0.5 rounded border border-primary-500/30 bg-primary-500/10">Developer</span>
@@ -579,10 +580,10 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
                       >
                         <div>
                           <h5 className="text-[10px] font-mono font-bold text-primary-600 uppercase tracking-widest mb-1">
-                            Data Migration
+                            {t("dataMigration")}
                           </h5>
                           <p className="text-xs text-slate-500 font-mono">
-                            Inject preset templates into the database ({PRODUCT_CATALOG.length} items)
+                            {t("dataMigrationDesc").replace("{count}", String(PRODUCT_CATALOG.length))}
                           </p>
                         </div>
                         <button
@@ -591,7 +592,7 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
                           className="px-4 py-2 bg-primary-600 text-white rounded-xl text-xs font-bold font-mono tracking-widest uppercase hover:bg-primary-500 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
                         >
                           {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
-                          {isSeeding ? `${seedProgress}%` : "Seed Database"}
+                          {isSeeding ? `${seedProgress}%` : t("seedDatabase")}
                         </button>
                       </motion.div>
 
@@ -600,7 +601,7 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
                         className="p-6 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl relative overflow-hidden shadow-sm transition-all hover:shadow-md hover:border-emerald-500/50 cursor-default"
                       >
                         <div className="flex items-center justify-between mb-4 relative z-10">
-                          <div className="flex items-center gap-3">
+                           <div className="flex items-center gap-3">
                             <div className="p-2 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 text-emerald-600 shadow-sm">
                               <CheckCircle2 size={16} />
                             </div>
@@ -622,7 +623,7 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
                         </div>
                         <p className="text-[10px] font-mono font-bold text-slate-500 mt-4 flex items-center gap-2 relative z-10">
                           <Sparkles size={12} className="text-emerald-500" />
-                          15,200/17,200 属性已完成单位对齐与标准化校验。
+                          {t("governanceDesc")}
                         </p>
                       </motion.div>
                     </motion.div>

@@ -13,7 +13,7 @@ export const DataQualityAuditModal: React.FC<DataQualityAuditModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   const { allProducts } = useData();
 
   const auditResults = useMemo(() => {
@@ -107,7 +107,7 @@ export const DataQualityAuditModal: React.FC<DataQualityAuditModalProps> = ({
                 <ShieldAlert size={20} />
               </div>
               <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">
-                {language === 'zh' ? '数据质量审计' : 'Data Quality Audit'}
+                {t('dataQualityAudit')}
               </h2>
             </div>
             <button
@@ -156,13 +156,13 @@ export const DataQualityAuditModal: React.FC<DataQualityAuditModalProps> = ({
               <div className="space-y-3">
                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
                     <span className="w-2 h-2 rounded-full bg-red-500" />
-                    {language === 'zh' ? '重复的牌号' : 'Duplicate Grades'}
+                    {t('duplicateGrades')}
                  </h3>
                  <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 max-h-[250px] overflow-y-auto border border-slate-100 dark:border-slate-800">
                     {auditResults.duplicates.length === 0 ? (
                        <div className="text-sm text-slate-500 flex items-center gap-2">
                          <CheckCircle2 size={16} className="text-emerald-500" />
-                         {language === 'zh' ? '没有找到重复的牌号' : 'No duplicate grades found'}
+                         {t('noDuplicateGrades')}
                        </div>
                     ) : (
                        <ul className="space-y-1">
@@ -180,13 +180,13 @@ export const DataQualityAuditModal: React.FC<DataQualityAuditModalProps> = ({
               <div className="space-y-3">
                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
                     <span className="w-2 h-2 rounded-full bg-amber-500" />
-                    {language === 'zh' ? '属性单位不一致' : 'Inconsistent Units'}
+                    {t('inconsistentUnits')}
                  </h3>
                  <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 max-h-[250px] overflow-y-auto border border-slate-100 dark:border-slate-800">
                     {auditResults.inconsistentUnits.length === 0 ? (
                        <div className="text-sm text-slate-500 flex items-center gap-2">
                          <CheckCircle2 size={16} className="text-emerald-500" />
-                         {language === 'zh' ? '所有属性单位一致' : 'All property units are consistent'}
+                         {t('consistentUnits')}
                        </div>
                     ) : (
                        <ul className="space-y-2">
@@ -205,13 +205,13 @@ export const DataQualityAuditModal: React.FC<DataQualityAuditModalProps> = ({
               <div className="space-y-3">
                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
                     <span className="w-2 h-2 rounded-full bg-blue-500" />
-                    {language === 'zh' ? '无分类的产品' : 'Uncategorized Products'}
+                    {t('uncategorizedProducts')}
                  </h3>
                  <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 max-h-[250px] overflow-y-auto border border-slate-100 dark:border-slate-800">
                     {auditResults.itemsWithoutCategory.length === 0 ? (
                        <div className="text-sm text-slate-500 flex items-center gap-2">
                          <CheckCircle2 size={16} className="text-emerald-500" />
-                         {language === 'zh' ? '所有产品均已分类' : 'All products have categories'}
+                         {t('allProductsCategorized')}
                        </div>
                     ) : (
                        <ul className="space-y-1">
@@ -229,13 +229,13 @@ export const DataQualityAuditModal: React.FC<DataQualityAuditModalProps> = ({
               <div className="space-y-3">
                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
                     <span className="w-2 h-2 rounded-full bg-purple-500" />
-                    {language === 'zh' ? '无厂家的产品' : 'Missing Manufacturers'}
+                    {t('missingManufacturers')}
                  </h3>
                  <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3 max-h-[250px] overflow-y-auto border border-slate-100 dark:border-slate-800">
                     {auditResults.missingManufacturer.length === 0 ? (
                        <div className="text-sm text-slate-500 flex items-center gap-2">
                          <CheckCircle2 size={16} className="text-emerald-500" />
-                         {language === 'zh' ? '所有产品均关联厂家' : 'All products have a manufacturer'}
+                         {t('allProductsHaveManufacturer')}
                        </div>
                     ) : (
                        <ul className="space-y-1">
@@ -256,7 +256,7 @@ export const DataQualityAuditModal: React.FC<DataQualityAuditModalProps> = ({
                 onClick={onClose}
                 className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 rounded-lg text-sm transition-colors"
              >
-                {language === 'zh' ? '关闭' : 'Close'}
+                {t('close')}
              </button>
           </div>
         </motion.div>

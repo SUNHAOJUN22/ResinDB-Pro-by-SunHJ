@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToasts } from '@/contexts/ToastContext';
+import { safeStorage } from '@/lib/utils';
 
 // Standard scientific properties interface for our sandbox
 interface SampleLot {
@@ -35,6 +36,69 @@ interface SampleLot {
   crystallinity: number | null;
 }
 
+interface TelemetryPacket {
+  _senderPing?: number;
+  data?: {
+    mfr?: number | string;
+    density?: number | string;
+    modulus?: number | string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+// Excel formula parser helper for raw lot row
+const evaluateLotFormula = (lot: SampleLot, expr: string, t: (key: string) => string): string => {
+  try {
+    const lowerExpr = expr.toLowerCase();
+    const hasDensity = lowerExpr.includes('[density]');
+    const hasMfr = lowerExpr.includes('[mfr]');
+    const hasModulus = lowerExpr.includes('[modulus]');
+    const hasCrystallinity = lowerExpr.includes('[crystallinity]');
+
+    if (hasDensity && (lot.density === null || lot.density === undefined || isNaN(lot.density))) return t('missingDensity');
+    if (hasMfr && (lot.mfr === null || lot.mfr === undefined || isNaN(lot.mfr))) return t('missingMfr');
+    if (hasModulus && (lot.modulus === null || lot.modulus === undefined || isNaN(lot.modulus))) return t('missingModulus');
+    if (hasCrystallinity && (lot.crystallinity === null || lot.crystallinity === undefined || isNaN(lot.crystallinity))) return t('missingCrystal');
+
+    let cleaned = lowerExpr;
+    cleaned = cleaned.replace(/\[density\]/g, String(lot.density ?? 0));
+    cleaned = cleaned.replace(/\[mfr\]/g, String(lot.mfr ?? 0));
+    cleaned = cleaned.replace(/\[modulus\]/g, String(lot.modulus ?? 0));
+    cleaned = cleaned.replace(/\[crystallinity\]/g, String(lot.crystallinity ?? 0));
+    
+    // Basic math operations sanitization
+    if (/[^0-9+\-*/().\s]/g.test(cleaned)) {
+      return t('formulaSyntaxErr');
+    }
+    
+    // Safe numerical evaluation using standard Function syntax
+    const calcResult = new Function(`return (${cleaned})`)();
+    if (isNaN(calcResult) || !isFinite(calcResult)) return t('formulaMathErr');
+    return Number(calcResult).toFixed(2);
+  } catch {
+    return t('formulaEvalErr');
+  }
+};
+
+interface ComputedCellProps {
+  lot: SampleLot;
+  formula: string;
+}
+
+const ComputedCell: React.FC<ComputedCellProps> = React.memo(({ lot, formula }) => {
+  const { t } = useLanguage();
+  const result = useMemo(() => {
+    return evaluateLotFormula(lot, formula, t);
+  }, [lot, formula, t]);
+
+  return (
+    <span className="bg-emerald-500/5 border border-emerald-500/10 px-2 py-0.5 rounded text-[10.5px]">
+      {result}
+    </span>
+  );
+});
+
 interface ParentProduct {
   id: string;
   name: string;
@@ -43,14 +107,13 @@ interface ParentProduct {
   lots: SampleLot[];
 }
 
-const DEVICES = [
-  { id: 'DMA-700', name: 'DMA-700 Rheometer (松弛流变仪)', type: 'WebSockets (WS)', status: 'online', port: '8081' },
-  { id: 'TGA-50', name: 'TGA-50 Thermal Analyzer (热氧降解仪)', type: 'WebSockets (WS)', status: 'online', port: '8082' },
-  { id: 'MFI-3', name: 'MFI-3 Automated Melt Indexer (自动物料指数仪)', type: 'Server-Sent Events (SSE)', status: 'online', port: '9010' }
-];
-
 export const BetaSandboxView: React.FC = () => {
-  const { language } = useLanguage();
+  const { t, language } = useLanguage();
+  const DEVICES = useMemo(() => [
+    { id: 'DMA-700', name: t('dma700Name'), type: t('dma700Type'), status: 'online', port: '8081' },
+    { id: 'TGA-50', name: t('tga50Name'), type: t('tga50Type'), status: 'online', port: '8082' },
+    { id: 'MFI-3', name: t('mfi3Name'), type: t('mfi3Type'), status: 'online', port: '9010' }
+  ], [t]);
   const { addToast } = useToasts();
 
   // Stabilize addToast reference via useRef to prevent dependency size change bugs
@@ -62,7 +125,7 @@ export const BetaSandboxView: React.FC = () => {
   // --- TAB / SECTION CONTROL ---
   const [activeTab, setActiveTab] = useState<'wasm' | 'telemetry' | 'gemini' | 'grid'>('wasm');
   const [isCompact, setIsCompact] = useState<boolean>(() => {
-    const saved = localStorage.getItem("resindb-compact");
+    const saved = safeStorage.local.getItem("resindb-compact");
     return saved !== null ? saved === "true" : true;
   });
 
@@ -84,8 +147,26 @@ export const BetaSandboxView: React.FC = () => {
     return etaZero * Math.pow(term, exponent);
   }, [shearRate, lambda, nParameter, etaZero]);
 
+  const fitterCurvePath = useMemo(() => {
+    return Array.from({ length: 50 }).map((_, i) => {
+      const xVal = (i * 10);
+      const curveShear = Math.max(1, xVal);
+      const factorTerm = 1 + Math.pow(lambda * curveShear, 2);
+      const expVal = (nParameter - 1) / 2;
+      const visFit = etaZero * Math.pow(factorTerm, expVal);
+      // Normalize point positions values
+      const normX = (i / 50) * 500;
+      const normY = 200 - (visFit / 5000) * 200;
+      return `${normX},${normY}`;
+    }).join(' L ');
+  }, [lambda, nParameter, etaZero]);
+
   // Simulated Newton-Raphson Solver with performance timing
   const runFittingSolver = () => {
+    if (isNaN(calculatedViscosity) || !isFinite(calculatedViscosity)) {
+      setIsSolving(false);
+      return;
+    }
     setIsSolving(true);
     const startTime = performance.now();
     
@@ -118,21 +199,40 @@ export const BetaSandboxView: React.FC = () => {
     const duration = (endTime - startTime).toFixed(solverMode === 'wasm' ? 3 : 1);
     
     setTimeout(() => {
+      const initLog = t('sandboxInitLog')
+        .replace('{time}', new Date().toLocaleTimeString())
+        .replace('{mode}', solverMode.toUpperCase());
+      
+      const convLog = t('sandboxConvLog')
+        .replace('{visc}', calculatedViscosity.toFixed(2))
+        .replace('{etaZero}', String(etaZero))
+        .replace('{lambda}', String(lambda));
+      
+      const timingLog = t('sandboxTimingLog')
+        .replace('{duration}', duration)
+        .replace('{unit}', t('msUnit'))
+        .replace('{steps}', String(iterations + 1));
+      
+      const detailsLog = solverMode === 'wasm'
+        ? t('sandboxDetailsWasmLog').replace('{pct}', (parseFloat(duration) > 0 ? (4.2 / parseFloat(duration)) * 100 : 420).toFixed(0))
+        : t('sandboxDetailsJsLog');
+
       setWasmPerformanceLog(prev => [
-        `[${new Date().toLocaleTimeString()}] 求解器初始化成功，运行堆模型: [${solverMode.toUpperCase()}] / Solver initialized on [${solverMode.toUpperCase()}] target heap.`,
-        `[收敛拟合 / CONVERGENCE] 本构粘度 η: ${calculatedViscosity.toFixed(2)} Pa·s (η0 = ${etaZero} Pa·s, 松弛阻尼 λ = ${lambda} s).`,
-        `[时序时钟 / TIMING] Newton-Raphson 极值迭代拟合耗时: ${duration} 毫秒 / ms (迭代步步: ${iterations + 1}).`,
-        solverMode === 'wasm' 
-          ? `🚀 [WASM 流能倍率拟合加速] 编译后的 Rust-Wasm 计算核心免除 JS 碎片堆垃圾清扫（GC）. 相对速率提升: +${(parseFloat(duration) > 0 ? (4.2 / parseFloat(duration)) * 100 : 420).toFixed(0)}%! (完美消除 V8 本地解释器开销).`
-          : `⚠️ [JS 引擎主堆分配警告] JS 多维连续数学计算产生大量零碎悬空内存微对象，触发 V8 堆内存回收并导致数纳秒阻塞。`,
+        initLog,
+        convLog,
+        timingLog,
+        detailsLog,
         ...prev.slice(0, 10)
       ]);
       setIsSolving(false);
+      
+      const toastMsg = solverMode === 'wasm'
+        ? t('sandboxToastWasmMsg').replace('{duration}', duration)
+        : t('sandboxToastJsMsg').replace('{duration}', duration);
+      
       addToast(
         solverMode === 'wasm' ? 'success' : 'info',
-        solverMode === 'wasm' 
-          ? `Rust WebAssembly 物理本构拟合：在 ${duration} 毫秒内极速收敛! / Solver converged in ${duration} ms!` 
-          : `JS 计算主线程拟合运算完成，耗时: ${duration} 毫秒 / Completed in ${duration} ms`
+        toastMsg
       );
     }, 150);
   };
@@ -177,6 +277,19 @@ export const BetaSandboxView: React.FC = () => {
   const [historyMfr, setHistoryMfr] = useState<number[]>([]);
   const [historyDensity, setHistoryDensity] = useState<number[]>([]);
   const [historyModulus, setHistoryModulus] = useState<number[]>([]);
+
+  // Pre-calculate sparkline ranges to avoid O(N^2) Math.min/max recalculations inside map() during rendering
+  const historyMfrMin = useMemo(() => Math.min(...historyMfr) * 0.95, [historyMfr]);
+  const historyMfrMax = useMemo(() => Math.max(...historyMfr) * 1.05 || 1, [historyMfr]);
+  const historyMfrDen = useMemo(() => historyMfrMax - historyMfrMin || 1, [historyMfrMin, historyMfrMax]);
+
+  const historyDenMin = useMemo(() => Math.min(...historyDensity) * 0.999, [historyDensity]);
+  const historyDenMax = useMemo(() => Math.max(...historyDensity) * 1.001 || 1, [historyDensity]);
+  const historyDenDen = useMemo(() => historyDenMax - historyDenMin || 0.001, [historyDenMin, historyDenMax]);
+
+  const historyModMin = useMemo(() => Math.min(...historyModulus) * 0.95, [historyModulus]);
+  const historyModMax = useMemo(() => Math.max(...historyModulus) * 1.05 || 1, [historyModulus]);
+  const historyModDen = useMemo(() => historyModMax - historyModMin || 1, [historyModMin, historyModMax]);
 
   // Simulation sliding base vectors
   const [simBaseMfr, setSimBaseMfr] = useState<number>(2.20);
@@ -227,12 +340,12 @@ export const BetaSandboxView: React.FC = () => {
         setWsStatus('connected');
         const stamp = new Date().toLocaleTimeString();
         setTelemetryLogs(prev => [
-          `[${stamp}] [VIRTUAL WS LINK] Loopback Sockets 虚拟通信链建立成功`,
+          t('wsVirtualSuccess').replace('{stamp}', stamp),
           `[${stamp}] [VIRTUAL WS LINK] Listening on virtual interface ws://localhost:3000/api/labs/ws`,
-          `⚡ [VIRTUAL WS LINK] Target update bound successfully to lot ID: [${targetLotId}]`,
+          t('wsTargetBound').replace('{id}', targetLotId),
           ...prev
         ].slice(0, 100));
-        addToastRef.current('success', 'Virtual local WS broker mock context established!');
+        addToastRef.current('success', t('wsBrokerEstablished'));
       }, 500);
 
       let localTx = 0;
@@ -246,7 +359,7 @@ export const BetaSandboxView: React.FC = () => {
           const lossStamp = new Date().toLocaleTimeString();
           if (logFilterLevel === 'ALL' || logFilterLevel === 'ALERT') {
             setTelemetryLogs(prev => [
-              `🚨 [物理层丢包仿真] [${lossStamp}] 数据传输过程中在物理信道发生瞬态丢包 (丢包率: ${simPacketLossRate}%)`,
+              t('wsPacketLoss').replace('{stamp}', lossStamp).replace('{rate}', String(simPacketLossRate)),
               ...prev
             ].slice(-100));
           }
@@ -341,13 +454,25 @@ export const BetaSandboxView: React.FC = () => {
           setTotalAlarmsTriggered(c => c + 1);
           if (!isAlarmMuted) {
             if (outOfMfr) {
-              logsToAppend.push(`🚨 [告警管理器] MFR 超出设定阈值范围 [已标定: ${mfrVal} g/10min] (允许: ${mfrWarningRange.min} - ${mfrWarningRange.max})`);
+              logsToAppend.push(
+                language === 'zh'
+                  ? `🚨 [告警管理器] MFR 超出设定阈值范围 [已标定: ${mfrVal} g/10min] (允许: ${mfrWarningRange.min} - ${mfrWarningRange.max})`
+                  : `🚨 [Alarm Manager] MFR out of range [Calibrated: ${mfrVal} g/10min] (Allowed: ${mfrWarningRange.min} - ${mfrWarningRange.max})`
+              );
             }
             if (outOfDensity) {
-              logsToAppend.push(`🚨 [告警管理器] 密度超出设定阈值范围 [已标定: ${denVal} g/cm³] (允许: ${densityWarningRange.min} - ${densityWarningRange.max})`);
+              logsToAppend.push(
+                language === 'zh'
+                  ? `🚨 [告警管理器] 密度超出设定阈值范围 [已标定: ${denVal} g/cm³] (允许: ${densityWarningRange.min} - ${densityWarningRange.max})`
+                  : `🚨 [Alarm Manager] Density out of range [Calibrated: ${denVal} g/cm³] (Allowed: ${densityWarningRange.min} - ${densityWarningRange.max})`
+              );
             }
             if (outOfModulus) {
-              logsToAppend.push(`🚨 [告警管理器] 杨氏模量超出设定阈值范围 [已标定: ${modVal} MPa] (允许: ${modulusWarningRange.min} - ${modulusWarningRange.max})`);
+              logsToAppend.push(
+                language === 'zh'
+                  ? `🚨 [告警管理器] 杨氏模量超出设定阈值范围 [已标定: ${modVal} MPa] (允许: ${modulusWarningRange.min} - ${modulusWarningRange.max})`
+                  : `🚨 [Alarm Manager] Elastic Modulus out of range [Calibrated: ${modVal} MPa] (Allowed: ${modulusWarningRange.min} - ${modulusWarningRange.max})`
+              );
             }
           }
         }
@@ -384,7 +509,9 @@ export const BetaSandboxView: React.FC = () => {
           })));
 
           if (logFilterLevel === 'ALL' || logFilterLevel === 'SWAP') {
-            logsToAppend.push(`🚀 [PHYSICAL HOT SWAP] Real-time injection passed successfully to active lot ID: ${targetLotId}`);
+            logsToAppend.push(
+              t('wsHotSwapSuccess').replace('{id}', targetLotId)
+            );
           }
         }
 
@@ -403,7 +530,7 @@ export const BetaSandboxView: React.FC = () => {
       setWsStatus('connecting');
       const stamp = new Date().toLocaleTimeString();
       setTelemetryLogs(prev => [
-        `[${stamp}] [WS CLIENT CONNECTING] Attempting socket handshakes with ${wsUrl}...`,
+        t('wsConnecting').replace('{stamp}', stamp).replace('{url}', wsUrl),
         ...prev
       ].slice(0, 100));
 
@@ -416,8 +543,8 @@ export const BetaSandboxView: React.FC = () => {
           const openedStamp = new Date().toLocaleTimeString();
           setTelemetryLogs(prev => [
             ...prev,
-            `[${openedStamp}] [WS CLIENT CONNECTED] Sockets established successfully to host ${wsUrl}!`,
-            `⚡ [HANDSHAKE OPTION] Protocol negotiating completed. Frame multiplexing available.`
+            t('wsConnected').replace('{openedStamp}', openedStamp).replace('{url}', wsUrl),
+            t('wsHandshakeCompleted')
           ].slice(-100));
           addToastRef.current('success', `WebSocket linked to: ${wsUrl}`);
         };
@@ -427,7 +554,10 @@ export const BetaSandboxView: React.FC = () => {
           const closedStamp = new Date().toLocaleTimeString();
           setTelemetryLogs(prev => [
             ...prev,
-            `[${closedStamp}] [WS CLIENT DISCONNECTED] Host closed connection. Code: ${ev.code}, Reason: ${ev.reason || 'None provided'}`
+            t('wsDisconnected')
+              .replace('{stamp}', closedStamp)
+              .replace('{code}', String(ev.code))
+              .replace('{reason}', ev.reason || 'None')
           ].slice(-100));
         };
 
@@ -436,8 +566,8 @@ export const BetaSandboxView: React.FC = () => {
           const errTime = new Date().toLocaleTimeString();
           setTelemetryLogs(prev => [
             ...prev,
-            `❌ [WS HANDSHAKE ERROR] Connection rejected at ${errTime}. Underlying cause: ${wsErr?.toString() || 'SSL/Block'}`,
-            `💡 [SOLUTION] Browsers require secure wss:// endpoints over HTTPS. Use "Virtual Loopback Server" for uninterrupted offline operations.`
+            t('wsHandshakeError').replace('{stamp}', errTime).replace('{cause}', wsErr?.toString() || 'SSL/Block'),
+            t('wsHandshakeSolution')
           ].slice(-100));
           addToastRef.current('error', `WebSocket connection failed: ${wsUrl}`);
         };
@@ -481,16 +611,25 @@ export const BetaSandboxView: React.FC = () => {
           if (parsed && parsed.data) {
             const receivedData = parsed.data;
             if (receivedData.mfr) {
-              setLiveMfrOutput(receivedData.mfr);
-              setHistoryMfr(prev => [...prev, receivedData.mfr].slice(-24));
+              const val = parseFloat(String(receivedData.mfr));
+              if (!isNaN(val) && isFinite(val)) {
+                setLiveMfrOutput(val);
+                setHistoryMfr(prev => [...prev, val].slice(-24));
+              }
             }
             if (receivedData.density) {
-              setLiveDensityOutput(receivedData.density);
-              setHistoryDensity(prev => [...prev, receivedData.density].slice(-24));
+              const val = parseFloat(String(receivedData.density));
+              if (!isNaN(val) && isFinite(val)) {
+                setLiveDensityOutput(val);
+                setHistoryDensity(prev => [...prev, val].slice(-24));
+              }
             }
             if (receivedData.modulus) {
-              setLiveModulusOutput(receivedData.modulus);
-              setHistoryModulus(prev => [...prev, receivedData.modulus].slice(-24));
+              const val = parseFloat(String(receivedData.modulus));
+              if (!isNaN(val) && isFinite(val)) {
+                setLiveModulusOutput(val);
+                setHistoryModulus(prev => [...prev, val].slice(-24));
+              }
             }
 
             // Check alarm limits
@@ -501,9 +640,30 @@ export const BetaSandboxView: React.FC = () => {
             if (outOfMfr || outOfDensity || outOfModulus) {
               setTotalAlarmsTriggered(c => c + 1);
               if (!isAlarmMuted) {
-                if (outOfMfr && receivedData.mfr) logsToAppend.push(`🚨 [告警管理器] MFR 超出设定阈值范围 [已标定: ${receivedData.mfr} g/10min] (允许: ${mfrWarningRange.min} - ${mfrWarningRange.max})`);
-                if (outOfDensity && receivedData.density) logsToAppend.push(`🚨 [告警管理器] 密度超出设定阈值范围 [已标定: ${receivedData.density} g/cm³] (允许: ${densityWarningRange.min} - ${densityWarningRange.max})`);
-                if (outOfModulus && receivedData.modulus) logsToAppend.push(`🚨 [告警管理器] 杨氏模量超出设定阈值范围 [已标定: ${receivedData.modulus} MPa] (允许: ${modulusWarningRange.min} - ${modulusWarningRange.max})`);
+                if (outOfMfr && receivedData.mfr) {
+                  logsToAppend.push(
+                    t('wsMfrRangeAlarm')
+                      .replace('{mfr}', String(receivedData.mfr))
+                      .replace('{min}', String(mfrWarningRange.min))
+                      .replace('{max}', String(mfrWarningRange.max))
+                  );
+                }
+                if (outOfDensity && receivedData.density) {
+                  logsToAppend.push(
+                    t('wsDensityRangeAlarm')
+                      .replace('{density}', String(receivedData.density))
+                      .replace('{min}', String(densityWarningRange.min))
+                      .replace('{max}', String(densityWarningRange.max))
+                  );
+                }
+                if (outOfModulus && receivedData.modulus) {
+                  logsToAppend.push(
+                    t('wsModulusRangeAlarm')
+                      .replace('{modulus}', String(receivedData.modulus))
+                      .replace('{min}', String(modulusWarningRange.min))
+                      .replace('{max}', String(modulusWarningRange.max))
+                  );
+                }
               }
             }
 
@@ -540,7 +700,9 @@ export const BetaSandboxView: React.FC = () => {
               })));
 
               if (logFilterLevel === 'ALL' || logFilterLevel === 'SWAP') {
-                logsToAppend.push(`🚀 [PHYSICAL HOT SWAP] WebSocket data mapped directly onto target lot ID: ${targetLotId}`);
+                logsToAppend.push(
+                  t('wsHotSwapMapped').replace('{id}', targetLotId)
+                );
               }
             }
           }
@@ -560,7 +722,7 @@ export const BetaSandboxView: React.FC = () => {
             const lossStamp = new Date().toLocaleTimeString();
             if (logFilterLevel === 'ALL' || logFilterLevel === 'ALERT') {
               setTelemetryLogs(prev => [
-                `🚨 [物理层丢包仿真] [${lossStamp}] 数据重传失败，在物理链接发送时抛弃帧包 (丢包率: ${simPacketLossRate}%)`,
+                t('wsRetransmitFailure').replace('{stamp}', lossStamp).replace('{rate}', String(simPacketLossRate)),
                 ...prev
               ].slice(-100));
             }
@@ -622,7 +784,9 @@ export const BetaSandboxView: React.FC = () => {
           if (logFilterLevel === 'ALL') {
             setTelemetryLogs(prev => [
               ...prev,
-              `[${txStamp}] [WS MESSAGE TRANSMITTED] Tx Packet dispatched: ${txStr.substring(0, 110)}...`
+              t('wsFrameTransmitted')
+                .replace('{stamp}', txStamp)
+                .replace('{packet}', txStr.substring(0, 110))
             ].slice(-100));
           }
 
@@ -661,7 +825,10 @@ export const BetaSandboxView: React.FC = () => {
     simPacketLossRate,
     logFilterLevel,
     simJitterMs,
-    isAlarmMuted
+    isAlarmMuted,
+    t,
+    language,
+    DEVICES
   ]);
 
   // Handle hand-typed terminal packet injections
@@ -669,21 +836,21 @@ export const BetaSandboxView: React.FC = () => {
     if (!customTermCommand.trim()) return;
     const stamp = new Date().toLocaleTimeString();
 
-    let parsedBody: any = null;
+    let parsedBody: TelemetryPacket | null = null;
     try {
-      parsedBody = JSON.parse(customTermCommand);
+      parsedBody = JSON.parse(customTermCommand) as TelemetryPacket;
     } catch (parseSyntaxErr) {
-      addToast('error', 'Malformed JSON block! Please check quotes and commas.');
+      addToast('error', t('jsonMalformed'));
       setTelemetryLogs(prev => [
         ...prev,
-        `[${stamp}] ❌ [TERMINAL INPUT SYNTAX ERROR] Malformed JSON package structure: ${parseSyntaxErr}`
+        t('wsTermSyntaxError').replace('{stamp}', stamp).replace('{error}', String(parseSyntaxErr))
       ].slice(-80));
       return;
     }
 
     setTelemetryLogs(prev => [
       ...prev,
-      `[${stamp}] 🖥️ [TERMINAL EXECUTE] Injecting custom user telemetry payload frame...`
+      t('wsTermExecute').replace('{stamp}', stamp)
     ].slice(-80));
 
     // If connected to a real WebSocket, let's actually send it!
@@ -702,14 +869,36 @@ export const BetaSandboxView: React.FC = () => {
     setTimeout(() => {
       const respStamp = new Date().toLocaleTimeString();
       const okLogs = [
-        `[${respStamp}] ☄️ [LOCAL CONSOLE RX] Manual dynamic injection processed.`
+        t('wsConsoleRxManual').replace('{stamp}', respStamp)
       ];
 
       if (parsedBody && parsedBody.data) {
         const receivedData = parsedBody.data;
-        if (receivedData.mfr) setLiveMfrOutput(receivedData.mfr);
-        if (receivedData.density) setLiveDensityOutput(receivedData.density);
-        if (receivedData.modulus) setLiveModulusOutput(receivedData.modulus);
+        let finalMfr: number | undefined;
+        let finalDensity: number | undefined;
+        let finalModulus: number | undefined;
+
+        if (receivedData.mfr !== undefined && receivedData.mfr !== null) {
+          const val = parseFloat(String(receivedData.mfr));
+          if (!isNaN(val) && isFinite(val)) {
+            setLiveMfrOutput(val);
+            finalMfr = val;
+          }
+        }
+        if (receivedData.density !== undefined && receivedData.density !== null) {
+          const val = parseFloat(String(receivedData.density));
+          if (!isNaN(val) && isFinite(val)) {
+            setLiveDensityOutput(val);
+            finalDensity = val;
+          }
+        }
+        if (receivedData.modulus !== undefined && receivedData.modulus !== null) {
+          const val = parseFloat(String(receivedData.modulus));
+          if (!isNaN(val) && isFinite(val)) {
+            setLiveModulusOutput(val);
+            finalModulus = val;
+          }
+        }
 
         if (targetLotId && targetLotId !== 'none') {
           setNestedProducts(prev => prev.map(p => ({
@@ -720,9 +909,9 @@ export const BetaSandboxView: React.FC = () => {
               setHighlightedLots(prevH => ({
                 ...prevH,
                 [targetLotId]: {
-                  mfr: !!receivedData.mfr,
-                  density: !!receivedData.density,
-                  modulus: !!receivedData.modulus
+                  mfr: finalMfr !== undefined,
+                  density: finalDensity !== undefined,
+                  modulus: finalModulus !== undefined
                 }
               }));
 
@@ -736,13 +925,13 @@ export const BetaSandboxView: React.FC = () => {
 
               return {
                 ...l,
-                mfr: receivedData.mfr || l.mfr,
-                density: receivedData.density || l.density,
-                modulus: receivedData.modulus || l.modulus
+                mfr: finalMfr !== undefined ? finalMfr : l.mfr,
+                density: finalDensity !== undefined ? finalDensity : l.density,
+                modulus: finalModulus !== undefined ? finalModulus : l.modulus
               };
             })
           })));
-          okLogs.push(`🚀 [PHYSICAL HOT SWAP] Terminal injected variables successfully into: ${targetLotId}`);
+          okLogs.push(t('swappedInjected').replace('{target}', targetLotId));
         }
       } else {
         okLogs.push(`⚠️ [INTERPRETATION WARNING] Payload lacked standard {"data": {"mfr": ...}} keys. No direct row injection performed.`);
@@ -751,7 +940,7 @@ export const BetaSandboxView: React.FC = () => {
       setRxFrames(prev => prev + 1);
       setTelemetryLogs(prev => [...prev, ...okLogs].slice(-80));
       setCustomTermCommand('');
-      addToast('success', 'Custom telemetry packet injected!');
+      addToast('success', t('telemetryInjected'));
     }, 120);
   };
 
@@ -899,40 +1088,6 @@ export const BetaSandboxView: React.FC = () => {
   const [expandedParents, setExpandedParents] = useState<Record<string, boolean>>({ 'parent-1': true });
   const [customFormulaExpr, setCustomFormulaExpr] = useState<string>('[density] * 1200 + [modulus] * 0.4');
 
-  // Excel formula parser helper for raw lot row
-  const evaluateLotFormula = (lot: SampleLot, expr: string): string => {
-    try {
-      const lowerExpr = expr.toLowerCase();
-      const hasDensity = lowerExpr.includes('[density]');
-      const hasMfr = lowerExpr.includes('[mfr]');
-      const hasModulus = lowerExpr.includes('[modulus]');
-      const hasCrystallinity = lowerExpr.includes('[crystallinity]');
-
-      if (hasDensity && (lot.density === null || lot.density === undefined || isNaN(lot.density))) return '缺失密度 / Missing Density';
-      if (hasMfr && (lot.mfr === null || lot.mfr === undefined || isNaN(lot.mfr))) return '缺失流动率 / Missing MFR';
-      if (hasModulus && (lot.modulus === null || lot.modulus === undefined || isNaN(lot.modulus))) return '缺失模量 / Missing Modulus';
-      if (hasCrystallinity && (lot.crystallinity === null || lot.crystallinity === undefined || isNaN(lot.crystallinity))) return '缺失结晶度 / Missing Crystal';
-
-      let cleaned = lowerExpr;
-      cleaned = cleaned.replace(/\[density\]/g, String(lot.density ?? 0));
-      cleaned = cleaned.replace(/\[mfr\]/g, String(lot.mfr ?? 0));
-      cleaned = cleaned.replace(/\[modulus\]/g, String(lot.modulus ?? 0));
-      cleaned = cleaned.replace(/\[crystallinity\]/g, String(lot.crystallinity ?? 0));
-      
-      // Basic math operations sanitization
-      if (/[^0-9+\-*/().\s]/g.test(cleaned)) {
-        return 'Syntax Err';
-      }
-      
-      // Safe numerical evaluation using standard Function syntax
-      const calcResult = new Function(`return (${cleaned})`)();
-      if (isNaN(calcResult) || !isFinite(calcResult)) return 'Math Err';
-      return Number(calcResult).toFixed(2);
-    } catch {
-      return 'Eval Err';
-    }
-  };
-
   const toggleParent = (pId: string) => {
     setExpandedParents(prev => ({
       ...prev,
@@ -940,7 +1095,12 @@ export const BetaSandboxView: React.FC = () => {
     }));
   };
 
-  const handleUpdateLotProperty = (parentId: string, lotId: string, field: keyof SampleLot, value: string) => {
+  const handleUpdateLotProperty = (
+    parentId: string,
+    lotId: string,
+    field: 'mfr' | 'density' | 'modulus' | 'crystallinity',
+    value: string
+  ) => {
     if (value === '') {
       setNestedProducts(prev => prev.map(p => {
         if (p.id !== parentId) return p;
@@ -982,34 +1142,34 @@ export const BetaSandboxView: React.FC = () => {
     
     // MFR
     if (lot.mfr === null || lot.mfr === undefined || isNaN(lot.mfr)) {
-      anomalies.push({ field: 'mfr', type: 'missing', value: null, message: '流动速率缺失 / MFR missing' });
+      anomalies.push({ field: 'mfr', type: 'missing', value: null, message: t('missingMfr') });
     } else if (lot.mfr < mfrWarningRange.min || lot.mfr > mfrWarningRange.max) {
-      anomalies.push({ field: 'mfr', type: 'out_of_range', value: lot.mfr, message: `MFR超限: ${lot.mfr} (${mfrWarningRange.min} - ${mfrWarningRange.max})` });
+      anomalies.push({ field: 'mfr', type: 'out_of_range', value: lot.mfr, message: `MFR: ${lot.mfr} (${mfrWarningRange.min} - ${mfrWarningRange.max})` });
     }
 
     // Density
     if (lot.density === null || lot.density === undefined || isNaN(lot.density)) {
-      anomalies.push({ field: 'density', type: 'missing', value: null, message: '标准密度缺失 / Density missing' });
+      anomalies.push({ field: 'density', type: 'missing', value: null, message: t('missingDensity') });
     } else if (lot.density < densityWarningRange.min || lot.density > densityWarningRange.max) {
-      anomalies.push({ field: 'density', type: 'out_of_range', value: lot.density, message: `密度超限: ${lot.density} (${densityWarningRange.min} - ${densityWarningRange.max})` });
+      anomalies.push({ field: 'density', type: 'out_of_range', value: lot.density, message: `Density: ${lot.density} (${densityWarningRange.min} - ${densityWarningRange.max})` });
     }
 
     // Modulus
     if (lot.modulus === null || lot.modulus === undefined || isNaN(lot.modulus)) {
-      anomalies.push({ field: 'modulus', type: 'missing', value: null, message: '弯曲模量缺失 / Modulus missing' });
+      anomalies.push({ field: 'modulus', type: 'missing', value: null, message: t('missingModulus') });
     } else if (lot.modulus < modulusWarningRange.min || lot.modulus > modulusWarningRange.max) {
-      anomalies.push({ field: 'modulus', type: 'out_of_range', value: lot.modulus, message: `模量超限: ${lot.modulus} (${modulusWarningRange.min} - ${modulusWarningRange.max})` });
+      anomalies.push({ field: 'modulus', type: 'out_of_range', value: lot.modulus, message: `Modulus: ${lot.modulus} (${modulusWarningRange.min} - ${modulusWarningRange.max})` });
     }
 
     // Crystallinity
     if (lot.crystallinity === null || lot.crystallinity === undefined || isNaN(lot.crystallinity)) {
-      anomalies.push({ field: 'crystallinity', type: 'missing', value: null, message: '结晶度测量缺失 / Crystallinity missing' });
+      anomalies.push({ field: 'crystallinity', type: 'missing', value: null, message: t('missingCrystal') });
     } else if (lot.crystallinity < crystallinityWarningRange.min || lot.crystallinity > crystallinityWarningRange.max) {
-      anomalies.push({ field: 'crystallinity', type: 'out_of_range', value: lot.crystallinity, message: `结晶超限: ${lot.crystallinity}% (${crystallinityWarningRange.min}% - ${crystallinityWarningRange.max}%)` });
+      anomalies.push({ field: 'crystallinity', type: 'out_of_range', value: lot.crystallinity, message: `Crystallinity: ${lot.crystallinity}% (${crystallinityWarningRange.min}% - ${crystallinityWarningRange.max}%)` });
     }
 
     return anomalies;
-  }, [mfrWarningRange, densityWarningRange, modulusWarningRange, crystallinityWarningRange]);
+  }, [mfrWarningRange, densityWarningRange, modulusWarningRange, crystallinityWarningRange, t]);
 
   const handleAutoRepairMissing = () => {
     setNestedProducts(prev => prev.map(p => ({
@@ -1022,7 +1182,7 @@ export const BetaSandboxView: React.FC = () => {
         crystallinity: (l.crystallinity === null || l.crystallinity === undefined || isNaN(l.crystallinity)) ? 55.4 : l.crystallinity,
       }))
     })));
-    addToast('success', '缺失数据修复成功！已自动填补推荐流化聚合物典型值。 / All missing values repaired with simulated benchmark values.');
+    addToast('success', t('missingRepaired'));
   };
 
   const handleClampOutliers = () => {
@@ -1054,7 +1214,7 @@ export const BetaSandboxView: React.FC = () => {
         };
       })
     })));
-    addToast('success', '超出理化阀值的异常特征数据已自动执行区间向内安全截断！ / Out-of-bounds metrics clamped to safe margins.');
+    addToast('success', t('boundsClamped'));
   };
 
   const handleInjectAnomalies = () => {
@@ -1083,7 +1243,7 @@ export const BetaSandboxView: React.FC = () => {
       }
       return p;
     }));
-    addToast('warning', '成功注入3组包含缺失值与野值超限的特异数据，已激活网格质量校验高亮！ / Injected 3 custom anomalous materials into the system.');
+    addToast('info', t('anomalyInjected'));
   };
 
   // Compute real-time data grid audit statistics
@@ -1142,14 +1302,14 @@ export const BetaSandboxView: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-base sm:text-lg font-mono font-bold tracking-tight bg-gradient-to-r from-slate-50 via-indigo-100 to-indigo-300 bg-clip-text text-transparent">
-                ResinDB v3.1-Beta Laboratory Gateway
+                {t("sandboxTitle")}
               </h1>
               <span className="text-[8px] uppercase tracking-widest font-mono bg-indigo-500/10 text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-500/20 shadow-[0_0_10px_rgba(99,102,241,0.1)]">
                 AI / WASM Engine
               </span>
             </div>
             <p className="text-[10px] text-slate-400 font-mono">
-              PetroChn Research Institute (CNPC/化学工业研究院) • Advanced Complex Fluid Physics Core
+              {t("sandboxSubtitle")}
             </p>
           </div>
         </div>
@@ -1161,40 +1321,40 @@ export const BetaSandboxView: React.FC = () => {
             <button
               onClick={() => {
                 setIsCompact(true);
-                localStorage.setItem("resindb-compact", "true");
-                addToast("info", "Grid: High Information Density engaged");
+                safeStorage.local.setItem("resindb-compact", "true");
+                addToast("info", t("gridHighDensity"));
               }}
               className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                 isCompact ? 'bg-indigo-600 text-white font-bold shadow-sm' : 'hover:text-slate-200'
               }`}
             >
-              Compact 紧凑
+              {t('viewCompact')}
             </button>
             <button
               onClick={() => {
                 setIsCompact(false);
-                localStorage.setItem("resindb-compact", "false");
-                addToast("info", "Grid: Relaxed Density engaged");
+                safeStorage.local.setItem("resindb-compact", "false");
+                addToast("info", t("gridRelaxedDensity"));
               }}
               className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                 !isCompact ? 'bg-indigo-600 text-white font-bold shadow-sm' : 'hover:text-slate-200'
               }`}
             >
-              Relaxed 宽松
+              {t('viewRelaxed')}
             </button>
           </div>
 
           {/* ACTIVE TABS SELECT PANEL */}
           <div className="flex bg-slate-950/90 border border-slate-800/85 p-0.5 rounded-lg shrink-0 overflow-x-auto custom-scrollbar shadow-inner">
             {[
-              { id: 'wasm', icon: Cpu, name: language === 'zh' ? 'Wasm 流变拟合 / Rheology Solver' : 'Wasm Rheology Solver' },
-              { id: 'telemetry', icon: Wifi, name: language === 'zh' ? '物性遥测网关 / Lab Telemetry' : 'Lab Telemetry' },
-              { id: 'gemini', icon: Scan, name: language === 'zh' ? '多模态 AI 识别 / Multimodal AI' : 'Multimodal AI' },
-              { id: 'grid', icon: TableProperties, name: language === 'zh' ? '配方公式矩阵 / Formulation Grid' : 'Formulation Grid' }
+              { id: 'wasm' as const, icon: Cpu, name: t('sandboxWasmSolver') },
+              { id: 'telemetry' as const, icon: Wifi, name: t('sandboxTelemetry') },
+              { id: 'gemini' as const, icon: Scan, name: t('sandboxGemini') },
+              { id: 'grid' as const, icon: TableProperties, name: t('sandboxGrid') }
             ].map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded transition-all cursor-pointer ${
                   activeTab === tab.id
                     ? 'bg-indigo-600/15 text-indigo-300 border border-indigo-500/30'
@@ -1237,7 +1397,7 @@ export const BetaSandboxView: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <h3 className="text-[11px] font-bold tracking-wider font-mono uppercase text-indigo-400 flex items-center gap-1.5">
                       <Sliders size={13} className="text-indigo-400" />
-                      Rheology Parameter Tuner 流变因子参数拟合微调
+                      {t('rheologyTuner')}
                     </h3>
                     <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 shrink-0 text-[8px] font-mono shadow-inner">
                       <button
@@ -1260,16 +1420,14 @@ export const BetaSandboxView: React.FC = () => {
                   </div>
 
                   <p className="text-[10px] text-slate-400 leading-normal leading-relaxed">
-                    Adjust the fluid parameters. Standard JS execution triggers high garbage collector penalty, while compiled Wasm bypasses browser engine heap overhead for deep convergence.
-                    <br />
-                    <span className="text-indigo-400/85">调整流变流体特征参数。传统 JS 多维回归高维计算易频繁触发 V8 空闲垃圾回收（GC），而 AOT 编译的高性能 WebAssembly 直连线程独占堆内存块，能无损极速拟合本构粘度。</span>
+                    <span>{t('rheologyTunerDesc')}</span>
                   </p>
 
                   {/* Sliders in visual grid */}
                   <div className={`grid ${isCompact ? 'grid-cols-2 gap-x-3 gap-y-2' : 'grid-cols-1 gap-y-3'} pt-1.5 border-t border-slate-900`}>
                     <div className="space-y-1">
                       <div className="flex justify-between text-[10px] font-mono">
-                        <span className="text-slate-400">Shear Rate 剪切速率 (γ̇ / Shear Rate)</span>
+                        <span className="text-slate-400">{t('shearRate')}</span>
                         <span className="text-indigo-400 font-bold">{shearRate} s⁻¹</span>
                       </div>
                       <input
@@ -1284,7 +1442,7 @@ export const BetaSandboxView: React.FC = () => {
 
                     <div className="space-y-1">
                       <div className="flex justify-between text-[10px] font-mono">
-                        <span className="text-slate-400">Zero shear 零剪切极限粘度 (η0 / Viscosity)</span>
+                        <span className="text-slate-400">{t('zeroShearViscosity')}</span>
                         <span className="text-indigo-400 font-bold">{etaZero} Pa·s</span>
                       </div>
                       <input
@@ -1300,7 +1458,7 @@ export const BetaSandboxView: React.FC = () => {
 
                     <div className="space-y-1">
                       <div className="flex justify-between text-[10px] font-mono">
-                        <span className="text-slate-400">Relaxation 特征松弛常数 (λ / Relaxation)</span>
+                        <span className="text-slate-400">{t('relaxationTime')}</span>
                         <span className="text-indigo-400 font-bold">{lambda} s</span>
                       </div>
                       <input
@@ -1316,7 +1474,7 @@ export const BetaSandboxView: React.FC = () => {
 
                     <div className="space-y-1">
                       <div className="flex justify-between text-[10px] font-mono">
-                        <span className="text-slate-400">Shear exponent 稀剪切幂指数 (n / Exponent)</span>
+                        <span className="text-slate-400">{t('shearExponent')}</span>
                         <span className="text-indigo-400 font-bold">{nParameter}</span>
                       </div>
                       <input
@@ -1343,7 +1501,7 @@ export const BetaSandboxView: React.FC = () => {
                     ) : (
                       <Calculator size={11} className="text-indigo-200" />
                     )}
-                    <span>运行牛顿迭代求解器 / Run Newton-Raphson Solver</span>
+                    <span>{t('runNewtonSolver')}</span>
                   </button>
 
                   {/* Timings Scoreboard */}
@@ -1351,18 +1509,22 @@ export const BetaSandboxView: React.FC = () => {
                     <div className="border-r border-slate-900 pr-1.5">
                       <div className="text-slate-550 uppercase font-black tracking-tight flex items-center gap-1">
                         <span className="w-1.5 h-1.5 bg-amber-500/60 rounded-full" />
-                        <span>JavaScript V8 引擎线程</span>
+                        <span>{t('jsV8Engine')}</span>
                       </div>
-                      <div className="text-xs font-bold text-amber-500 mt-1">~ 0.85 毫秒 / ms</div>
-                      <div className="text-[8px] text-slate-600 mt-0.5 leading-none">V8 GC 堆碎片扫描/内存挂起开销</div>
+                      <div className="text-xs font-bold text-amber-500 mt-1">~ 0.85 {t('msUnit')}</div>
+                      <div className="text-[8px] text-slate-600 mt-0.5 leading-none">
+                        {t('v8HeapPause')}
+                      </div>
                     </div>
                     <div className="pl-1.5">
                       <div className="text-emerald-400 font-bold flex items-center gap-1 uppercase tracking-tight">
                         <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-                        <span>Rust超线程 WebAssembly</span>
+                        <span>{t('rustWasm')}</span>
                       </div>
-                      <div className="text-xs font-bold text-emerald-400 mt-1">~ 0.04 毫秒 / ms</div>
-                      <div className="text-[8px] text-slate-600 mt-0.5 leading-none">独占线程独立寻址堆，零 GC 阻塞</div>
+                      <div className="text-xs font-bold text-emerald-400 mt-1">~ 0.04 {t('msUnit')}</div>
+                      <div className="text-[8px] text-slate-600 mt-0.5 leading-none">
+                        {t('exclusiveHeap')}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1371,7 +1533,7 @@ export const BetaSandboxView: React.FC = () => {
                 <div className="bg-slate-950/40 border border-slate-900/80 rounded-xl p-3 font-mono text-[9px] text-indigo-300/80 space-y-1.5 shadow-inner">
                   <div className="text-[10px] font-bold text-slate-300 border-b border-indigo-950 pb-1.5 uppercase flex items-center justify-between">
                     <span>Mathematical Physics Formula</span>
-                    <span className="text-[8px] text-slate-500">Rheology Core v3.1</span>
+                    <span className="text-[8px] text-slate-500">Rheology Core v3.0.0</span>
                   </div>
                   <div>
                     <span className="text-teal-400 font-semibold"># Carreau-Yasuda Model:</span>
@@ -1392,7 +1554,7 @@ export const BetaSandboxView: React.FC = () => {
                   <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
                     <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
                       <Cpu className="text-emerald-400" size={13} />
-                      WASM Stress Convergence Curve (η vs. γ̇)
+                      {t("wasmStressCurve")}
                     </span>
                     <div className="flex items-center gap-1.5 text-[9px] font-mono text-emerald-400 bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/20">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
@@ -1410,7 +1572,7 @@ export const BetaSandboxView: React.FC = () => {
                     </div>
 
                     <div className="absolute top-2.5 left-2.5 font-mono text-[9px] text-slate-500 space-y-0.5 pointer-events-none">
-                      <div>Viscosity Upper Limit (η0): <span className="text-indigo-400 font-bold">{etaZero} Pa·s</span></div>
+                      <div>{t("viscosityUpperLimit")} <span className="text-indigo-400 font-bold">{etaZero} Pa·s</span></div>
                       <div>Relaxation constant (λ): <span className="text-indigo-400 font-bold">{lambda} s</span></div>
                     </div>
 
@@ -1432,17 +1594,7 @@ export const BetaSandboxView: React.FC = () => {
 
                         {/* Generated Newton Fit Curve */}
                         <path
-                          d={`M ${Array.from({ length: 50 }).map((_, i) => {
-                            const xVal = (i * 10);
-                            const curveShear = Math.max(1, xVal);
-                            const factorTerm = 1 + Math.pow(lambda * curveShear, 2);
-                            const expVal = (nParameter - 1) / 2;
-                            const visFit = etaZero * Math.pow(factorTerm, expVal);
-                            // Normalize point positions values
-                            const normX = (i / 50) * 500;
-                            const normY = 200 - (visFit / 5000) * 200;
-                            return `${normX},${normY}`;
-                          }).join(' L ')}`}
+                          d={`M ${fitterCurvePath}`}
                           fill="none"
                           stroke="url(#gradient-fitter)"
                           strokeWidth="3.5"
@@ -1481,7 +1633,7 @@ export const BetaSandboxView: React.FC = () => {
                 <div className="bg-slate-950/60 border border-slate-800/70 rounded-xl p-3 flex flex-col h-[145px] backdrop-blur-md shadow-lg">
                   <div className="text-[10px] font-mono font-bold text-slate-400 border-b border-slate-900 pb-2 mb-1.5 flex items-center justify-between uppercase">
                     <span className="flex items-center gap-1 text-indigo-400">
-                      <Terminal size={12} /> Live Rheology Solver Streams 迭代阻尼谱
+                      <Terminal size={12} /> {t("dampingSpectrum")}
                     </span>
                     <button
                       onClick={() => setWasmPerformanceLog([])}
@@ -1494,7 +1646,7 @@ export const BetaSandboxView: React.FC = () => {
                   <div className="flex-1 overflow-y-auto space-y-1 font-mono text-[9px] leading-relaxed custom-scrollbar text-slate-300 pr-1">
                     {wasmPerformanceLog.length === 0 ? (
                       <div className="text-slate-600 italic h-full flex flex-col items-center justify-center gap-1">
-                        <span>Execute a Newtonian curve fit convergence session to see live solver timings...</span>
+                        <span>{t("fitViscosityPrompt")}</span>
                       </div>
                     ) : (
                       wasmPerformanceLog.map((log, index) => (
@@ -1533,7 +1685,7 @@ export const BetaSandboxView: React.FC = () => {
                   <div className="flex items-center justify-between border-b border-slate-900 pb-2.5">
                     <h3 className="text-[11px] font-bold tracking-wider font-mono uppercase text-teal-400 flex items-center gap-1.5">
                       <Wifi size={13} className="text-teal-400 animate-pulse" />
-                      实验室自动化端遥测网关 Telemetry Lab Gateway
+                      {t("telemetryGateway")}
                     </h3>
                     
                     {/* Status badge */}
@@ -1548,9 +1700,9 @@ export const BetaSandboxView: React.FC = () => {
                         wsStatus === 'connecting' ? 'text-amber-400' :
                         wsStatus === 'error' ? 'text-rose-400' : 'text-slate-500'
                       }`}>
-                        {wsStatus === 'connected' ? 'CONNECTED / 已连接' :
-                         wsStatus === 'connecting' ? 'CONNECTING / 连接中' :
-                         wsStatus === 'error' ? 'ERROR / 故障' : 'DISCONNECTED / 未连接'}
+                        {wsStatus === 'connected' ? t("connected") :
+                         wsStatus === 'connecting' ? t("connecting") :
+                         wsStatus === 'error' ? t("statusError") : t("disconnected")}
                       </span>
                     </div>
                   </div>
@@ -1558,7 +1710,7 @@ export const BetaSandboxView: React.FC = () => {
                   <p className="text-[10px] text-slate-400 leading-relaxed font-sans">
                     Establish high-frequency real-time physical telemetry pipelines directly into the experimental data spreadsheet.
                     <br />
-                    <span className="text-teal-400/80 font-mono text-[9px]">建立高频理化分析探针的流变数据通道，测量值支持就地数字级标定并热注入至下列表格中。</span>
+                    <span className="text-teal-400/80 font-mono text-[9px]">建立高频理化分析探针 of real-time fluid telemetry pipelines into target lot spreadsheets.</span>
                   </p>
 
                   {/* Sockets Sub Tabs Navigation */}
@@ -1572,7 +1724,7 @@ export const BetaSandboxView: React.FC = () => {
                       }`}
                     >
                       <Database size={10} className={socketSubTab === 'conn' ? 'text-teal-400' : 'text-slate-600'} />
-                      <span>连接拓扑 Topology</span>
+                      <span>{t("connTopology")}</span>
                     </button>
                     <button
                       onClick={() => setSocketSubTab('calib')}
@@ -1583,7 +1735,7 @@ export const BetaSandboxView: React.FC = () => {
                       }`}
                     >
                       <Sliders size={10} className={socketSubTab === 'calib' ? 'text-teal-400' : 'text-slate-600'} />
-                      <span>数控标定 Calib</span>
+                      <span>{t("telemetryCalib")}</span>
                     </button>
                     <button
                       onClick={() => setSocketSubTab('sim')}
@@ -1594,7 +1746,7 @@ export const BetaSandboxView: React.FC = () => {
                       }`}
                     >
                       <Activity size={10} className={socketSubTab === 'sim' ? 'text-teal-400' : 'text-slate-600'} />
-                      <span>传输仿真 Jitter</span>
+                      <span>{t("jitterSim")}</span>
                     </button>
                   </div>
 
@@ -1621,7 +1773,7 @@ export const BetaSandboxView: React.FC = () => {
                                 : 'text-slate-500 hover:text-slate-300'
                             }`}
                           >
-                            Virtual Loopback (虚拟沙箱环回)
+                            {t("virtualLoopback")}
                           </button>
                           <button
                             onClick={() => {
@@ -1637,7 +1789,7 @@ export const BetaSandboxView: React.FC = () => {
                                 : 'text-slate-500 hover:text-slate-300'
                             }`}
                           >
-                            Real WebSockets (物理套接字)
+                            {t("physicalWebSockets")}
                           </button>
                         </div>
                       </div>
@@ -1726,15 +1878,15 @@ export const BetaSandboxView: React.FC = () => {
                         </span>
                         <div className="grid grid-cols-4 gap-1 p-0.5 bg-slate-950 rounded-lg border border-slate-900">
                           {[
-                            { id: 'mild', label_en: 'Mild', label_cn: '温和波动' },
-                            { id: 'drift', label_en: 'Drift', label_cn: '温漂正弦' },
-                            { id: 'spike', label_en: 'Spikes', label_cn: '瞬态尖峰' },
-                            { id: 'calib', label_en: 'Calib', label_cn: '零漂基线' }
+                            { id: 'mild' as const, label_en: 'Mild', label_cn: '温和波动' },
+                            { id: 'drift' as const, label_en: 'Drift', label_cn: '温漂正弦' },
+                            { id: 'spike' as const, label_en: 'Spikes', label_cn: '瞬态尖峰' },
+                            { id: 'calib' as const, label_en: 'Calib', label_cn: '零漂基线' }
                           ].map(profile => (
                             <button
                               key={profile.id}
                               onClick={() => {
-                                setSignalProfile(profile.id as any);
+                                setSignalProfile(profile.id);
                                 addToast('info', `Signal Profile shifted to ${profile.label_en}`);
                               }}
                               className={`py-1 text-center font-mono text-[8px] rounded transition-all cursor-pointer ${
@@ -1825,14 +1977,14 @@ export const BetaSandboxView: React.FC = () => {
                         <div className="flex justify-between items-center border-b border-slate-950 pb-1.5">
                           <span className="text-[9px] font-mono font-bold text-teal-400 tracking-wider flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-                            MFR (熔融指数) 数值在线校准
+                            {t("mfrCalibration")}
                           </span>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-3 text-[9px] font-mono">
                           <div className="space-y-1">
                             <div className="flex justify-between text-slate-500">
-                              <span>MFR 校准增益 (x)</span>
+                              <span>{t("mfrGain")}</span>
                               <span className="text-slate-300 font-bold">{mfrCalibrationGain.toFixed(2)}x</span>
                             </div>
                             <input
@@ -2125,15 +2277,15 @@ export const BetaSandboxView: React.FC = () => {
                         <span className="text-[8.5px] font-mono text-slate-500 uppercase font-black">Diagnostic Logger Log Filter / 终端日志级别过滤</span>
                         <div className="grid grid-cols-4 gap-1 p-0.5 bg-slate-950 rounded border border-slate-900">
                           {[
-                            { id: 'ALL', label: 'ALL (全部)' },
-                            { id: 'INFO', label: 'INFO (普通)' },
-                            { id: 'ALERT', label: 'WARN (告警)' },
-                            { id: 'SWAP', label: 'GRID (注入)' }
+                            { id: 'ALL' as const, label: 'ALL (全部)' },
+                            { id: 'INFO' as const, label: 'INFO (普通)' },
+                            { id: 'ALERT' as const, label: 'WARN (告警)' },
+                            { id: 'SWAP' as const, label: 'GRID (注入)' }
                           ].map(item => (
                             <button
                               key={item.id}
                               onClick={() => {
-                                setLogFilterLevel(item.id as any);
+                                setLogFilterLevel(item.id);
                                 addToast('info', `Terminal filter configured: ${item.id}`);
                               }}
                               className={`py-0.5 text-center text-[8.5px] font-mono rounded cursor-pointer transition-colors ${
@@ -2243,7 +2395,7 @@ export const BetaSandboxView: React.FC = () => {
                           <span className="text-[8px] text-slate-500 font-normal">g/10m</span>
                         </div>
                         <div className="w-full bg-slate-900 h-1 rounded-full overflow-hidden">
-                          <div className={`h-full transition-all duration-300 ${isMfrAlert ? 'bg-rose-500' : 'bg-teal-500'}`} style={{ width: `${Math.min(100, (liveMfrOutput / 15) * 100)}%` }} />
+                          <div className={`h-full transition-all duration-300 ${isMfrAlert ? 'bg-rose-500' : 'bg-teal-500'}`} style={{ width: `${Math.max(0, Math.min(100, (liveMfrOutput / 15) * 100))}%` }} />
                         </div>
 
                         {/* Mini Sparkline Visualization */}
@@ -2263,10 +2415,7 @@ export const BetaSandboxView: React.FC = () => {
                               <path
                                 d={`M ${historyMfr.map((val, idx) => {
                                   const x = (idx / (historyMfr.length - 1)) * 100;
-                                  const minRange = Math.min(...historyMfr) * 0.95;
-                                  const maxRange = Math.max(...historyMfr) * 1.05 || 1;
-                                  const denRange = maxRange - minRange || 1;
-                                  const y = 24 - ((val - minRange) / denRange) * 18 - 2;
+                                  const y = 24 - ((val - historyMfrMin) / historyMfrDen) * 18 - 2;
                                   return `${x},${y}`;
                                 }).join(' L ')}`}
                                 fill="none"
@@ -2277,10 +2426,7 @@ export const BetaSandboxView: React.FC = () => {
                               <path
                                 d={`M 0,24 L ${historyMfr.map((val, idx) => {
                                   const x = (idx / (historyMfr.length - 1)) * 100;
-                                  const minRange = Math.min(...historyMfr) * 0.95;
-                                  const maxRange = Math.max(...historyMfr) * 1.05 || 1;
-                                  const denRange = maxRange - minRange || 1;
-                                  const y = 24 - ((val - minRange) / denRange) * 18 - 2;
+                                  const y = 24 - ((val - historyMfrMin) / historyMfrDen) * 18 - 2;
                                   return `${x},${y}`;
                                 }).join(' L ')} L 100,24 Z`}
                                 fill={isMfrAlert ? 'url(#mfr-spark-grad-alert)' : 'url(#mfr-spark-grad)'}
@@ -2316,7 +2462,7 @@ export const BetaSandboxView: React.FC = () => {
                           <span className="text-[8px] text-slate-500 font-normal">g/cm³</span>
                         </div>
                         <div className="w-full bg-slate-900 h-1 rounded-full overflow-hidden">
-                          <div className={`h-full transition-all duration-300 ${isDenAlert ? 'bg-rose-500' : 'bg-sky-500'}`} style={{ width: `${Math.min(100, ((liveDensityOutput - 0.85) / 0.3) * 100)}%` }} />
+                          <div className={`h-full transition-all duration-300 ${isDenAlert ? 'bg-rose-500' : 'bg-sky-500'}`} style={{ width: `${Math.max(0, Math.min(100, ((liveDensityOutput - 0.85) / 0.3) * 100))}%` }} />
                         </div>
 
                         {/* Mini Sparkline Visualization */}
@@ -2336,10 +2482,7 @@ export const BetaSandboxView: React.FC = () => {
                               <path
                                 d={`M ${historyDensity.map((val, idx) => {
                                   const x = (idx / (historyDensity.length - 1)) * 100;
-                                  const minRange = Math.min(...historyDensity) * 0.999;
-                                  const maxRange = Math.max(...historyDensity) * 1.001 || 1;
-                                  const denRange = maxRange - minRange || 0.001;
-                                  const y = 24 - ((val - minRange) / denRange) * 18 - 2;
+                                  const y = 24 - ((val - historyDenMin) / historyDenDen) * 18 - 2;
                                   return `${x},${y}`;
                                 }).join(' L ')}`}
                                 fill="none"
@@ -2350,10 +2493,7 @@ export const BetaSandboxView: React.FC = () => {
                               <path
                                 d={`M 0,24 L ${historyDensity.map((val, idx) => {
                                   const x = (idx / (historyDensity.length - 1)) * 100;
-                                  const minRange = Math.min(...historyDensity) * 0.999;
-                                  const maxRange = Math.max(...historyDensity) * 1.001 || 1;
-                                  const denRange = maxRange - minRange || 0.001;
-                                  const y = 24 - ((val - minRange) / denRange) * 18 - 2;
+                                  const y = 24 - ((val - historyDenMin) / historyDenDen) * 18 - 2;
                                   return `${x},${y}`;
                                 }).join(' L ')} L 100,24 Z`}
                                 fill={isDenAlert ? 'url(#den-spark-grad-alert)' : 'url(#den-spark-grad)'}
@@ -2389,7 +2529,7 @@ export const BetaSandboxView: React.FC = () => {
                           <span className="text-[8px] text-slate-500 font-normal">MPa</span>
                         </div>
                         <div className="w-full bg-slate-900 h-1 rounded-full overflow-hidden">
-                          <div className={`h-full transition-all duration-300 ${isModAlert ? 'bg-rose-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(100, (liveModulusOutput / 4500) * 100)}%` }} />
+                          <div className={`h-full transition-all duration-300 ${isModAlert ? 'bg-rose-500' : 'bg-indigo-500'}`} style={{ width: `${Math.max(0, Math.min(100, (liveModulusOutput / 4500) * 100))}%` }} />
                         </div>
 
                         {/* Mini Sparkline Visualization */}
@@ -2409,10 +2549,7 @@ export const BetaSandboxView: React.FC = () => {
                               <path
                                 d={`M ${historyModulus.map((val, idx) => {
                                   const x = (idx / (historyModulus.length - 1)) * 100;
-                                  const minRange = Math.min(...historyModulus) * 0.95;
-                                  const maxRange = Math.max(...historyModulus) * 1.05 || 1;
-                                  const denRange = maxRange - minRange || 1;
-                                  const y = 24 - ((val - minRange) / denRange) * 18 - 2;
+                                  const y = 24 - ((val - historyModMin) / historyModDen) * 18 - 2;
                                   return `${x},${y}`;
                                 }).join(' L ')}`}
                                 fill="none"
@@ -2423,10 +2560,7 @@ export const BetaSandboxView: React.FC = () => {
                               <path
                                 d={`M 0,24 L ${historyModulus.map((val, idx) => {
                                   const x = (idx / (historyModulus.length - 1)) * 100;
-                                  const minRange = Math.min(...historyModulus) * 0.95;
-                                  const maxRange = Math.max(...historyModulus) * 1.05 || 1;
-                                  const denRange = maxRange - minRange || 1;
-                                  const y = 24 - ((val - minRange) / denRange) * 18 - 2;
+                                  const y = 24 - ((val - historyModMin) / historyModDen) * 18 - 2;
                                   return `${x},${y}`;
                                 }).join(' L ')} L 100,24 Z`}
                                 fill={isModAlert ? 'url(#mod-spark-grad-alert)' : 'url(#mod-spark-grad)'}
@@ -2467,9 +2601,9 @@ export const BetaSandboxView: React.FC = () => {
                         setTelemetryLogs([]);
                         addToast('info', 'Console logs cleared');
                       }}
-                      className="text-[8px] text-slate-605 hover:text-slate-300 tracking-wider transition-colors uppercase font-bold"
+                      className="text-[8px] text-slate-650 hover:text-slate-300 tracking-wider transition-colors uppercase font-bold"
                     >
-                      CLEAR TERMINAL (清空日志)
+                      {t('clearTerminal')}
                     </button>
                   </div>
 
@@ -2482,9 +2616,7 @@ export const BetaSandboxView: React.FC = () => {
                       <div className="h-full flex flex-col items-center justify-center text-slate-700 gap-1.5 italic text-center">
                         <Terminal size={22} className="text-slate-850" />
                         <span className="max-w-[280px] text-[8.5px] leading-relaxed uppercase tracking-wider">
-                          Ready. Activate the socket handshake loop above or inject user frame variables below.
-                          <br />
-                          <span className="text-slate-800/80">就绪。请启动上方的 WebSocket 协议包循环或在下方快速注入自定义通讯帧。</span>
+                          {t('readyMessage')}
                         </span>
                       </div>
                     ) : (
@@ -2963,10 +3095,10 @@ export const BetaSandboxView: React.FC = () => {
 
                             {/* Sub Child Rows */}
                             {isOpen && parent.lots
-                              .filter(lot => !isAuditModeActive || !hideNormalLots || getLotAnomalies(lot).length > 0)
-                              .map(lot => {
+                              .map(lot => ({ lot, anomalies: getLotAnomalies(lot) }))
+                              .filter(({ anomalies }) => !isAuditModeActive || !hideNormalLots || anomalies.length > 0)
+                              .map(({ lot, anomalies }) => {
                                 const matchesHighlight = highlightedLots[lot.id];
-                                const anomalies = getLotAnomalies(lot);
 
                                 // MFR
                                 const mfrAnoms = anomalies.filter(a => a.field === 'mfr');
@@ -3122,9 +3254,7 @@ export const BetaSandboxView: React.FC = () => {
                                       )}
                                     </td>
                                     <td className={`text-right font-bold bg-emerald-500/[0.015] ${isCompact ? 'py-1 px-2.5 text-emerald-400' : 'py-1.5 px-3 text-emerald-400'}`}>
-                                      <span className="bg-emerald-500/5 border border-emerald-500/10 px-2 py-0.5 rounded text-[10.5px]">
-                                        {evaluateLotFormula(lot, customFormulaExpr)}
-                                      </span>
+                                      <ComputedCell lot={lot} formula={customFormulaExpr} />
                                     </td>
                                   </tr>
                                 );
@@ -3146,11 +3276,11 @@ export const BetaSandboxView: React.FC = () => {
       <div className="border-t border-slate-800/60 pt-2.5 flex items-center justify-between text-[9px] font-mono text-slate-500 shrink-0">
         <div className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>中石油流化物理数据实验室网关 PetroChn Physical Lab Gateway (Future Workspace Engine v3.1-Beta)</span>
+          <span>{t("telemetryGateway")} (Future Workspace Engine v3.0.0)</span>
         </div>
         <div className="hidden sm:flex items-center gap-4">
-          <span>Wasm 独立虚拟线程堆栈: WASM HEAP Thread-Isolated Pool (24 Active Core)</span>
-          <span>前端套接字通信总线: WebSocket Bus: 115200 Baud Est. (OK)</span>
+          <span>{t("wasmStack")}</span>
+          <span>{t("websocketBus")}</span>
         </div>
       </div>
 

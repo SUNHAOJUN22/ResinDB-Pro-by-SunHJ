@@ -42,8 +42,9 @@ self.onmessage = (e: MessageEvent<WeibullMessage>) => {
       const p = (rank - 0.3) / (n + 0.4); // Bernard's Median Rank approximation
       
       const value = sorted[i];
-      const lnX = Math.log(value);
-      const lnLnY = Math.log(-Math.log(1 - p));
+      const lnX = Math.log(Math.max(value, 1e-15));
+      const innerLog = -Math.log(Math.max(1 - p, 1e-15));
+      const lnLnY = Math.log(Math.max(innerLog, 1e-15));
 
       points.push({ value, x: lnX, y: lnLnY, p });
 
@@ -52,8 +53,9 @@ self.onmessage = (e: MessageEvent<WeibullMessage>) => {
     }
 
     // 3. Least Squares Linear Regression
-    const meanX = sumX / n;
-    const meanY = sumY / n;
+    const safeN = n > 0 ? n : 1;
+    const meanX = sumX / safeN;
+    const meanY = sumY / safeN;
     
     let ssX = 0;
     let ssY = 0;
@@ -65,16 +67,19 @@ self.onmessage = (e: MessageEvent<WeibullMessage>) => {
         ssXY += (pt.x - meanX) * (pt.y - meanY);
     }
 
-    const m = ssXY / ssX;
+    const safeSsX = Math.abs(ssX) > 1e-15 ? ssX : 1e-15;
+    const m = ssXY / safeSsX;
     const intercept = meanY - m * meanX;
-    const eta = Math.exp(-intercept / m);
+    const safeM = Math.abs(m) > 1e-15 ? m : 1e-15;
+    const eta = Math.exp(-intercept / safeM);
     
     // R^2 calculation
-    const rSquared = Math.pow(ssXY, 2) / (ssX * ssY);
+    const rSquaredDenom = ssX * ssY;
+    const rSquared = Math.pow(ssXY, 2) / (Math.abs(rSquaredDenom) > 1e-15 ? rSquaredDenom : 1e-15);
 
     // 4. Safe limit (5% failure -> 95% reliable)
     // p = 1 - exp(-(x/eta)^m) => x = eta * (-ln(1-p))^(1/m)
-    const safeValue95 = eta * Math.pow(-Math.log(1 - 0.05), 1 / m);
+    const safeValue95 = eta * Math.pow(Math.max(-Math.log(1 - 0.05), 1e-15), 1 / safeM);
 
     self.postMessage({
       type: 'WEIBULL_RESULT',

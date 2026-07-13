@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState } from "react";
 import { AppView } from '@/types/index';
+import { safeStorage } from '@/lib/utils';
 
 interface UIContextType {
   activeView: AppView;
@@ -16,6 +17,8 @@ interface UIContextType {
   setShowFilters: (show: boolean) => void;
   isHistoryOpen: boolean;
   setHistoryOpen: (show: boolean) => void;
+  clickFeedbackEnabled: boolean;
+  setClickFeedbackEnabled: (enabled: boolean) => void;
 }
 
 const UIContext = createContext<UIContextType | undefined>(undefined);
@@ -26,7 +29,7 @@ export const UIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const [systemStatus, setSystemStatus] = useState<"online" | "syncing" | "error">("online");
   const [showWelcome, setShowWelcome] = useState(() => {
     try {
-      return !localStorage.getItem("resindb-welcome-dismissed");
+      return !safeStorage.local.getItem("resindb-welcome-dismissed");
     } catch {
       return true;
     }
@@ -34,6 +37,23 @@ export const UIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const [showSummary, setShowSummary] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [isHistoryOpen, setHistoryOpen] = useState(false);
+  const [clickFeedbackEnabled, setClickFeedbackEnabledState] = useState<boolean>(() => {
+    try {
+      const stored = safeStorage.local.getItem("resindb-click-feedback");
+      return stored === null ? true : stored === "true";
+    } catch {
+      return true;
+    }
+  });
+
+  const setClickFeedbackEnabled = (enabled: boolean) => {
+    setClickFeedbackEnabledState(enabled);
+    try {
+      safeStorage.local.setItem("resindb-click-feedback", String(enabled));
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <UIContext.Provider
@@ -52,6 +72,8 @@ export const UIProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         setShowFilters,
         isHistoryOpen,
         setHistoryOpen,
+        clickFeedbackEnabled,
+        setClickFeedbackEnabled,
       }}
     >
       {children}

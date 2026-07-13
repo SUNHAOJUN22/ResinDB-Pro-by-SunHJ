@@ -40,7 +40,7 @@ interface PivotViewProps {
 }
 
 export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, formulas }) => {
-    const { tProp, language } = useLanguage();
+    const { tProp, t } = useLanguage();
   
   // Pivot Configuration State
   const [rowGroups, setRowGroups] = useState<string[]>(["gradeName"]);
@@ -144,7 +144,7 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
           <div className="p-1.5 bg-primary-100 dark:bg-primary-900/30 text-primary-600 rounded-lg">
             <Settings2 size={16} />
           </div>
-          <h2 className="text-sm font-bold text-slate-900 dark:text-white">{language === "en" ? "Pivot Settings" : "透视表设置"}</h2>
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white">{t("pivotSettings")}</h2>
         </div>
 
         <div className="space-y-5">
@@ -152,7 +152,7 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
           <div className="space-y-3">
             <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
               <Rows size={12} />
-              {language === "en" ? "Row Groups" : "行分组"}
+              {t("rowGroups")}
             </label>
             <div className="space-y-2">
               {availableCols.map(col => (
@@ -184,18 +184,18 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
           <div className="space-y-3">
             <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
               <Sigma size={12} />
-              {language === "en" ? "Aggregation Values" : "聚合运算"}
+              {t("aggregationValues")}
             </label>
             <select 
               value={aggType}
               onChange={(e) => setAggType(e.target.value as "avg" | "sum" | "count" | "min" | "max")}
               className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary-500/20"
             >
-              <option value="avg">{language === "en" ? "Average" : "平均值 (Avg)"}</option>
-              <option value="sum">{language === "en" ? "Sum" : "求和 (Sum)"}</option>
-              <option value="min">{language === "en" ? "Min" : "最小值 (Min)"}</option>
-              <option value="max">{language === "en" ? "Max" : "最大值 (Max)"}</option>
-              <option value="count">{language === "en" ? "Count" : "计数 (Count)"}</option>
+              <option value="avg">{t("average")}</option>
+              <option value="sum">{t("sum")}</option>
+              <option value="min">{t("min")}</option>
+              <option value="max">{t("max")}</option>
+              <option value="count">{t("count")}</option>
             </select>
             <div className="space-y-2 pt-2">
               {numericCols.map(col => (
@@ -225,13 +225,13 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
         <div className="flex items-center justify-between mb-5 shrink-0">
           <div>
             <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2.5">
-              {language === "en" ? "Pivot Table" : "数据透视表"}
+              {t("pivotTable")}
               <span className="px-3 py-1 bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400 text-xs rounded-full">
-                {language === "en" ? `${pivotData.length} Root Groups` : `${pivotData.length} 根分组`}
+                {t("rootGroups").replace("{count}", String(pivotData.length))}
               </span>
             </h1>
             <p className="text-slate-500 text-sm mt-1">
-              {language === "en" ? `Analyzing ${data.length} records through ${rowGroups.length} groupings` : `正在通过 ${rowGroups.length} 级分组分析 ${data.length} 条记录`}
+              {t("pivotAnalysisDesc").replace("{groups}", String(rowGroups.length)).replace("{total}", String(data.length))}
             </p>
           </div>
           
@@ -240,13 +240,13 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
               onClick={() => setViewMode("table")}
               className={`px-4 py-2 ${viewMode === "table" ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"} rounded-xl text-sm font-bold flex items-center gap-2 transition-all`}
             >
-              <TableIcon size={16} /> {language === "en" ? "Table" : "表格"}
+              <TableIcon size={16} /> {t("table")}
             </button>
             <button 
               onClick={() => setViewMode("chart")}
               className={`px-4 py-2 ${viewMode === "chart" ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"} rounded-xl text-sm font-bold flex items-center gap-2 transition-all`}
             >
-              <BarChart3 size={16} /> {language === "en" ? "Chart" : "图表"}
+              <BarChart3 size={16} /> {t("chart")}
             </button>
           </div>
         </div>
@@ -257,10 +257,10 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
               <thead className="sticky top-0 z-20 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    Groups
+                    {t("groups")}
                   </th>
                   <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    Count
+                    {t("count")}
                   </th>
                   {valueMetrics.map(mKey => (
                     <th key={mKey} className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -273,7 +273,7 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
                 {pivotData.length === 0 ? (
                   <tr>
                     <td colSpan={2 + valueMetrics.length} className="px-6 py-20 text-center text-slate-400 italic">
-                      Select grouping criteria to generate pivot table
+                      {t("pivotEmptyState")}
                     </td>
                   </tr>
                 ) : (

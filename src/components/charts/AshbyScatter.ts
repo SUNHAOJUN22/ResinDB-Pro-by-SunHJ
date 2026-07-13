@@ -1,10 +1,13 @@
 import * as echarts from "echarts";
 import { materialEngine } from "@/lib/materialScience";
+import { translations } from "@/config/i18n";
+
 
 // Chart 2: "Ashby" Scatter Plot Option Configuration - High-Performance Version
 export const getAshbyChartOption = (
   data: { series?: unknown[]; xAxis?: string; yAxis?: string } | unknown[],
   theme: "light" | "dark",
+  language?: "zh" | "en",
 ): echarts.EChartsOption => {
   const isDark = theme === "dark";
   const colorPalette = ["#3b82f6", "#f43f5e", "#10b981", "#8b5cf6", "#f59e0b"];
@@ -90,7 +93,7 @@ export const getAshbyChartOption = (
               <span>${yAxisName}:</span>
               <span style="font-weight: 700;">${val[1]}</span>
             </div>
-            ${isPareto ? '<div style="margin-top: 8px; color: #10b981; font-weight: 900; font-size: 10px; text-transform: uppercase; border-top: 1px solid rgba(16, 185, 129, 0.2); padding-top: 4px;">★ 帕累托最优材质 (Pareto Optimal)</div>' : ''}
+            ${isPareto ? `<div style="margin-top: 8px; color: #10b981; font-weight: 900; font-size: 10px; text-transform: uppercase; border-top: 1px solid rgba(16, 185, 129, 0.2); padding-top: 4px;">${translations[language === 'en' ? 'en' : 'zh'].paretoOptimalMaterial}</div>` : ''}
           </div>
         `;
       },

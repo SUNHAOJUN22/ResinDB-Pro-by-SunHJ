@@ -37,7 +37,7 @@ export const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({
         className="text-[9px] font-mono text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors"
         title={`Last Sync: ${lastSyncTime}`}
       >
-        v2.6.1
+        v3.0.0
       </span>
       <motion.button
         whileHover={{ scale: 1.1, rotate: 180 }}

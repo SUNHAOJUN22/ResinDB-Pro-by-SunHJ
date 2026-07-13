@@ -48,9 +48,10 @@ function cholesky(A: number[][], maxJitter = 1.0): number[][] {
                         success = false;
                         break;
                     }
-                    L[i][j] = Math.sqrt(val);
+                    L[i][j] = Math.sqrt(Math.max(val, 0));
                 } else {
-                    L[i][j] = (1.0 / L[j][j]) * (A[i][j] - sum);
+                    const safeLjj = Math.abs(L[j][j]) > 1e-15 ? L[j][j] : 1e-15;
+                    L[i][j] = (1.0 / safeLjj) * (A[i][j] - sum);
                 }
             }
             if (!success) break;
@@ -67,7 +68,8 @@ function forwardSolve(L: number[][], B: number[]): number[] {
     for (let i = 0; i < n; i++) {
         let sum = 0;
         for (let j = 0; j < i; j++) sum += L[i][j] * Y[j];
-        Y[i] = (B[i] - sum) / L[i][i];
+        const safeLii_f = Math.abs(L[i][i]) > 1e-15 ? L[i][i] : 1e-15;
+        Y[i] = (B[i] - sum) / safeLii_f;
     }
     return Y;
 }
@@ -78,7 +80,8 @@ function backwardSolve(L: number[][], Y: number[]): number[] {
     for (let i = n - 1; i >= 0; i--) {
         let sum = 0;
         for (let j = i + 1; j < n; j++) sum += L[j][i] * X[j];
-        X[i] = (Y[i] - sum) / L[i][i];
+        const safeLii_b = Math.abs(L[i][i]) > 1e-15 ? L[i][i] : 1e-15;
+        X[i] = (Y[i] - sum) / safeLii_b;
     }
     return X;
 }
@@ -158,8 +161,9 @@ self.onmessage = (e: MessageEvent<MooMessage>) => {
 
         const gps = targets.map(t => {
             const Y = data.map(row => row[t.name]);
-            const yMean = Y.reduce((a, b) => a + b, 0) / n;
-            let yStd = Math.sqrt(Y.reduce((sum, y) => sum + Math.pow(y - yMean, 2), 0) / n);
+            const safeN = n > 0 ? n : 1;
+            const yMean = Y.reduce((a, b) => a + b, 0) / safeN;
+            let yStd = Math.sqrt(Math.max(0, Y.reduce((sum, y) => sum + Math.pow(y - yMean, 2), 0) / safeN));
             if (yStd === 0) yStd = 1;
             const Y_norm = Y.map(y => (y - yMean) / yStd);
             const alpha = backwardSolve(L, forwardSolve(L, Y_norm));

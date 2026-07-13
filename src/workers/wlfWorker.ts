@@ -56,7 +56,7 @@ self.onmessage = (e: MessageEvent<WlfMessage>) => {
     
     const theRefTemp = refCurve.temp;
     
-    const logRefPoints = refCurve.points.map(p => ({ x: Math.log10(p.rate), y: Math.log10(p.visc) }));
+    const logRefPoints = refCurve.points.map(p => ({ x: Math.log10(Math.max(p.rate, 1e-15)), y: Math.log10(Math.max(p.visc, 1e-15)) }));
     
     // 1. Numerically find best horizontal shift factor log(aT) for each curve relative to refCurve
     // We assume mainly horizontal shift: log(rate_master) = log(rate) + log(aT)
@@ -68,7 +68,7 @@ self.onmessage = (e: MessageEvent<WlfMessage>) => {
     const shiftFactors = sortedCurves.map(c => {
        if (c.temp === theRefTemp) return { temp: c.temp, aT: 1, logAT: 0 };
        
-       const logPoints = c.points.map(p => ({ x: Math.log10(p.rate), y: Math.log10(p.visc) }));
+       const logPoints = c.points.map(p => ({ x: Math.log10(Math.max(p.rate, 1e-15)), y: Math.log10(Math.max(p.visc, 1e-15)) }));
        
        // Grid search for u in [-10, 10]
        let bestU = 0;

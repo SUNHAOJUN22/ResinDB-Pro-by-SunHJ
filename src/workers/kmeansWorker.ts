@@ -165,7 +165,7 @@ self.onmessage = (e: MessageEvent<KMeansMessage>) => {
         if (maxAB > 0) s = (b - a) / maxAB;
         totalSil += s;
       }
-      return totalSil / n;
+      return n > 0 ? totalSil / n : 0;
     };
 
     if (maxTestedK < 2) {

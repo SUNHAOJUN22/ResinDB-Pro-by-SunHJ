@@ -1,10 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-sans: "Inter", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif;
   --font-display: "Inter", var(--font-sans);
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
@@ -197,6 +197,27 @@ body {
       page-break-inside: avoid;
       page-break-after: auto;
   }
+}
+
+/* --- Smooth Button Micro-Interactions & Click Feedback --- */
+button, .btn-interactive {
+  transition: transform 0.12s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover, .btn-interactive:hover {
+  transform: translateY(-1px) scale(1.02);
+}
+
+button:active, .btn-interactive:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Override for motion-controlled buttons to prevent conflict */
+button[style*="transform"] {
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+button[style*="transform"]:hover, button[style*="transform"]:active {
+  transform: none;
 }
 
 

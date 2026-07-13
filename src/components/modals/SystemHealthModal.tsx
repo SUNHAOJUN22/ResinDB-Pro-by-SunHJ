@@ -12,6 +12,8 @@ import {
   Upload,
 } from "lucide-react";
 import { useData } from "@/contexts/DataContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { safeStorage } from "@/lib/utils";
 
 interface SystemHealthModalProps {
   isOpen: boolean;
@@ -30,6 +32,7 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { refreshData, isRefreshing, syncEvents } = useData();
+  const { t } = useLanguage();
   const [syncProgress, setSyncProgress] = useState(0);
 
   useEffect(() => {
@@ -65,7 +68,7 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({
     const configData: Record<string, string | null> = {};
 
     configKeys.forEach((key) => {
-      configData[key] = localStorage.getItem(key);
+      configData[key] = safeStorage.local.getItem(key);
     });
 
     const blob = new Blob([JSON.stringify(configData, null, 2)], {
@@ -108,21 +111,21 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({
         Object.keys(configData).forEach((key) => {
           if (allowedKeys.includes(key) && configData[key] !== null) {
             // Further type checking could go here for critical items
-            localStorage.setItem(key, configData[key]);
+            safeStorage.local.setItem(key, configData[key]);
             importCount++;
           }
         });
 
         if (importCount === 0) {
-          addToast("error", "未能识别出有效的系统配置项。");
+          addToast("error", t("sysHealthImportEmptyError"));
           return;
         }
 
-        addToast("success", `成功导入 ${importCount} 项系统配置！页面将立即刷新。`);
+        addToast("success", t("sysHealthImportSuccess"));
         setTimeout(() => window.location.reload(), 1000);
       } catch (err) {
         logger.error("Config import error:", err);
-        addToast("error", "导入配置失败：文件格式不兼容或 JSON 已损坏。");
+        addToast("error", t("sysHealthImportError"));
       }
     };
     reader.readAsText(file);
@@ -156,10 +159,10 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-800 dark:text-white tracking-tight">
-                    系统诊断与版本
+                    {t("sysHealthTitle")}
                   </h3>
                   <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mt-0.5">
-                    System Health & Versioning
+                    {t("sysHealthSubtitle")}
                   </p>
                 </div>
               </div>
@@ -247,10 +250,10 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({
                   </div>
                   <div className="flex-1">
                     <p className={`text-xs font-mono font-bold ${isRefreshing ? 'text-primary-900 dark:text-primary-300' : 'text-emerald-900 dark:text-emerald-300'} tracking-tight`}>
-                      {isRefreshing ? '系统数据同步中...' : '所有系统运行正常'}
+                      {isRefreshing ? t("sysHealthSyncing") : t("sysHealthAllNormal")}
                     </p>
                     <p className={`text-[9px] ${isRefreshing ? 'text-primary-600 dark:text-primary-500' : 'text-emerald-600 dark:text-emerald-500'} font-mono uppercase tracking-widest mt-1`}>
-                      延迟: 24ms | 吞吐量: 1.2GB/s
+                      {t("sysHealthLatency")}
                     </p>
                   </div>
                   <button
@@ -263,7 +266,7 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({
                     }`}
                   >
                     <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
-                    {isRefreshing ? 'Syncing...' : 'Sync Now'}
+                    {isRefreshing ? t("syncing") : t("syncNow")}
                   </button>
                 </div>
 
@@ -297,16 +300,16 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({
                 <div className="flex items-center justify-between px-1">
                   <h4 className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                     <Activity size={12} />
-                    最近同步日志
+                    {t("sysHealthSyncLog")}
                   </h4>
                   <span className="text-[9px] font-mono text-slate-400">
-                    {syncEvents.length} events
+                    {syncEvents.length} {t("syncLogsCount")}
                   </span>
                 </div>
                 <div className="p-1 max-h-48 overflow-y-auto custom-scrollbar space-y-2 pr-2">
                   {syncEvents.length === 0 ? (
                     <div className="text-center p-4 text-[10px] font-mono text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
-                      暂无同步日志 (No recent events)
+                      {t("sysHealthNoEvents")}
                     </div>
                   ) : (
                     syncEvents.map((event) => (
@@ -347,13 +350,13 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({
                   <div className="relative z-10">
                     <h4 className="text-[9px] font-mono uppercase tracking-widest mb-4 text-primary-400 flex items-center gap-2">
                       <div className="w-2 h-2 bg-primary-500 rounded-full" />
-                      版本说明 (v2.6.1-PRO)
+                      {t("sysHealthReleaseNotes")} (v3.0.0-PRO)
                     </h4>
                     <div className="space-y-3">
                       {[
-                        "引入智能牌号相似度推荐引擎",
-                        "优化了大数据量下的 DataGrid 渲染性能",
-                        "新增多维度雷达图对比分析功能",
+                        t("sysHealthReleaseNote1"),
+                        t("sysHealthReleaseNote2"),
+                        t("sysHealthReleaseNote3"),
                       ].map((item, i) => (
                         <motion.div
                           key={i}
@@ -382,9 +385,9 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({
                   whileTap={{ scale: 0.95 }}
                   onClick={handleExportConfig}
                   className="px-4 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono font-bold text-[10px] uppercase tracking-widest hover:bg-slate-300 dark:hover:bg-slate-700 transition-all rounded-xl shadow-sm flex items-center gap-2"
-                  title="导出系统配置"
+                  title={t("sysHealthExport")}
                 >
-                  <Download size={14} /> 导出配置
+                  <Download size={14} /> {t("sysHealthExport")}
                 </motion.button>
                 <input
                   type="file"
@@ -398,9 +401,9 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({
                   whileTap={{ scale: 0.95 }}
                   onClick={() => fileInputRef.current?.click()}
                   className="px-4 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono font-bold text-[10px] uppercase tracking-widest hover:bg-slate-300 dark:hover:bg-slate-700 transition-all rounded-xl shadow-sm flex items-center gap-2"
-                  title="导入系统配置"
+                  title={t("sysHealthImport")}
                 >
-                  <Upload size={14} /> 导入配置
+                  <Upload size={14} /> {t("sysHealthImport")}
                 </motion.button>
               </div>
               <motion.button
@@ -409,7 +412,7 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({
                 onClick={onClose}
                 className="px-10 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-mono font-bold text-[10px] uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-slate-100 transition-all rounded-xl shadow-lg"
               >
-                确认
+                {t("sysHealthConfirm")}
               </motion.button>
             </div>
           </motion.div>

@@ -1,20 +1,14 @@
-import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from "react";
-import { Product, ColumnConfig, FilterGroup, ProductUpdates, FormulaConfig, FilterItem, Category } from '@/types/index';
+import React, { createContext, useContext, useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { Product, ColumnConfig, FilterGroup, ProductUpdates, FormulaConfig, FilterItem, Category, SyncEvent } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToasts } from "@/contexts/ToastContext";
 import { useUI } from "@/contexts/UIContext";
 import { useDatabase } from '@/hooks/app/useDatabase';
 import { CATEGORY_TREE } from '@/config/constants';
-import { api } from '@/services/api';
+import api from '@/lib/adapters';
+import { safeStorage } from "@/lib/utils";
 import { useHistory } from '@/hooks/app/useHistory';
 import { HistoryRecord } from "@/lib/adapters/types";
-
-export interface SyncEvent {
-  id: string;
-  timestamp: number;
-  status: 'success' | 'error';
-  message: string;
-}
 
 export interface RecentSearch {
   id: string;
@@ -79,11 +73,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { setShowSidebar } = useUI();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [recentSearches, setRecentSearches] = useState<RecentSearch[]>(() => {
-    try {
-      const saved = typeof window !== 'undefined' ? sessionStorage.getItem("resindb-recent-searches") : null;
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // Ignore
+    const saved = safeStorage.session.getItem("resindb-recent-searches");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // Ignore
+      }
     }
     return [];
   });
@@ -101,10 +97,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [language]);
 
   const db = useDatabase(categoryNameMap, tProp, addToast, t);
-  const { history, pushToHistory, restoreSnapshot } = useHistory(db.allProducts, db.setAllProducts);
+  const {
+    allProducts,
+    setAllProducts,
+    searchQuery,
+    setSearchQuery,
+    selectedCategoryIds,
+    setSelectedCategoryIds,
+    advancedFilterGroup,
+    setAdvancedFilterGroup,
+    setMinCompleteness,
+  } = db;
+
+  const { history, pushToHistory, restoreSnapshot } = useHistory(allProducts, setAllProducts);
+
+  /** Concurrent-mode-safe ref: always holds the latest committed allProducts value. */
+  const allProductsRef = useRef<Product[]>(allProducts);
+  useEffect(() => { allProductsRef.current = allProducts; }, [allProducts]);
 
   const categoryCounts = useMemo(() => {
-    const products = db.allProducts;
+    const products = allProducts;
     const catToProductIds: Record<string, Set<string>> = {};
     
     // 1. Map products to their directly assigned categories
@@ -131,7 +143,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     CATEGORY_TREE.forEach(collectIdsRecursive);
 
     return finalCounts;
-  }, [db.allProducts]);
+  }, [allProducts]);
 
   const handleCreate = useCallback(async (p: Partial<Product>) => {
     const tempId = `temp-${Date.now()}`;
@@ -146,83 +158,76 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       createdAt: new Date().toISOString().split('T')[0],
     };
 
-    db.setAllProducts((prev) => [optimisticProduct, ...prev]);
+    const previousProducts = allProductsRef.current;
+    setAllProducts((prev) => [optimisticProduct, ...prev]);
 
     try {
-      pushToHistory(`Create product ${p.gradeName || 'New Product'}`, db.allProducts);
       const created = await api.create(p);
-      db.setAllProducts((prev) =>
+      setAllProducts((prev) =>
         prev.map((old) => (old.id === tempId ? created : old)),
       );
+      pushToHistory(`Create product ${p.gradeName || 'New Product'}`, previousProducts);
       addToast("success", t("createSuccess") || "Product created successfully");
     } catch (error) {
-      db.setAllProducts((prev) => prev.filter((product) => product.id !== tempId));
+      setAllProducts((prev) => prev.filter((product) => product.id !== tempId));
       addToast(
         "error",
         (t("createFailed") || "Failed to create product: ") +
-          (error instanceof Error ? error.message : t("unknownError")),
+          (error instanceof Error ? t(error.message) : t("unknownError")),
       );
     }
-  }, [db, addToast, t, pushToHistory]);
+  }, [setAllProducts, addToast, t, pushToHistory]);
 
   const handleDelete = useCallback(async (ids: string[]) => {
-    let previousProducts: Product[] = [];
-    db.setAllProducts((prev) => {
-      previousProducts = prev;
-      return prev.filter((p) => !ids.includes(p.id));
-    });
+    const previousProducts = allProductsRef.current;
+    setAllProducts((prev) => prev.filter((p) => !ids.includes(p.id)));
     setSelectedIds(new Set());
 
     try {
-      pushToHistory(`Delete ${ids.length} product(s)`, previousProducts);
       await api.delete(ids);
+      pushToHistory(`Delete ${ids.length} product(s)`, previousProducts);
       addToast(
         "success",
         t("deleteSuccess").replace("{count}", ids.length.toString()),
       );
       setShowSidebar(true);
     } catch (error) {
-      db.setAllProducts(previousProducts);
+      setAllProducts(previousProducts);
       addToast(
         "error",
         t("deleteFailed") +
-          (error instanceof Error ? error.message : t("unknownError")),
+          (error instanceof Error ? t(error.message) : t("unknownError")),
       );
     }
-  }, [db, setSelectedIds, addToast, t, setShowSidebar, pushToHistory]);
+  }, [setAllProducts, setSelectedIds, addToast, t, setShowSidebar, pushToHistory]);
 
   const handleUpdate = useCallback(async (p: Product) => {
-    let previousProducts: Product[] = [];
-    db.setAllProducts((prev) => {
-      previousProducts = prev;
-      return prev.map((old) => (old.id === p.id ? p : old));
-    });
+    const previousProducts = allProductsRef.current;
+    setAllProducts((prev) => prev.map((old) => (old.id === p.id ? p : old)));
 
     try {
-      pushToHistory(`Update product ${p.gradeName}`, previousProducts);
       const updated = await api.update(p);
-      db.setAllProducts((prev) =>
+      setAllProducts((prev) =>
         prev.map((old) => (old.id === updated.id ? updated : old)),
       );
+      pushToHistory(`Update product ${p.gradeName}`, previousProducts);
       addToast("success", t("updateSuccessMsg"));
       setShowSidebar(true);
     } catch (error) {
-      db.setAllProducts(previousProducts);
+      setAllProducts(previousProducts);
       addToast(
         "error",
         t("updateFailed") +
-          (error instanceof Error ? error.message : t("unknownError")),
+          (error instanceof Error ? t(error.message) : t("unknownError")),
       );
     }
-  }, [db, addToast, t, setShowSidebar, pushToHistory]);
+  }, [setAllProducts, addToast, t, setShowSidebar, pushToHistory]);
 
   const handleBatchUpdate = useCallback(async (ids: string[], updates: ProductUpdates) => {
-    let previousProducts: Product[] = [];
+    const previousProducts = allProductsRef.current;
     const { _propertyUpdates, ...restUpdates } = updates;
 
-    db.setAllProducts((prev) => {
-      previousProducts = prev;
-      return prev.map((p) => {
+    setAllProducts((prev) => prev.map((p) => {
         if (!ids.includes(p.id)) return p;
 
         const newProperties = { ...p.properties };
@@ -253,123 +258,117 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         return { ...p, ...restUpdates, properties: newProperties };
-      });
-    });
+      }),
+    );
 
     try {
-      pushToHistory(`Batch updated ${ids.length} products`, previousProducts);
       await api.batchUpdate(ids, updates);
+      pushToHistory(`Batch updated ${ids.length} products`, previousProducts);
       addToast("success", t("batchUpdateSuccess"));
       setShowSidebar(true);
     } catch (error) {
-      db.setAllProducts(previousProducts);
+      setAllProducts(previousProducts);
       addToast(
         "error",
         t("batchUpdateFailed") +
-          (error instanceof Error ? error.message : t("unknownError")),
+          (error instanceof Error ? t(error.message) : t("unknownError")),
       );
     }
-  }, [db, addToast, t, setShowSidebar, pushToHistory]);
+  }, [setAllProducts, addToast, t, setShowSidebar, pushToHistory]);
 
   const handleBatchTagging = useCallback(async (
     ids: string[],
     tagsToApply: string[],
     mode: "append" | "overwrite" | "remove"
   ) => {
-    let previousProducts: Product[] = [];
-    let updatedList: Product[] = [];
+    const previousProducts = allProductsRef.current;
 
-    db.setAllProducts((prev) => {
-      previousProducts = prev;
-      updatedList = prev.map((p) => {
-        if (!ids.includes(p.id)) return p;
+    // Compute the updated list eagerly so we can reference it after the setter
+    const applyTags = (list: Product[]): Product[] => list.map((p) => {
+      if (!ids.includes(p.id)) return p;
 
-        let newTags = p.tags ? [...p.tags] : [];
-        if (mode === "append") {
-          tagsToApply.forEach((t) => {
-            if (!newTags.includes(t)) newTags.push(t);
-          });
-        } else if (mode === "overwrite") {
-          newTags = [...tagsToApply];
-        } else if (mode === "remove") {
-          newTags = newTags.filter((t) => !tagsToApply.includes(t));
-        }
+      let newTags = p.tags ? [...p.tags] : [];
+      if (mode === "append") {
+        tagsToApply.forEach((tag) => {
+          if (!newTags.includes(tag)) newTags.push(tag);
+        });
+      } else if (mode === "overwrite") {
+        newTags = [...tagsToApply];
+      } else if (mode === "remove") {
+        newTags = newTags.filter((tag) => !tagsToApply.includes(tag));
+      }
 
-        return {
-          ...p,
-          tags: newTags,
-          updatedAt: new Date().toISOString().split("T")[0],
-        };
-      });
-      return updatedList;
+      return {
+        ...p,
+        tags: newTags,
+        updatedAt: new Date().toISOString().split("T")[0],
+      };
     });
 
+    const updatedList = applyTags(previousProducts);
+    setAllProducts((prev) => applyTags(prev));
+
     try {
-      const modeText = mode === "append" ? "追加" : mode === "overwrite" ? "覆盖" : "移除";
-      pushToHistory(`批量${modeText}标签 (${ids.length} 个牌号)`, previousProducts);
-      
       const affectedProducts = updatedList.filter(p => ids.includes(p.id));
       await Promise.all(affectedProducts.map(p => api.update(p)));
 
-      addToast("success", language === "zh" ? "批量修改标签成功！" : "Bulk tagging updated successfully!");
+      const modeText = mode === "append" ? t("tagModeAppend", "append") : mode === "overwrite" ? t("tagModeOverwrite", "overwrite") : t("tagModeRemove", "remove");
+      pushToHistory(t("batchTagHistory", "Bulk tag {mode} ({count} items)").replace("{mode}", modeText).replace("{count}", String(ids.length)), previousProducts);
+      addToast("success", t("batchTagSuccess", "Bulk tagging updated successfully!"));
     } catch (error) {
-      db.setAllProducts(previousProducts);
+      setAllProducts(previousProducts);
       addToast(
         "error",
-        (language === "zh" ? "批量修改标签失败: " : "Bulk tagging failed: ") +
-          (error instanceof Error ? error.message : t("unknownError")),
+        t("batchTagFailed", "Bulk tagging failed: ") +
+          (error instanceof Error ? t(error.message) : t("unknownError")),
       );
     }
-  }, [db, addToast, t, language, pushToHistory]);
+  }, [setAllProducts, addToast, t, pushToHistory]);
 
   const handleBatchReorder = useCallback(async (
     updates: { id: string; priority: number }[]
   ) => {
-    let previousProducts: Product[] = [];
-    let updatedList: Product[] = [];
+    const previousProducts = allProductsRef.current;
 
     const updateMap = new Map<string, number>();
     updates.forEach((u) => updateMap.set(u.id, u.priority));
 
-    db.setAllProducts((prev) => {
-      previousProducts = prev;
-      updatedList = prev.map((p) => {
-        if (!updateMap.has(p.id)) return p;
-        return {
-          ...p,
-          priority: updateMap.get(p.id)!,
-          updatedAt: new Date().toISOString().split("T")[0],
-        };
-      });
-      return updatedList;
+    // Compute eagerly from ref snapshot for API call, but use functional updater for state
+    const applyReorder = (list: Product[]): Product[] => list.map((p) => {
+      if (!updateMap.has(p.id)) return p;
+      return {
+        ...p,
+        priority: updateMap.get(p.id)!,
+        updatedAt: new Date().toISOString().split("T")[0],
+      };
     });
 
+    const updatedList = applyReorder(previousProducts);
+    setAllProducts((prev) => applyReorder(prev));
+
     try {
-      const titleText = language === "zh" ? `批量重排/定义优先级 (${updates.length} 个牌号)` : `Bulk reorder/prioritize (${updates.length} items)`;
-      pushToHistory(titleText, previousProducts);
-      
       const affectedProducts = updatedList.filter((p) => updateMap.has(p.id));
       await Promise.all(affectedProducts.map((p) => api.update(p)));
 
-      addToast("success", language === "zh" ? "批量重排与优先级更新成功！" : "Bulk reordering & priority updated successfully!");
+      const titleText = t("batchReorderHistory", "Bulk reorder/prioritize ({count} items)").replace("{count}", String(updates.length));
+      pushToHistory(titleText, previousProducts);
+      addToast("success", t("batchReorderSuccess", "Bulk reordering & priority updated successfully!"));
     } catch (error) {
-      db.setAllProducts(previousProducts);
+      setAllProducts(previousProducts);
       addToast(
         "error",
-        (language === "zh" ? "批量重排失败: " : "Bulk reordering failed: ") +
-          (error instanceof Error ? error.message : t("unknownError")),
+        t("batchReorderFailed", "Bulk reordering failed: ") +
+          (error instanceof Error ? t(error.message) : t("unknownError")),
       );
     }
-  }, [db, addToast, t, language, pushToHistory]);
+  }, [setAllProducts, addToast, t, pushToHistory]);
 
   const handleImportData = useCallback(async (newProducts: Product[]) => {
-    const previousProducts = [...db.allProducts];
-    // Add temporary IDs for optimistic UI if needed, but here we just show a loader if we wanted
-    // However, since imports can be large, we'll do it as a background task with success notification
     try {
-      pushToHistory(`Imported ${newProducts.length} products`, previousProducts);
       const created = await api.batchCreate(newProducts);
-      db.setAllProducts((prev) => [...created, ...prev]);
+      const previousProducts = allProductsRef.current;
+      setAllProducts((prev) => [...created, ...prev]);
+      pushToHistory(`Imported ${newProducts.length} products`, previousProducts);
       addToast(
         "success",
         t("importSuccess").replace("{count}", created.length.toString()),
@@ -378,89 +377,85 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error) {
       addToast(
         "error",
-        t("importFailed", "Import failed: ") + (error instanceof Error ? error.message : t("unknownError")),
+        t("importFailed", "Import failed: ") + (error instanceof Error ? t(error.message) : t("unknownError")),
       );
     }
-  }, [db, addToast, t, setShowSidebar, pushToHistory]);
+  }, [setAllProducts, addToast, t, setShowSidebar, pushToHistory]);
 
   const clearFilters = useCallback(() => {
-    db.setSearchQuery("");
-    db.setSelectedCategoryIds(new Set());
-    db.setAdvancedFilterGroup({
+    setSearchQuery("");
+    setSelectedCategoryIds(new Set());
+    setAdvancedFilterGroup({
       id: "root",
       type: "group",
       logic: "AND",
       conditions: [],
     });
-    db.setMinCompleteness(0);
-  }, [db]);
+    setMinCompleteness(0);
+  }, [setSearchQuery, setSelectedCategoryIds, setAdvancedFilterGroup, setMinCompleteness]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
-      const q = db.searchQuery.trim();
-      const hasFilters = db.advancedFilterGroup.conditions.length > 0;
-      const hasCategories = db.selectedCategoryIds.size > 0;
+      const q = searchQuery.trim();
+      const hasFilters = advancedFilterGroup.conditions.length > 0;
+      const hasCategories = selectedCategoryIds.size > 0;
       
       if (q || hasFilters || hasCategories) {
         setRecentSearches(prev => {
           // Avoid duplicates
           const isDup = prev.some(r => 
-            r.query === db.searchQuery && 
-            JSON.stringify(r.filters) === JSON.stringify(db.advancedFilterGroup) &&
-            JSON.stringify([...r.selectedCategoryIds].sort()) === JSON.stringify(Array.from(db.selectedCategoryIds).sort())
+            r.query === searchQuery && 
+            JSON.stringify(r.filters) === JSON.stringify(advancedFilterGroup) &&
+            JSON.stringify([...r.selectedCategoryIds].sort()) === JSON.stringify(Array.from(selectedCategoryIds).sort())
           );
           if (isDup) return prev;
 
           const labelParts = [];
           if (q) labelParts.push(`"${q}"`);
-          if (hasCategories) labelParts.push(`${db.selectedCategoryIds.size} categories`);
-          if (hasFilters) labelParts.push(`${db.advancedFilterGroup.conditions.length} filters`);
+          if (hasCategories) labelParts.push(`${selectedCategoryIds.size} categories`);
+          if (hasFilters) labelParts.push(`${advancedFilterGroup.conditions.length} filters`);
           const label = labelParts.join(" + ");
 
           const newSearch: RecentSearch = {
             id: Date.now().toString(),
             label,
-            query: db.searchQuery,
-            filters: db.advancedFilterGroup,
-            selectedCategoryIds: Array.from(db.selectedCategoryIds),
+            query: searchQuery,
+            filters: advancedFilterGroup,
+            selectedCategoryIds: Array.from(selectedCategoryIds),
             timestamp: Date.now()
           };
 
           const next = [newSearch, ...prev].slice(0, 10); // Keep last 10
-          try {
-            sessionStorage.setItem("resindb-recent-searches", JSON.stringify(next));
-          } catch {
-            // Ignore security error in sandboxed iframe
-          }
+          safeStorage.session.setItem("resindb-recent-searches", JSON.stringify(next));
           return next;
         });
       }
     }, 2000); // 2 second debounce to capture final query states
 
     return () => clearTimeout(handler);
-  }, [db.searchQuery, db.advancedFilterGroup, db.selectedCategoryIds]);
+  }, [searchQuery, advancedFilterGroup, selectedCategoryIds]);
 
   const selectSingleCategory = useCallback((id: string) => {
-    db.setSelectedCategoryIds(new Set([id]));
-  }, [db]);
+    setSelectedCategoryIds(new Set([id]));
+  }, [setSelectedCategoryIds]);
 
   const activeFilters = useMemo(() => {
     const items: FilterItem[] = [];
-    if (db.searchQuery.trim()) {
+    if (searchQuery.trim()) {
       items.push({
         id: "search",
-        label: `Search: "${db.searchQuery}"`,
+        label: `Search: "${searchQuery}"`,
         type: "search",
-        onRemove: () => db.setSearchQuery(""),
+        onRemove: () => setSearchQuery(""),
       });
     }
-    db.selectedCategoryIds.forEach((id) => {
+    selectedCategoryIds.forEach((id) => {
       items.push({
         id: id,
         label: categoryNameMap.get(id) || id,
         type: "category",
         onRemove: () => {
-          db.setSelectedCategoryIds((prev) => {
+          setSelectedCategoryIds((prev) => {
             const next = new Set(prev);
             next.delete(id);
             return next;
@@ -468,13 +463,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
       });
     });
-    if (db.advancedFilterGroup.conditions.length > 0) {
+    if (advancedFilterGroup.conditions.length > 0) {
       items.push({
         id: "advanced-filters",
-        label: `${t("advancedFilters")} (${db.advancedFilterGroup.conditions.length})`,
+        label: `${t("advancedFilters")} (${advancedFilterGroup.conditions.length})`,
         type: "advanced",
         onRemove: () =>
-          db.setAdvancedFilterGroup({
+          setAdvancedFilterGroup({
             id: "root",
             type: "group",
             logic: "AND",
@@ -483,7 +478,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
     return items;
-  }, [db, categoryNameMap, t]);
+  }, [searchQuery, setSearchQuery, selectedCategoryIds, setSelectedCategoryIds, advancedFilterGroup, setAdvancedFilterGroup, categoryNameMap, t]);
 
   const value = useMemo(() => ({
     ...db,

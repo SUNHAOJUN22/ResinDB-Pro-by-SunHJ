@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from "react";
 import { User } from '@/types/index';
+import { safeStorage } from "@/lib/utils";
 
 interface AuthContextType {
   currentUser: User | null;
@@ -14,29 +15,32 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    try {
-      const saved = typeof window !== 'undefined' ? localStorage.getItem("resindb-session") : null;
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
+    const saved = safeStorage.local.getItem("resindb-session");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return null;
+      }
     }
+    return null;
   });
 
   const login = useCallback((user: User) => {
     setCurrentUser(user);
-    localStorage.setItem("resindb-session", JSON.stringify(user));
+    safeStorage.local.setItem("resindb-session", JSON.stringify(user));
   }, []);
 
   const logout = useCallback(() => {
     setCurrentUser(null);
-    localStorage.removeItem("resindb-session");
+    safeStorage.local.removeItem("resindb-session");
   }, []);
 
   const updateUserProfile = useCallback((updatedData: Partial<User> & { password?: string }) => {
     if (!currentUser) return;
     const newUser = { ...currentUser, ...updatedData };
     setCurrentUser(newUser);
-    localStorage.setItem('resindb-session', JSON.stringify(newUser));
+    safeStorage.local.setItem('resindb-session', JSON.stringify(newUser));
   }, [currentUser]);
 
   const value = useMemo(() => ({

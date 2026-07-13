@@ -1,43 +1,24 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useCallback } from 'react';
+import { useWorkerManager } from './useWorkerManager';
 import type { CopulaMessage, CopulaResponse } from '@/workers/copulaWorker';
 
 export function useCopulaWorker() {
-  const [isCalculating, setIsCalculating] = useState(false);
-  const [copulaResult, setCopulaResult] = useState<CopulaResponse['payload'] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const workerRef = useRef<Worker | null>(null);
-
-  useEffect(() => {
-    workerRef.current = new Worker(new URL('../../workers/copulaWorker.ts', import.meta.url), {
-      type: 'module'
-    });
-
-    workerRef.current.onmessage = (e: MessageEvent<CopulaResponse>) => {
-      const res = e.data;
-      if (res.type === 'COPULA_RESULT') {
-        setCopulaResult(res.payload || null);
-        setError(null);
-        setIsCalculating(false);
-      } else if (res.type === 'ERROR') {
-        setError(res.error || 'Unknown error');
-        setIsCalculating(false);
-      }
-    };
-
-    return () => {
-      workerRef.current?.terminate();
-    };
-  }, []);
+  const {
+    isCalculating,
+    result: copulaResult,
+    error,
+    postMessage
+  } = useWorkerManager<CopulaMessage, CopulaResponse['payload']>(
+    useCallback(() => new Worker(new URL('../../workers/copulaWorker.ts', import.meta.url), { type: 'module' }), []),
+    'COPULA_RESULT'
+  );
 
   const calculateCopula = useCallback((data: { x: number; y: number }[]) => {
-    if (!workerRef.current) return;
-    setIsCalculating(true);
-    setError(null);
-    workerRef.current.postMessage({
+    postMessage({
       type: 'CALCULATE_COPULA',
       payload: { data }
-    } as CopulaMessage);
-  }, []);
+    });
+  }, [postMessage]);
 
   const getJointFailureProb = useCallback((thresholdX: number, thresholdY: number) => {
     if (!copulaResult) return null;
@@ -46,11 +27,11 @@ export function useCopulaWorker() {
     // Find u and v for thresholds
     let uIdx = 0;
     while(uIdx < sortedX.length && sortedX[uIdx] <= thresholdX) uIdx++;
-    const u = uIdx / sortedX.length;
+    const u = sortedX.length > 0 ? uIdx / sortedX.length : 0;
     
     let vIdx = 0;
     while(vIdx < sortedY.length && sortedY[vIdx] <= thresholdY) vIdx++;
-    const v = vIdx / sortedY.length;
+    const v = sortedY.length > 0 ? vIdx / sortedY.length : 0;
     
     // Integrate copula PDF numerically from grid (Riemann sum approximation)
     // grid is 50x50, step is 1/50 = 0.02
@@ -70,3 +51,4 @@ export function useCopulaWorker() {
 
   return { isCalculating, copulaResult, error, calculateCopula, getJointFailureProb };
 }
+

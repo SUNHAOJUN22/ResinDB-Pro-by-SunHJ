@@ -26,6 +26,8 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { Product, PropertyValue } from '@/types/index';
 import { motion, AnimatePresence } from "motion/react";
 import { logger } from "@/lib/logger";
+import { getProductValidationWarnings } from '@/utils/productUtils';
+
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -37,7 +39,7 @@ interface ImportModalProps {
 interface RawFileContent {
   fileName: string;
   headers: string[];
-  rows: any[];
+  rows: Record<string, unknown>[];
 }
 
 export const ImportModal: React.FC<ImportModalProps> = React.memo(({
@@ -75,50 +77,7 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
     ).length;
   }, [parsedProducts, allProducts]);
   
-  // Domain warning thresholds validation helper for chemical & materials metrics
-  const getProductValidationWarnings = useCallback((p: Product): string[] => {
-    const warnings: string[] = [];
-    const props = p.properties || {};
-    
-    if (Object.keys(props).length === 0) {
-      warnings.push("⚠️ 未检测到任何具体的物理或化学性能参数数据");
-    }
-    
-    // Check typical polymer Density (0.8 ~ 2.4 g/cm³)
-    if (props["密度"]?.value !== undefined) {
-      const d = parseFloat(String(props["密度"].value));
-      if (!isNaN(d) && (d < 0.7 || d >= 2.5)) {
-        warnings.push(`⚠️ 密度值 (${d} g/cm³) 偏离常见聚合物标准范围 (0.8 ~ 2.4)`);
-      }
-    }
 
-    // Check MFR
-    if (props["熔体质量流动速率"]?.value !== undefined) {
-      const m = parseFloat(String(props["熔体质量流动速率"].value));
-      if (!isNaN(m) && (m <= 0 || m > 500)) {
-        warnings.push(`⚠️ 熔指 MFR (${m}) 过高或小于零，请确认单位和数值精度`);
-      }
-    }
-
-    // Tensile strength
-    if (props["拉伸屈服应力"]?.value !== undefined) {
-      const s = parseFloat(String(props["拉伸屈服应力"].value));
-      if (!isNaN(s) && (s <= 0 || s > 500)) {
-        warnings.push(`⚠️ 拉伸屈服应力 (${s} MPa) 超出常温塑性材料一般极值`);
-      }
-    }
-
-    // Modulus
-    if (props["弯曲模量"]?.value !== undefined) {
-      const s = parseFloat(String(props["弯曲模量"].value));
-      if (!isNaN(s) && (s <= 10 || s > 50000)) {
-        warnings.push(`⚠️ 弯曲模量 (${s} MPa) 异常，常见塑料一般在 100~15000 MPa`);
-      }
-    }
-    
-    return warnings;
-  }, []);
-  
   // Custom properties added during mapping process
   const [customColumns, setCustomColumns] = useState<string[]>([]);
   const [newCustomColumnName, setNewCustomColumnName] = useState("");
@@ -297,13 +256,13 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
           try {
             const result = e.target?.result as string;
             const data = JSON.parse(result);
-            let rows: any[] = [];
+            let rows: Record<string, unknown>[] = [];
             if (Array.isArray(data)) {
-              rows = data;
-            } else if (data.products && Array.isArray(data.products)) {
-              rows = data.products;
-            } else {
-              rows = [data];
+              rows = data as Record<string, unknown>[];
+            } else if (data && typeof data === "object" && "products" in data && Array.isArray((data as Record<string, unknown>).products)) {
+              rows = (data as Record<string, unknown>).products as Record<string, unknown>[];
+            } else if (data && typeof data === "object") {
+              rows = [data as Record<string, unknown>];
             }
 
             const keysSet = new Set<string>();
@@ -332,7 +291,7 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
             const workbook = XLSX.read(data, { type: "array" });
             const firstSheet = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheet];
-            const rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" }) as any[];
+            const rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" }) as Record<string, unknown>[];
 
             const keysSet = new Set<string>();
             rows.forEach((r) => Object.keys(r).forEach((k) => keysSet.add(k)));
@@ -354,11 +313,11 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
           header: true,
           skipEmptyLines: true,
           complete: (results) => {
-            const rows = results.data;
+            const rows = results.data as Record<string, unknown>[];
             const headers = results.meta.fields || [];
             if (headers.length === 0 && rows.length > 0) {
               const keysSet = new Set<string>();
-              rows.forEach((r: any) => Object.keys(r).forEach((k) => keysSet.add(k)));
+              rows.forEach((r) => Object.keys(r).forEach((k) => keysSet.add(k)));
               headers.push(...Array.from(keysSet));
             }
             onProgress(100);
@@ -396,16 +355,17 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
       }
       
       const headers = results.meta.fields || [];
-      if (headers.length === 0 && results.data.length > 0) {
+      const dataRows = results.data as Record<string, unknown>[];
+      if (headers.length === 0 && dataRows.length > 0) {
         const keysSet = new Set<string>();
-        results.data.forEach((r: any) => Object.keys(r).forEach((k) => keysSet.add(k)));
+        dataRows.forEach((r) => Object.keys(r).forEach((k) => keysSet.add(k)));
         headers.push(...Array.from(keysSet));
       }
       
       setRawFileContents([{
         fileName: "剪贴板直接粘滞数据 (Clipboard Data)",
         headers,
-        rows: results.data,
+        rows: dataRows,
       }]);
       
       // Auto guess mappings for pasted text
@@ -538,9 +498,9 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
             }
           }
 
-          const parseFloatValue = parseFloat(rawVal);
+          const parseFloatValue = parseFloat(String(rawVal));
           properties[bindingDestination] = {
-            value: isNaN(parseFloatValue) ? rawVal : parseFloatValue,
+            value: isNaN(parseFloatValue) ? String(rawVal) : parseFloatValue,
             unit: detectedUnit,
           };
         });
@@ -1361,7 +1321,7 @@ PP-M1600	中石油		0.910		1200`}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-                      {[
+                      {([
                         {
                           key: "merge",
                           title: "🔍 增量合并，局部覆盖",
@@ -1382,7 +1342,7 @@ PP-M1600	中石油		0.910		1200`}
                           title: "📝 并存，作为新记录导入",
                           desc: "忽略同名约束，为其分配新的UUID，在列表中并存记录",
                         }
-                      ].map((policy) => (
+                      ] as const).map((policy) => (
                         <label
                           key={policy.key}
                           className={`p-3 border rounded-xl cursor-pointer select-none transition-all flex flex-col justify-between ${
@@ -1396,7 +1356,7 @@ PP-M1600	中石油		0.910		1200`}
                               type="radio"
                               name="policy"
                               checked={duplicateAction === policy.key}
-                              onChange={() => setDuplicateAction(policy.key as any)}
+                              onChange={() => setDuplicateAction(policy.key)}
                               className="w-3.5 h-3.5 text-primary-600 focus:ring-primary-500 cursor-pointer"
                             />
                             <span className="text-[11px] font-bold text-slate-900 dark:text-slate-200">
@@ -1490,7 +1450,7 @@ PP-M1600	中石油		0.910		1200`}
                           type="text"
                           value={sandboxSearch}
                           onChange={(e) => setSandboxSearch(e.target.value)}
-                          placeholder="输入物理牌号或厂家检索合流沙盒数据（支持双击牌号、厂家、具体物价值直接原位修改）..."
+                          placeholder={t("importGradeSearchPlaceholder")}
                           className="w-full pl-9 pr-3 py-1.5 font-sans font-medium text-xs border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-xl outline-none focus:ring-1 focus:ring-primary-500 transition-all shadow-xs"
                         />
                       </div>
@@ -1500,7 +1460,7 @@ PP-M1600	中石油		0.910		1200`}
                           onClick={() => setSandboxSearch("")}
                           className="px-3 py-1.5 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:text-slate-800 hover:bg-slate-200 text-xs font-mono font-semibold rounded-lg cursor-pointer"
                         >
-                          清除过滤
+                          {t("clearFilter", "清除过滤")}
                         </button>
                       )}
                     </div>
@@ -1510,11 +1470,11 @@ PP-M1600	中石油		0.910		1200`}
                       <table className="w-full text-left border-collapse table-auto">
                         <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900 shadow-xs z-10 border-b border-slate-300 dark:border-slate-700">
                           <tr className="text-[9px] font-mono font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                            <th className="px-4 py-2.5">模型标识/自测牌号 (双击修改)</th>
-                            <th className="px-4 py-2.5">归属厂家/制造商 (双击修改)</th>
-                            <th className="px-4 py-2.5">提取出的性能属性维度 (双击原位数修改)</th>
-                            <th className="px-4 py-2.5 text-center">状态校验 / 偏差预警</th>
-                            <th className="px-4 py-2 text-center">排他剔除</th>
+                            <th className="px-4 py-2.5">{t("importGradeHeader")}</th>
+                            <th className="px-4 py-2.5">{t("importMfrHeader")}</th>
+                            <th className="px-4 py-2.5">{t("importPropertiesHeader")}</th>
+                            <th className="px-4 py-2.5 text-center">{t("importStatusHeader")}</th>
+                            <th className="px-4 py-2 text-center">{t("importActionHeader")}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-150 dark:divide-slate-800/50">
@@ -1523,7 +1483,7 @@ PP-M1600	中石油		0.910		1200`}
                               (x) => x.gradeName.toUpperCase() === p.gradeName.toUpperCase()
                             );
                             const totalProps = Object.keys(p.properties).length;
-                            const warnings = getProductValidationWarnings(p);
+                            const warnings = getProductValidationWarnings(p, t);
 
                             return (
                               <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/10 transition-colors group">
@@ -1541,7 +1501,7 @@ PP-M1600	中石油		0.910		1200`}
                                   ) : (
                                     <div 
                                       className="font-mono font-bold text-xs text-slate-800 dark:text-slate-200 truncate max-w-[190px] group-hover:text-primary-600 transition-colors cursor-pointer" 
-                                      title="双击即可修改此格数据"
+                                      title={t("doubleClickToEdit")}
                                       onDoubleClick={() => setEditingCell({ id: p.id, field: "gradeName" })}
                                     >
                                       {p.gradeName} <span className="opacity-0 group-hover:opacity-100 text-[9px] text-primary-500 ml-1">✏️</span>
@@ -1562,7 +1522,7 @@ PP-M1600	中石油		0.910		1200`}
                                   ) : (
                                     <div 
                                       className="text-[10px] font-mono text-slate-500 truncate max-w-[140px] cursor-pointer" 
-                                      title="双击即可修改此格数据"
+                                      title={t("doubleClickToEdit")}
                                       onDoubleClick={() => setEditingCell({ id: p.id, field: "manufacturer" })}
                                     >
                                       {p.manufacturer} <span className="opacity-0 group-hover:opacity-100 text-[9px] text-primary-500 ml-1">✏️</span>
@@ -1577,7 +1537,7 @@ PP-M1600	中石油		0.910		1200`}
                                         return (
                                           <span 
                                             key={propK}
-                                            title="双击即可修改此属性数值"
+                                            title={t("doubleClickValueToEdit")}
                                             className="text-[8px] font-mono px-1.5 py-0.5 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-350 border border-slate-200 dark:border-slate-800 rounded flex items-center gap-1 cursor-pointer hover:border-primary-400 group/item transition-colors"
                                             onDoubleClick={() => setEditingCell({ id: p.id, field: propK })}
                                           >
@@ -1609,7 +1569,7 @@ PP-M1600	中石油		0.910		1200`}
                                       })
                                     ) : (
                                       <span className="text-[8px] font-mono text-rose-500 dark:text-rose-400">
-                                        无物性性能提取
+                                        {t("noPropertiesExtracted", "无物性性能提取")}
                                       </span>
                                     )}
                                   </div>
@@ -1619,13 +1579,13 @@ PP-M1600	中石油		0.910		1200`}
                                     {isNewDuplicate ? (
                                       <span 
                                         className="text-[8px] font-mono font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 px-2 py-0.5 rounded cursor-help"
-                                        title={`在本地物性库中发现同牌号重合数据，将按照所选 ${duplicateAction} 规范合流。`}
+                                        title={t("duplicateWarnMsg").replace("{action}", duplicateAction)}
                                       >
-                                        共用牌号冲突重合
+                                        {t("duplicateConflict", "共用牌号冲突重合")}
                                       </span>
                                     ) : (
                                       <span className="text-[8px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 px-2 py-0.5 rounded">
-                                        物理安全通过
+                                        {t("pass", "物理安全通过")}
                                       </span>
                                     )}
                                     {warnings.map((w, idx) => (
@@ -1634,7 +1594,7 @@ PP-M1600	中石油		0.910		1200`}
                                         className="text-[7px] font-sans text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-955/35 border border-rose-100 px-1 py-0.5 rounded flex items-center gap-0.5"
                                         title={w}
                                       >
-                                        ⚠️ 数值明显偏常规偏离
+                                        ⚠️ {t("valueAnomalyDev", "数值明显常规偏离")}
                                       </span>
                                     ))}
                                   </div>
@@ -1645,7 +1605,7 @@ PP-M1600	中石油		0.910		1200`}
                                     whileTap={{ scale: 0.9 }}
                                     onClick={() => handleRemoveSandboxProduct(p.id)}
                                     className="p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors cursor-pointer"
-                                    title="临时彻底剔除此条，不进行合流入库"
+                                    title={t("excludeTempBtnTitle")}
                                   >
                                     <Trash2 size={12} />
                                   </motion.button>
@@ -1657,7 +1617,7 @@ PP-M1600	中石油		0.910		1200`}
                       </table>
                       {filteredProducts.length === 0 && (
                         <div className="p-8 text-center text-xs font-mono text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                          无可检索匹配的沙盒内记录。
+                          {t("noStagedProducts", "无可检索匹配的沙盒内记录。")}
                         </div>
                       )}
                     </div>
@@ -1681,7 +1641,7 @@ PP-M1600	中石油		0.910		1200`}
                         }}
                         className="flex-[2.5] py-3.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white font-mono font-bold text-[10px] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2 rounded-xl border border-primary-500 shadow-primary-500/20 cursor-pointer"
                       >
-                        <CheckCircle size={14} /> 确认无误，开始数据底层合并合流至系统 ({filteredProducts.length} 条记录)
+                        <CheckCircle size={14} /> {t("mergeAndImportBtn").replace("{count}", String(filteredProducts.length))}
                       </motion.button>
                     </div>
                   </motion.div>
@@ -1710,13 +1670,13 @@ PP-M1600	中石油		0.910		1200`}
 
                   <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-205 dark:border-slate-800 rounded-xl p-4 w-full max-w-sm mb-6 text-left space-y-2">
                     <h5 className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-600 dark:text-slate-350">
-                      物性摄取审计 (Data Ingestion Telemetry)
+                      {t("dataIngestionTelemetry", "物性摄取审计 (Data Ingestion Telemetry)")}
                     </h5>
                     <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-500 dark:text-slate-400">
-                      <div>合并材料记录: <span className="text-slate-800 dark:text-white font-bold">{parsedProducts.length} 条</span></div>
-                      <div>重合冲突覆盖: <span className="text-slate-850 dark:text-white font-bold">{computedDuplicateOverlapCount} 个</span></div>
-                      <div>注入层模式: <span className="text-slate-800 dark:text-white font-bold">{isExperimentalImport ? "自测实验数据" : "主厂合流"}</span></div>
-                      <div>校验健康等级: <span className="text-emerald-600 font-bold">100% EXCELLENT</span></div>
+                      <div>{t("successImportRecords")}: <span className="text-slate-800 dark:text-white font-bold">{parsedProducts.length} {t("itemsUnit", "条")}</span></div>
+                      <div>{t("successOverlapConflicts")}: <span className="text-slate-850 dark:text-white font-bold">{computedDuplicateOverlapCount} {t("countUnit", "个")}</span></div>
+                      <div>{t("successInjectMode")}: <span className="text-slate-800 dark:text-white font-bold">{isExperimentalImport ? t("experimentalLabData", "自测实验数据") : t("mainMerge", "主厂合流")}</span></div>
+                      <div>{t("successValidationLevel")}: <span className="text-emerald-600 font-bold">100% EXCELLENT</span></div>
                     </div>
                   </div>
 

@@ -38,7 +38,7 @@ export class UniversalStorageBridge {
     const validated = PolymerDataValidator.validateAndClean(record);
     if (!validated) {
       console.error("[Polymer Validator Rejected] Save operation aborted. Record is lacking minimum core physical properties.");
-      throw new Error("数据合规错误：核心物理力学指标（密度、熔指、拉伸强度、弯曲模量、冲击强度）最少需声明2项且参数必须具有真实物理合法范围。");
+      throw new Error("validationErrorMinProps");
     }
     try {
       const records = this.getLabRecords();
@@ -107,7 +107,7 @@ export class UniversalStorageBridge {
     const validated = PolymerDataValidator.validateAndClean(record);
     if (!validated) {
       console.error("[Polymer Validator Rejected] Open Market Save aborted. Minimum property-count validation failed.");
-      throw new Error("数据合规错误：该牌号有效物性指标过少，或不符合ISO/ASTM规范区间。已触发自动防护熔断。");
+      throw new Error("validationErrorMeltdown");
     }
     try {
       const records = this.getOpenMarketRecords();

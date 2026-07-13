@@ -40,14 +40,19 @@ self.onmessage = (e: MessageEvent<ParetoMessage>) => {
   try {
     const { data, objectives } = e.data.payload;
     if (!objectives.length || !data.length) {
-      self.postMessage({ type: 'PARETO_RESULT', payload: { paretoIds: data.map(d => d.id) } });
+      self.postMessage({ type: 'PARETO_RESULT', payload: { paretoIds: (data || []).map(d => d.id) } });
       return;
     }
 
     const minimizeMap = objectives.map(o => o.minimize);
     const keys = objectives.map(o => o.key);
 
-    const points = data.map(d => ({
+    const validData = data.filter(d => 
+      d && d.values && 
+      keys.every(k => typeof d.values[k] === 'number' && !isNaN(d.values[k]))
+    );
+
+    const points = validData.map(d => ({
       id: d.id,
       values: keys.map(k => d.values[k] ?? (minimizeMap[keys.indexOf(k)] ? Infinity : -Infinity))
     }));
@@ -70,6 +75,7 @@ self.onmessage = (e: MessageEvent<ParetoMessage>) => {
        });
 
        let bestO2SoFar = o2Min ? Infinity : -Infinity;
+       let lastParetoPoint: typeof points[0] | null = null;
        
        for (const p of points) {
            const v2 = p.values[1];
@@ -77,7 +83,8 @@ self.onmessage = (e: MessageEvent<ParetoMessage>) => {
                if (v2 < bestO2SoFar) {
                    paretoIds.push(p.id);
                    bestO2SoFar = v2;
-               } else if (v2 === bestO2SoFar && p.values[0] === points[paretoIds.length > 0 ? points.findIndex(x => x.id === paretoIds[paretoIds.length-1]) : 0]?.values[0]) {
+                   lastParetoPoint = p;
+               } else if (v2 === bestO2SoFar && lastParetoPoint && p.values[0] === lastParetoPoint.values[0]) {
                    // identical points
                    paretoIds.push(p.id);
                }
@@ -85,7 +92,8 @@ self.onmessage = (e: MessageEvent<ParetoMessage>) => {
                if (v2 > bestO2SoFar) {
                    paretoIds.push(p.id);
                    bestO2SoFar = v2;
-               } else if (v2 === bestO2SoFar && p.values[0] === points[paretoIds.length > 0 ? points.findIndex(x => x.id === paretoIds[paretoIds.length-1]) : 0]?.values[0]) {
+                   lastParetoPoint = p;
+               } else if (v2 === bestO2SoFar && lastParetoPoint && p.values[0] === lastParetoPoint.values[0]) {
                    paretoIds.push(p.id);
                }
            }

@@ -2,6 +2,7 @@ import { logger } from '@/lib/logger';
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Product, SortConfig, ColumnConfig, FilterItem } from '@/types/index';
 import { useFormulas } from '@/hooks/math/useFormulas';
+import { safeStorage } from '@/lib/utils';
 import type { WorkerMessage, WorkerResponse } from '@/workers/dataWorker';
 
 interface UseDataGridWorkerProps {
@@ -22,12 +23,7 @@ export function useDataGridWorker({
   const { formulas } = useFormulas();
   
   const [sortConfig, setSortConfig] = useState<SortConfig[]>(() => {
-    let saved = null;
-    try {
-      saved = localStorage.getItem('resindb-sort-config-multi');
-    } catch {
-      // Ignore
-    }
+    const saved = safeStorage.local.getItem('resindb-sort-config-multi');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -54,11 +50,7 @@ export function useDataGridWorker({
         const newSort: SortConfig = { key, direction: 'asc' };
         next = multi ? [...prev, newSort] : [newSort];
       }
-      try {
-        localStorage.setItem('resindb-sort-config-multi', JSON.stringify(next));
-      } catch {
-        // Ignore
-      }
+      safeStorage.local.setItem('resindb-sort-config-multi', JSON.stringify(next));
       return next;
     });
   }, []);

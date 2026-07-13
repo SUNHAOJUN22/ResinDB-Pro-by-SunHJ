@@ -13,48 +13,7 @@ interface Node extends d3.SimulationNodeDatum {
   cas?: string;
 }
 
-const nodeZhMap: Record<string, string> = {
-  "Ethylene": "乙烯",
-  "Propylene": "丙烯",
-  "Styrene": "苯乙烯",
-  "Butadiene": "丁二烯",
-  "Acrylonitrile": "丙烯腈",
-  "Vinyl Chloride": "氯乙烯",
-  "Bisphenol A": "双酚A",
-  "Caprolactam": "己内酰胺",
-  "Terephthalic Acid": "对苯二甲酸",
-  "Ethylene Glycol": "乙二醇",
-  "Phosgene": "光气"
-};
 
-const nodeZhDescMap: Record<string, string> = {
-  "Ethylene": "石化工业的关键基础原料，用于生产聚乙烯、环氧乙烷等。",
-  "Propylene": "主要单体，用于生产聚丙烯及多种环氧丙烷衍生物。",
-  "Styrene": "芳香烃类，主要用于生产聚苯乙烯以及ABS、SAN等共聚物。",
-  "Butadiene": "重要的二烯烃，广泛作为生产合成橡胶和聚合物树脂的单体。",
-  "Acrylonitrile": "一种反应性单体，用于生产聚丙烯腈、ABS塑料和特种合成橡胶。",
-  "Vinyl Chloride": "合成聚氯乙烯 (PVC) 的主要前体原料，PVC是一种用途广泛的塑料。",
-  "Bisphenol A": "合成聚碳酸酯和环氧树脂的关键起始原料。",
-  "Caprolactam": "主要作为生产尼龙6 (PA6) 的单体的有机化合物。",
-  "Terephthalic Acid": "生产PET和PBT等聚酯树脂的主要前体原料。",
-  "Ethylene Glycol": "与对苯二甲酸一起用于生产PET，也是一种常见的防冻剂。",
-  "Phosgene": "一种高反应性分子，用作聚碳酸酯和聚氨酯的工业基础原料。",
-  "PE": "聚乙烯：世界上产量最大的塑料，广泛应用于包装、管道等领域。",
-  "HDPE": "高密度聚乙烯：以高强度密度比著称，常用于硬质容器和管道。",
-  "LDPE": "低密度聚乙烯：柔韧且具韧性，通常用于塑料袋和普通薄膜。",
-  "LLDPE": "线性低密度聚乙烯：比LDPE具有更高的韧性和抗穿刺性。",
-  "EVA": "乙烯-醋酸乙烯酯共聚物：一种弹性体聚合物，可生产柔软且具灵活性的类似橡胶的材料。",
-  "PP": "聚丙烯：坚固且对许多化学溶剂、碱和酸具有异常的耐受性。",
-  "PS": "聚苯乙烯：由苯乙烯制成的坚硬塑料，常用于保护性包装和食品容器。",
-  "EPS": "发泡聚苯乙烯：一种轻质的硬质闭孔塑料，主要用于隔热和包装。",
-  "ABS": "丙烯腈-丁二烯-苯乙烯共聚物：一种不透明的热塑性聚合物，提供卓越的抗冲击性和韧性。",
-  "SAN": "苯乙烯-丙烯腈共聚物：一种结合了苯乙烯的高透明度和丙烯腈的高韧性的共聚塑料。",
-  "PVC": "聚氯乙烯：世界上产量第三的合成塑料聚合物，被大量应用于建筑行业。",
-  "PC": "聚碳酸酯：一种坚固、强韧的材料，具有高度的抗冲击性，某些级别透明度极高。",
-  "PA6": "聚酰胺6 (尼龙6)：提供出色的机械韧性和耐化学性，用于纤维和工程塑料。",
-  "PET": "聚对苯二甲酸乙二醇酯：常用于服装纤维、食品包装和液体容器。",
-  "PBT": "聚对苯二甲酸丁二醇酯：一种热塑性工程聚合物，广泛用作电绝缘体。"
-};
 
 interface Link extends d3.SimulationLinkDatum<Node> {
   source: string | Node;
@@ -115,12 +74,16 @@ const rawData = {
   ] as Link[]
 };
 
+const getLinkId = (node: string | Node): string => {
+  return typeof node === 'string' ? node : node.id;
+};
+
 const DependencyMapD3: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
@@ -147,8 +110,14 @@ const DependencyMapD3: React.FC = () => {
   });
 
   const zoomRef = useRef<any>(null);
+  const resetZoomRef = useRef<(() => void) | null>(null);
 
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, nodeId: string } | null>(null);
+
+  const paramsRef = useRef(params);
+  useEffect(() => {
+    paramsRef.current = params;
+  }, [params]);
 
   useEffect(() => {
     selectedNodeIdRef.current = selectedNodeId;
@@ -158,7 +127,11 @@ const DependencyMapD3: React.FC = () => {
     hoveredNodeIdRef.current = hoveredNodeId;
   }, [hoveredNodeId]);
 
-  const getDisplayName = useCallback((id: string) => language === 'zh' ? (nodeZhMap[id] || id) : id, [language]);
+  const getDisplayName = useCallback((id: string) => t(`node_${id}`, id), [t]);
+  const getDisplayNameRef = useRef(getDisplayName);
+  useEffect(() => {
+    getDisplayNameRef.current = getDisplayName;
+  }, [getDisplayName]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -213,8 +186,7 @@ const DependencyMapD3: React.FC = () => {
 
     const svgData = new XMLSerializer().serializeToString(svgClone);
     const svgBlob = new Blob([svgData.includes('xmlns=') ? svgData : svgData.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ')], {type: 'image/svg+xml;charset=utf-8'});
-    const DOMURL = (window.URL || window.webkitURL || window) as any;
-    const url = DOMURL.createObjectURL(svgBlob);
+    const url = URL.createObjectURL(svgBlob);
 
     const img = new Image();
     img.onload = () => {
@@ -237,7 +209,7 @@ const DependencyMapD3: React.FC = () => {
         downloadAnchorNode.click();
         downloadAnchorNode.remove();
       }
-      DOMURL.revokeObjectURL(url);
+      URL.revokeObjectURL(url);
     };
     img.src = url;
   };
@@ -263,7 +235,7 @@ const DependencyMapD3: React.FC = () => {
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0 || dimensions.height === 0) return;
 
-    const svg = d3.select(svgRef.current);
+    const svg = d3.select<SVGSVGElement, unknown>(svgRef.current);
     svg.selectAll("*").remove(); // Clear previous render
 
     const width = dimensions.width;
@@ -285,7 +257,7 @@ const DependencyMapD3: React.FC = () => {
       });
 
     zoomRef.current = zoom;
-    svg.call(zoom as any);
+    svg.call(zoom);
     // Initial centering
     svg.call(zoom.transform, d3.zoomIdentity.translate(width / 2, height / 2).scale(1));
 
@@ -317,18 +289,18 @@ const DependencyMapD3: React.FC = () => {
     feMerge.append("feMergeNode").attr("in", "SourceGraphic");
 
     const simulation = d3.forceSimulation(data.nodes)
-      .force("link", d3.forceLink(data.links).id((d: any) => d.id).distance(params.linkDistance))
-      .force("charge", d3.forceManyBody().strength(-params.repulsion))
+      .force("link", d3.forceLink(data.links).id((d: any) => d.id).distance(paramsRef.current.linkDistance))
+      .force("charge", d3.forceManyBody().strength(-paramsRef.current.repulsion))
       .force("collide", d3.forceCollide().radius((d: any) => d.radius + 15).iterations(2));
       
-    if (params.layout === 'force') {
+    if (paramsRef.current.layout === 'force') {
       simulation
         .force("x", d3.forceX().strength(0.05))
         .force("y", d3.forceY().strength(0.05));
-    } else if (params.layout === 'layered') {
+    } else if (paramsRef.current.layout === 'layered') {
       simulation
         .force("x", d3.forceX(width / 2).strength(0.1))
-        .force("y", d3.forceY((d: any) => d.group === 'chemical' ? height * 0.25 : height * 0.75).strength(0.3));
+        .force("y", d3.forceY((d: Node) => d.group === 'chemical' ? height * 0.25 : height * 0.75).strength(0.3));
     }
 
     simulationRef.current = simulation;
@@ -340,7 +312,7 @@ const DependencyMapD3: React.FC = () => {
       .attr("fill", "none")
       .attr("stroke", "#94a3b8")
       .attr("stroke-opacity", 0.4)
-      .attr("stroke-width", (d: any) => Math.sqrt(d.value) * 1.5);
+      .attr("stroke-width", (d: Link) => Math.sqrt(d.value) * 1.5);
 
     linkRef.current = link;
 
@@ -348,10 +320,10 @@ const DependencyMapD3: React.FC = () => {
       .selectAll("g")
       .data(data.nodes)
       .join("g")
-      .call(d3.drag<SVGGElement, any>()
+      .call(d3.drag<any, any>()
         .on("start", dragstarted)
         .on("drag", dragged)
-        .on("end", dragended) as any);
+        .on("end", dragended));
 
     nodeRef.current = node;
 
@@ -378,24 +350,22 @@ const DependencyMapD3: React.FC = () => {
           .attr("stroke-width", 4)
           .attr("filter", "url(#glow)");
 
-        // Highlight connected links
         link.attr("stroke", l => {
-          const srcId = typeof l.source === 'string' ? l.source : (l.source as any).id;
-          const tgtId = typeof l.target === 'string' ? l.target : (l.target as any).id;
+          const srcId = getLinkId(l.source);
+          const tgtId = getLinkId(l.target);
           return (srcId === d.id || tgtId === d.id) ? (d.group === 'chemical' ? '#3b82f6' : '#10b981') : '#94a3b8';
         })
         .attr("stroke-opacity", l => {
-          const srcId = typeof l.source === 'string' ? l.source : (l.source as any).id;
-          const tgtId = typeof l.target === 'string' ? l.target : (l.target as any).id;
+          const srcId = getLinkId(l.source);
+          const tgtId = getLinkId(l.target);
           return (srcId === d.id || tgtId === d.id) ? 1 : 0.1;
         });
 
-        // Fade out non-connected nodes
         node.attr("opacity", n => {
           if (n.id === d.id) return 1;
           const isConnected = data.links.some(l => {
-            const srcId = typeof l.source === 'string' ? l.source : (l.source as any).id;
-            const tgtId = typeof l.target === 'string' ? l.target : (l.target as any).id;
+            const srcId = getLinkId(l.source);
+            const tgtId = getLinkId(l.target);
             return (srcId === d.id && tgtId === n.id) || (tgtId === d.id && srcId === n.id);
           });
           return isConnected ? 1 : 0.15;
@@ -408,27 +378,24 @@ const DependencyMapD3: React.FC = () => {
           .attr("stroke-width", 2)
           .attr("filter", null);
 
-        // Reset highlights
         link.attr("stroke", "#94a3b8")
             .attr("stroke-opacity", 0.4);
         node.attr("opacity", 1);
       });
 
-    // Handle background click to deselect
     svg.on("click", () => {
       setSelectedNodeId(null);
       setContextMenu(null);
     });
 
-    // Add flowing particles layer under nodes
     const particleLinks = g.insert("g", ":first-child")
       .selectAll("path")
       .data(data.links)
       .join("path")
       .attr("fill", "none")
       .attr("stroke", "url(#flowingGradient)")
-      .attr("stroke-opacity", params.showParticles ? 0.6 : 0)
-      .attr("stroke-width", (d: any) => Math.sqrt(d.value) * 1.5)
+      .attr("stroke-opacity", paramsRef.current.showParticles ? 0.6 : 0)
+      .attr("stroke-width", (d: Link) => Math.sqrt(d.value) * 1.5)
       .attr("stroke-dasharray", "4 8")
       .attr("class", "animate-[flow_0.5s_linear_infinite]");
 
@@ -436,70 +403,62 @@ const DependencyMapD3: React.FC = () => {
       .attr("dx", 0)
       .attr("dy", d => d.radius + 16)
       .attr("text-anchor", "middle")
-      .text(d => getDisplayName(d.id))
-      .attr("opacity", params.showLabels ? 1 : 0)
+      .text(d => getDisplayNameRef.current(d.id))
+      .attr("opacity", paramsRef.current.showLabels ? 1 : 0)
       .attr("class", "font-sans text-[10px] font-bold fill-slate-700 dark:fill-slate-200 pointer-events-none transition-opacity duration-300")
       .attr("paint-order", "stroke")
       .attr("stroke", "rgba(255,255,255,0.8)")
       .attr("stroke-width", 3);
 
-    // Make dark mode label background stroke look right
     const isDark = document.documentElement.classList.contains('dark');
     if (isDark) {
       node.selectAll("text").attr("stroke", "rgba(15,23,42,0.8)");
     }
 
     simulation.on("tick", () => {
-      const getPath = (d: any) => {
-        if (params.linkStyle === 'curved') {
-          const dx = d.target.x - d.source.x,
-                dy = d.target.y - d.source.y,
+      const getPath = (d: Link) => {
+        const source = d.source as Node;
+        const target = d.target as Node;
+        const sx = source.x ?? 0;
+        const sy = source.y ?? 0;
+        const tx = target.x ?? 0;
+        const ty = target.y ?? 0;
+        if (paramsRef.current.linkStyle === 'curved') {
+          const dx = tx - sx,
+                dy = ty - sy,
                 dr = Math.sqrt(dx * dx + dy * dy);
-          return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+          return `M${sx},${sy}A${dr},${dr} 0 0,1 ${tx},${ty}`;
         }
-        return `M${d.source.x},${d.source.y}L${d.target.x},${d.target.y}`;
+        return `M${sx},${sy}L${tx},${ty}`;
       };
       
       link.attr("d", getPath);
       particleLinks.attr("d", getPath);
 
-      node.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
+      node.attr("transform", (d: Node) => `translate(${d.x},${d.y})`);
     });
 
-    function dragstarted(event: any, d: any) {
+    function dragstarted(event: d3.D3DragEvent<SVGGElement, Node, unknown>, d: Node) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
       d.fx = d.x;
       d.fy = d.y;
     }
 
-    function dragged(event: any, d: any) {
+    function dragged(event: d3.D3DragEvent<SVGGElement, Node, unknown>, d: Node) {
       d.fx = event.x;
       d.fy = event.y;
     }
 
-    function dragended(event: any, d: any) {
+    function dragended(event: d3.D3DragEvent<SVGGElement, Node, unknown>, d: Node) {
       if (!event.active) simulation.alphaTarget(0);
       d.fx = null;
       d.fy = null;
     }
 
-    // Controls
-    const resetZoom = () => {
-      svg.transition().duration(750).call(
-        zoom.transform,
-        d3.zoomIdentity.translate(width / 2, height / 2).scale(1)
-      );
-    };
-
-    if (containerRef.current) {
-      (containerRef.current as any).resetZoom = resetZoom;
-    }
-
     return () => {
       simulation.stop();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dimensions]); // Note: removing dependencies that shouldn't trigger full simulation rebuild
+  }, [dimensions]);
 
   useEffect(() => {
     if (!simulationRef.current) return;
@@ -514,28 +473,26 @@ const DependencyMapD3: React.FC = () => {
     } else if (params.layout === 'layered') {
       simulation
         .force("x", d3.forceX(dimensions.width / 2).strength(0.1))
-        .force("y", d3.forceY((d: any) => d.group === 'chemical' ? dimensions.height * 0.25 : dimensions.height * 0.75).strength(0.3));
+        .force("y", d3.forceY((d: Node) => d.group === 'chemical' ? dimensions.height * 0.25 : dimensions.height * 0.75).strength(0.3));
     }
     
     simulation.alpha(1).restart();
   }, [params.layout, dimensions.width, dimensions.height]);
 
-  // Handle physics parameter updates
   useEffect(() => {
     if (simulationRef.current) {
-      simulationRef.current.force("charge").strength(-params.repulsion);
-      simulationRef.current.force("link").distance(params.linkDistance);
+      simulationRef.current.force("charge")?.strength(-params.repulsion);
+      simulationRef.current.force("link")?.distance(params.linkDistance);
       simulationRef.current.alpha(0.3).restart();
     }
   }, [params.repulsion, params.linkDistance]);
 
   useEffect(() => {
-    if (linkRef.current && gRef.current && simulationRef.current) {
-       simulationRef.current.on('tick')(); // Call tick directly to redraw paths immediately
+    if (simulationRef.current) {
+       simulationRef.current.tick();
     }
   }, [params.linkStyle]);
 
-  // Handle toggling display elements
   useEffect(() => {
     if (nodeRef.current) {
       nodeRef.current.selectAll("text").attr("opacity", params.showLabels ? 1 : 0);
@@ -546,9 +503,14 @@ const DependencyMapD3: React.FC = () => {
   }, [params.showLabels, params.showParticles]);
 
   useEffect(() => {
+    if (nodeRef.current) {
+      nodeRef.current.selectAll("text").text((d: Node) => getDisplayName(d.id));
+    }
+  }, [getDisplayName]);
+
+  useEffect(() => {
     if (!nodeRef.current || !linkRef.current || !rawData || !gRef.current) return;
     
-    // First reset everything to default state
     nodeRef.current.attr("opacity", 1);
     linkRef.current.attr("stroke", "#94a3b8").attr("stroke-opacity", 0.4);
     nodeRef.current.selectAll("circle").attr("stroke-width", 2).attr("filter", null);
@@ -559,7 +521,7 @@ const DependencyMapD3: React.FC = () => {
       const d = rawData.nodes.find(n => n.id === selectedNodeId);
       if (d) {
         nodeRef.current.selectAll("circle")
-          .filter((n: any) => n.id === selectedNodeId)
+          .filter((n: Node) => n.id === selectedNodeId)
           .attr("stroke-width", 4)
           .attr("filter", "url(#glow)");
 
@@ -572,8 +534,8 @@ const DependencyMapD3: React.FC = () => {
 
           const traverseDown = (id: string) => {
             rawData.links.forEach((l, idx) => {
-              const srcId = typeof l.source === 'string' ? l.source : (l.source as any).id;
-              const tgtId = typeof l.target === 'string' ? l.target : (l.target as any).id;
+              const srcId = getLinkId(l.source);
+              const tgtId = getLinkId(l.target);
               if (srcId === id) {
                 activeDownstreamLinks.add(`${srcId}-${tgtId}-${idx}`);
                 if (!activeNodes.has(tgtId)) {
@@ -586,8 +548,8 @@ const DependencyMapD3: React.FC = () => {
 
           const traverseUp = (id: string) => {
             rawData.links.forEach((l, idx) => {
-              const srcId = typeof l.source === 'string' ? l.source : (l.source as any).id;
-              const tgtId = typeof l.target === 'string' ? l.target : (l.target as any).id;
+              const srcId = getLinkId(l.source);
+              const tgtId = getLinkId(l.target);
               if (tgtId === id) {
                 activeUpstreamLinks.add(`${srcId}-${tgtId}-${idx}`);
                 if (!activeNodes.has(srcId)) {
@@ -606,9 +568,9 @@ const DependencyMapD3: React.FC = () => {
           }
         }
 
-        linkRef.current.attr("stroke", (l: any, idx: number) => {
-          const srcId = typeof l.source === 'string' ? l.source : (l.source as any).id;
-          const tgtId = typeof l.target === 'string' ? l.target : (l.target as any).id;
+        linkRef.current.attr("stroke", (l: Link, idx: number) => {
+          const srcId = getLinkId(l.source);
+          const tgtId = getLinkId(l.target);
           const linkKey = `${srcId}-${tgtId}-${idx}`;
           
           if (params.traceMode) {
@@ -623,9 +585,9 @@ const DependencyMapD3: React.FC = () => {
              return (srcId === d.id || tgtId === d.id) ? (d.group === 'chemical' ? '#3b82f6' : '#10b981') : '#94a3b8';
           }
         })
-        .attr("stroke-opacity", (l: any, idx: number) => {
-          const srcId = typeof l.source === 'string' ? l.source : (l.source as any).id;
-          const tgtId = typeof l.target === 'string' ? l.target : (l.target as any).id;
+        .attr("stroke-opacity", (l: Link, idx: number) => {
+          const srcId = getLinkId(l.source);
+          const tgtId = getLinkId(l.target);
           const linkKey = `${srcId}-${tgtId}-${idx}`;
 
           if (params.traceMode) {
@@ -636,14 +598,14 @@ const DependencyMapD3: React.FC = () => {
           }
         });
 
-        nodeRef.current.attr("opacity", (n: any) => {
+        nodeRef.current.attr("opacity", (n: Node) => {
           if (n.id === d.id) return 1;
           if (params.traceMode) {
              return activeNodes.has(n.id) ? 1 : 0.05;
           } else {
              const isConnected = rawData.links.some(l => {
-              const srcId = typeof l.source === 'string' ? l.source : (l.source as any).id;
-              const tgtId = typeof l.target === 'string' ? l.target : (l.target as any).id;
+              const srcId = getLinkId(l.source);
+              const tgtId = getLinkId(l.target);
               return (srcId === d.id && tgtId === n.id) || (tgtId === d.id && srcId === n.id);
             });
             return isConnected ? 1 : 0.05;
@@ -651,8 +613,7 @@ const DependencyMapD3: React.FC = () => {
         });
       }
     } else if (query) {
-      // Highlight search matches
-      nodeRef.current.attr("opacity", (n: any) => {
+      nodeRef.current.attr("opacity", (n: Node) => {
         const name = getDisplayName(n.id).toLowerCase();
         const engName = n.id.toLowerCase();
         const formula = (n.formula || '').toLowerCase();
@@ -666,7 +627,7 @@ const DependencyMapD3: React.FC = () => {
   const selectedNodeData = selectedNodeId ? rawData.nodes.find(n => n.id === selectedNodeId) : null;
 
   const handlePinNode = (nodeId: string, pinned: boolean) => {
-    const node = rawData.nodes.find(n => n.id === nodeId) as any;
+    const node = rawData.nodes.find(n => n.id === nodeId);
     if (node) {
       if (pinned) {
         node.fx = node.x;
@@ -715,7 +676,7 @@ const DependencyMapD3: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={language === 'zh' ? "搜索物质、CAS..." : "Search chemical, CAS..."}
+            placeholder={t('searchChemicalCas', 'Search chemical, CAS...')}
             className="w-full pl-9 pr-4 py-2.5 bg-white/90 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-xl text-sm shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 backdrop-blur-md"
           />
           {searchQuery && (
@@ -727,7 +688,7 @@ const DependencyMapD3: React.FC = () => {
         <button 
           onClick={() => setShowSettings(!showSettings)}
           className={`p-2.5 rounded-xl shadow-lg transition-all border backdrop-blur-md ${showSettings ? 'bg-indigo-500 text-white border-indigo-600' : 'bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-          title={language === 'zh' ? '设置' : 'Settings'}
+          title={t('settings', 'Settings')}
         >
           <Settings2 className="w-5 h-5" />
         </button>
@@ -743,40 +704,40 @@ const DependencyMapD3: React.FC = () => {
           >
             <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
               <Settings2 className="w-4 h-4 text-indigo-500" />
-              {language === 'zh' ? '图表参数与显示' : 'Graph Physics & Display'}
+              {t('graphDisplaySettings', 'Graph Physics & Display')}
             </h3>
             <div className="space-y-4">
               <div className="space-y-2">
-                <p className="text-xs font-mono text-slate-500 mb-1">{language === 'zh' ? '布局模式' : 'Layout Mode'}</p>
+                <p className="text-xs font-mono text-slate-500 mb-1">{t('layoutMode', 'Layout Mode')}</p>
                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                   <button onClick={() => setParams(p => ({ ...p, layout: 'force' }))} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-all ${params.layout === 'force' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                     <Network size={14} />
-                    {language === 'zh' ? '引力' : 'Force'}
+                    {t('layoutForce', 'Force')}
                   </button>
                   <button onClick={() => setParams(p => ({ ...p, layout: 'layered' }))} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-all ${params.layout === 'layered' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                     <Layers size={14} />
-                    {language === 'zh' ? '分层' : 'Layered'}
+                    {t('layoutLayered', 'Layered')}
                   </button>
                 </div>
               </div>
               
               <div className="space-y-2">
-                <p className="text-xs font-mono text-slate-500 mb-1">{language === 'zh' ? '连线样式' : 'Link Style'}</p>
+                <p className="text-xs font-mono text-slate-500 mb-1">{t('linkStyle', 'Link Style')}</p>
                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                   <button onClick={() => setParams(p => ({ ...p, linkStyle: 'straight' }))} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-all ${params.linkStyle === 'straight' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                     <GitBranch size={14} />
-                    {language === 'zh' ? '直线' : 'Straight'}
+                    {t('linkStraight', 'Straight')}
                   </button>
                   <button onClick={() => setParams(p => ({ ...p, linkStyle: 'curved' }))} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-all ${params.linkStyle === 'curved' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                     <RotateCcw size={14} />
-                    {language === 'zh' ? '曲线' : 'Curved'}
+                    {t('linkCurved', 'Curved')}
                   </button>
                 </div>
               </div>
               
               <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex justify-between text-xs font-mono text-slate-500">
-                  <span>{language === 'zh' ? '节点排斥力' : 'Node Repulsion'}</span>
+                  <span>{t('nodeRepulsion', 'Node Repulsion')}</span>
                   <span>{params.repulsion}</span>
                 </div>
                 <input 
@@ -789,7 +750,7 @@ const DependencyMapD3: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between text-xs font-mono text-slate-500">
-                  <span>{language === 'zh' ? '连线长度' : 'Link Distance'}</span>
+                  <span>{t('linkDistance', 'Link Distance')}</span>
                   <span>{params.linkDistance}</span>
                 </div>
                 <input 
@@ -802,30 +763,30 @@ const DependencyMapD3: React.FC = () => {
               </div>
               <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
                 <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{language === 'zh' ? '深度追溯模式' : 'Deep Trace Mode'}</span>
+                  <span className="text-sm text-slate-700 dark:text-slate-300">{t('deepTraceMode', 'Deep Trace Mode')}</span>
                   <input type="checkbox" className="sr-only peer" checked={params.traceMode} onChange={e => setParams(p => ({ ...p, traceMode: e.target.checked}))} />
                   <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-500 relative"></div>
                 </label>
                 {params.traceMode && (
                   <div className="flex gap-2">
                     <button onClick={() => setParams(p => ({ ...p, traceDirection: 'upstream' }))} className={`flex-1 py-1 text-[10px] font-bold rounded uppercase tracking-wider ${params.traceDirection === 'upstream' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
-                      {language === 'zh' ? '来源' : 'Upstream'}
+                      {t('traceUpstream', 'Upstream')}
                     </button>
                     <button onClick={() => setParams(p => ({ ...p, traceDirection: 'both' }))} className={`flex-1 py-1 text-[10px] font-bold rounded uppercase tracking-wider ${params.traceDirection === 'both' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
-                      {language === 'zh' ? '双向' : 'Both'}
+                      {t('traceBoth', 'Both')}
                     </button>
                     <button onClick={() => setParams(p => ({ ...p, traceDirection: 'downstream' }))} className={`flex-1 py-1 text-[10px] font-bold rounded uppercase tracking-wider ${params.traceDirection === 'downstream' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
-                      {language === 'zh' ? '影响' : 'Downstream'}
+                      {t('traceDownstream', 'Downstream')}
                     </button>
                   </div>
                 )}
                 <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{language === 'zh' ? '显示标签' : 'Show Labels'}</span>
+                  <span className="text-sm text-slate-700 dark:text-slate-300">{t('showLabels', 'Show Labels')}</span>
                   <input type="checkbox" className="sr-only peer" checked={params.showLabels} onChange={e => setParams(p => ({ ...p, showLabels: e.target.checked}))} />
                   <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-500 relative"></div>
                 </label>
                 <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{language === 'zh' ? '粒子流动效果' : 'Particle Flow'}</span>
+                  <span className="text-sm text-slate-700 dark:text-slate-300">{t('particleFlow', 'Particle Flow')}</span>
                   <input type="checkbox" className="sr-only peer" checked={params.showParticles} onChange={e => setParams(p => ({ ...p, showParticles: e.target.checked}))} />
                   <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-500 relative"></div>
                 </label>
@@ -840,14 +801,14 @@ const DependencyMapD3: React.FC = () => {
           <button 
             onClick={() => svgRef.current && d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 1.3)}
             className="p-2.5 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md text-slate-700 dark:text-slate-200 rounded-xl shadow-lg hover:shadow-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700"
-            title={language === 'zh' ? '放大' : 'Zoom In'}
+            title={t('zoomIn', 'Zoom In')}
           >
             <ZoomIn className="w-4 h-4" />
           </button>
           <button 
             onClick={() => svgRef.current && d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 0.77)}
             className="p-2.5 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md text-slate-700 dark:text-slate-200 rounded-xl shadow-lg hover:shadow-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700"
-            title={language === 'zh' ? '缩小' : 'Zoom Out'}
+            title={t('zoomOut', 'Zoom Out')}
           >
             <ZoomOut className="w-4 h-4" />
           </button>
@@ -857,28 +818,28 @@ const DependencyMapD3: React.FC = () => {
           <button 
             onClick={handleExportJSON}
             className="p-2.5 bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all border-r border-slate-200 dark:border-slate-700"
-            title={language === 'zh' ? '导出 JSON' : 'Export JSON'}
+            title={t('exportJson', 'Export JSON')}
           >
             <FileJson className="w-4 h-4" />
           </button>
           <button 
             onClick={handleExportPNG}
             className="p-2.5 bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all border-r border-slate-200 dark:border-slate-700"
-            title={language === 'zh' ? '导出高清 PNG' : 'Export High-Res PNG'}
+            title={t('exportPng', 'Export High-Res PNG')}
           >
             <ImageIcon className="w-4 h-4" />
           </button>
           <button 
-            onClick={() => (containerRef.current as any)?.resetZoom()}
+            onClick={() => resetZoomRef.current?.()}
             className="p-2.5 bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all border-r border-slate-200 dark:border-slate-700"
-            title={language === 'zh' ? '重置视图' : 'Reset View'}
+            title={t('resetView', 'Reset View')}
           >
             <RotateCcw className="w-4 h-4" />
           </button>
           <button 
             onClick={toggleFullscreen}
             className="p-2.5 bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
-            title={language === 'zh' ? (isFullscreen ? '退出全屏' : '全屏显示') : 'Toggle Fullscreen'}
+            title={isFullscreen ? t('exitFullscreen', 'Exit Fullscreen') : t('enterFullscreen', 'Fullscreen Mode')}
           >
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </button>
@@ -904,7 +865,7 @@ const DependencyMapD3: React.FC = () => {
               </p>
             </div>
             {(() => {
-              const node = rawData.nodes.find(n => n.id === contextMenu.nodeId) as any;
+              const node = rawData.nodes.find(n => n.id === contextMenu.nodeId);
               const isPinned = node && node.fx !== null && node.fx !== undefined;
               return (
                 <div className="py-1">
@@ -913,7 +874,7 @@ const DependencyMapD3: React.FC = () => {
                     className="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-2"
                   >
                     <MousePointerClick className="w-4 h-4" />
-                    {language === 'zh' ? (isPinned ? '取消固定位置' : '固定当前位置') : (isPinned ? 'Unpin Node' : 'Pin Node')}
+                    {isPinned ? t('unpinNode', 'Unpin Node') : t('pinNode', 'Pin Node')}
                   </button>
                   <button 
                     onClick={() => {
@@ -923,17 +884,17 @@ const DependencyMapD3: React.FC = () => {
                     className="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-2"
                   >
                     <Info className="w-4 h-4" />
-                    {language === 'zh' ? '查看详情' : 'View Details'}
+                    {t('viewDetails', 'View Details')}
                   </button>
                   <button 
                     onClick={() => {
-                        window.open(`https://${language === 'zh' ? 'zh' : 'en'}.wikipedia.org/wiki/${encodeURIComponent(language === 'zh' && nodeZhMap[contextMenu.nodeId] ? nodeZhMap[contextMenu.nodeId] : contextMenu.nodeId)}`, '_blank');
+                        window.open(t('wikipediaUrlPrefix', 'https://en.wikipedia.org/wiki/') + encodeURIComponent(getDisplayName(contextMenu.nodeId)), '_blank');
                         setContextMenu(null);
                     }}
                     className="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-2"
                   >
                     <Globe className="w-4 h-4" />
-                    {language === 'zh' ? '维基百科' : 'Wikipedia lookup'}
+                    {t('wikipedia', 'Wikipedia lookup')}
                   </button>
                 </div>
               );
@@ -959,8 +920,8 @@ const DependencyMapD3: React.FC = () => {
                     <div className={`w-2 h-2 rounded-full ${d.group === 'chemical' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
                     <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100">{getDisplayName(d.id)}</h4>
                   </div>
-                  {d.desc && <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-3">{language === 'zh' ? (nodeZhDescMap[d.id] || d.desc) : d.desc}</p>}
-                  <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800/50">{language === 'zh' ? '点击节点可以隔离查看' : 'Click to isolate node'}</p>
+                  {d.desc && <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-3">{t('node_' + d.id + '_desc', d.desc)}</p>}
+                  <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800/50">{t('clickToIsolate', 'Click to isolate node')}</p>
                 </div>
               );
             })()}
@@ -1004,13 +965,13 @@ const DependencyMapD3: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                   {selectedNodeData.formula && (
                     <div className="bg-slate-100 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
-                      <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">{language === 'zh' ? '化学式' : 'Formula'}</p>
+                      <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">{t('chemicalFormula', 'Formula')}</p>
                       <p className="font-mono text-slate-800 dark:text-slate-200">{selectedNodeData.formula}</p>
                     </div>
                   )}
                   {selectedNodeData.cas && (
                     <div className="bg-slate-100 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
-                      <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">{language === 'zh' ? 'CAS编号' : 'CAS No.'}</p>
+                      <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">{t('casNumberLabel', 'CAS No.')}</p>
                       <p className="font-mono text-slate-800 dark:text-slate-200">{selectedNodeData.cas}</p>
                     </div>
                   )}
@@ -1021,23 +982,23 @@ const DependencyMapD3: React.FC = () => {
                 <div>
                   <h4 className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-2 flex items-center gap-1.5">
                     <Info size={12} />
-                    {language === 'zh' ? '概述' : 'Overview'}
+                    {t('overview', 'Overview')}
                   </h4>
                   <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-sans">
-                    {language === 'zh' ? (nodeZhDescMap[selectedNodeData.id] || selectedNodeData.desc) : selectedNodeData.desc}
+                    {t('node_' + selectedNodeData.id + '_desc', selectedNodeData.desc)}
                   </p>
                 </div>
               )}
               
               <div className="mt-2">
                 <a 
-                  href={`https://${language === 'zh' ? 'zh' : 'en'}.wikipedia.org/wiki/${encodeURIComponent(language === 'zh' && nodeZhMap[selectedNodeData.id] ? nodeZhMap[selectedNodeData.id] : selectedNodeData.id)}`} 
+                  href={t('wikipediaUrlPrefix', 'https://en.wikipedia.org/wiki/') + encodeURIComponent(getDisplayName(selectedNodeData.id))} 
                   target="_blank" 
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
                 >
                   <Globe size={14} />
-                  {language === 'zh' ? '通过维基百科查询' : 'Wikipedia Lookup'}
+                  {t('wikipediaLookup', 'Wikipedia Lookup')}
                 </a>
               </div>
             </div>

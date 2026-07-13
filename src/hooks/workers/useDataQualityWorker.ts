@@ -1,46 +1,27 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useCallback } from 'react';
+import { useWorkerManager } from './useWorkerManager';
 import { Product } from '@/types/index';
-import { QualityWorkerMessage, QualityWorkerResponse } from '@/workers/dataQualityWorker';
+import { QualityWorkerMessage, QualityMonitorResultPayload } from '@/workers/dataQualityWorker';
 
 export function useDataQualityWorker() {
-  const [isAnomalizing, setIsAnomalizing] = useState(false);
-  const [result, setResult] = useState<QualityWorkerResponse['payload'] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const workerRef = useRef<Worker | null>(null);
-
-  useEffect(() => {
-    workerRef.current = new Worker(
-      new URL('../../workers/dataQualityWorker.ts', import.meta.url),
-      { type: 'module' }
-    );
-
-    workerRef.current.onmessage = (e: MessageEvent<any>) => {
-      setIsAnomalizing(false);
-      const data = e.data;
-      if (data.type === 'ERROR' || data.error) {
-        setError(data.error || data.payload?.message || 'Error running data quality process.');
-      } else if (data.type === 'QUALITY_MONITOR_RESULT') {
-        setResult(data.payload);
-      }
-    };
-
-    return () => {
-      workerRef.current?.terminate();
-    };
-  }, []);
+  const {
+    isCalculating: isAnomalizing,
+    result,
+    setResult,
+    error,
+    postMessage
+  } = useWorkerManager<QualityWorkerMessage, QualityMonitorResultPayload>(
+    useCallback(() => new Worker(new URL('../../workers/dataQualityWorker.ts', import.meta.url), { type: 'module' }), []),
+    'QUALITY_MONITOR_RESULT'
+  );
 
   const runQualityCheck = useCallback((allProducts: Product[], options?: QualityWorkerMessage['payload']['options']) => {
-    if (!workerRef.current) return;
-    setIsAnomalizing(true);
-    setError(null);
     setResult(null);
-
-    const msg: QualityWorkerMessage = {
+    postMessage({
       type: 'RUN_MONITOR',
       payload: { allProducts, options }
-    };
-    workerRef.current.postMessage(msg);
-  }, []);
+    });
+  }, [postMessage, setResult]);
 
   return {
     isAnomalizing,
@@ -49,3 +30,4 @@ export function useDataQualityWorker() {
     runQualityCheck
   };
 }
+

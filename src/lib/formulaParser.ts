@@ -10,6 +10,11 @@ export class FormulaEngine {
     "abs", "sqrt", "pow", "log", "log10", "exp", "sin", "cos", "tan", "min", "max", "PI",
   ];
 
+  private static readonly MATH_REGEXES = FormulaEngine.MATH_FUNCS.map(func => ({
+    regex: new RegExp(`\\b${func}\\(`, "g"),
+    replacement: `Math.${func}(`
+  }));
+
   /**
    * Extracts dependent property names or computed column names from an expression.
    */
@@ -31,7 +36,7 @@ export class FormulaEngine {
       /(?:props|Props|p|P)\[['"](.+?)['"]\]/gi,
       (_, pName) => {
         const safePName = pName.replace(/'/g, "\\'");
-        return `(__p['${safePName}'] || 0)`;
+        return `(p['${safePName}'] || 0)`;
       },
     );
 
@@ -39,12 +44,11 @@ export class FormulaEngine {
       return match === " " ? " " : "";
     });
 
-    FormulaEngine.MATH_FUNCS.forEach((func) => {
-      const regex = new RegExp(`\\b${func}\\(`, "g");
-      sanitized = sanitized.replace(regex, `Math.${func}(`);
+    FormulaEngine.MATH_REGEXES.forEach(({ regex, replacement }) => {
+      sanitized = sanitized.replace(regex, replacement);
     });
 
-    return sanitized.replace(/__p/g, "p");
+    return sanitized;
   }
 
   /**
@@ -105,8 +109,16 @@ export class FormulaEngine {
   public validate(expression: string, currentName?: string, allFormulas: FormulaConfig[] = []): string | null {
     if (!expression.trim()) return "Expression cannot be empty";
     
-    if (expression.includes('constructor') || expression.includes('__proto__') || expression.includes('prototype')) {
-      return "Security violation: Forbidden keywords detected";
+    const forbiddenKeywords = [
+      'window', 'document', 'globalThis', 'fetch', 'XMLHttpRequest', 'eval', 
+      'Function', 'setTimeout', 'setInterval', 'alert', 'cookie', 'localStorage', 
+      'sessionStorage', 'indexedDB', 'constructor', '__proto__', 'prototype'
+    ];
+    for (const kw of forbiddenKeywords) {
+      const regex = new RegExp(`\\b${kw}\\b`, 'i');
+      if (regex.test(expression)) {
+        return `Security violation: Forbidden keyword "${kw}" detected`;
+      }
     }
 
     const body = this.sanitize(expression);
@@ -137,11 +149,26 @@ export class FormulaEngine {
     executor: (product: Product) => Record<string, number>;
   } | null = null;
 
+  private areFormulasEqual(a: FormulaConfig[], b: FormulaConfig[]): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (
+        a[i].id !== b[i].id ||
+        a[i].name !== b[i].name ||
+        a[i].expression !== b[i].expression ||
+        a[i].unit !== b[i].unit
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /**
    * Creates an execution plan for evaluating a product across all compiled formulas.
    */
   public compileGraph(formulas: FormulaConfig[]): (product: Product) => Record<string, number> {
-    if (this._cachedPlan && this._cachedPlan.formulasRef === formulas) {
+    if (this._cachedPlan && (this._cachedPlan.formulasRef === formulas || this.areFormulasEqual(this._cachedPlan.formulasRef, formulas))) {
       return this._cachedPlan.executor;
     }
 

@@ -1,6 +1,7 @@
 import { logger } from '@/lib/logger';
 import { useState, useCallback } from "react";
 import { FilterGroup, ColumnConfig, Toast } from '@/types/index';
+import { safeStorage } from '@/lib/utils';
 
 export interface SavedView {
   id: string;
@@ -22,7 +23,7 @@ export function useSavedViews(
 ) {
   const [savedViews, setSavedViews] = useState<SavedView[]>(() => {
     try {
-      const saved = typeof window !== 'undefined' ? localStorage.getItem("resindb-saved-views") : null;
+      const saved = safeStorage.local.getItem("resindb-saved-views");
       if (!saved) return [];
       const parsed = JSON.parse(saved);
       return Array.isArray(parsed) ? parsed : [];
@@ -44,7 +45,7 @@ export function useSavedViews(
         };
         const updated = [...savedViews, newView];
         setSavedViews(updated);
-        localStorage.setItem("resindb-saved-views", JSON.stringify(updated));
+        safeStorage.local.setItem("resindb-saved-views", JSON.stringify(updated));
         addToast("success", t("viewSaved").replace("{name}", name));
       } catch (e) {
         logger.error("Failed to save view:", e);
@@ -83,7 +84,7 @@ export function useSavedViews(
       const updated = savedViews.filter((v) => v.id !== id);
       setSavedViews(updated);
       try {
-        localStorage.setItem("resindb-saved-views", JSON.stringify(updated));
+        safeStorage.local.setItem("resindb-saved-views", JSON.stringify(updated));
       } catch {
         // Ignore
       }

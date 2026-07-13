@@ -4,29 +4,38 @@ export class PCA {
   
   static getComponents(data: number[][], numComponents: number = 2) {
       if (!data.length || !data[0].length) return { projected: [], loadingVectors: [] };
+
+      // Filter out rows that contain NaN or non-finite values
+      const validData = data.filter((row) =>
+        row.every((v) => Number.isFinite(v)),
+      );
+
+      if (validData.length === 0) return { projected: [], loadingVectors: [] };
       
-      const n = data.length;
-      const m = data[0].length;
+      const n = validData.length;
+      const m = validData[0].length;
+      const safeComponents = Math.max(1, Math.floor(numComponents) || 2);
       
       // 1. Zero-mean the data
       const means = new Array(m).fill(0);
       for (let i = 0; i < n; i++) {
           for (let j = 0; j < m; j++) {
-              means[j] += data[i][j];
+              means[j] += validData[i][j];
           }
       }
       for (let j = 0; j < m; j++) {
-          means[j] /= n;
+          // Guard against division by zero (should be unreachable due to early return above)
+          means[j] = n > 0 ? means[j] / n : 0;
       }
       
-      const X = data.map(row => row.map((val, j) => val - means[j]));
+      const X = validData.map(row => row.map((val, j) => val - means[j]));
       
       const loadingVectors: number[][] = [];
-      const scores: number[][] = new Array(n).fill(0).map(() => new Array(numComponents).fill(0));
+      const scores: number[][] = new Array(n).fill(0).map(() => new Array(safeComponents).fill(0));
       
       const residualX = X.map(row => [...row]);
       
-      for (let k = 0; k < Math.min(numComponents, m); k++) {
+      for (let k = 0; k < Math.min(safeComponents, m); k++) {
           // Initialize score vector t as the first column of residualX
           const t = residualX.map(row => row[0]);
           const p = new Array(m).fill(0);
@@ -53,7 +62,7 @@ export class PCA {
               // Normalize p: p = p / ||p||
               let pNorm = 0;
               for (let j = 0; j < m; j++) pNorm += p[j] * p[j];
-              pNorm = Math.sqrt(pNorm);
+              pNorm = Math.sqrt(Math.max(0, pNorm));
               if (pNorm === 0) break;
               for (let j = 0; j < m; j++) p[j] /= pNorm;
               

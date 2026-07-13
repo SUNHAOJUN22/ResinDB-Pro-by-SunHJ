@@ -36,6 +36,7 @@ import {
   getChemicalReplacementSuggestions, 
   AiSuggestionEngineResponse 
 } from "@/services/geminiService";
+import { safeStorage } from "@/lib/utils";
 
 
 interface FormulaEditorModalProps {
@@ -260,7 +261,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
   const [copiedType, setCopiedType] = useState<'json' | 'share' | null>(null);
   
   const [customTemplates, setCustomTemplates] = useState<FormulaTemplate[]>(() => {
-    const saved = localStorage.getItem('resindb-custom-templates');
+    const saved = safeStorage.local.getItem('resindb-custom-templates');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -272,7 +273,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
   });
 
   useEffect(() => {
-    localStorage.setItem('resindb-custom-templates', JSON.stringify(customTemplates));
+    safeStorage.local.setItem('resindb-custom-templates', JSON.stringify(customTemplates));
   }, [customTemplates]);
 
   const [selectedTemplate, setSelectedTemplate] = useState<FormulaTemplate | null>(null);

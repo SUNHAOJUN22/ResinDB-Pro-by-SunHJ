@@ -1,19 +1,13 @@
 import { useState, useMemo, useDeferredValue, useEffect, useCallback, useRef } from 'react';
-import { Product, FilterGroup, Category, Toast } from '@/types/index';
+import { Product, FilterGroup, Category, Toast, SyncEvent } from '@/types/index';
 import { compileFilterGroup } from '@/lib/filterUtils';
 import { calculateCompleteness, getLower } from '@/utils/productUtils';
 import { CATEGORY_TREE, PRODUCT_CATALOG } from '@/config/constants';
 import { debounce } from 'lodash';
-import { api } from '@/services/api';
+import api from '@/lib/adapters';
 import { useColumns } from '@/hooks/datagrid/useColumns';
 import { propertyMap } from '@/config/i18n';
-
-export interface SyncEvent {
-  id: string;
-  timestamp: number;
-  status: 'success' | 'error';
-  message: string;
-}
+import { safeStorage } from '@/lib/utils';
 
 // Module-level WeakMap: Provides O(1) GC-safe caching for massive product tokens.
 // Avoids regenerating strings per object across 2.5 MILLION deep iterations per keystroke!
@@ -29,11 +23,13 @@ export function useDatabase(
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [syncEvents, setSyncEvents] = useState<SyncEvent[]>(() => {
-    try {
-      const saved = localStorage.getItem('resindb-sync-events');
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // ignore
+    const saved = safeStorage.local.getItem('resindb-sync-events');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // ignore
+      }
     }
     return [];
   });
@@ -44,11 +40,7 @@ export function useDatabase(
         { ...event, id: Date.now().toString(), timestamp: Date.now() },
         ...prev
       ].slice(0, 50); // Keep last 50 events
-      try {
-        localStorage.setItem('resindb-sync-events', JSON.stringify(newEvents));
-      } catch {
-        // ignore
-      }
+      safeStorage.local.setItem('resindb-sync-events', JSON.stringify(newEvents));
       return newEvents;
     });
   }, []);
@@ -56,10 +48,15 @@ export function useDatabase(
   const columnManagement = useColumns(allProducts);
   const { columns } = columnManagement;
 
+  const columnsRef = useRef(columns);
+  useEffect(() => {
+    columnsRef.current = columns;
+  }, [columns]);
+
   const resolvePropKey = useCallback(
     (label: string): string | null => {
       const cleanLabel = label.toLowerCase();
-      const directMatch = columns.find(
+      const directMatch = columnsRef.current.find(
         (c) =>
           c.key.toLowerCase() === cleanLabel ||
           tProp(c.label).toLowerCase() === cleanLabel,
@@ -73,7 +70,7 @@ export function useDatabase(
       if (reverseKey) return reverseKey;
       return null;
     },
-    [columns, tProp],
+    [tProp],
   );
 
   const fetchRequestId = useRef(0);

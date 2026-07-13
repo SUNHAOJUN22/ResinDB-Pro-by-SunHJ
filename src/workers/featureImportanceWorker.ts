@@ -48,19 +48,24 @@ function mathMultiply(A: number[][], B: number[][]): number[][] {
 }
 
 function transpose(A: number[][]): number[][] {
+  if (!A || A.length === 0 || !A[0]) return [];
   return A[0].map((_, j) => A.map(row => row[j]));
 }
 
 self.onmessage = (e: MessageEvent<FeatureImportanceMessage>) => {
   try {
     const { data, featureNames } = e.data.payload;
-    if (data.length === 0) throw new Error("No data provided");
+    if (!data || data.length === 0) throw new Error("No data provided");
     
+    // Filter out rows containing NaN or non-finite values
+    const validData = data.filter(
+      (row) => row && row.every((v) => Number.isFinite(v))
+    );
     const numFeatures = featureNames.length;
-    const numPoints = data.length;
+    const numPoints = validData.length;
     
     if (numPoints <= numFeatures + 1) {
-       throw new Error("Not enough data points for regression modeling.");
+       throw new Error("Not enough valid data points for regression modeling.");
     }
 
     // Standardize data to get standardized coefficients (Beta weights)
@@ -68,15 +73,16 @@ self.onmessage = (e: MessageEvent<FeatureImportanceMessage>) => {
     const stds = new Array(numFeatures + 1).fill(0);
     
     for (let i = 0; i < numPoints; i++) {
-      for (let j = 0; j <= numFeatures; j++) means[j] += data[i][j];
+      for (let j = 0; j <= numFeatures; j++) means[j] += validData[i][j];
     }
     for (let j = 0; j <= numFeatures; j++) means[j] /= numPoints;
     
     for (let i = 0; i < numPoints; i++) {
-        for (let j = 0; j <= numFeatures; j++) stds[j] += (data[i][j] - means[j])**2;
+        for (let j = 0; j <= numFeatures; j++) stds[j] += (validData[i][j] - means[j])**2;
     }
+    const safePoints = numPoints > 0 ? numPoints : 1;
     for (let j = 0; j <= numFeatures; j++) {
-       stds[j] = Math.sqrt(stds[j] / numPoints);
+       stds[j] = Math.sqrt(Math.max(0, stds[j] / safePoints));
        if (stds[j] < 1e-9) stds[j] = 1; // Prevent div by zero
     }
     
@@ -89,10 +95,10 @@ self.onmessage = (e: MessageEvent<FeatureImportanceMessage>) => {
     for (let i = 0; i < numPoints; i++) {
       const row = [1]; // intercept
       for (let j = 0; j < numFeatures; j++) {
-        row.push((data[i][j] - means[j]) / stds[j]);
+        row.push((validData[i][j] - means[j]) / stds[j]);
       }
       X.push(row);
-      Y.push([(data[i][numFeatures] - means[numFeatures]) / stds[numFeatures]]);
+      Y.push([(validData[i][numFeatures] - means[numFeatures]) / stds[numFeatures]]);
     }
     
     const XT = transpose(X);

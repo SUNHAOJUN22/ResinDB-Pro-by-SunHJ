@@ -315,50 +315,60 @@ export const BulkReorderModal: React.FC<BulkReorderModalProps> = ({
                   </h4>
                   
                   <div className="space-y-2">
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
                       type="button"
                       onClick={() => handlePresetSort("gradeName")}
-                      className="w-full text-left px-3.5 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all flex items-center justify-between"
+                      className="w-full text-left px-3.5 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all flex items-center justify-between cursor-pointer"
                     >
                       <span>{isZh ? "按牌号名称 A-Z" : "By Grade Name A-Z"}</span>
                       <ArrowUpDown size={12} className="text-slate-400" />
-                    </button>
+                    </motion.button>
 
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
                       type="button"
                       onClick={() => handlePresetSort("manufacturer")}
-                      className="w-full text-left px-3.5 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all flex items-center justify-between"
+                      className="w-full text-left px-3.5 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all flex items-center justify-between cursor-pointer"
                     >
                       <span>{isZh ? "按生产商字母" : "By Manufacturer A-Z"}</span>
                       <ArrowUpDown size={12} className="text-slate-400" />
-                    </button>
+                    </motion.button>
 
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
                       type="button"
                       onClick={() => handlePresetSort("completeness")}
-                      className="w-full text-left px-3.5 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all flex items-center justify-between"
+                      className="w-full text-left px-3.5 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all flex items-center justify-between cursor-pointer"
                     >
                       <span>{isZh ? "按数据完整度降序" : "By Completeness (High to Low)"}</span>
                       <ArrowUpDown size={12} className="text-slate-400" />
-                    </button>
+                    </motion.button>
 
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
                       type="button"
                       onClick={() => handlePresetSort("density")}
-                      className="w-full text-left px-3.5 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all flex items-center justify-between"
+                      className="w-full text-left px-3.5 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all flex items-center justify-between cursor-pointer"
                     >
                       <span>{isZh ? "按密度数值降序" : "By Density Values (High-Low)"}</span>
                       <ArrowUpDown size={12} className="text-slate-400" />
-                    </button>
+                    </motion.button>
 
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
                       type="button"
                       onClick={() => handlePresetSort("tensile")}
-                      className="w-full text-left px-3.5 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all flex items-center justify-between"
+                      className="w-full text-left px-3.5 py-2.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 transition-all flex items-center justify-between cursor-pointer"
                     >
                       <span>{isZh ? "按拉伸强度降序" : "By Tensile Strength (High-Low)"}</span>
                       <ArrowUpDown size={12} className="text-slate-400" />
-                    </button>
+                    </motion.button>
                   </div>
                 </div>
 
@@ -368,14 +378,16 @@ export const BulkReorderModal: React.FC<BulkReorderModalProps> = ({
                     {isZh ? "全选集合翻转" : "Transformations"}
                   </h4>
 
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
                     type="button"
                     onClick={handleReverseOrder}
-                    className="w-full py-2.5 px-3.5 bg-indigo-50/50 hover:bg-indigo-50 dark:bg-indigo-950/20 dark:hover:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
+                    className="w-full py-2.5 px-3.5 bg-indigo-50/50 hover:bg-indigo-50 dark:bg-indigo-950/20 dark:hover:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer"
                   >
                     <RefreshCw size={12} />
                     {isZh ? "逆序/反转排列" : "Reverse Selected Sequence"}
-                  </button>
+                  </motion.button>
                 </div>
 
                 {/* Instructions card */}

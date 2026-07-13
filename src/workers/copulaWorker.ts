@@ -83,11 +83,16 @@ function getRanks(values: number[]) {
 self.onmessage = (e: MessageEvent<CopulaMessage>) => {
   try {
     const { data, gridSize = 50 } = e.data.payload;
-    const n = data.length;
-    if (n < 5) throw new Error("Requires at least 5 points for Copula estimation.");
     
-    const xVals = data.map(d => d.x);
-    const yVals = data.map(d => d.y);
+    // Filter out rows containing NaN or non-finite values
+    const validData = (data || []).filter(
+      (d) => d && Number.isFinite(d.x) && Number.isFinite(d.y)
+    );
+    const n = validData.length;
+    if (n < 5) throw new Error("Requires at least 5 valid numeric points for Copula estimation.");
+    
+    const xVals = validData.map(d => d.x);
+    const yVals = validData.map(d => d.y);
     
     // For joint CDF calculations
     const sortedX = [...xVals].sort((a,b) => a-b);
@@ -112,24 +117,27 @@ self.onmessage = (e: MessageEvent<CopulaMessage>) => {
         sumZ2Sq += z2 * z2;
     }
     
-    let rho = sumZ1Z2 / Math.sqrt(sumZ1Sq * sumZ2Sq);
+    const sumZProduct = sumZ1Sq * sumZ2Sq;
+    let rho = sumZProduct > 0 ? sumZ1Z2 / Math.sqrt(Math.max(1e-15, sumZProduct)) : 0;
     if (rho > 0.99) rho = 0.99;
     if (rho < -0.99) rho = -0.99;
     
     const grid = [];
-    for (let i = 1; i < gridSize; i++) {
-        const u = i / gridSize;
+    const safeGridSize = Math.max(5, Math.min(100, Number(gridSize) || 50));
+    const oneMinusRhoSq = Math.max(1e-15, 1 - rho * rho);
+    for (let i = 1; i < safeGridSize; i++) {
+        const u = i / safeGridSize;
         const z1 = norminv(u);
         const z1Sq = z1 * z1;
         
-        for (let j = 1; j < gridSize; j++) {
-            const v = j / gridSize;
+        for (let j = 1; j < safeGridSize; j++) {
+            const v = j / safeGridSize;
             const z2 = norminv(v);
             const z2Sq = z2 * z2;
             
             // Gaussian Copula PDF
-            const exponent = - (rho * rho * (z1Sq + z2Sq) - 2 * rho * z1 * z2) / (2 * (1 - rho * rho));
-            const c_uv = (1 / Math.sqrt(1 - rho * rho)) * Math.exp(exponent);
+            const exponent = - (rho * rho * (z1Sq + z2Sq) - 2 * rho * z1 * z2) / (2 * oneMinusRhoSq);
+            const c_uv = (1 / Math.sqrt(oneMinusRhoSq)) * Math.exp(exponent);
             
             grid.push({ u, v, z: c_uv });
         }

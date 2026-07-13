@@ -277,9 +277,9 @@ export const ResinCapacityForecast: React.FC = () => {
 
     const currentIdx = 12; // index of "Current" / Month 0
     const currentVal = capacityDataStream[currentIdx]?.historical || 0;
-    const projected12m = capacityDataStream[capacityDataStream.length - 1]?.projected || 0;
+    const predicted12m = capacityDataStream[capacityDataStream.length - 1]?.projected || 0;
 
-    const growthRatePercent = currentVal > 0 ? ((projected12m - currentVal) / currentVal) * 100 : 0;
+    const growthRatePercent = currentVal > 0 ? ((predicted12m - currentVal) / currentVal) * 100 : 0;
 
     // Simulated R² or Confidence Score depending on historical volatility & window parameters
     let confidenceScore = 96.2;
@@ -377,7 +377,12 @@ export const ResinCapacityForecast: React.FC = () => {
           </label>
           <select
             value={projectionType}
-            onChange={(e) => setProjectionType(e.target.value as any)}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === 'linear' || val === 'moving_average') {
+                setProjectionType(val);
+              }
+            }}
             className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500/20 outline-none cursor-pointer text-slate-800 dark:text-slate-100"
           >
             <option value="linear">📈 {language === 'zh' ? '最小二乘线性回归' : 'Linear Regression'}</option>

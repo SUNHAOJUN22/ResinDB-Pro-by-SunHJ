@@ -8,10 +8,12 @@ import { PredictiveTrends } from '@/components/features/Analytics/PredictiveTren
 import { ResinCapacityForecast } from '@/components/features/Analytics/ResinCapacityForecast';
 import { ShieldAlert, BarChart3, TrendingUp, LineChart, Factory } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export const AnalyticsView: React.FC = () => {
     const { allProducts, selectedIds } = useData();
     const { formulas } = useFormulas();
+    const { t } = useLanguage();
     const [subTab, setSubTab] = useState<'charts' | 'quality' | 'forecasting' | 'predictive-trends' | 'capacity-forecast'>('charts');
 
     const selectedProducts = useMemo(() => {
@@ -31,7 +33,7 @@ export const AnalyticsView: React.FC = () => {
                     }`}
                 >
                     <BarChart3 size={14} />
-                    <span>Scientific Charts</span>
+                    <span>{t("scientificCharts")}</span>
                 </button>
                 <button
                     onClick={() => setSubTab('quality')}
@@ -42,7 +44,7 @@ export const AnalyticsView: React.FC = () => {
                     }`}
                 >
                     <ShieldAlert size={14} />
-                    <span>Data Quality Diagnostics</span>
+                    <span>{t("dataQualityDiagnostics")}</span>
                 </button>
                 <button
                     onClick={() => setSubTab('forecasting')}
@@ -53,7 +55,7 @@ export const AnalyticsView: React.FC = () => {
                     }`}
                 >
                     <TrendingUp size={14} />
-                    <span>Material Durability Forecast</span>
+                    <span>{t("materialDurabilityForecast")}</span>
                 </button>
                 <button
                     onClick={() => setSubTab('predictive-trends')}
@@ -64,7 +66,7 @@ export const AnalyticsView: React.FC = () => {
                     }`}
                 >
                     <LineChart size={14} />
-                    <span>Predictive Trends</span>
+                    <span>{t("predictiveTrends")}</span>
                 </button>
                 <button
                     onClick={() => setSubTab('capacity-forecast')}
@@ -75,7 +77,7 @@ export const AnalyticsView: React.FC = () => {
                     }`}
                 >
                     <Factory size={14} />
-                    <span>Resin Capacity Forecast</span>
+                    <span>{t("resinCapacityForecast")}</span>
                 </button>
             </div>
 

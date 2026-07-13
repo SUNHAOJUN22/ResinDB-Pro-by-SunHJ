@@ -18,6 +18,7 @@ import {
 import { User as UserType } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme, ColorTheme } from "@/contexts/ThemeContext";
+import { useUI } from "@/contexts/UIContext";
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -35,6 +36,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onAddToast,
 }) => {
   const { t } = useLanguage();
+  const { clickFeedbackEnabled, setClickFeedbackEnabled } = useUI();
   const { colorTheme, setColorTheme, theme, toggleTheme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,7 +61,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        onAddToast("error", "File too large. Please use an image under 2MB.");
+        onAddToast("error", t("fileTooLarge"));
         return;
       }
       const reader = new FileReader();
@@ -227,12 +229,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                           type="text"
                           value={
                             avatar.startsWith("data:")
-                              ? "Local Image Attached (Base64)"
+                              ? t("localImageAttached")
                               : avatar
                           }
                           onChange={(e) => setAvatar(e.target.value)}
                           className={`w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-[10px] font-mono font-bold outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/5 transition-all dark:text-slate-200 ${avatar.startsWith("data:") ? "italic text-emerald-600 dark:text-emerald-400" : ""}`}
-                          placeholder="Or paste an image URL..."
+                          placeholder={t("avatarPlaceholder")}
                         />
                       </div>
                     </div>
@@ -312,32 +314,32 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     <div className="flex items-center gap-2 mb-2">
                        <Palette size={14} className="text-slate-400" />
                        <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
-                         Appearance Settings
+                         {t("appearanceSettings")}
                        </label>
                     </div>
                     
                     <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
                       <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
-                        Color Theme (Real-time)
+                        {t("colorTheme")}
                       </span>
                       <select 
                         value={colorTheme}
                         onChange={(e) => setColorTheme(e.target.value as ColorTheme)}
                         className="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-mono font-bold uppercase tracking-widest pl-3 pr-8 py-1.5 outline-none focus:border-primary-500 transition-all cursor-pointer shadow-sm text-slate-700 dark:text-slate-300"
                       >
-                        <option value="indigo">Industrial (Default)</option>
-                        <option value="high-contrast">High Contrast</option>
-                        <option value="emerald">Emerald</option>
-                        <option value="rose">Rose</option>
-                        <option value="blue">Blue</option>
-                        <option value="amber">Amber</option>
-                        <option value="violet">Violet</option>
+                        <option value="indigo">{t("themeIndustrial")}</option>
+                        <option value="high-contrast">{t("themeHighContrast")}</option>
+                        <option value="emerald">{t("themeEmerald")}</option>
+                        <option value="rose">{t("themeRose")}</option>
+                        <option value="blue">{t("themeBlue")}</option>
+                        <option value="amber">{t("themeAmber")}</option>
+                        <option value="violet">{t("themeViolet")}</option>
                       </select>
                     </div>
 
                     <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
                       <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
-                        Dark Mode
+                        {t("darkMode")}
                       </span>
                       <button
                         type="button"
@@ -345,6 +347,23 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         className="p-1.5 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-primary-500 transition-colors shadow-sm"
                       >
                          {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
+                      <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
+                        {t("clickFeedbackTitle")}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setClickFeedbackEnabled(!clickFeedbackEnabled)}
+                        className={`px-3 py-1.5 rounded-lg border text-[10px] font-mono font-bold uppercase transition-all ${
+                          clickFeedbackEnabled
+                            ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                            : 'bg-white dark:bg-slate-950 text-slate-500 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900'
+                        }`}
+                      >
+                        {clickFeedbackEnabled ? t("statusOn") : t("statusOff")}
                       </button>
                     </div>
                   </div>
@@ -398,17 +417,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   </div>
                 </form>
 
-                <div className="mt-2 mb-6 pt-6 border-t border-slate-200 dark:border-slate-800 text-center">
-                  <p className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-widest">
-                    System Designed by
-                  </p>
-                  <p className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest">
-                    孙浩峻 (Sun Haojun)
-                  </p>
-                  <p className="text-[9px] font-mono text-slate-400 uppercase tracking-widest">
-                    合成树脂研究所 • PRI
-                  </p>
-                </div>
+                  <div className="mt-2 mb-6 pt-6 border-t border-slate-200 dark:border-slate-800 text-center">
+                    <p className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-widest">
+                      {t("systemDesignedBy")}
+                    </p>
+                    <p className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest">
+                      孙浩峻 (Sun Haojun)
+                    </p>
+                    <p className="text-[9px] font-mono text-slate-400 uppercase tracking-widest">
+                      {t("priInstitute")}
+                    </p>
+                  </div>
               </div>
             )}
           </motion.div>

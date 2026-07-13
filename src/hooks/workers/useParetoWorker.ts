@@ -1,43 +1,31 @@
-import { logger } from '@/lib/logger';
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useWorkerManager } from './useWorkerManager';
 import type { ParetoMessage, ParetoResponse, ParetoObjective } from '@/workers/paretoWorker';
 
 export function useParetoWorker() {
-  const [isComputing, setIsComputing] = useState(false);
-  const [paretoFrontIds, setParetoFrontIds] = useState<Set<string>>(new Set());
-  const workerRef = useRef<Worker | null>(null);
-
-  useEffect(() => {
-    const worker = new Worker(new URL('../../workers/paretoWorker.ts', import.meta.url), { type: 'module' });
-    workerRef.current = worker;
-    
-    worker.onmessage = (e: MessageEvent<ParetoResponse>) => {
-       const res = e.data;
-       if (res.type === 'PARETO_RESULT') {
-          setParetoFrontIds(new Set(res.payload.paretoIds));
-          setIsComputing(false);
-       } else if (res.type === 'ERROR') {
-          logger.error("ParetoWorker Error:", res.payload.message);
-          setIsComputing(false);
-       }
-    };
-
-    return () => {
-      worker.terminate();
-    };
-  }, []);
+  const {
+    isCalculating: isComputing,
+    result,
+    setResult,
+    postMessage
+  } = useWorkerManager<ParetoMessage, Extract<ParetoResponse, { type: 'PARETO_RESULT' }>['payload']>(
+    useCallback(() => new Worker(new URL('../../workers/paretoWorker.ts', import.meta.url), { type: 'module' }), []),
+    'PARETO_RESULT'
+  );
 
   const computePareto = useCallback((data: {id: string, values: Record<string, number>}[], objectives: ParetoObjective[]) => {
-      if (!workerRef.current || objectives.length === 0 || data.length === 0) {
-         setParetoFrontIds(new Set());
+      if (objectives.length === 0 || data.length === 0) {
+         setResult(null);
          return;
       }
-      setIsComputing(true);
-      workerRef.current.postMessage({
+      postMessage({
          type: 'COMPUTE_PARETO',
          payload: { data, objectives }
-      } as ParetoMessage);
-  }, []);
+      });
+  }, [postMessage, setResult]);
+
+  const paretoFrontIds = useMemo(() => new Set(result?.paretoIds || []), [result]);
 
   return { paretoFrontIds, computePareto, isComputingPareto: isComputing };
 }
+

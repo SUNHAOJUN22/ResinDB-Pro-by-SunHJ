@@ -3,6 +3,7 @@ import { Product, SortConfig, ColumnConfig, FilterItem } from '@/types/index';
 import { calculateCompleteness, isLowBest } from '@/utils/productUtils';
 import { formulaEngine } from '@/lib/formulaParser';
 import { useFormulas } from '@/hooks/math/useFormulas';
+import { safeStorage } from '@/lib/utils';
 
 interface UseDataGridProps {
   data: Product[];
@@ -22,12 +23,7 @@ interface UseDataGridProps {
 export function useDataGrid({ data, columns, activeFilters = [], selectedIds: controlledSelectedIds, onSelectionChange }: UseDataGridProps) {
   const { formulas } = useFormulas();
   const [sortConfig, setSortConfig] = useState<SortConfig[]>(() => {
-    let saved = null;
-    try {
-      saved = localStorage.getItem('resindb-sort-config-multi');
-    } catch {
-      // Ignore
-    }
+    const saved = safeStorage.local.getItem('resindb-sort-config-multi');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -59,11 +55,7 @@ export function useDataGrid({ data, columns, activeFilters = [], selectedIds: co
         next = multi ? [...prev, newSort] : [newSort];
       }
 
-      try {
-        localStorage.setItem('resindb-sort-config-multi', JSON.stringify(next));
-      } catch {
-        // Ignore
-      }
+      safeStorage.local.setItem('resindb-sort-config-multi', JSON.stringify(next));
       return next;
     });
   }, []);

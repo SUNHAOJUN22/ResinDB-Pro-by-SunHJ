@@ -19,6 +19,24 @@ export interface Insight {
   type: 'info' | 'warning' | 'success';
 }
 
+// Module-level mathematical helpers to avoid recreation on every execution
+function erf(x: number): number {
+  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+  const t = 1.0 / (1.0 + p * Math.abs(x));
+  const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+  return x >= 0 ? y : -y;
+}
+
+function getPercentile(sorted: number[], p: number): number {
+  const idx = (sorted.length - 1) * p;
+  const base = Math.floor(idx);
+  const rest = idx - base;
+  if (sorted[base + 1] !== undefined) {
+    return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
+  }
+  return sorted[base];
+}
+
 export const materialEngine = {
   /**
    * Percentile-based Normalization
@@ -67,30 +85,42 @@ export const materialEngine = {
   },
 
   /**
-   * Simple Linear Regression for Trend Detection
+   * Internal helper to calculate sums for correlation analysis
    */
-  analyzeCorrelation: (points: [number, number][]): CorrelationResult | null => {
-    if (points.length < 2) return null;
-    
+  calculateSums: (points: [number, number][]) => {
     let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
-    const n = points.length;
-
-    for (const [x, y] of points) {
+    for (let i = 0; i < points.length; i++) {
+      const [x, y] = points[i];
       sumX += x;
       sumY += y;
       sumXY += x * y;
       sumX2 += x * x;
       sumY2 += y * y;
     }
+    return { sumX, sumY, sumXY, sumX2, sumY2 };
+  },
+
+  /**
+   * Simple Linear Regression for Trend Detection
+   */
+  analyzeCorrelation: (points: [number, number][]): CorrelationResult | null => {
+    if (points.length < 2) return null;
+    
+    const n = points.length;
+    const { sumX, sumY, sumXY, sumX2, sumY2 } = materialEngine.calculateSums(points);
 
     const numerator = n * sumXY - sumX * sumY;
-    const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+    const termX = n * sumX2 - sumX * sumX;
+    const termY = n * sumY2 - sumY * sumY;
+    const prod = termX * termY;
+    if (prod <= 0 || termX <= 0) return null;
+    const denominator = Math.sqrt(prod);
     
     if (denominator === 0) return null;
     
     const r = numerator / denominator;
     const r2 = r * r;
-    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const slope = numerator / termX;
     const intercept = (sumY - slope * sumX) / n;
 
     return {
@@ -130,16 +160,13 @@ export const materialEngine = {
   calculatePearson: (points: [number, number][]): number => {
     if (points.length < 2) return 0;
     const n = points.length;
-    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
-    for (const [x, y] of points) {
-      sumX += x;
-      sumY += y;
-      sumXY += x * y;
-      sumX2 += x * x;
-      sumY2 += y * y;
-    }
+    const { sumX, sumY, sumXY, sumX2, sumY2 } = materialEngine.calculateSums(points);
     const num = n * sumXY - sumX * sumY;
-    const den = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+    const termX = n * sumX2 - sumX * sumX;
+    const termY = n * sumY2 - sumY * sumY;
+    const prod = termX * termY;
+    if (prod <= 0) return 0;
+    const den = Math.sqrt(prod);
     return den === 0 ? 0 : num / den;
   },
 
@@ -185,7 +212,7 @@ export const materialEngine = {
     
     if (logPoints.length < 2) return null;
     // Regression on log-log data
-    const n = points.length;
+    const n = logPoints.length;
     let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
     for (const p of logPoints) {
       sumX += p.x;
@@ -193,14 +220,76 @@ export const materialEngine = {
       sumXY += p.x * p.y;
       sumXX += p.x * p.x;
     }
-    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const denom = n * sumXX - sumX * sumX;
+    if (denom <= 0) return null;
+    const slope = (n * sumXY - sumX * sumY) / denom;
     const intercept = (sumY - slope * sumX) / n;
     
     return {
       n: slope, // Flow behavior index
-      k: Math.pow(10, intercept), // Consistency index
-      isShearThinning: slope < 1
+      K: Math.pow(10, intercept) // Consistency index
     };
+  },
+
+  /**
+   * Runs regression and computes confidence limits (Upper/Lower boundaries)
+   * for a simple linear model at a specified confidence value.
+   */
+  calculateSlopeConfidenceInterval: (points: [number, number][]) => {
+    if (points.length < 3) return null;
+    
+    const n = points.length;
+    const model = materialEngine.analyzeCorrelation(points);
+    if (!model) return null;
+    
+    const { slope, intercept } = model;
+    const { sumX, sumX2 } = materialEngine.calculateSums(points);
+    
+    let sumResidualSq = 0;
+    for (let i = 0; i < points.length; i++) {
+      const [x, y] = points[i];
+      const yPred = slope * x + intercept;
+      sumResidualSq += Math.pow(y - yPred, 2);
+    }
+    
+    const seY = Math.sqrt(Math.max(0, sumResidualSq) / (n - 2));
+    const ssX = sumX2 - (Math.pow(sumX, 2) / n);
+    if (ssX <= 0) return null;
+    const seSlope = seY / Math.sqrt(ssX);
+    
+    // Simplification of t-value for 95% CI (approx 1.96 for n > 30, but we use 2.0 for safety)
+    const tValue = 2.0; 
+    return {
+      lower: slope - tValue * seSlope,
+      upper: slope + tValue * seSlope,
+      se: seSlope
+    };
+  },
+
+  /**
+   * Calculates the P-value for a given Pearson correlation r and sample size n
+   * (Simplification using t-distribution approximation)
+   */
+  calculatePValue: (r: number, n: number): number => {
+    if (n <= 2) return 1;
+    const denom = 1 - r * r;
+    if (denom <= 0) return 0;
+    const t = Math.abs(r) * Math.sqrt((n - 2) / denom);
+    // Approximation for P-value (Normal distribution CDF)
+    const cdf = 0.5 * (1 + erf(t / Math.sqrt(2)));
+    return 2 * (1 - cdf); // Two-tailed
+  },
+
+  /**
+   * Calculates Quartiles (Q1, Q2/Median, Q3) and Interquartile Range (IQR)
+   */
+  calculateQuartiles: (values: number[]) => {
+    if (values.length === 0) return null;
+    const sorted = [...values].sort((a, b) => a - b);
+    const q1 = getPercentile(sorted, 0.25);
+    const q2 = getPercentile(sorted, 0.5);
+    const q3 = getPercentile(sorted, 0.75);
+    return { q1, q2, q3, iqr: q3 - q1 };
   },
 
   /**
@@ -359,8 +448,14 @@ export const materialEngine = {
       kurtSum += Math.pow(z, 4);
     }
 
-    const skewness = (n / ((n - 1) * (n - 2))) * skewSum;
-    const kurtosis = (n * (n + 1) / ((n - 1) * (n - 2) * (n - 3))) * kurtSum - (3 * Math.pow(n - 1, 2) / ((n - 2) * (n - 3)));
+    let skewness = 0;
+    let kurtosis = 0;
+    if (n > 2) {
+      skewness = (n / ((n - 1) * (n - 2))) * skewSum;
+    }
+    if (n > 3) {
+      kurtosis = (n * (n + 1) / ((n - 1) * (n - 2) * (n - 3))) * kurtSum - (3 * Math.pow(n - 1, 2) / ((n - 2) * (n - 3)));
+    }
 
     return { skewness, kurtosis };
   },
@@ -396,8 +491,9 @@ export const materialEngine = {
       sumX2 += x * x;
     }
 
-    const seY = Math.sqrt(sumResidualSq / (n - 2));
+    const seY = Math.sqrt(Math.max(0, sumResidualSq) / (n - 2));
     const ssX = sumX2 - (Math.pow(sumX, 2) / n);
+    if (ssX <= 0) return null;
     const seSlope = seY / Math.sqrt(ssX);
     
     // Simplification of t-value for 95% CI (approx 1.96 for n > 30, but we use 2.0 for safety)
@@ -410,55 +506,18 @@ export const materialEngine = {
   },
 
   /**
-   * Calculates the P-value for a given Pearson correlation r and sample size n
-   * (Simplification using t-distribution approximation)
-   */
-  calculatePValue: (r: number, n: number): number => {
-    if (n <= 2) return 1;
-    const t = Math.abs(r) * Math.sqrt((n - 2) / (1 - r * r));
-    // Approximation for P-value (Normal distribution CDF)
-    const erf = (x: number) => {
-      const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
-      const t = 1.0 / (1.0 + p * Math.abs(x));
-      const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
-      return x >= 0 ? y : -y;
-    };
-    const cdf = 0.5 * (1 + erf(t / Math.sqrt(2)));
-    return 2 * (1 - cdf); // Two-tailed
-  },
-
-  /**
-   * Calculates Quartiles (Q1, Q2/Median, Q3) and Interquartile Range (IQR)
-   */
-  calculateQuartiles: (values: number[]) => {
-    if (values.length === 0) return null;
-    const sorted = [...values].sort((a, b) => a - b);
-    const getPercentile = (p: number) => {
-      const idx = (sorted.length - 1) * p;
-      const base = Math.floor(idx);
-      const rest = idx - base;
-      if (sorted[base + 1] !== undefined) {
-        return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
-      }
-      return sorted[base];
-    };
-    const q1 = getPercentile(0.25);
-    const q2 = getPercentile(0.5);
-    const q3 = getPercentile(0.75);
-    return { q1, q2, q3, iqr: q3 - q1 };
-  },
-
-  /**
    * Robust Regression Assessment (Cook's Distance Approximation)
    * Measures the influence of each point on the model.
    */
   analyzeDatalineIntegrity: (points: [number, number][], slope: number, intercept: number) => {
-    if (points.length < 4) return { healthScore: 100, influentialPoints: [] };
+    if (points.length < 4) return { healthScore: 100, influentialPointsCount: 0 };
     const n = points.length;
     let ssE = 0;
     const hValues: number[] = [];
     const meanX = points.reduce((a, b) => a + b[0], 0) / n;
     const ssX = points.reduce((a, b) => a + Math.pow(b[0] - meanX, 2), 0);
+
+    if (ssX <= 0) return { healthScore: 100, influentialPointsCount: 0 };
 
     points.forEach(([x, y]) => {
       const yPred = slope * x + intercept;
@@ -467,12 +526,15 @@ export const materialEngine = {
     });
 
     const mse = ssE / (n - 2);
+    if (mse <= 0) return { healthScore: 100, influentialPointsCount: 0 };
+
     const influentialIndices: number[] = [];
     
     hValues.forEach((h, i) => {
       const [x, y] = points[i];
       const yPred = slope * x + intercept;
       const residual = y - yPred;
+      if (Math.abs(1 - h) < 1e-9) return;
       // Cook's Distance approximation
       const d = (Math.pow(residual, 2) / (2 * mse)) * (h / Math.pow(1 - h, 2));
       if (d > 4 / n) influentialIndices.push(i);

@@ -9,6 +9,7 @@ import {
   Bug,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { getRadarChartOption } from "@/components/charts/RadarBenchmark";
 import { getAshbyChartOption } from "@/components/charts/AshbyScatter";
 import { getGpcChartOption } from "@/components/charts/GpcDistribution";
@@ -48,6 +49,7 @@ export const ScientificChart: React.FC<ScientificChartProps> = React.memo(({
   const chartInstance = useRef<echarts.ECharts | null>(null);
   const resizeObserver = useRef<ResizeObserver | null>(null);
   const { theme } = useTheme();
+  const { t, language } = useLanguage();
 
   const [error, setError] = useState<string | null>(null);
   const [isChartEmpty, setIsChartEmpty] = useState(false);
@@ -134,10 +136,10 @@ export const ScientificChart: React.FC<ScientificChartProps> = React.memo(({
           break;
         }
         case "ashby":
-          option = getAshbyChartOption(data as any, theme);
+          option = getAshbyChartOption(data as { series?: unknown[]; xAxis?: string; yAxis?: string } | unknown[], theme, language);
           break;
         case "mfr_density":
-          option = getMfrDensityChartOption(data as any, theme);
+          option = getMfrDensityChartOption(data as { series?: unknown[]; xAxis?: string; yAxis?: string } | unknown[], theme);
           break;
         case "parallel": {
           const pData = data as {
@@ -196,7 +198,7 @@ export const ScientificChart: React.FC<ScientificChartProps> = React.memo(({
         err instanceof Error ? err.message : "Failed to generate visualization",
       );
     }
-  }, [type, data, theme]);
+  }, [type, data, theme, language]);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -275,12 +277,12 @@ export const ScientificChart: React.FC<ScientificChartProps> = React.memo(({
   // Helper to make error messages friendlier with scientific context
   const getFriendlyErrorMessage = (rawError: string) => {
     if (rawError.includes("series") || rawError.includes("indicators"))
-      return "数理结构失匹配：当前样本的属性维度（如拉伸、冲击等）不全，无法生成多维对比图。";
+      return t("sciChartErrorMatch");
     if (rawError.includes("log") || rawError.includes("positive"))
-      return "坐标系冲突：阿什比图采用对数坐标，部分数值为 0 或负值的样本已被自动剔除。";
+      return t("sciChartErrorCoord");
     if (rawError.includes("GPC") || rawError.includes("MWD"))
-      return "GPC 诊断提示：当前样本缺少分子量分布原始数据点，无法执行 MWD 矩计算。";
-    return `数理引擎提示: ${rawError.length > 40 ? rawError.substring(0, 40) + '...' : rawError}`;
+      return t("sciChartErrorGpc");
+    return `${t("sciChartEngineHint")}: ${rawError.length > 40 ? rawError.substring(0, 40) + '...' : rawError}`;
   };
 
   if (error) {
@@ -391,12 +393,12 @@ export const ScientificChart: React.FC<ScientificChartProps> = React.memo(({
             </motion.div>
             <h3 className="text-base font-black text-slate-700 dark:text-slate-200 tracking-tight mb-2 uppercase">
               {type === "mfr_density"
-                ? "MFR-密度"
-                : type === "ashby" ? "阿什比对标" : type.toUpperCase()}{" "}
-              分析模型未激活
+                ? t("sciChartMfrDensity")
+                : type === "ashby" ? t("sciChartAshby") : type.toUpperCase()}{" "}
+              {t("sciChartModelNotActive")}
             </h3>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-[280px] text-center leading-relaxed font-medium">
-              当前样本集合缺乏生成此维度图表所需的关键实验参数（如粘度阶梯或分子量分布）。请尝试选择不同类别的牌号以开启数理对标。
+              {t("sciChartNoParams")}
             </p>
           </motion.div>
         )}

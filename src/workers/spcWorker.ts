@@ -43,7 +43,8 @@ function erf(x: number) {
 }
 
 function cdf(x: number, mean: number, sigma: number) {
-    return 0.5 * (1 + erf((x - mean) / (Math.sqrt(2) * sigma)));
+    const safeSigma = Math.abs(sigma) > 1e-15 ? sigma : 1e-15;
+    return 0.5 * (1 + erf((x - mean) / (Math.sqrt(2) * safeSigma)));
 }
 
 self.onmessage = (e: MessageEvent<SpcMessage>) => {
@@ -65,7 +66,7 @@ self.onmessage = (e: MessageEvent<SpcMessage>) => {
         for (let i = 0; i < n; i++) {
             sumSq += Math.pow(data[i] - mean, 2);
         }
-        const sigma = Math.sqrt(sumSq / (n - 1));
+        const sigma = Math.sqrt(Math.max(0, sumSq / (n - 1)));
 
         if (sigma === 0) {
             throw new Error("Standard deviation is zero. Data points are identical.");
@@ -96,7 +97,8 @@ self.onmessage = (e: MessageEvent<SpcMessage>) => {
         
         // Sturges' rule for number of bins
         const k = Math.max(7, Math.ceil(1 + 3.322 * Math.log10(n))); 
-        const binWidth = (maxData - minData) / k;
+        const safeK = k > 0 ? k : 1;
+        const binWidth = (maxData - minData) / safeK;
         
         const histogramCounts = new Array(k).fill(0);
         for (let i = 0; i < n; i++) {

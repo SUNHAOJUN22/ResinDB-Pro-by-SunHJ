@@ -16,11 +16,180 @@ interface ResinDB extends DBSchema {
   };
 }
 
+function collectSubcategories(node: Category, targetSet: Set<string>) {
+  targetSet.add(node.id);
+  node.children?.forEach(c => collectSubcategories(c, targetSet));
+}
+
+function findAndAddSubcategories(id: string, tree: Category[], targetSet: Set<string>): boolean {
+  for (const node of tree) {
+    if (node.id === id) {
+      collectSubcategories(node, targetSet);
+      return true;
+    }
+    if (node.children && findAndAddSubcategories(id, node.children, targetSet)) return true;
+  }
+  return false;
+}
+
+function formatCsvValue(val: unknown): string {
+  const s = String(val ?? '');
+  if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
 export class IndexedDBProductAdapter implements IProductAdapter {
   private dbPromise: Promise<IDBPDatabase<ResinDB>> | null = null;
+  private cachedProducts: Product[] | null = null;
+  private categoryInvertedIndex: Map<string, Set<string>> = new Map();
+  private propertyIndex: Map<string, Array<{ id: string; value: number }>> = new Map();
+  private indicesRebuilt: boolean = false;
 
   constructor() {
     // Lazy initialization happens in getDB()
+  }
+
+  private rebuildIndices(): void {
+    if (!this.cachedProducts) return;
+    this.categoryInvertedIndex.clear();
+    this.propertyIndex.clear();
+
+    for (const product of this.cachedProducts) {
+      this.indexProduct(product);
+    }
+    this.sortPropertyIndices();
+    this.indicesRebuilt = true;
+  }
+
+  private indexProduct(product: Product): void {
+    // Index categories
+    if (product.categoryIds) {
+      for (const catId of product.categoryIds) {
+        if (!this.categoryInvertedIndex.has(catId)) {
+          this.categoryInvertedIndex.set(catId, new Set());
+        }
+        this.categoryInvertedIndex.get(catId)!.add(product.id);
+      }
+    }
+
+    // Index numeric properties
+    if (product.properties) {
+      for (const [key, prop] of Object.entries(product.properties)) {
+        if (prop && prop.value !== undefined && prop.value !== null) {
+          const numValue = typeof prop.value === 'number' ? prop.value : parseFloat(String(prop.value));
+          if (!isNaN(numValue)) {
+            if (!this.propertyIndex.has(key)) {
+              this.propertyIndex.set(key, []);
+            }
+            this.propertyIndex.get(key)!.push({ id: product.id, value: numValue });
+          }
+        }
+      }
+    }
+  }
+
+  private deindexProduct(productId: string): void {
+    // Remove from category index
+    for (const set of this.categoryInvertedIndex.values()) {
+      set.delete(productId);
+    }
+
+    // Remove from property index
+    for (const arr of this.propertyIndex.values()) {
+      const idx = arr.findIndex(item => item.id === productId);
+      if (idx !== -1) {
+        arr.splice(idx, 1);
+      }
+    }
+  }
+
+  private sortPropertyIndices(): void {
+    for (const arr of this.propertyIndex.values()) {
+      arr.sort((a, b) => a.value - b.value);
+    }
+  }
+
+  private registerMutationCreate(product: Product): void {
+    if (this.cachedProducts) {
+      this.cachedProducts.push(product);
+    }
+    if (this.indicesRebuilt) {
+      this.indexProduct(product);
+      this.sortPropertyIndices();
+    }
+  }
+
+  private registerMutationUpdate(product: Product): void {
+    if (this.cachedProducts) {
+      const idx = this.cachedProducts.findIndex(p => p.id === product.id);
+      if (idx !== -1) {
+        this.cachedProducts[idx] = product;
+      } else {
+        this.cachedProducts.push(product);
+      }
+    }
+    if (this.indicesRebuilt) {
+      this.deindexProduct(product.id);
+      this.indexProduct(product);
+      this.sortPropertyIndices();
+    }
+  }
+
+  private registerMutationDelete(ids: string[]): void {
+    if (this.cachedProducts) {
+      this.cachedProducts = this.cachedProducts.filter(p => !ids.includes(p.id));
+    }
+    if (this.indicesRebuilt) {
+      for (const id of ids) {
+        this.deindexProduct(id);
+      }
+    }
+  }
+
+  private registerMutationBatchUpdate(ids: string[], updates: ProductUpdates): void {
+    if (!this.cachedProducts) return;
+    const { _propertyUpdates, ...restUpdates } = updates;
+    
+    for (const id of ids) {
+      const p = this.cachedProducts.find(x => x.id === id);
+      if (p) {
+        const newProperties = { ...p.properties };
+        if (_propertyUpdates) {
+          Object.entries(_propertyUpdates).forEach(([key, updateVal]) => {
+            if (updateVal !== null && typeof updateVal === "object" && "value" in updateVal) {
+              newProperties[key] = { ...newProperties[key], ...updateVal as PropertyValue };
+            } else {
+              newProperties[key] = { 
+                ...(newProperties[key] || { unit: "" }), 
+                value: updateVal as string | number 
+              };
+            }
+          });
+        }
+        
+        const updated = {
+          ...p,
+          ...restUpdates,
+          properties: newProperties,
+          updatedAt: new Date().toISOString().split('T')[0]
+        };
+        
+        const idx = this.cachedProducts.findIndex(x => x.id === id);
+        if (idx !== -1) {
+          this.cachedProducts[idx] = updated;
+        }
+        
+        if (this.indicesRebuilt) {
+          this.deindexProduct(id);
+          this.indexProduct(updated);
+        }
+      }
+    }
+    if (this.indicesRebuilt) {
+      this.sortPropertyIndices();
+    }
   }
 
   private async getDB(): Promise<IDBPDatabase<ResinDB>> {
@@ -94,39 +263,51 @@ export class IndexedDBProductAdapter implements IProductAdapter {
   async search(query: string, categoryId: string | null): Promise<Product[]> {
     await this.simulateLatency();
     const db = await this.getDB();
-    const allProducts = await db.getAll('products');
+    if (!this.cachedProducts) {
+      this.cachedProducts = await db.getAll('products');
+      this.rebuildIndices();
+    } else if (!this.indicesRebuilt) {
+      this.rebuildIndices();
+    }
     
     const lowerQuery = query.toLowerCase().trim();
     
     // Resolve all sub-category IDs if categoryId is provided
     const targetCategoryIds = new Set<string>();
     if (categoryId) {
-      const findAndAddSubcategories = (id: string, tree: Category[]): boolean => {
-        for (const node of tree) {
-          if (node.id === id) {
-            const collect = (n: Category) => {
-              targetCategoryIds.add(n.id);
-              n.children?.forEach(collect);
-            };
-            collect(node);
-            return true;
-          }
-          if (node.children && findAndAddSubcategories(id, node.children)) return true;
-        }
-        return false;
-      };
-      findAndAddSubcategories(categoryId, CATEGORY_TREE);
+      findAndAddSubcategories(categoryId, CATEGORY_TREE, targetCategoryIds);
     }
 
-    return allProducts.filter(p => {
+    // QUERY PLANNER: Seek candidate product IDs via inverted index if categoryId is active
+    let candidateIds: Set<string> | null = null;
+    if (categoryId) {
+      candidateIds = new Set<string>();
+      for (const catId of targetCategoryIds) {
+        const productIds = this.categoryInvertedIndex.get(catId);
+        if (productIds) {
+          for (const id of productIds) {
+            candidateIds.add(id);
+          }
+        }
+      }
+      // If category has no items mapped, fast-bail with empty array
+      if (candidateIds.size === 0) {
+        return [];
+      }
+    }
+
+    // Filter candidate list or complete cached catalog
+    const productsToFilter = candidateIds
+      ? this.cachedProducts.filter(p => candidateIds!.has(p.id))
+      : this.cachedProducts;
+
+    return productsToFilter.filter(p => {
       const matchesSearch = !lowerQuery || 
         p.gradeName.toLowerCase().includes(lowerQuery) ||
         p.manufacturer.toLowerCase().includes(lowerQuery) ||
         Object.keys(p.properties).some(k => k.toLowerCase().includes(lowerQuery));
       
-      const matchesCategory = !categoryId || p.categoryIds.some(id => targetCategoryIds.has(id));
-      
-      return matchesSearch && matchesCategory;
+      return matchesSearch;
     });
   }
 
@@ -152,6 +333,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     const db = await this.getDB();
     try {
       await db.add('products', newProduct);
+      this.registerMutationCreate(newProduct);
       
       // Sync to UniversalStorageBridge if experimental
       if (newProduct.isExperimental) {
@@ -168,6 +350,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
       if (e instanceof Error && e.name === 'ConstraintError') {
         newProduct.id = `p-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
         await db.add('products', newProduct);
+        this.registerMutationCreate(newProduct);
         
         if (newProduct.isExperimental) {
           try {
@@ -205,6 +388,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     }
 
     await db.put('products', updatedProduct);
+    this.registerMutationUpdate(updatedProduct);
 
     // Sync to UniversalStorageBridge if experimental
     if (updatedProduct.isExperimental) {
@@ -227,7 +411,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     const db = await this.getDB();
     const tx = db.transaction('products', 'readwrite');
     const { _propertyUpdates, ...restUpdates } = updates;
-
+ 
     for (const id of ids) {
       const p = await tx.store.get(id);
       if (p) {
@@ -254,6 +438,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
       }
     }
     await tx.done;
+    this.registerMutationBatchUpdate(ids, updates);
   }
 
   async batchCreate(products: Partial<Product>[]): Promise<Product[]> {
@@ -298,6 +483,20 @@ export class IndexedDBProductAdapter implements IProductAdapter {
       }
     }
     await tx.done;
+
+    // Update cache and indices in bulk
+    for (const product of createdProducts) {
+      if (this.cachedProducts) {
+        this.cachedProducts.push(product);
+      }
+      if (this.indicesRebuilt) {
+        this.indexProduct(product);
+      }
+    }
+    if (this.indicesRebuilt) {
+      this.sortPropertyIndices();
+    }
+    
     return createdProducts;
   }
 
@@ -318,6 +517,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
       }
     }
     await tx.done;
+    this.registerMutationDelete(ids);
   }
 
   async exportReport(products: Product[], format: 'csv' | 'xlsx' | 'json' | 'xml'): Promise<Blob> {
@@ -370,15 +570,6 @@ ${props}
         p.categoryIds.join('|'), 
         p.updatedAt
       ];
-      
-      const formatCsvValue = (val: unknown) => {
-        const s = String(val ?? '');
-        if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
-          return `"${s.replace(/"/g, '""')}"`;
-        }
-        return s;
-      };
-
       const props = propKeys.map(k => formatCsvValue(p.properties[k]?.value));
       return [...basic.map(formatCsvValue), ...props].join(',');
     });
@@ -396,5 +587,7 @@ ${props}
       await tx.store.add(p);
     }
     await tx.done;
+    this.cachedProducts = [...products];
+    this.rebuildIndices();
   }
 }

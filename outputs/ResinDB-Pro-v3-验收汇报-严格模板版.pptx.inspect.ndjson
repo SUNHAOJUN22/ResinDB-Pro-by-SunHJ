@@ -1,0 +1,181 @@
+{"kind":"deck","id":"pr/s1af9q","name":"Deck"}
+{"kind":"layout","layoutId":"/ppt/slideMasters/slideMaster1.xml","name":"","type":"master","placeholders":[{"name":"dateTime","type":"dateTime","textPreview":"2026/6/15"},{"name":"footer","type":"footer"},{"name":"slideNumber","type":"slideNumber","textPreview":"‹#›"}]}
+{"kind":"layout","layoutId":"/ppt/slideLayouts/slideLayout1.xml","name":"图片与标题","type":"picTx","placeholders":[{"name":"dateTime","type":"dateTime","textPreview":"2026/6/15"},{"name":"footer","type":"footer"},{"name":"slideNumber","type":"slideNumber","textPreview":"‹#›"}]}
+{"kind":"layout","layoutId":"/ppt/slideMasters/slideMaster2.xml","name":"","type":"master","placeholders":[{"name":"dateTime","type":"dateTime","textPreview":"2026/6/15"},{"name":"footer","type":"footer"},{"name":"slideNumber","type":"slideNumber","textPreview":"‹#›"}]}
+{"kind":"layout","layoutId":"/ppt/slideLayouts/slideLayout2.xml","name":"图片与标题","type":"picTx"}
+{"kind":"slide","id":"sl/2x4nap4r","slide":1,"title":"项目名称：ResinDB Pro v3.0","textShapes":4}
+{"kind":"textbox","id":"sh/54zidony","slide":1,"name":"Rectangle 20","text":"项目名称：ResinDB Pro v3.0\n课（专）题名称：合成树脂产品数据与科研智能分析系统\n起止年限：2026年\n主管部门：项目验收组","textPreview":"项目名称：ResinDB Pro v3.0 | 课（专）题名称：合成树脂产品数据与科研智能分析系统 | 起止年限：2026年 | 主管部门：项目验收组","textChars":69,"textLines":4,"bbox":[42.77,118.08,1194.46,258.76]}
+{"kind":"textbox","id":"sh/u9knih4b","slide":1,"name":"Text Box 21","text":"承担单位：ResinDB Pro by SunHJ\n汇报人：SunHJ / 项目组","textPreview":"承担单位：ResinDB Pro by SunHJ | 汇报人：SunHJ / 项目组","textChars":41,"textLines":2,"bbox":[753.4,402.83,430.91,193.92]}
+{"kind":"textbox","id":"sh/judg7ads","slide":1,"name":"Text Box 21","text":"2026 年 06 月 17 日","textPreview":"2026 年 06 月 17 日","textChars":16,"textLines":1,"bbox":[783.64,586.8,392.89,71.04]}
+{"kind":"textbox","id":"sh/nyd0z610","slide":1,"name":"Rectangle 20","text":"科技项目结题验收汇报材料","textPreview":"科技项目结题验收汇报材料","textChars":12,"textLines":1,"bbox":[859.24,25.85,435.48,51.84]}
+{"kind":"image","id":"im/1032lszq","slide":1,"name":"Picture 16","bbox":[42.77,397.8,155.91,147.16]}
+{"kind":"image","id":"im/u9knih4b","slide":1,"name":"Picture 18","bbox":[551,397.69,156.12,149.92]}
+{"kind":"image","id":"im/judg7ads","slide":1,"name":"Picture 19","bbox":[382.04,397.69,155.91,149.92]}
+{"kind":"image","id":"im/c7u54zid","slide":1,"name":"Picture 11","bbox":[211.62,397.8,156.22,147.01]}
+{"kind":"notes","id":"nt/2x4nap4r","slide":1,"text":""}
+{"kind":"slide","id":"sl/pg3ex0nu","slide":2,"title":"目  录","textShapes":3}
+{"kind":"textbox","id":"sh/e9cvixcz","slide":2,"name":"Rectangle 7","text":"目  录","textPreview":"目  录","textChars":4,"textLines":1,"bbox":[352.67,-2.87,574.67,95.33]}
+{"kind":"textbox","id":"sh/5o7qpg3e","slide":2,"name":"灯片编号占位符 1","placeholder":"slideNumber","text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/g3ex0nux","slide":2,"name":"文本框 2","text":"一、计划任务完成情况\n二、主要研究工作\n三、技术研究报告\n四、成果应用及前景\n五、对外合作及知识产权\n六、经费使用及决算\n七、总结与建议","textPreview":"一、计划任务完成情况 | 二、主要研究工作 | 三、技术研究报告 | 四、成果应用及前景 | 五、对外合作及知识产权 | 六、经费使用及决算 | 七、总结与建议","textChars":68,"textLines":7,"bbox":[201.53,148.32,559.43,476.7]}
+{"kind":"notes","id":"nt/pg3ex0nu","slide":2,"text":""}
+{"kind":"slide","id":"sl/s72x4nap","slide":3,"title":"一、计划任务完成情况","textShapes":4}
+{"kind":"textbox","id":"sh/6dcbulwv","slide":3,"name":"标题 1","text":"一、计划任务完成情况","textPreview":"一、计划任务完成情况","textChars":10,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/vy90je9c","slide":3,"name":"灯片编号占位符 4","placeholder":"slideNumber","text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/oj2t83it","slide":3,"name":"TextBox 5","text":"1.1 项目背景","textPreview":"1.1 项目背景","textChars":8,"textLines":1,"bbox":[30.81,101.29,1218.39,69.56]}
+{"kind":"textbox","id":"sh/d4vmtwra","slide":3,"name":"Text Box 3","text":"合成树脂科研数据通常分散在 Excel、仪器报告、实验批次记录与本地脚本中，难以支撑快速检索、对标和复用。\nResinDB Pro 面向 PE、PP、PVC、ABS 等树脂牌号，统一管理出厂指标、实验室数据、流变/GPC/力学等关键参数。\n项目重点解决三类问题：高密度数据表格不卡顿、科研计算不阻塞主线程、存储层可在本地 IndexedDB、远端 API 与 Firebase 间迁移。\n本次汇报依据本地全量源码、README、测试/构建结果和运行截图梳理。","textPreview":"合成树脂科研数据通常分散在 Excel、仪器报告、实验批次记录与本地脚本中，难以支撑快速检索、对标和复用。 | ResinDB Pro 面向 PE、PP、PVC、ABS 等树脂牌号，统一管理出厂指标、实验室数据、流变/GPC/力学等关键参数。 | 项目重点解决三类问题：高密...","textChars":229,"textLines":4,"bbox":[60,175,1120,390]}
+{"kind":"notes","id":"nt/s72x4nap","slide":3,"text":""}
+{"kind":"slide","id":"sl/val87ed8","slide":4,"title":"一、计划任务完成情况","textShapes":4}
+{"kind":"textbox","id":"sh/x4nap4r6","slide":4,"name":"标题 1","text":"一、计划任务完成情况","textPreview":"一、计划任务完成情况","textChars":10,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/qtcj6tov","slide":4,"name":"灯片编号占位符 1","placeholder":"slideNumber","text":"4","textPreview":"4","textChars":1,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/87ed8bat","slide":4,"name":"TextBox 5","text":"1.2 总体研究目标","textPreview":"1.2 总体研究目标","textChars":10,"textLines":1,"bbox":[22.63,101.44,1218.39,69.56]}
+{"kind":"textbox","id":"sh/je9cvixc","slide":4,"name":"文本框 7","text":"项目名称：ResinDB Pro v3.0 工业级合成树脂数据与科研分析系统\n合同编号：本地仓库未提供，验收材料待补录\n起止时间：2026年项目验收版本\n承担单位：ResinDB Pro by SunHJ\n外协单位：仓库未体现正式外协合同\n攻关目标：构建可运行、可验证、可迁移的树脂数据管理前端，实现高性能 DataGrid、科研可视化、多线程计算、适配器式数据服务与权限规则。","textPreview":"项目名称：ResinDB Pro v3.0 工业级合成树脂数据与科研分析系统 | 合同编号：本地仓库未提供，验收材料待补录 | 起止时间：2026年项目验收版本 | 承担单位：ResinDB Pro by SunHJ | 外协单位：仓库未体现正式外协合同 | 攻关目标：构建...","textChars":189,"textLines":6,"bbox":[55,190,1160,368]}
+{"kind":"notes","id":"nt/val87ed8","slide":4,"text":""}
+{"kind":"slide","id":"sl/mlkjm1cf","slide":5,"title":"一、计划任务完成情况","textShapes":5}
+{"kind":"textbox","id":"sh/vy90je9c","slide":5,"name":"标题 1","text":"一、计划任务完成情况","textPreview":"一、计划任务完成情况","textChars":10,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/ovahoza1","slide":5,"name":"灯片编号占位符 1","placeholder":"slideNumber","text":"5","textPreview":"5","textChars":1,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/nuxc3ylc","slide":5,"name":"TextBox 5","text":"1.3.计划任务调整情况","textPreview":"1.3.计划任务调整情况","textChars":12,"textLines":1,"bbox":[22.63,102.96,946.23,69.56]}
+{"kind":"textbox","id":"sh/dg7adsji","slide":5,"name":"文本框 7","text":"计划任务未见正式变更审批文件；从 README 与源码演进看，项目范围由“树脂数据管理界面”扩展为“数据仓库 + 科研分析 + Worker 计算 + Adapter 数据服务”的完整前端原型。\n调整口径：不改变验收对象，仍围绕合成树脂科研数据管理；新增内容作为增强项纳入验收说明。\n需后续补齐：合同编号、正式计划任务书、经费批复、外协与知识产权佐证材料。","textPreview":"计划任务未见正式变更审批文件；从 README 与源码演进看，项目范围由“树脂数据管理界面”扩展为“数据仓库 + 科研分析 + Worker 计算 + Adapter 数据服务”的完整前端原型。 | 调整口径：不改变验收对象，仍围绕合成树脂科研数据管理；新增内容作为增强项纳...","textChars":178,"textLines":3,"bbox":[60,195,1120,257.6]}
+{"kind":"textbox","id":"sh/z25kb6xk","slide":5,"name":"文本框 4","text":"依据：README / 源码 / 测试构建记录","textPreview":"依据：README / 源码 / 测试构建记录","textChars":23,"textLines":1,"bbox":[430,480,440,42]}
+{"kind":"notes","id":"nt/mlkjm1cf","slide":5,"text":""}
+{"kind":"slide","id":"sl/58z25kb6","slide":6,"title":"一、计划任务完成情况","textShapes":4}
+{"kind":"textbox","id":"sh/5o7qpg3e","slide":6,"name":"标题 1","text":"一、计划任务完成情况","textPreview":"一、计划任务完成情况","textChars":10,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/g3ex0nux","slide":6,"name":"灯片编号占位符 3","placeholder":"slideNumber","text":"6","textPreview":"6","textChars":1,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/yxobm58z","slide":6,"name":"TextBox 5","text":"1.4 研究内容完成情况","textPreview":"1.4 研究内容完成情况","textChars":12,"textLines":1,"bbox":[33.97,102.96,1218.39,69.56]}
+{"kind":"textbox","id":"sh/ylc7u54z","slide":6,"name":"文本框 7","text":"结论：计划研究内容在本地可运行版本中已形成完整闭环；非源码类佐证材料需在正式验收归档时补录。","textPreview":"结论：计划研究内容在本地可运行版本中已形成完整闭环；非源码类佐证材料需在正式验收归档时补录。","textChars":46,"textLines":1,"bbox":[41.84,612.11,1202.64,68.8]}
+{"kind":"table","id":"tb/upwb2hwf","slide":6,"name":"表格 6","rows":7,"cols":4,"preview":"序号 | 研究内容 | 完成情况 | 佐证材料","bbox":[57.89,193.68,1164.22,385.55]}
+{"kind":"notes","id":"nt/58z25kb6","slide":6,"text":""}
+{"kind":"slide","id":"sl/0z61032l","slide":7,"title":"一、计划任务完成情况","textShapes":5}
+{"kind":"textbox","id":"sh/qpg3ex0n","slide":7,"name":"标题 1","text":"一、计划任务完成情况","textPreview":"一、计划任务完成情况","textChars":10,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/fa9w3m94","slide":7,"name":"灯片编号占位符 3","placeholder":"slideNumber","text":"7","textPreview":"7","textChars":1,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/8v6psfil","slide":7,"name":"TextBox 5","text":"1.5 技术经济考核指标完成情况","textPreview":"1.5 技术经济考核指标完成情况","textChars":16,"textLines":1,"bbox":[30.81,101.44,1218.39,69.56]}
+{"kind":"textbox","id":"sh/x4nap4r6","slide":7,"name":"文本框 7","text":"知识产权指标及完成情况：仓库未提供专利、软著或申请号；建议后续补充软件著作权登记与技术文档归档。","textPreview":"知识产权指标及完成情况：仓库未提供专利、软著或申请号；建议后续补充软件著作权登记与技术文档归档。","textChars":48,"textLines":1,"bbox":[46.19,459.97,1202.64,84.01]}
+{"kind":"textbox","id":"sh/8jqh0fep","slide":7,"name":"文本框 7","text":"结论：源码、测试和运行截图可支撑软件功能验收；知识产权编号、财务数据需另行补录。","textPreview":"结论：源码、测试和运行截图可支撑软件功能验收；知识产权编号、财务数据需另行补录。","textChars":40,"textLines":1,"bbox":[41.84,617.04,1202.64,68.8]}
+{"kind":"table","id":"tb/6xkf6dcb","slide":7,"name":"表格 5","rows":4,"cols":4,"preview":"序号 | 考核指标 | 完成情况 | 说明","bbox":[73.01,201.24,1111.3,225.02]}
+{"kind":"notes","id":"nt/0z61032l","slide":7,"text":""}
+{"kind":"slide","id":"sl/fu18jqh0","slide":8,"title":"二、主要研究工作","textShapes":3}
+{"kind":"textbox","id":"sh/judg7ads","slide":8,"name":"标题 1","text":"二、主要研究工作","textPreview":"二、主要研究工作","textChars":8,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/u9knih4b","slide":8,"name":"灯片编号占位符 1","placeholder":"slideNumber","text":"8","textPreview":"8","textChars":1,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/u18jqh0f","slide":8,"name":"TextBox 5","text":"2.1 实物工作量","textPreview":"2.1 实物工作量","textChars":9,"textLines":1,"bbox":[30.81,94.98,1218.39,69.56]}
+{"kind":"table","id":"tb/itgfmlkj","slide":8,"name":"表格 4","rows":7,"cols":3,"preview":"序号 | 实物工作量 | 完成量/状态","bbox":[57.89,193.68,1164.22,390.54]}
+{"kind":"notes","id":"nt/fu18jqh0","slide":8,"text":""}
+{"kind":"slide","id":"sl/qh0fepkz","slide":9,"title":"二、主要研究工作","textShapes":4}
+{"kind":"textbox","id":"sh/dg7adsji","slide":9,"name":"标题 1","text":"二、主要研究工作","textPreview":"二、主要研究工作","textChars":8,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/onyd0z61","slide":9,"name":"灯片编号占位符 5","placeholder":"slideNumber","text":"9","textPreview":"9","textChars":1,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/d8v6psfi","slide":9,"name":"TextBox 5","text":"2.2 解决的关键技术问题","textPreview":"2.2 解决的关键技术问题","textChars":13,"textLines":1,"bbox":[35.21,89.01,1218.39,69.56]}
+{"kind":"textbox","id":"sh/6dcbulwv","slide":9,"name":"Text Box 49","text":"关键技术问题1：大数据量树脂牌号表格的交互性能。\n解决：DataGrid 使用 @tanstack/react-virtual 做虚拟滚动，并配合列宽持久化、固定列、组合排序/筛选、右键上下文菜单，避免海量 DOM 渲染。\n \n关键技术问题2：科研计算和前端响应解耦。\n解决：Carreau、WLF、Prony、Weibull、Monte Carlo、Sobol 等计算下沉到 Web Worker；UI 通过 hook 调度，主线程保持可交互。\n \n关键技术问题3：存储迁移与弱网/离线容错。\n解决：IProductAdapter 抽象 CRUD/导出/快照接口，IndexedDB 与 Remote API 可替换；远端失败时回退本地。","textPreview":"关键技术问题1：大数据量树脂牌号表格的交互性能。 | 解决：DataGrid 使用 @tanstack/react-virtual 做虚拟滚动，并配合列宽持久化、固定列、组合排序/筛选、右键上下文菜单，避免海量 DOM 渲染。 |   | 关键技术问题2：科研计算和前端响应...","textChars":320,"textLines":8,"bbox":[58,165,1135,461.6]}
+{"kind":"notes","id":"nt/qh0fepkz","slide":9,"text":""}
+{"kind":"slide","id":"sl/29gr2p8n","slide":10,"title":"二、主要研究工作","textShapes":5}
+{"kind":"textbox","id":"sh/gvy90je9","slide":10,"name":"标题 1","text":"二、主要研究工作","textPreview":"二、主要研究工作","textChars":8,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/2hwfyxob","slide":10,"name":"object 2","text":"1. 将科研数据表格、实验数据、计算模型和分析图谱整合到一个前端工作台。\n2. DataGrid 采用虚拟滚动与列级交互，适合高信息密度数据库管理场景。\n3. 24 个 Worker 形成科研计算矩阵，降低主线程阻塞风险。\n4. Adapter Pattern 使 UI 不绑定单一数据库，支持 IndexedDB、REST/Firebase 等后端替换。\n5. Firestore rules 提供角色与数据校验边界，便于后续云端协作。","textPreview":"1. 将科研数据表格、实验数据、计算模型和分析图谱整合到一个前端工作台。 | 2. DataGrid 采用虚拟滚动与列级交互，适合高信息密度数据库管理场景。 | 3. 24 个 Worker 形成科研计算矩阵，降低主线程阻塞风险。 | 4. Adapter Pattern ...","textChars":219,"textLines":5,"bbox":[92,190,1110,310]}
+{"kind":"textbox","id":"sh/9gr2p8nq","slide":10,"name":"文本框 1","text":"创新点","textPreview":"创新点","textChars":3,"textLines":1,"bbox":[20,193,72,38.4]}
+{"kind":"textbox","id":"sh/94fu18jq","slide":10,"name":"灯片编号占位符 5","placeholder":"slideNumber","text":"10","textPreview":"10","textChars":2,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/kjm1cfa9","slide":10,"name":"TextBox 5","text":"2.3 创新点","textPreview":"2.3 创新点","textChars":7,"textLines":1,"bbox":[30.81,97.74,1218.39,69.56]}
+{"kind":"notes","id":"nt/29gr2p8n","slide":10,"text":""}
+{"kind":"slide","id":"sl/re1w7mp0","slide":11,"title":"二、主要研究工作","textShapes":4}
+{"kind":"textbox","id":"sh/vahoza1g","slide":11,"name":"标题 1","text":"二、主要研究工作","textPreview":"二、主要研究工作","textChars":8,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/6tovahoz","slide":11,"name":"灯片编号占位符 1","placeholder":"slideNumber","text":"11","textPreview":"11","textChars":2,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/d8v6psfi","slide":11,"name":"TextBox 5","text":"2.4 取得的主要技术成果","textPreview":"2.4 取得的主要技术成果","textChars":13,"textLines":1,"bbox":[24.7,95.86,1218.39,69.56]}
+{"kind":"textbox","id":"sh/onyd0z61","slide":11,"name":"文本框 7","text":"1. 形成 ResinDB Pro v3.0 可运行原型，覆盖树脂数据仓库、仪表盘、分析视图、对比视图、透视视图和科研模态框。\n2. 建立从 UI 组件、hooks、services/adapters 到 workers 的分层结构，便于迁移到 Next.js、Firebase 或自建 REST 后端。\n3. 完成本地质量验证：TypeScript 静态检查通过，Vitest 19 项测试通过，生产构建通过。\n4. 输出可用于验收展示的真实运行截图，展示数据仓库界面与高密度表格能力。","textPreview":"1. 形成 ResinDB Pro v3.0 可运行原型，覆盖树脂数据仓库、仪表盘、分析视图、对比视图、透视视图和科研模态框。 | 2. 建立从 UI 组件、hooks、services/adapters 到 workers 的分层结构，便于迁移到 Next.js、Fire...","textChars":244,"textLines":4,"bbox":[58,178,1140,385.6]}
+{"kind":"notes","id":"nt/re1w7mp0","slide":11,"text":""}
+{"kind":"slide","id":"sl/4fu18jqh","slide":12,"title":"三、技术研究报告","textShapes":5}
+{"kind":"textbox","id":"sh/lszqtcj6","slide":12,"name":"标题 1","text":"三、技术研究报告","textPreview":"三、技术研究报告","textChars":8,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/j2t83itg","slide":12,"name":"AutoShape 8","text":"技术路线图","textPreview":"技术路线图","textChars":5,"textLines":1,"bbox":[82.43,260.21,64.67,256.02]}
+{"kind":"textbox","id":"sh/s72x4nap","slide":12,"name":"文本框 1","text":"需求梳理 → 类型模型与数据种子 → 高性能 DataGrid → 科研图表/AI/Worker → Adapter 数据服务 → 权限规则 → 测试构建 → 验收展示\n \n核心设计：UI 只负责呈现与事件派发；hooks 管理状态和副作用；adapters 封装数据源；workers 承担重计算；测试/构建作为验收门禁。","textPreview":"需求梳理 → 类型模型与数据种子 → 高性能 DataGrid → 科研图表/AI/Worker → Adapter 数据服务 → 权限规则 → 测试构建 → 验收展示 |   | 核心设计：UI 只负责呈现与事件派发；hooks 管理状态和副作用；adapters 封装数...","textChars":162,"textLines":3,"bbox":[240,190,915,250]}
+{"kind":"textbox","id":"sh/3ylc7u54","slide":12,"name":"灯片编号占位符 4","placeholder":"slideNumber","text":"12","textPreview":"12","textChars":2,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/sji5snel","slide":12,"name":"TextBox 5","text":"研究思路","textPreview":"研究思路","textChars":4,"textLines":1,"bbox":[30.81,93.42,1218.39,76.8]}
+{"kind":"notes","id":"nt/4fu18jqh","slide":12,"text":""}
+{"kind":"slide","id":"sl/lwval87e","slide":13,"title":"三、技术研究报告","textShapes":4}
+{"kind":"textbox","id":"sh/wfyxobm5","slide":13,"name":"标题 1","text":"三、技术研究报告","textPreview":"三、技术研究报告","textChars":8,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/eloj2t83","slide":13,"name":"文本框 4","text":"图：ResinDB Pro 数据仓库运行截图","textPreview":"图：ResinDB Pro 数据仓库运行截图","textChars":22,"textLines":1,"bbox":[435,682,410,38.4]}
+{"kind":"textbox","id":"sh/lc7u54zi","slide":13,"name":"灯片编号占位符 5","placeholder":"slideNumber","text":"13","textPreview":"13","textChars":2,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/wra5gbq1","slide":13,"name":"TextBox 5","text":"技术研究报告内容：数据仓库实机界面","textPreview":"技术研究报告内容：数据仓库实机界面","textChars":17,"textLines":1,"bbox":[30.81,87.84,1218.39,76.8]}
+{"kind":"image","id":"im/itgfmlkj","slide":13,"name":"","bbox":[232,165,816,510]}
+{"kind":"notes","id":"nt/lwval87e","slide":13,"text":""}
+{"kind":"slide","id":"sl/25kb6xkf","slide":14,"title":"三、技术研究报告","textShapes":5}
+{"kind":"textbox","id":"sh/dcbulwva","slide":14,"name":"标题 1","text":"三、技术研究报告","textPreview":"三、技术研究报告","textChars":8,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"shape","id":"sh/vixczed8","slide":14,"name":"Text Box 6","bbox":[262.05,163.47,331.07,48.33]}
+{"kind":"textbox","id":"sh/kre1w7mp","slide":14,"name":"文本框 1","text":"架构分层：\nUI 展现层：DataGrid、Dashboard、Analytics、Comparison、Pivot 等组件只处理视图和事件。\n状态与用例层：useDatabase、useDataGrid、useColumns、useHistory 等 hooks 管理查询、筛选、列配置、历史和副作用。\n数据服务层：IProductAdapter 统一 search/create/update/batch/export/restore，IndexedDBProductAdapter 与 RemoteAPIProductAdapter 可替换。\n安全边界：firestore.rules 以登录、admin/editor 角色和数据校验限制云端读写。","textPreview":"架构分层： | UI 展现层：DataGrid、Dashboard、Analytics、Comparison、Pivot 等组件只处理视图和事件。 | 状态与用例层：useDatabase、useDataGrid、useColumns、useHistory 等 hooks ...","textChars":327,"textLines":5,"bbox":[82,175,1060,355]}
+{"kind":"textbox","id":"sh/2x4nap4r","slide":14,"name":"文本框 3","text":"关键证据","textPreview":"关键证据","textChars":4,"textLines":1,"bbox":[1214.55,95.4,45.36,988.8]}
+{"kind":"textbox","id":"sh/donyd0z6","slide":14,"name":"灯片编号占位符 6","placeholder":"slideNumber","text":"14","textPreview":"14","textChars":2,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/29gr2p8n","slide":14,"name":"TextBox 5","text":"3.1 系统架构与数据适配","textPreview":"3.1 系统架构与数据适配","textChars":13,"textLines":1,"bbox":[30.81,87.84,1218.39,76.8]}
+{"kind":"notes","id":"nt/25kb6xkf","slide":14,"text":""}
+{"kind":"slide","id":"sl/7y1kre1w","slide":15,"title":"三、技术研究报告","textShapes":5}
+{"kind":"textbox","id":"sh/rytsvu9k","slide":15,"name":"标题 1","text":"三、技术研究报告","textPreview":"三、技术研究报告","textChars":8,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"shape","id":"sh/9s36hcrm","slide":15,"name":"Text Box 6","bbox":[262.05,163.47,331.07,48.33]}
+{"kind":"textbox","id":"sh/yd0z6103","slide":15,"name":"文本框 1","text":"性能机制：\nDataGrid：@tanstack/react-virtual 控制可见行渲染，减少 DOM 数量。\n搜索：300ms debounce + useDeferredValue，降低高频输入造成的主线程压力。\n索引：WeakMap 缓存产品文本索引，避免重复拼接和 GC 压力。\n并发：fetchRequestId 防止旧请求覆盖新结果，Worker 承担重计算。\n验证：typecheck/test/build 均通过；构建提示 vendor chunk 超过 2000 kB，建议后续继续做 manualChunks / 动态导入优化。","textPreview":"性能机制： | DataGrid：@tanstack/react-virtual 控制可见行渲染，减少 DOM 数量。 | 搜索：300ms debounce + useDeferredValue，降低高频输入造成的主线程压力。 | 索引：WeakMap 缓存产品文本索引，...","textChars":276,"textLines":6,"bbox":[82,175,1060,380]}
+{"kind":"textbox","id":"sh/g7adsji5","slide":15,"name":"文本框 3","text":"关键数据","textPreview":"关键数据","textChars":4,"textLines":1,"bbox":[1214.55,95.4,45.36,902.4]}
+{"kind":"textbox","id":"sh/rmhk3q5o","slide":15,"name":"灯片编号占位符 6","placeholder":"slideNumber","text":"15","textPreview":"15","textChars":2,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/g3ex0nux","slide":15,"name":"TextBox 5","text":"3.2 性能与交互工程","textPreview":"3.2 性能与交互工程","textChars":11,"textLines":1,"bbox":[30.81,87.84,1218.39,76.8]}
+{"kind":"notes","id":"nt/7y1kre1w","slide":15,"text":""}
+{"kind":"slide","id":"sl/8z25kb6x","slide":16,"title":"三、技术研究报告","textShapes":4}
+{"kind":"textbox","id":"sh/wval87ed","slide":16,"name":"标题 1","text":"三、技术研究报告","textPreview":"三、技术研究报告","textChars":8,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"shape","id":"sh/e1w7mp0b","slide":16,"name":"Text Box 6","bbox":[262.05,163.47,331.07,48.33]}
+{"kind":"textbox","id":"sh/psfil0rq","slide":16,"name":"TextBox 5","text":"结论","textPreview":"结论","textChars":2,"textLines":1,"bbox":[33.97,110.52,1218.39,69.56]}
+{"kind":"textbox","id":"sh/7mp0bi9s","slide":16,"name":"灯片编号占位符 3","placeholder":"slideNumber","text":"16","textPreview":"16","textChars":2,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/pg3ex0nu","slide":16,"name":"文本框 7","text":"1. 项目已完成从树脂产品数据录入、查询、筛选、分析到报告导出的主要软件闭环。\n2. 代码结构符合可迁移目标：类型、hooks、adapters、workers、视图组件分层清晰。\n3. 本地验证通过，能支撑验收演示；构建体积提示和正式财务/IP材料属于后续完善项。\n4. 建议验收结论：软件原型与技术路线完成，具备继续工程化部署与科研数据接入条件。","textPreview":"1. 项目已完成从树脂产品数据录入、查询、筛选、分析到报告导出的主要软件闭环。 | 2. 代码结构符合可迁移目标：类型、hooks、adapters、workers、视图组件分层清晰。 | 3. 本地验证通过，能支撑验收演示；构建体积提示和正式财务/IP材料属于后续完善项。...","textChars":175,"textLines":4,"bbox":[58,190,1130,295]}
+{"kind":"notes","id":"nt/8z25kb6x","slide":16,"text":""}
+{"kind":"slide","id":"sl/54zidony","slide":17,"title":"四、成果应用及前景","textShapes":5}
+{"kind":"textbox","id":"sh/4fu18jqh","slide":17,"name":"标题 1","text":"四、成果应用及前景","textPreview":"四、成果应用及前景","textChars":9,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/qxs72x4n","slide":17,"name":"灯片编号占位符 4","placeholder":"slideNumber","text":"17","textPreview":"17","textChars":2,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/83itgfml","slide":17,"name":"文本框 6","text":"图：系统运行截图","textPreview":"图：系统运行截图","textChars":8,"textLines":1,"bbox":[690,680,220,38.4]}
+{"kind":"textbox","id":"sh/oj2t83it","slide":17,"name":"文本框 9","text":"应用场景：\n1. 合成树脂牌号库统一检索与对标。\n2. 实验批次数据录入、校验、批量编辑。\n3. 流变、寿命、分布和统计模型快速分析。\n4. 科研汇报、质量复核和项目验收展示。","textPreview":"应用场景： | 1. 合成树脂牌号库统一检索与对标。 | 2. 实验批次数据录入、校验、批量编辑。 | 3. 流变、寿命、分布和统计模型快速分析。 | 4. 科研汇报、质量复核和项目验收展示。","textChars":88,"textLines":5,"bbox":[58,185,295,384]}
+{"kind":"textbox","id":"sh/d4vmtwra","slide":17,"name":"TextBox 5","text":"4.1 成果应用","textPreview":"4.1 成果应用","textChars":8,"textLines":1,"bbox":[35.21,91.5,265.84,76.8]}
+{"kind":"image","id":"im/1kre1w7m","slide":17,"name":"","bbox":[390,170.25,780,487.5]}
+{"kind":"notes","id":"nt/54zidony","slide":17,"text":""}
+{"kind":"slide","id":"sl/m58z25kb","slide":18,"title":"四、成果应用及前景","textShapes":4}
+{"kind":"textbox","id":"sh/4nap4r65","slide":18,"name":"标题 1","text":"四、成果应用及前景","textPreview":"四、成果应用及前景","textChars":9,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/t83itgfm","slide":18,"name":"文本框 1","text":"预期应用前景：\n1. 在科研所内部形成树脂牌号、实验数据、物性指标和分析模型的一体化数字资产库。\n2. 与 Firebase / REST API / 企业数据库对接后，可扩展为多用户协同的云端科研数据平台。\n3. 引入仪器遥测、WASM 高性能求解和 AI 配方识别后，可进一步减少人工 Excel 导入和离线脚本切换。\n4. 构建体积和正式权限审计是上线前的重点工程化工作。","textPreview":"预期应用前景： | 1. 在科研所内部形成树脂牌号、实验数据、物性指标和分析模型的一体化数字资产库。 | 2. 与 Firebase / REST API / 企业数据库对接后，可扩展为多用户协同的云端科研数据平台。 | 3. 引入仪器遥测、WASM 高性能求解和 AI 配...","textChars":189,"textLines":5,"bbox":[85,180,1085,340]}
+{"kind":"textbox","id":"sh/bm58z25k","slide":18,"name":"灯片编号占位符 7","placeholder":"slideNumber","text":"18","textPreview":"18","textChars":2,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/c7u54zid","slide":18,"name":"TextBox 5","text":"4.2 预期应用前景","textPreview":"4.2 预期应用前景","textChars":10,"textLines":1,"bbox":[35.21,93.46,318.76,69.56]}
+{"kind":"notes","id":"nt/m58z25kb","slide":18,"text":""}
+{"kind":"slide","id":"sl/bat47y1k","slide":19,"title":"五、对外合作及知识产权","textShapes":6}
+{"kind":"textbox","id":"sh/je9cvixc","slide":19,"name":"标题 1","text":"五、对外合作及知识产权","textPreview":"五、对外合作及知识产权","textChars":11,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/xs72x4na","slide":19,"name":"TextBox 5","text":"研究内容完成情况","textPreview":"研究内容完成情况","textChars":8,"textLines":1,"bbox":[518.42,156.53,243.16,52.45]}
+{"kind":"textbox","id":"sh/fmlkjm1c","slide":19,"name":"灯片编号占位符 6","placeholder":"slideNumber","text":"19","textPreview":"19","textChars":2,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/8jqh0fep","slide":19,"name":"文本框 7","text":"外协单位：仓库未提供正式外协合同","textPreview":"外协单位：仓库未提供正式外协合同","textChars":16,"textLines":1,"bbox":[723.16,108.27,521.63,42.93]}
+{"kind":"textbox","id":"sh/87ed8bat","slide":19,"name":"文本框 3","text":"5.1 对外合作","textPreview":"5.1 对外合作","textChars":8,"textLines":1,"bbox":[34.06,98.73,377.99,69.56]}
+{"kind":"textbox","id":"sh/q1orytsv","slide":19,"name":"文本框 7","text":"说明：本仓库未体现正式外协合同；本页按“开源依赖与外部接口支撑”口径梳理，正式外协信息待补录。","textPreview":"说明：本仓库未体现正式外协合同；本页按“开源依赖与外部接口支撑”口径梳理，正式外协信息待补录。","textChars":47,"textLines":1,"bbox":[43.58,608.62,1202.64,68.8]}
+{"kind":"table","id":"tb/c7u54zid","slide":19,"name":"表格 10","rows":7,"cols":4,"preview":"序号 | 合作/支撑内容 | 完成情况 | 说明","bbox":[88,208.8,1164.22,385.55]}
+{"kind":"notes","id":"nt/bat47y1k","slide":19,"text":""}
+{"kind":"slide","id":"sl/j2t83itg","slide":20,"title":"五、对外合作及知识产权","textShapes":6}
+{"kind":"textbox","id":"sh/b2hwfyxo","slide":20,"name":"标题 1","text":"五、对外合作及知识产权","textPreview":"五、对外合作及知识产权","textChars":11,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/mhk3q5o7","slide":20,"name":"灯片编号占位符 1","placeholder":"slideNumber","text":"20","textPreview":"20","textChars":2,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/twra5gbq","slide":20,"name":"文本框 7","text":"取得结论和成果：\n1. 已完成一个可运行的合成树脂数据管理与科研分析前端原型。\n2. 开源依赖选型满足高密度表格、科学图表、云端接入和动效交互需求。\n3. 外部系统对接采用接口适配器和 Firestore 安全规则预留，后续可接入企业真实数据源。\n4. 正式外协单位、合同号、交付物编号在当前仓库未出现，应由项目管理资料补齐。","textPreview":"取得结论和成果： | 1. 已完成一个可运行的合成树脂数据管理与科研分析前端原型。 | 2. 开源依赖选型满足高密度表格、科学图表、云端接入和动效交互需求。 | 3. 外部系统对接采用接口适配器和 Firestore 安全规则预留，后续可接入企业真实数据源。 | 4. 正式...","textChars":163,"textLines":5,"bbox":[58,245,1130,345.6]}
+{"kind":"textbox","id":"sh/47y1kre1","slide":20,"name":"TextBox 5","text":"取得结论和成果","textPreview":"取得结论和成果","textChars":7,"textLines":1,"bbox":[518.42,171.82,243.16,52.45]}
+{"kind":"textbox","id":"sh/tsvu9kni","slide":20,"name":"文本框 8","text":"外协单位：仓库未提供正式外协合同","textPreview":"外协单位：仓库未提供正式外协合同","textChars":16,"textLines":1,"bbox":[723.16,108.27,521.63,42.93]}
+{"kind":"textbox","id":"sh/90je9cvi","slide":20,"name":"文本框 9","text":"5.1 对外合作","textPreview":"5.1 对外合作","textChars":8,"textLines":1,"bbox":[34.06,98.73,377.99,69.56]}
+{"kind":"notes","id":"nt/j2t83itg","slide":20,"text":""}
+{"kind":"slide","id":"sl/mhk3q5o7","slide":21,"title":"五、对外合作及知识产权","textShapes":6}
+{"kind":"textbox","id":"sh/d8v6psfi","slide":21,"name":"标题 1","text":"五、对外合作及知识产权","textPreview":"五、对外合作及知识产权","textChars":11,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/dg7adsji","slide":21,"name":"TextBox 5","text":"考核指标完成情况","textPreview":"考核指标完成情况","textChars":8,"textLines":1,"bbox":[405.64,163.44,446.03,52.45]}
+{"kind":"textbox","id":"sh/6tovahoz","slide":21,"name":"灯片编号占位符 3","placeholder":"slideNumber","text":"21","textPreview":"21","textChars":2,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/ovahoza1","slide":21,"name":"文本框 5","text":"外协单位：仓库未提供正式外协合同","textPreview":"外协单位：仓库未提供正式外协合同","textChars":16,"textLines":1,"bbox":[723.16,108.27,521.63,42.93]}
+{"kind":"textbox","id":"sh/mhk3q5o7","slide":21,"name":"文本框 10","text":"5.1 对外合作","textPreview":"5.1 对外合作","textChars":8,"textLines":1,"bbox":[34.06,98.73,377.99,69.56]}
+{"kind":"textbox","id":"sh/t83itgfm","slide":21,"name":"文本框 7","text":"结论：软件支撑指标已完成；正式外协指标需项目管理资料确认后补入。","textPreview":"结论：软件支撑指标已完成；正式外协指标需项目管理资料确认后补入。","textChars":32,"textLines":1,"bbox":[43.58,608.62,1202.64,68.8]}
+{"kind":"table","id":"tb/neloj2t8","slide":21,"name":"表格 4","rows":4,"cols":4,"preview":"序号 | 外协/支撑考核指标 | 完成情况 | 说明","bbox":[73.01,231.48,1111.3,225.02]}
+{"kind":"notes","id":"nt/mhk3q5o7","slide":21,"text":""}
+{"kind":"slide","id":"sl/5wjudg7a","slide":22,"title":"五、对外合作及知识产权","textShapes":4}
+{"kind":"textbox","id":"sh/g3ex0nux","slide":22,"name":"标题 1","text":"五、对外合作及知识产权","textPreview":"五、对外合作及知识产权","textChars":11,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/r65wjudg","slide":22,"name":"灯片编号占位符 3","placeholder":"slideNumber","text":"22","textPreview":"22","textChars":2,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/9cvixcze","slide":22,"name":"文本框 5","text":"5.2 知识产权","textPreview":"5.2 知识产权","textChars":8,"textLines":1,"bbox":[34.06,98.73,377.99,69.56]}
+{"kind":"textbox","id":"sh/w3m94fu1","slide":22,"name":"文本框 7","text":"知识产权指标及完成情况：当前仓库未提供专利/软著申请号，以下为建议归档口径。","textPreview":"知识产权指标及完成情况：当前仓库未提供专利/软著申请号，以下为建议归档口径。","textChars":38,"textLines":1,"bbox":[50.33,177.71,1202.64,84.01]}
+{"kind":"table","id":"tb/q1orytsv","slide":22,"name":"表格 12","rows":3,"cols":7,"preview":"序号 | 知识产权类型 | 名称 | 申请/登记号 | 权利人 | 状态 | 说明","bbox":[35.21,314.64,1217.76,291.81]}
+{"kind":"notes","id":"nt/5wjudg7a","slide":22,"text":""}
+{"kind":"slide","id":"sl/crmhk3q5","slide":23,"title":"六、经费使用及决算","textShapes":3}
+{"kind":"textbox","id":"sh/47y1kre1","slide":23,"name":"标题 1","text":"六、经费使用及决算","textPreview":"六、经费使用及决算","textChars":9,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/bat47y1k","slide":23,"name":"灯片编号占位符 3","placeholder":"slideNumber","text":"23","textPreview":"23","textChars":2,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/tgfmlkjm","slide":23,"name":"object 3","text":"总经费、拨付经费、支出和结余：当前源码仓库未提供财务凭证，以下仅保留模板决算口径，金额待财务确认。","textPreview":"总经费、拨付经费、支出和结余：当前源码仓库未提供财务凭证，以下仅保留模板决算口径，金额待财务确认。","textChars":49,"textLines":1,"bbox":[57.43,122.99,930.32,117.87]}
+{"kind":"table","id":"tb/l87ed8ba","slide":23,"name":"表格 4","rows":12,"cols":6,"preview":"序号 | 经费科目 | 预算 | 支出 | 结余 | 说明","bbox":[65.45,178.56,1149.1,429.62]}
+{"kind":"notes","id":"nt/crmhk3q5","slide":23,"text":""}
+{"kind":"slide","id":"sl/bq1oryts","slide":24,"title":"七、总结与建议","textShapes":6}
+{"kind":"textbox","id":"sh/rmhk3q5o","slide":24,"name":"标题 1","text":"七、总结与建议","textPreview":"七、总结与建议","textChars":7,"textLines":1,"bbox":[141.05,14.45,997.91,61.13]}
+{"kind":"textbox","id":"sh/y1kre1w7","slide":24,"name":"灯片编号占位符 1","placeholder":"slideNumber","text":"24","textPreview":"24","textChars":2,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/90je9cvi","slide":24,"name":"TextBox 5","text":"总结","textPreview":"总结","textChars":2,"textLines":1,"bbox":[25.96,96.56,522.87,69.56]}
+{"kind":"textbox","id":"sh/tovahoza","slide":24,"name":"TextBox 5","text":"建议","textPreview":"建议","textChars":2,"textLines":1,"bbox":[25.96,438.69,117.54,69.56]}
+{"kind":"textbox","id":"sh/gfmlkjm1","slide":24,"name":"文本框 7","text":"总结：\nResinDB Pro v3.0 已形成可运行、可验证、可迁移的树脂科研数据管理原型。核心交付包括高性能 DataGrid、科研图谱与图表、多 Worker 科学计算、Adapter 数据服务、Firebase 安全规则、测试与构建验证。","textPreview":"总结： | ResinDB Pro v3.0 已形成可运行、可验证、可迁移的树脂科研数据管理原型。核心交付包括高性能 DataGrid、科研图谱与图表、多 Worker 科学计算、Adapter 数据服务、Firebase 安全规则、测试与构建验证。","textChars":123,"textLines":2,"bbox":[48,175,1165,135]}
+{"kind":"textbox","id":"sh/yd0z6103","slide":24,"name":"文本框 7","text":"建议：\n补齐计划任务书、合同编号、经费决算、知识产权申请号和外协资料；继续优化 vendor/ECharts 构建分包；接入真实实验室数据源并补充 E2E、性能基准和权限审计。","textPreview":"建议： | 补齐计划任务书、合同编号、经费决算、知识产权申请号和外协资料；继续优化 vendor/ECharts 构建分包；接入真实实验室数据源并补充 E2E、性能基准和权限审计。","textChars":88,"textLines":2,"bbox":[48,505,1165,124.8]}
+{"kind":"notes","id":"nt/bq1oryts","slide":24,"text":""}
+{"kind":"slide","id":"sl/61032lsz","slide":25,"title":"25","textShapes":2}
+{"kind":"textbox","id":"sh/t47y1kre","slide":25,"name":"灯片编号占位符 2","placeholder":"slideNumber","text":"25","textPreview":"25","textChars":2,"textLines":1,"bbox":[0,0,0,0]}
+{"kind":"textbox","id":"sh/il0rqd4v","slide":25,"name":"文本框 2","text":"敬请专家批评指正\n谢 谢","textPreview":"敬请专家批评指正 | 谢 谢","textChars":12,"textLines":2,"bbox":[165,245,925,250]}
+{"kind":"notes","id":"nt/61032lsz","slide":25,"text":""}

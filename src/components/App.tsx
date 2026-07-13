@@ -9,24 +9,11 @@ import React, {
 } from "react";
 
 // --- ResizeObserver Error Suppression ---
-// We suppress the Vite error overlay for ResizeObserver loop errors instead of patching ResizeObserver,
-// because patching ResizeObserver with requestAnimationFrame breaks @tanstack/react-virtual synchronous layout during zoom/resize.
-if (typeof window !== "undefined") {
-  window.addEventListener("error", (e) => {
-    if (
-      e.message === "ResizeObserver loop limit exceeded" ||
-      e.message ===
-        "ResizeObserver loop completed with undelivered notifications."
-    ) {
-      // e.stopImmediatePropagation() sometimes doesn't stop Vite's overlay,
-      // so we actively remove it if it pops up.
-      const overlay = document.querySelector("vite-error-overlay");
-      if (overlay) overlay.remove();
-    }
-  });
-}
+// We suppress the Vite error overlay for ResizeObserver loop errors.
+// This is handled via a useEffect hook inside AppContent to prevent memory leaks and duplicate listeners.
 
 import { CATEGORY_TREE } from '@/config/constants';
+import { safeStorage } from "@/lib/utils";
 import {
   Manufacturer,
 } from "../types";
@@ -50,6 +37,7 @@ import { BatchActionBar } from '@/components/features/DataGrid/BatchActionBar';
 import { useShortcuts } from '@/hooks/app/useShortcuts';
 import { useSavedViews } from '@/hooks/app/useSavedViews';
 import { useExportData } from '@/hooks/app/useExportData';
+import { useClickFeedback } from '@/hooks/useClickFeedback';
 
 // Lazy loaded modals and heavy components
 const FilterPanel = lazy(() =>
@@ -70,6 +58,12 @@ const ComparisonView = lazy(() =>
 );
 const PivotView = lazy(() =>
   import("@/components/views/PivotView").then((m) => ({ default: m.PivotView })),
+);
+const AnalyticsView = lazy(() =>
+  import("@/components/views/AnalyticsView").then((m) => ({ default: m.AnalyticsView })),
+);
+const BetaSandboxView = lazy(() =>
+  import("@/components/views/BetaSandboxView").then((m) => ({ default: m.BetaSandboxView })),
 );
 const DependencyMapD3 = lazy(() => import("@/components/charts/DependencyMapD3"));
 const BatchEditModal = lazy(() =>
@@ -121,8 +115,6 @@ const SmartExportModal = lazy(() =>
 import { Loader2 } from "lucide-react";
 
 import { DashboardView } from "@/components/views/DashboardView";
-import { AnalyticsView } from "@/components/views/AnalyticsView";
-import { BetaSandboxView } from "@/components/views/BetaSandboxView";
 
 import { ToastProvider } from "@/contexts/ToastContext";
 import { ModalProvider } from "@/contexts/ModalContext";
@@ -207,9 +199,11 @@ const AppContent = memo(() => {
     isModalOpen,
   } = useModals();
 
+  const { triggerFeedback } = useClickFeedback();
+
   const [showTour, setShowTour] = useState(() => {
     try {
-      return !localStorage.getItem("resindb-tour-completed");
+      return !safeStorage.local.getItem("resindb-tour-completed");
     } catch {
       return false;
     }
@@ -264,6 +258,54 @@ const AppContent = memo(() => {
     selectedIds,
     handleExport,
   });
+
+  // --- Global Click tactile & audio feedback handler ---
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // Check semantic interactive elements first
+      const interactive = target.closest(
+        'button, [role="button"], a, input[type="submit"], input[type="button"], input[type="checkbox"], input[type="radio"], select, option'
+      );
+      if (interactive) {
+        triggerFeedback();
+        return;
+      }
+      // Fallback: check if element or ancestors have pointer cursor
+      let el: HTMLElement | null = target;
+      for (let i = 0; i < 3 && el; i++) {
+        try {
+          if (window.getComputedStyle(el).cursor === 'pointer') {
+            triggerFeedback();
+            return;
+          }
+        } catch { break; }
+        el = el.parentElement;
+      }
+    };
+    document.addEventListener("click", handleGlobalClick, { capture: true, passive: true });
+    return () => {
+      document.removeEventListener("click", handleGlobalClick, { capture: true });
+    };
+  }, [triggerFeedback]);
+
+  // --- Suppression of ResizeObserver loop errors ---
+  useEffect(() => {
+    const handleResizeObserverError = (e: ErrorEvent) => {
+      if (
+        e.message === "ResizeObserver loop limit exceeded" ||
+        e.message ===
+          "ResizeObserver loop completed with undelivered notifications."
+      ) {
+        const overlay = document.querySelector("vite-error-overlay");
+        if (overlay) overlay.remove();
+      }
+    };
+    window.addEventListener("error", handleResizeObserverError);
+    return () => {
+      window.removeEventListener("error", handleResizeObserverError);
+    };
+  }, []);
 
   // --- Centralized Scroll Lock for Modals & Overlays ---
   useEffect(() => {
@@ -717,7 +759,7 @@ const AppContent = memo(() => {
               key="onboarding-tour-root"
               onComplete={() => {
                 setShowTour(false);
-                localStorage.setItem("resindb-tour-completed", "true");
+                safeStorage.local.setItem("resindb-tour-completed", "true");
               }}
             />
           )}

@@ -24,15 +24,17 @@ export interface KdeResponse {
 function calculateBandwidth(values: number[]): number {
   if (values.length < 2) return 1;
   const n = values.length;
-  const mean = values.reduce((a, b) => a + b, 0) / n;
-  const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n - 1);
-  return 1.06 * Math.sqrt(variance) * Math.pow(n, -1/5);
+  const safeN = n > 0 ? n : 1;
+  const mean = values.reduce((a, b) => a + b, 0) / safeN;
+  const variance = Math.max(0, values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (safeN - 1 || 1));
+  return 1.06 * Math.sqrt(variance) * Math.pow(safeN, -0.2);
 }
 
 self.onmessage = (e: MessageEvent<KdeMessage>) => {
   try {
     const { points, gridSize = 50 } = e.data.payload;
-    if (points.length === 0) throw new Error("No points for KDE");
+    const validPoints = (points || []).filter(p => p && typeof p.x === 'number' && typeof p.y === 'number' && !isNaN(p.x) && !isNaN(p.y));
+    if (validPoints.length === 0) throw new Error("No valid points for KDE");
 
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
@@ -40,7 +42,7 @@ self.onmessage = (e: MessageEvent<KdeMessage>) => {
     const xVals = [];
     const yVals = [];
     
-    for (const p of points) {
+    for (const p of validPoints) {
       if (p.x < minX) minX = p.x;
       if (p.x > maxX) maxX = p.x;
       if (p.y < minY) minY = p.y;
@@ -63,20 +65,21 @@ self.onmessage = (e: MessageEvent<KdeMessage>) => {
     const grid = [];
     let minZ = Infinity, maxZ = -Infinity;
 
-    for (let j = 0; j < gridSize; j++) {
-      const cy = minY + (j / (gridSize - 1)) * (maxY - minY);
-      for (let i = 0; i < gridSize; i++) {
-        const cx = minX + (i / (gridSize - 1)) * (maxX - minX);
+    const safeGridSize = gridSize > 1 ? gridSize : 50;
+    for (let j = 0; j < safeGridSize; j++) {
+      const cy = minY + (j / (safeGridSize - 1)) * (maxY - minY);
+      for (let i = 0; i < safeGridSize; i++) {
+        const cx = minX + (i / (safeGridSize - 1)) * (maxX - minX);
         
         let z = 0;
-        for (const p of points) {
+        for (const p of validPoints) {
            // scaled distance squared to treat x and y equally in kernel footprint
            const dx = (p.x - cx) / (bwX || 1);
            const dy = (p.y - cy) / (bwY || 1);
            const dSq = dx*dx + dy*dy;
            z += Math.exp(-dSq / 2); // 2D standard normal
         }
-        z = z / points.length; // normalize
+        z = z / validPoints.length; // normalize
         
         if (z < minZ) minZ = z;
         if (z > maxZ) maxZ = z;

@@ -80,34 +80,43 @@ self.onmessage = (e: MessageEvent<MahalanobisMessage>) => {
         if (features.length < 2) {
             throw new Error("请至少选择2个特征进行多元异常检测。");
         }
-        if (data.length <= features.length) {
-            throw new Error(`需要至少 ${features.length + 1} 个有效观察样本以建立全秩协方差矩阵，当前可用样本数: ${data.length}。`);
+        
+        // Filter out items that don't have all features as valid numbers
+        const validData = (data || []).filter(d => 
+            d && 
+            features.every(f => typeof d[f] === 'number' && !isNaN(d[f]))
+        );
+
+        if (validData.length <= features.length) {
+            throw new Error(`需要至少 ${features.length + 1} 个有效观察样本以建立全秩协方差矩阵，当前可用样本数: ${validData.length}。`);
         }
         
-        const n = data.length;
+        const n = validData.length;
         const p = features.length;
         
         // 1. Calculate Mean
         const mean: number[] = new Array(p).fill(0);
         for (let i = 0; i < n; i++) {
             for (let j = 0; j < p; j++) {
-                mean[j] += data[i][features[j]];
+                mean[j] += validData[i][features[j]];
             }
         }
-        for (let j = 0; j < p; j++) mean[j] /= n;
+        const safeN = n > 0 ? n : 1;
+        for (let j = 0; j < p; j++) mean[j] /= safeN;
         
         // 2. Covariance Matrix
         const cov: number[][] = Array.from({length: p}, () => new Array(p).fill(0));
         for (let i = 0; i < n; i++) {
             for (let j = 0; j < p; j++) {
                 for (let k = 0; k < p; k++) {
-                    cov[j][k] += (data[i][features[j]] - mean[j]) * (data[i][features[k]] - mean[k]);
+                    cov[j][k] += (validData[i][features[j]] - mean[j]) * (validData[i][features[k]] - mean[k]);
                 }
             }
         }
+        const safeNm1 = n > 1 ? n - 1 : 1;
         for (let j = 0; j < p; j++) {
             for (let k = 0; k < p; k++) {
-                cov[j][k] /= (n - 1);
+                cov[j][k] /= safeNm1;
                 // regularize diagonal
                 if (j === k) cov[j][k] += 1e-8; 
             }
@@ -121,7 +130,7 @@ self.onmessage = (e: MessageEvent<MahalanobisMessage>) => {
         for (let i = 0; i < n; i++) {
             const diff = new Array(p).fill(0);
             for (let j = 0; j < p; j++) {
-                diff[j] = data[i][features[j]] - mean[j];
+                diff[j] = validData[i][features[j]] - mean[j];
             }
             
             let distSq = 0; // D^2 (Mahalanobis Distance Squared, follows Chi-Square)
@@ -135,8 +144,8 @@ self.onmessage = (e: MessageEvent<MahalanobisMessage>) => {
             
             distances.push({
                 index: i + 1,
-                id: data[i]._id,
-                name: data[i].name,
+                id: validData[i]._id,
+                name: validData[i].name,
                 distance: distSq,
                 isOutlier: distSq > threshold
             });

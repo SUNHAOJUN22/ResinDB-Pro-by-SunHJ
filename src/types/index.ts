@@ -47,6 +47,9 @@ export interface PropertyValue {
   min?: number;
   max?: number;
   count?: number;
+  // MFR-specific parameters
+  temp?: string;
+  load?: string;
 }
 
 export interface Product {
@@ -175,4 +178,11 @@ export interface SavedView {
   query: string;
   filters: FilterGroup | null;
   columns: ColumnConfig[];
+}
+
+export interface SyncEvent {
+  id: string;
+  timestamp: number;
+  status: 'success' | 'error';
+  message: string;
 }

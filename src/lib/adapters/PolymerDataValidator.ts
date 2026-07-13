@@ -1,4 +1,5 @@
 import { MaterialRecord, MaterialPhysicsSpecs } from './types';
+import { isPlaceholderValue } from '@/utils/productUtils';
 
 /**
  * 🔬 PolymerDataValidator (国际塑料及高分子聚合物物性数据硬核校验与生成专家)
@@ -42,25 +43,7 @@ export class PolymerDataValidator {
         continue;
       }
 
-      // 1. 强物理空值与占位符熔断丢弃检测
-      const isPlaceholder = (val: any): boolean => {
-        if (val === null || val === undefined) return true;
-        const str = String(val).trim().toLowerCase();
-        return (
-          str === '' ||
-          str === '0' ||
-          str === 'unknown' ||
-          str === 'n/a' ||
-          str === 'none' ||
-          str === '-' ||
-          str === '暂无' ||
-          str === '未检测' ||
-          str === 'null' ||
-          Number.isNaN(Number(val))
-        );
-      };
-
-      if (isPlaceholder(prop.value)) {
+      if (isPlaceholderValue(prop.value)) {
         delete props[key];
         continue;
       }
@@ -80,7 +63,7 @@ export class PolymerDataValidator {
           
           // 绝对不能大于 3 或小于 0.8
           if (numVal < 0.8 || numVal > 3.0) {
-            console.warn(`[Polymer Validator Alert] 牌号 ${cleanedRecord.grade} 的密度值为 ${numVal} g/cm³，已超出国际物理极限 (0.8 - 3.0)，强制剔除。`);
+            console.warn(`[Polymer Validator Alert] Grade ${cleanedRecord.grade} density is ${numVal} g/cm³, which exceeds international physical limits (0.8 - 3.0). Removed.`);
             delete props.density;
           } else {
             // 对常见大类的无玻纤增强常规牌号提供校验与告警修正
@@ -103,17 +86,17 @@ export class PolymerDataValidator {
               if (categoryUpper.includes('PE') || categoryUpper.includes('HDPE') || categoryUpper.includes('LDPE')) {
                 // PE 应该在 0.91 – 0.97
                 if (numVal < 0.89 || numVal > 0.98) {
-                  console.info(`[Polymer Validator Info] 常规PE未改性牌号 ${cleanedRecord.grade} 密度在 ${numVal} g/cm³ 发生轻微漂移，保留并建议校验设备。`);
+                  console.info(`[Polymer Validator Info] Regular PE unmodified grade ${cleanedRecord.grade} density drift at ${numVal} g/cm³. Retained, device verification recommended.`);
                 }
               } else if (categoryUpper.includes('PP')) {
                 // PP 应该在 0.89 – 0.92
                 if (numVal < 0.88 || numVal > 0.93) {
-                  console.info(`[Polymer Validator Info] 常规PP牌号 ${cleanedRecord.grade} 密度在 ${numVal} g/cm³ 发生轻微漂移。`);
+                  console.info(`[Polymer Validator Info] Regular PP grade ${cleanedRecord.grade} density drift at ${numVal} g/cm³.`);
                 }
               } else if (categoryUpper.includes('ABS')) {
                 // ABS 应该在 1.03 – 1.06
                 if (numVal < 1.01 || numVal > 1.10) {
-                  console.info(`[Polymer Validator Info] ABS牌号 ${cleanedRecord.grade} 密度在 ${numVal} g/cm³。`);
+                  console.info(`[Polymer Validator Info] ABS grade ${cleanedRecord.grade} density at ${numVal} g/cm³.`);
                 }
               }
             }
@@ -129,7 +112,7 @@ export class PolymerDataValidator {
           }
           
           // 必须级联声明【测试温度】与【测试负荷】
-          const mfrSpec = prop as any;
+          const mfrSpec = prop as { value: number; unit: string; standard?: string; temp?: string; load?: string };
           const categoryUpper = cleanedRecord.category?.toUpperCase() || '';
           
           if (!mfrSpec.temp || mfrSpec.temp === '') {
@@ -201,7 +184,7 @@ export class PolymerDataValidator {
     const validCount = keysNow.filter(k => ['density', 'mfr', 'tensileYield', 'flexuralModulus', 'izodImpact'].includes(k)).length;
 
     if (validCount < 2) {
-      console.error(`🔴 [Polymer Validator BLOCKED] 牌号 ${cleanedRecord.grade} 因有效核心物性指标少于 2 项 (当前有效数: ${validCount})，触发强制熔断线，此残缺记录已自动拒绝写入/加载。`);
+      console.error(`🔴 [Polymer Validator BLOCKED] Grade ${cleanedRecord.grade} has fewer than 2 valid core properties (current: ${validCount}). Meltdown line triggered; this incomplete record was automatically rejected.`);
       return null;
     }
 

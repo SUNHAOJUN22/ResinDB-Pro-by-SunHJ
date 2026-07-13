@@ -98,10 +98,10 @@ export const TopBar: React.FC<TopBarProps> = ({
   const activeFilterCount = advancedFilterGroup.conditions.length;
 
   return (
-    <div className="w-full flex flex-col px-4 xl:px-8 h-16 justify-center bg-white/98 dark:bg-slate-950/98 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/80 relative z-[100] shadow-sm">
-      <div className="flex flex-row items-center justify-end gap-3 w-full">
-        <div className="flex items-center gap-1.5 md:gap-3 flex-nowrap justify-end flex-1 min-w-0 max-w-full">
-          <div className="flex items-center gap-1.5 md:gap-2 relative flex-nowrap justify-end">
+    <div className="w-full flex flex-col px-4 xl:px-8 h-16 justify-center bg-white/98 dark:bg-slate-950/98 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/80 relative z-[100] shadow-sm overflow-x-auto overflow-y-hidden scrollbar-none py-1">
+      <div className="flex flex-row items-center justify-start gap-3 w-full min-w-max">
+        <div className="flex items-center gap-1.5 md:gap-3 flex-nowrap justify-start flex-1 min-w-max ml-auto">
+          <div className="flex items-center gap-1.5 md:gap-2 relative flex-nowrap justify-start">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}

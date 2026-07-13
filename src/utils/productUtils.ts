@@ -1,4 +1,4 @@
-import { Product, ColumnConfig } from '@/types/index';
+import { Product, ColumnConfig, PropertyValue } from '@/types/index';
 import { DEFAULT_VISIBLE_COLUMNS } from '@/config/constants';
 
 export const getDynamicColumns = (products: Product[]): ColumnConfig[] => {
@@ -179,3 +179,86 @@ export const RADAR_DEFAULT_MAX: Record<string, number> = {
     '冲击强度': 120,
     '综合数据': 100
 };
+
+/**
+ * Checks if a property value is a placeholder (empty, unknown, n/a, etc.)
+ */
+export const isPlaceholderValue = (val: unknown): boolean => {
+  if (val === null || val === undefined) return true;
+  const str = String(val).trim().toLowerCase();
+  return (
+    str === "" ||
+    str === "0" ||
+    str === "unknown" ||
+    str === "n/a" ||
+    str === "none" ||
+    str === "-" ||
+    str === "暂无" ||
+    str === "未检测" ||
+    str === "无" ||
+    str === "null" ||
+    Number.isNaN(Number(val))
+  );
+};
+
+/**
+ * Returns the count of valid scientific properties in a properties dictionary
+ */
+export const getValidPropertiesCount = (properties: Record<string, PropertyValue | unknown> | null | undefined): number => {
+  if (!properties || typeof properties !== "object") return 0;
+  let count = 0;
+  for (const prop of Object.values(properties)) {
+    const val = prop && typeof prop === "object" && prop !== null && "value" in prop ? (prop as { value: unknown }).value : prop;
+    if (!isPlaceholderValue(val)) {
+      count++;
+    }
+  }
+  return count;
+};
+
+/**
+ * Domain warning thresholds validation helper for chemical & materials metrics
+ */
+export const getProductValidationWarnings = (p: Product, t: (key: string) => string): string[] => {
+  const warnings: string[] = [];
+  const props = p.properties || {};
+  
+  if (Object.keys(props).length === 0) {
+    warnings.push(t("warnNoProperties"));
+  }
+  
+  // Check typical polymer Density (0.8 ~ 2.4 g/cm³)
+  if (props["密度"]?.value !== undefined) {
+    const d = parseFloat(String(props["密度"].value));
+    if (!isNaN(d) && (d < 0.7 || d >= 2.5)) {
+      warnings.push(t("warnDensityBounds").replace("{d}", String(d)));
+    }
+  }
+  
+  // Check MFR
+  if (props["熔体质量流动速率"]?.value !== undefined) {
+    const m = parseFloat(String(props["熔体质量流动速率"].value));
+    if (!isNaN(m) && (m <= 0 || m > 500)) {
+      warnings.push(t("warnMfrBounds").replace("{m}", String(m)));
+    }
+  }
+
+  // Tensile strength
+  if (props["拉伸屈服应力"]?.value !== undefined) {
+    const s = parseFloat(String(props["拉伸屈服应力"].value));
+    if (!isNaN(s) && (s <= 0 || s > 500)) {
+      warnings.push(t("warnTensileBounds").replace("{s}", String(s)));
+    }
+  }
+
+  // Modulus
+  if (props["弯曲模量"]?.value !== undefined) {
+    const s = parseFloat(String(props["弯曲模量"].value));
+    if (!isNaN(s) && (s <= 10 || s > 50000)) {
+      warnings.push(t("warnModulusBounds").replace("{s}", String(s)));
+    }
+  }
+  
+  return warnings;
+};
+

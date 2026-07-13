@@ -50,6 +50,7 @@ import { FilterItem } from '@/types/index';
 import { DataGridRow } from '@/components/features/DataGrid/DataGridRow';
 import { SkeletonRow, EmptyState, QuickRadarPopup } from '@/components/features/DataGrid/DataGridComponents';
 import { formulaEngine } from "@/lib/formulaParser";
+import { safeStorage } from '@/lib/utils';
 
 interface DataGridProps {
   data: Product[];
@@ -119,7 +120,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
       y: number;
     } | null>(null);
     const [isCompact, setIsCompact] = useState(() => {
-      const saved = localStorage.getItem("resindb-compact");
+      const saved = safeStorage.local.getItem("resindb-compact");
       return saved !== null ? saved === "true" : true;
     });
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -187,7 +188,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
     };
 
     useEffect(() => {
-      localStorage.setItem("resindb-compact", String(isCompact));
+      safeStorage.local.setItem("resindb-compact", String(isCompact));
     }, [isCompact]);
 
     const visibleCols = useMemo(() => {

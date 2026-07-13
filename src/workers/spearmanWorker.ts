@@ -47,11 +47,21 @@ self.onmessage = (e: MessageEvent<SpearmanMessage>) => {
       return;
     }
 
-    const n = data.length;
+    const validData = data.filter(d => 
+       d && d.values && 
+       keys.every(k => typeof d.values[k] === 'number' && !isNaN(d.values[k]))
+    );
+
+    if (!validData.length) {
+      self.postMessage({ type: 'SPEARMAN_RESULT', payload: { matrix: [], keys } });
+      return;
+    }
+
+    const n = validData.length;
     const ranksByKey: Record<string, number[]> = {};
 
     for (const key of keys) {
-      const values = data.map(d => d.values[key] ?? 0);
+      const values = validData.map(d => d.values[key] ?? 0);
       ranksByKey[key] = getRanks(values);
     }
 
@@ -78,8 +88,8 @@ self.onmessage = (e: MessageEvent<SpearmanMessage>) => {
           sumXY += (rankX[k] - meanX) * (rankY[k] - meanY);
         }
 
-        const denom = Math.sqrt(sumSqX * sumSqY);
-        const rho = denom === 0 ? 0 : sumXY / denom;
+        const denom = Math.sqrt(Math.max(0, sumSqX * sumSqY));
+        const rho = Math.abs(denom) < 1e-15 ? 0 : sumXY / denom;
         
         matrix[i][j] = rho;
         matrix[j][i] = rho;

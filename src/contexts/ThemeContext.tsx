@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { safeStorage } from '@/lib/utils';
 
 type Theme = 'light' | 'dark';
 export type ColorTheme = 'indigo' | 'emerald' | 'rose' | 'blue' | 'amber' | 'violet' | 'high-contrast';
@@ -57,7 +58,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
         try {
-          const saved = localStorage.getItem('resindb-theme');
+          const saved = safeStorage.local.getItem('resindb-theme');
           if (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
           return (saved as Theme) || 'light';
         } catch {
@@ -71,7 +72,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
       if (typeof window !== 'undefined') {
           try {
-              return (localStorage.getItem('resindb-color-theme') as ColorTheme) || 'indigo';
+              return (safeStorage.local.getItem('resindb-color-theme') as ColorTheme) || 'indigo';
           } catch {
               return 'indigo';
           }
@@ -83,7 +84,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   useEffect(() => {
     const root = document.documentElement;
     try {
-      localStorage.setItem('resindb-theme', theme);
+      safeStorage.local.setItem('resindb-theme', theme);
     } catch {
       // Ignore security error inside sandboxed iframe
     }
@@ -100,7 +101,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   useEffect(() => {
       const root = document.documentElement;
       try {
-        localStorage.setItem('resindb-color-theme', colorTheme);
+        safeStorage.local.setItem('resindb-color-theme', colorTheme);
       } catch {
         // Ignore security error
       }

@@ -54,18 +54,19 @@ export interface PropertyQualityStats {
   outlierCount: number;
 }
 
-export interface QualityWorkerResponse {
-  type: 'QUALITY_MONITOR_RESULT';
-  payload: {
-    healthScore: number; // Overall quality index (0 - 100)
-    totalValuesChecked: number;
-    totalMissingCount: number;
-    totalOutliersCount: number;
-    outliers: OutlierItem[];
-    missing: MissingValueItem[];
-    propertyStats: PropertyQualityStats[];
-  };
+export interface QualityMonitorResultPayload {
+  healthScore: number; // Overall quality index (0 - 100)
+  totalValuesChecked: number;
+  totalMissingCount: number;
+  totalOutliersCount: number;
+  outliers: OutlierItem[];
+  missing: MissingValueItem[];
+  propertyStats: PropertyQualityStats[];
 }
+
+export type QualityWorkerResponse =
+  | { type: 'QUALITY_MONITOR_RESULT'; payload: QualityMonitorResultPayload }
+  | { type: 'ERROR'; payload: { message: string } };
 
 // Simple parsing helper to extract numeric value safely
 function parseNumeric(val: any): { isNum: boolean; value: number } {
@@ -180,7 +181,7 @@ self.onmessage = (e: MessageEvent<QualityWorkerMessage>) => {
 
         // Standard Deviation
         const squaredDiffs = numbers.reduce((acc, curr) => acc + Math.pow(curr.val - mean, 2), 0);
-        stdDev = Math.sqrt(squaredDiffs / numbers.length);
+        stdDev = Math.sqrt(Math.max(0, squaredDiffs / numbers.length));
 
         // Percentiles (Q1, Q3) and IQR
         const getPercentile = (p: number) => {
@@ -261,7 +262,7 @@ self.onmessage = (e: MessageEvent<QualityWorkerMessage>) => {
     // - Starts at 100
     // - Deductions: completeness score penalty (average missing percent weighted)
     // - Deductions: outliers percentage penalty
-    const averageCompleteness = propertyStats.reduce((acc, stat) => acc + stat.completenessRate, 0) / propertyStats.length;
+    const averageCompleteness = propertyStats.length > 0 ? (propertyStats.reduce((acc, stat) => acc + stat.completenessRate, 0) / propertyStats.length) : 100;
     const outlierRatio = totalValuesChecked > 0 ? (outliers.length / totalValuesChecked) : 0;
     
     // Custom formula: Health Score leans heavily on completeness and flags outlier rate
@@ -288,7 +289,9 @@ self.onmessage = (e: MessageEvent<QualityWorkerMessage>) => {
   } catch (error) {
     self.postMessage({
       type: 'ERROR',
-      error: error instanceof Error ? error.message : String(error)
-    } as any);
+      payload: {
+        message: error instanceof Error ? error.message : String(error)
+      }
+    } as QualityWorkerResponse);
   }
 };

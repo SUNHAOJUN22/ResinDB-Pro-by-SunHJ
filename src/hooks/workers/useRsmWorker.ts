@@ -1,43 +1,25 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useCallback } from 'react';
+import { useWorkerManager } from './useWorkerManager';
 import type { RSMMessage, RSMResponse } from '@/workers/rsmWorker';
 
 export function useRsmWorker() {
-  const [isCalculating, setIsCalculating] = useState(false);
-  const [rsmResult, setRsmResult] = useState<RSMResponse['payload'] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const workerRef = useRef<Worker | null>(null);
-
-  useEffect(() => {
-    workerRef.current = new Worker(new URL('../../workers/rsmWorker.ts', import.meta.url), {
-      type: 'module'
-    });
-
-    workerRef.current.onmessage = (e: MessageEvent<RSMResponse>) => {
-      const res = e.data;
-      if (res.type === 'RSM_CALCULATED') {
-        setRsmResult(res.payload || null);
-        setError(null);
-        setIsCalculating(false);
-      } else if (res.type === 'ERROR') {
-        setError(res.error || 'Unknown error');
-        setIsCalculating(false);
-      }
-    };
-
-    return () => {
-      workerRef.current?.terminate();
-    };
-  }, []);
+  const {
+    isCalculating,
+    result: rsmResult,
+    error,
+    postMessage
+  } = useWorkerManager<RSMMessage, RSMResponse['payload']>(
+    useCallback(() => new Worker(new URL('../../workers/rsmWorker.ts', import.meta.url), { type: 'module' }), []),
+    'RSM_CALCULATED'
+  );
 
   const calculateRSM = useCallback((data: {x1: number, x2: number, y: number}[]) => {
-    if (!workerRef.current) return;
-    setIsCalculating(true);
-    setError(null);
-    workerRef.current.postMessage({
+    postMessage({
       type: 'CALCULATE_RSM',
       payload: { data }
-    } as RSMMessage);
-  }, []);
+    });
+  }, [postMessage]);
 
   return { isCalculating, rsmResult, error, calculateRSM };
 }
+

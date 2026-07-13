@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { Product, Toast } from '@/types/index';
-import { api } from '@/services/api';
+import api from '@/lib/adapters';
 
 export function useExportData(
   filteredData: Product[],

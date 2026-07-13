@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useUI } from "@/contexts/UIContext";
 import { useData } from "@/contexts/DataContext";
 import { useModals } from "@/contexts/ModalContext";
+import { safeStorage } from "@/lib/utils";
 
 const DEFAULT_LAYOUT = ["stats", "trends", "grid"];
 
@@ -83,12 +84,7 @@ export const DashboardView = React.memo(() => {
   const { setViewingProduct, openModal } = useModals();
 
   const [layoutOrder, setLayoutOrder] = useState<string[]>(() => {
-    let saved = null;
-    try {
-      saved = localStorage.getItem("resindb-dashboard-layout");
-    } catch {
-      // Ignore
-    }
+    const saved = safeStorage.local.getItem("resindb-dashboard-layout");
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -104,11 +100,7 @@ export const DashboardView = React.memo(() => {
 
   const handleReorder = (newOrder: string[]) => {
     setLayoutOrder(newOrder);
-    try {
-      localStorage.setItem("resindb-dashboard-layout", JSON.stringify(newOrder));
-    } catch {
-      // Ignore
-    }
+    safeStorage.local.setItem("resindb-dashboard-layout", JSON.stringify(newOrder));
   };
 
   const renderLayoutItem = (key: string) => {
@@ -202,11 +194,7 @@ export const DashboardView = React.memo(() => {
               userName={currentUser.name}
               onDismiss={() => {
                 setShowWelcome(false);
-                try {
-                  localStorage.setItem("resindb-welcome-dismissed", "true");
-                } catch {
-                  // Ignore
-                }
+                safeStorage.local.setItem("resindb-welcome-dismissed", "true");
               }}
             />
           </motion.div>

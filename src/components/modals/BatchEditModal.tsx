@@ -10,6 +10,7 @@ import {
 import { Product, PropertyValue, ProductUpdates } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { motion, AnimatePresence } from "motion/react";
+import { safeStorage } from "@/lib/utils";
 
 interface BatchEditModalProps {
   isOpen: boolean;
@@ -56,7 +57,7 @@ export const BatchEditModal: React.FC<BatchEditModalProps> = ({
       dirtyRef.current = false;
       initializedIdsRef.current = currentIds;
       
-      const draftStr = localStorage.getItem(LOCAL_STORAGE_KEY);
+      const draftStr = safeStorage.local.getItem(LOCAL_STORAGE_KEY);
       
       let restored = false;
       if (draftStr) {
@@ -110,7 +111,7 @@ export const BatchEditModal: React.FC<BatchEditModalProps> = ({
         properties,
         enabledFields
       };
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(draft));
+      safeStorage.local.setItem(LOCAL_STORAGE_KEY, JSON.stringify(draft));
     }
   }, [manufacturer, properties, enabledFields, isOpen, selectedProducts]);
 
@@ -146,7 +147,7 @@ export const BatchEditModal: React.FC<BatchEditModalProps> = ({
       selectedProducts.map((p) => p.id),
       updatesPayload,
     );
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    safeStorage.local.removeItem(LOCAL_STORAGE_KEY);
     onClose();
   };
 

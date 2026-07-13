@@ -51,16 +51,19 @@ function calculateKDE(data: number[], bandwidth: number, steps: number = 100): {
     min -= margin;
     max += margin;
     
-    const step = (max - min) / steps;
+    const safeSteps = steps > 0 ? steps : 100;
+    const step = (max - min) / safeSteps;
     const kde = [];
     
     for (let x = min; x <= max; x += step) {
         let sum = 0;
         for (const d of data) {
-            const u = (x - d) / bandwidth;
+            const safeBW = Math.abs(bandwidth) > 1e-15 ? bandwidth : 1e-15;
+            const u = (x - d) / safeBW;
             sum += Math.exp(-0.5 * u * u) / (Math.sqrt(2 * Math.PI));
         }
-        kde.push({ x, y: sum / (data.length * bandwidth) });
+        const denom = data.length * (Math.abs(bandwidth) > 1e-15 ? bandwidth : 1e-15);
+        kde.push({ x, y: sum / denom });
     }
     return kde;
 }
@@ -105,8 +108,9 @@ self.onmessage = (e: MessageEvent<MonteCarloMessage>) => {
     results.sort((a, b) => a - b);
     
     const sum = results.reduce((a, b) => a + b, 0);
-    const mean = sum / results.length;
-    const variance = results.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / results.length;
+    const safeLen = results.length || 1;
+    const mean = sum / safeLen;
+    const variance = results.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / safeLen;
     const stdDev = Math.sqrt(variance);
     
     const p5 = results[Math.floor(results.length * 0.05)];

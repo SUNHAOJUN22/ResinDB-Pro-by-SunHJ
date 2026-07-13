@@ -20,7 +20,7 @@ import { Product, PropertyValue } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToasts } from "@/contexts/ToastContext";
 import { motion, AnimatePresence } from "motion/react";
-import { aiService } from "@/services/aiService";
+import { aiService } from "@/services/geminiService";
 
 interface EditProductModalProps {
   isOpen: boolean;
@@ -89,7 +89,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = React.memo(({
       // Verify that there are valid properties
       let validCount = 0;
       if (generated && typeof generated === "object") {
-        Object.values(generated).forEach((val: any) => {
+        Object.values(generated).forEach((val: PropertyValue) => {
           if (
             val && 
             val.value !== undefined && 

@@ -86,7 +86,7 @@ const PrecisionLabLogo: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
-  const { language, toggleLanguage } = useLanguage();
+  const { language, toggleLanguage, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
 
   const [isLoading, setIsLoading] = useState(false);
@@ -128,13 +128,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
             <PrecisionLabLogo className="w-12 h-12 md:w-16 md:h-16" />
           </motion.div>
           <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none mb-3">
-            Sign In to ResinDB
+            {t('signInTitle')}
           </h1>
           <div className="flex items-center justify-center gap-2 text-[10px] md:text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest">
             <Sparkles size={14} className="text-amber-500" />
             CNPC ResinDB.pri
             <div className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-700"></div>
-            v2.6.1
+            v3.0.0
           </div>
         </div>
 
@@ -156,7 +156,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
            <div className="space-y-3">
              <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-4">
                <span className="flex-1 h-px bg-slate-200 dark:bg-slate-800"></span>
-               Select Account
+               {t('selectAccount')}
                <span className="flex-1 h-px bg-slate-200 dark:bg-slate-800"></span>
              </div>
              

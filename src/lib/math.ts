@@ -2,29 +2,6 @@
  * Statistical utility functions for data analysis.
  */
 
-// Basic Linear Regression with safety checks
-export const linearRegression = (data: { x: number; y: number }[]) => {
-  const n = data.length;
-  if (n < 2) return { fn: (_x: number) => 0, slope: 0, intercept: 0 };
-  
-  let sumX = 0,
-    sumY = 0,
-    sumXY = 0,
-    sumXX = 0;
-  for (const { x, y } of data) {
-    sumX += x;
-    sumY += y;
-    sumXY += x * y;
-    sumXX += x * x;
-  }
-  
-  const denom = (n * sumXX - sumX * sumX);
-  if (denom === 0) return { fn: (_x: number) => data[0].y, slope: 0, intercept: data[0].y };
-  
-  const slope = (n * sumXY - sumX * sumY) / denom;
-  const intercept = (sumY - slope * sumX) / n;
-  return { fn: (x: number) => slope * x + intercept, slope, intercept };
-};
 
 /**
  * Calculates mean, standard deviation, min, max, and count for a set of numbers.
@@ -34,16 +11,22 @@ export const calculateStats = (data: number[]) => {
     return { mean: 0, stdDev: 0, min: 0, max: 0, count: 0 };
 
   const count = data.length;
-  const mean = data.reduce((sum, val) => sum + val, 0) / count;
+  const safeCount = count > 0 ? count : 1;
+  const mean = data.reduce((sum, val) => sum + val, 0) / safeCount;
   const squareDiffs = data.map((value) => {
     const diff = value - mean;
     return diff * diff;
   });
   const stdDev = Math.sqrt(
-    squareDiffs.reduce((sum, val) => sum + val, 0) / count,
+    Math.max(0, squareDiffs.reduce((sum, val) => sum + val, 0) / safeCount),
   );
-  const min = Math.min(...data);
-  const max = Math.max(...data);
+  let min = data[0];
+  let max = data[0];
+  for (let i = 1; i < data.length; i++) {
+    const v = data[i];
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
 
   return { mean, stdDev, min, max, count };
 };
@@ -58,6 +41,7 @@ export const getConfidenceInterval95 = (
 ) => {
   if (count <= 1) return { lower: mean, upper: mean };
   const z = 1.96;
-  const marginOfError = z * (stdDev / Math.sqrt(count));
+  const safeSqrt = Math.sqrt(Math.max(1, count));
+  const marginOfError = z * (stdDev / safeSqrt);
   return { lower: mean - marginOfError, upper: mean + marginOfError };
 };

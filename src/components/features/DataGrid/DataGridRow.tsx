@@ -138,7 +138,7 @@ export const DataGridRow = React.memo(
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [editingCell, setEditingCell] = useState<{ colKey: string; tempValue: string } | null>(null);
     const [quickEditColKey, setQuickEditColKey] = useState<string | null>(null);
-    const { t, tProp } = useLanguage();
+    const { t, tProp, language } = useLanguage();
 
     const handleCopy = useCallback(
       (e: React.MouseEvent | null, text: string, id: string) => {
@@ -197,7 +197,7 @@ export const DataGridRow = React.memo(
         onClick={handleRowClick}
         onDoubleClick={handleDblClick}
         onContextMenu={handleContextMenu}
-        title={mahalanobisAnomaly?.isOutlier ? `由于 ${mahalanobisAnomaly.contributingFeatures.map(k => tProp(k)).join(" 和 ")} 属性的悖逆，偏离群体协方差结构 95% 阈值` : undefined}
+        title={mahalanobisAnomaly?.isOutlier ? (language === "en" ? `Deviates from 95% joint covariance threshold due to anomaly in ${mahalanobisAnomaly.contributingFeatures.map(k => tProp(k)).join(" and ")}` : `由于 ${mahalanobisAnomaly.contributingFeatures.map(k => tProp(k)).join(" 和 ")} 属性的悖逆，偏离群体协方差结构 95% 阈值`) : undefined}
       >
         <td
           style={{ left: stickyOffsets["_checkbox"] }}

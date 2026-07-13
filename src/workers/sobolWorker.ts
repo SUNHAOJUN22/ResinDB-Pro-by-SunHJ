@@ -134,8 +134,9 @@ self.onmessage = (e: MessageEvent<SobolMessage>) => {
         const vti = sumVti / (2 * N); // Total variance contribution
         const vi = varY - (sumVi / (2 * N)); // First order variance contribution
 
-        const sTi = Math.max(0, vti / varY);
-        let sI = Math.max(0, vi / varY);
+        const safeVarY = Math.abs(varY) > 1e-15 ? varY : 1e-15;
+        const sTi = Math.max(0, vti / safeVarY);
+        let sI = Math.max(0, vi / safeVarY);
         if (sI > sTi) sI = sTi; // Numeric precision guard
 
         firstOrder.push({ name: inputKeys[i], value: sI });

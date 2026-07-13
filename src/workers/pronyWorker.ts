@@ -30,7 +30,7 @@ self.onmessage = (e: MessageEvent<PronyMessage>) => {
         
         const M = data.length;
         const minOmega = Math.max(1e-12, Math.min(...data.map(d=>d.omega)));
-        const maxOmega = Math.max(...data.map(d=>d.omega));
+        const maxOmega = Math.max(1e-12, Math.max(...data.map(d=>d.omega)));
         
         const minTau = 1 / maxOmega;
         const maxTau = 1 / minOmega;
@@ -156,7 +156,8 @@ self.onmessage = (e: MessageEvent<PronyMessage>) => {
         let abaqusStr = "*VISCOELASTIC, TIME=PRONY\n";
         terms.forEach(t => {
             if (t.E > 1e-10) {
-                const ratio = t.E / E_sum;
+                const safeESum = Math.abs(E_sum) > 1e-15 ? E_sum : 1e-15;
+                const ratio = t.E / safeESum;
                 abaqusStr += `${(ratio).toExponential(5)}, ${(ratio).toExponential(5)}, ${t.tau.toExponential(5)}\n`;
             }
         });

@@ -91,8 +91,12 @@ function transposeMatrix(A: number[][]): number[][] {
 self.onmessage = (e: MessageEvent<RSMMessage>) => {
   try {
     const { data } = e.data.payload;
-    if (data.length < 6) {
-      throw new Error("RSM required at least 6 data points to fit a quadratic surface.");
+    const validData = (data || []).filter(p => 
+      p && typeof p.x1 === 'number' && typeof p.x2 === 'number' && typeof p.y === 'number' &&
+      !isNaN(p.x1) && !isNaN(p.x2) && !isNaN(p.y)
+    );
+    if (validData.length < 6) {
+      throw new Error("RSM requires at least 6 valid data points to fit a quadratic surface.");
     }
     
     // Model: y = b0 + b1*x1 + b2*x2 + b11*x1^2 + b22*x2^2 + b12*x1*x2
@@ -101,7 +105,7 @@ self.onmessage = (e: MessageEvent<RSMMessage>) => {
     let minX1 = Infinity, maxX1 = -Infinity;
     let minX2 = Infinity, maxX2 = -Infinity;
     
-    for (const p of data) {
+    for (const p of validData) {
       X.push([1, p.x1, p.x2, p.x1 * p.x1, p.x2 * p.x2, p.x1 * p.x2]);
       Y.push([p.y]);
       if (p.x1 < minX1) minX1 = p.x1;

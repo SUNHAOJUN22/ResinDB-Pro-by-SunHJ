@@ -3,7 +3,7 @@ import { Product, ColumnConfig } from '@/types/index';
 import { RADAR_KEYS } from '@/utils/productUtils';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Search, RotateCcw } from "lucide-react";
-import * as echarts from "echarts";
+import type { ECharts } from "echarts";
 import { motion } from "motion/react";
 
 export const SkeletonRow: React.FC<{ columns: ColumnConfig[] }> = ({ columns }) => (
@@ -85,53 +85,66 @@ export const QuickRadarPopup: React.FC<{
 
   useEffect(() => {
     if (!chartRef.current) return;
-    const myChart =
-      echarts.getInstanceByDom(chartRef.current) ||
-      echarts.init(chartRef.current);
+    let active = true;
+    let myChart: ECharts | null = null;
 
-    // Filter RADAR_KEYS to only include properties that exist on this product
-    let availableProps = RADAR_KEYS.filter(
-      (p) => product.properties?.[p] !== undefined,
-    );
+    import("echarts").then((echartsLib) => {
+      if (!active || !chartRef.current) return;
 
-    // If less than 3 properties match, try to find any numeric properties
-    if (availableProps.length < 3) {
-      const numericProps = Object.keys(product.properties).filter((k) => {
-        const val = product.properties?.[k]?.value;
-        return typeof val === "number" || !isNaN(parseFloat(String(val)));
+      myChart =
+        echartsLib.getInstanceByDom(chartRef.current) ||
+        echartsLib.init(chartRef.current);
+
+      // Filter RADAR_KEYS to only include properties that exist on this product
+      let availableProps = RADAR_KEYS.filter(
+        (p) => product.properties?.[p] !== undefined,
+      );
+
+      // If less than 3 properties match, try to find any numeric properties
+      if (availableProps.length < 3) {
+        const numericProps = Object.keys(product.properties).filter((k) => {
+          const val = product.properties?.[k]?.value;
+          return typeof val === "number" || !isNaN(parseFloat(String(val)));
+        });
+        availableProps = numericProps.slice(0, 5); // Take up to 5 numeric properties
+      }
+
+      const props = availableProps.length >= 3 ? availableProps : RADAR_KEYS;
+
+      const values = props.map((p) => {
+        const v = product.properties?.[p]?.value;
+        return typeof v === "number" ? v : parseFloat(String(v)) || 0;
       });
-      availableProps = numericProps.slice(0, 5); // Take up to 5 numeric properties
-    }
 
-    const props = availableProps.length >= 3 ? availableProps : RADAR_KEYS;
-
-    const values = props.map((p) => {
-      const v = product.properties?.[p]?.value;
-      return typeof v === "number" ? v : parseFloat(String(v)) || 0;
-    });
-
-    myChart.setOption({
-      radar: {
-        indicator: props.map((p) => ({ name: tProp(p).slice(0, 8) })),
-        shape: "circle",
-        splitNumber: 3,
-        axisName: { fontSize: 8, color: "#94a3b8" },
-      },
-      series: [
-        {
-          type: "radar",
-          data: [
-            {
-              value: values,
-              areaStyle: { color: "rgba(99, 102, 241, 0.3)" },
-              lineStyle: { color: "#6366f1" },
-            },
-          ],
-          symbol: "none",
+      myChart.setOption({
+        radar: {
+          indicator: props.map((p) => ({ name: tProp(p).slice(0, 8) })),
+          shape: "circle",
+          splitNumber: 3,
+          axisName: { fontSize: 8, color: "#94a3b8" },
         },
-      ],
+        series: [
+          {
+            type: "radar",
+            data: [
+              {
+                value: values,
+                areaStyle: { color: "rgba(99, 102, 241, 0.3)" },
+                lineStyle: { color: "#6366f1" },
+              },
+            ],
+            symbol: "none",
+          },
+        ],
+      });
     });
-    return () => myChart.dispose();
+
+    return () => {
+      active = false;
+      if (myChart) {
+        myChart.dispose();
+      }
+    };
   }, [product, tProp]);
 
   const left = Math.min(position.x + 20, window.innerWidth - 280);

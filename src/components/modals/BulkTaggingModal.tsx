@@ -169,11 +169,13 @@ export const BulkTaggingModal: React.FC<BulkTaggingModalProps> = ({
                   {(["append", "overwrite", "remove"] as const).map((m) => {
                     const active = mode === m;
                     return (
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         key={m}
                         type="button"
                         onClick={() => setMode(m)}
-                        className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all ${
+                        className={`flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all cursor-pointer ${
                           active
                             ? "bg-indigo-50 border-indigo-200 dark:bg-indigo-950/40 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400 shadow-sm"
                             : "bg-white border-slate-200 hover:border-slate-300 dark:bg-slate-900 dark:border-slate-800 dark:hover:border-slate-700 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
@@ -189,7 +191,7 @@ export const BulkTaggingModal: React.FC<BulkTaggingModalProps> = ({
                           {m === "overwrite" && (isZh ? "全部清空并替换" : "Replace entirely")}
                           {m === "remove" && (isZh ? "清除选中匹配项" : "Subtract matching")}
                         </span>
-                      </button>
+                      </motion.button>
                     );
                   })}
                 </div>
@@ -272,7 +274,9 @@ export const BulkTaggingModal: React.FC<BulkTaggingModalProps> = ({
                     const tagStr = isZh ? p.zh : p.en;
                     const isSelected = tags.includes(tagStr);
                     return (
-                      <button
+                      <motion.button
+                        whileHover={isSelected ? {} : { scale: 1.05 }}
+                        whileTap={isSelected ? {} : { scale: 0.95 }}
                         key={idx}
                         type="button"
                         onClick={() => addTag(tagStr)}
@@ -280,11 +284,11 @@ export const BulkTaggingModal: React.FC<BulkTaggingModalProps> = ({
                         className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-all ${
                           isSelected
                             ? "bg-slate-100 border-slate-200 text-slate-400 dark:bg-slate-800 dark:border-slate-700 cursor-not-allowed"
-                            : "bg-white border-slate-200 hover:border-slate-300 dark:bg-slate-900/50 dark:border-slate-800 dark:hover:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                            : "bg-white border-slate-200 hover:border-slate-300 dark:bg-slate-900/50 dark:border-slate-800 dark:hover:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
                         }`}
                       >
                         {tagStr}
-                      </button>
+                      </motion.button>
                     );
                   })}
                 </div>
@@ -300,7 +304,9 @@ export const BulkTaggingModal: React.FC<BulkTaggingModalProps> = ({
                     {existingTagsUnion.map((tag, idx) => {
                       const isSelected = tags.includes(tag);
                       return (
-                        <button
+                        <motion.button
+                          whileHover={isSelected ? {} : { scale: 1.05 }}
+                          whileTap={isSelected ? {} : { scale: 0.95 }}
                           key={idx}
                           type="button"
                           onClick={() => addTag(tag)}
@@ -308,11 +314,11 @@ export const BulkTaggingModal: React.FC<BulkTaggingModalProps> = ({
                           className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-all ${
                             isSelected
                               ? "bg-slate-100 border-slate-200 text-slate-400 dark:bg-slate-800 dark:border-slate-700 cursor-not-allowed"
-                              : "bg-white border-slate-200 hover:border-slate-300 dark:bg-slate-900/50 dark:border-slate-800 dark:hover:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                              : "bg-white border-slate-200 hover:border-slate-300 dark:bg-slate-900/50 dark:border-slate-800 dark:hover:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
                           }`}
                         >
                           {tag}
-                        </button>
+                        </motion.button>
                       );
                     })}
                   </div>
