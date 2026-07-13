@@ -63,7 +63,7 @@ ResinDB Pro 采用严格可移植的**三层体系架构模型**，使底座展�
 作为顶尖工业级软件，本系统设计了极强的**防腐性与容灾性数据隔离安全机制**。整个核心高分子和催化剂静态牌号数据集已被物理剥离，独立存储于指定区域：
 
 * **分离式核心存储**：全球/全石油化系统核心牌号字典整体集中存放于 `/src/data/polymerDatabase.json`，不再与业务逻辑、路由或展现逻辑产生硬编码混合。
-* **物理删除零阻断 (Resilient Zero-Compilation Fail)**：为了应对在真实大规模部署和日常开发中因误操作或物理磁盘暴雷导致该 `polymerDatabase.json` 文件被**完全删除**的场景，系统采用先进得��于 Vite 编译期的 `import.meta.glob` 表达式动态探针。
+* **物理删除零阻断 (Resilient Zero-Compilation Fail)**：为了应对在真实大规模部署和日常开发中因误操作或物理磁盘暴雷导致该 `polymerDatabase.json` 文件被**完全删除**的场景，系统采用先进得基于 Vite 编译期的 `import.meta.glob` 表达式动态探针。
 * **双通道优雅降级 (Graceful Fallback)**：
   在系统启动及底层 IndexedDB 种子初始化阶段，动态加载器优先检验指定区域；若发现该数据库文件被物理删除，加载器会向全局 Logger 发送等级为 `WARN` 的工艺安全警告，并瞬间强制激活预先备用的**特高强度防御型自恰物理牌号（HDPE 5000S 与 PP T30S 核心样品备份）**。
   
@@ -80,12 +80,12 @@ ResinDB Pro 采用严格可移植的**三层体系架构模型**，使底座展�
 | `carreauWorker.ts` | **Carreau-Yasuda 剪切流变流动本构通用拟合方程**:<br>$$\eta(\dot{\gamma}) = \eta_{\infty} + (\eta_0 - \eta_{\infty})[1 + (\lambda \dot{\gamma})^a]^{\frac{n-1}{a}}$$ | 动态剪切速率变温扫频振幅向量 | 精确解算出材料宏观零剪切粘度 $\eta_0$、松弛时间常数 $\lambda$，定量判定产品挤出拉膜抗表面破裂和鲨鱼皮特性。 |
 | `wlfWorker.ts` | **William-Landel-Ferry (WLF) 时温等效动力本构相平移变换**:<br>$$\log a_T = \frac{-C_1(T - T_g)}{C_2 + (T - T_g)}$$ | 多重扫温频率 DMA（动态热力学分析仪）阻尼损失因子谱 | 依靠时域频域温度相互换算，将试验局限频率（如 $100\text{Hz}$）拓宽拟合出 $10^{10}\text{Hz}$ 的高阻尼降噪与力学松弛谱线。 |
 | `pronyWorker.ts` | **Prony Series 时域蠕变粘弹性离散麦克斯韦应力松弛模型**:<br>$$G(t) = G_e + \sum_{i=1}^N G_i \exp\left(-\frac{t}{\tau_i}\right)$$ | DMA 特征松弛扫频阶数系数阵列 | 估计高分子复合材料在连续长载荷形变（蠕变）下的结构应力松弛时间谱线，用于汽车/压力管道安全评测。 |
-| `weibullWorker.ts` | **Weibull 二参数极限极限应变力学疲劳寿命失效概率分布**:<br>$$F(t) = 1 - \exp\left(-\left(\frac{t}{\eta}\right)^\beta\right)$$ | 树脂高频率断裂强度测试及高温持久蠕变寿命序列 | 算出长效疲劳破坏概率，输出失效形状参数 $\beta$。辅助合成���迅速辨别由结晶球晶尺寸引起的力学退化。 |
+| `weibullWorker.ts` | **Weibull 二参数极限极限应变力学疲劳寿命失效概率分布**:<br>$$F(t) = 1 - \exp\left(-\left(\frac{t}{\eta}\right)^\beta\right)$$ | 树脂高频率断裂强度测试及高温持久蠕变寿命序列 | 算出长效疲劳破坏概率，输出失效形状参数 $\beta$。辅助合成室迅速辨别由结晶球晶尺寸引起的力学退化。 |
 | `arrheniusWorker.ts` | **Arrhenius 电化学/热氧化链解聚能量活化能热老化模型**:<br>$$k = A \exp\left(-\frac{E_a}{R T}\right)$$ | TGA 热分解终点质量残余、各温度下热氧损耗速率 | 解构当前高聚物大分子链化学共价键断键难度，判定该牌号产品的长周期实验室加速热氧老化衰减。 |
 | `kineticsWorker.ts` | **Avrami 升/降结晶动力学方程**:<br>$$1 - X_t = \exp(-k t^n)$$ | 熔体差示扫描量热计 (DSC) 降温晶粒形核与生长扫频谱 | 描绘出聚合产品在大规模后加工工艺中，结晶速度与晶核形成参数 $n$，为模具温控开合时间提供最合理的设定区间。 |
 | `bayesWorker.ts` | **贝叶斯不确定性多点位高分子物化性状联合估测模型** | 进料质量偏差、单体共聚比例高频波动谱 | 在缺乏实测取样阶段，输出产品实时在线熔指（MFR）、微观密度指标的在产均值变位概率。 |
 | `sobolWorker.ts` | **Sobol’ Global Sensitivity 全局一阶/全阶多变量敏感性分解分析** | 回收再生料掺杂比率、多抗氧剂助剂微克配比向量 | 定量判定各种主辅配方的细微波动对材料最核心物理指标（如拉伸强度、气味等级）产生的直接作用占比。 |
-| `monteCarloWorker.ts`| **高维多级多��道 Monte Carlo 配方容差不确定性投料推导引擎** | 原料单体挥发分、压强周期波动波动统计方差 | 历经 10 万次混沌步长高频率拟合算，预测该在产牌号大规模出厂的 Cp 与 Cpk 材料质量稳定性指数。 |
+| `monteCarloWorker.ts`| **高维多级多通道 Monte Carlo 配方容差不确定性投料推导引擎** | 原料单体挥发分、压强周期波动波动统计方差 | 历经 10 万次混沌步长高频率拟合算，预测该在产牌号大规模出厂的 Cp 与 Cpk 材料质量稳定性指数。 |
 | `copulaWorker.ts` | **Copula 联合极限偏态非线性物理参数应力关联分析器** | 拉伸强度与耐划伤强度边缘分布散点矩阵 | 脱开简陋的 Pearson 线性假设，发现物理极限特性在材料中的内在耦合规律。|
 | `similarityWorker.ts`| **基于 Mahalanobis 马氏和欧氏特征向量加权的关联材料对标器** | 16 个反映热/力/加工特性的高维物理极坐标数组 | 采用多特征加权矩阵，秒级搜索系统全部谱库，完成物理替代品推荐。 |
 | `kmeansWorker.ts` | **K-Means 高维特征空间无监督高分子牌号智能划分聚类** | 全球/全国同类树脂牌号力学和经济学特征离散阵列 | 完成自动智能归类排版，为销售和研究提供大材料层级的精细对标聚类分析。 |
@@ -97,7 +97,7 @@ ResinDB Pro 采用严格可移植的**三层体系架构模型**，使底座展�
 本系统关联谱图的核心（位于 `/src/components/charts/DependencyMapD3.tsx`）采用定制级的 D3.js v7 进行设计开发，专为化学制造、改性塑料合成制备关系网研发：
 
 ```typescript
-// 1. 初始化两极���尼引力约束
+// 1. 初始化两极阻尼引力约束
 const simulation = d3.forceSimulation(data.nodes)
   .force("link", d3.forceLink(data.links).id((d: any) => d.id).distance(params.linkDistance))
   .force("charge", d3.forceManyBody().strength(-params.repulsion)) // 排斥阻尼
@@ -116,7 +116,7 @@ const simulation = d3.forceSimulation(data.nodes)
      return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
      ```
 3. **级联 Trace 双向过滤与发光轨迹**:
-   * 支持 **Upstream 溯��� (蓝色)**、**Both 双向关联 (紫色)**、**Downstream 流布 (绿色)**。
+   * 支持 **Upstream 溯源 (蓝色)**、**Both 双向关联 (紫色)**、**Downstream 流布 (绿色)**。
    * 触发特异性节点分析时，无关联网络节点大幅度调减透明度至极具未来感的 `0.05`。特异相关的上下游连线上启动由 `flowingGradient` 与 `stroke-dasharray` 双重映射的匀速高分子流动粒子，生动体现合成化学供应链的能流、物流方向。
 4. **智能固定机制 (Pinning) 与快捷维基/SciFinder 检索**:
    * 一键固定/解固。支持对特特定牌号位置拖拽拖放锁定 (`node.fx = node.x`)，不再跟随引力晃动。
@@ -202,7 +202,7 @@ const simulation = d3.forceSimulation(data.nodes)
 
 ## 🚀 完美、保真使用方法全景指南 (User Manual Workflows)
 
-为确保科研工作者开箱即用，以下是材料从对标到计算的最佳全场景科研流程��
+为确保科研工作者开箱即用，以下是材料从对标到计算的最佳全场景科研流程：
 
 ### 流程阶段 A：高性能过滤定位
 1. **树型层树选择**: 首现在左侧 `TreeSidebar` 框中选定要研究的聚合物树突骨架（例如选择：`聚合树脂-聚丙烯-茂金属共混PP`）。
@@ -268,7 +268,7 @@ npx firebase deploy --only hosting
 
 ## 🚀 完美下一步 v3.1-Beta 版迭代升级计划 (v3.1-Beta Roadmap)
 
-为了进一步引领合成树脂理化计算智能化革新，中国石油化工研究院数字化实验室团队特制定了 **v3.1-Beta 升级路线图**。下一���，我们将重点在**计算效率、硬件感知、AI 图谱生成及边缘网格**四大极性核心方向，进行高维度突破：
+为了进一步引领合成树脂理化计算智能化革新，中国石油化工研究院数字化实验室团队特制定了 **v3.1-Beta 升级路线图**。下一步，我们将重点在**计算效率、硬件感知、AI 图谱生成及边缘网格**四大极性核心方向，进行高维度突破：
 
 ```
                     ┌────────────────────────────────────────────────────────┐
@@ -279,7 +279,7 @@ npx firebase deploy --only hosting
                     ├────────────────────┼───────────────────────────────────┤
                     │   Gemini 视觉配方  │   TanStack Grid v5 多层嵌套网格   │
                     │   (物化配方草图提取)│   (单元格公式动态跨域求和解析)    │
-                    └────────────────────┴───────────────────────────���───────┘
+                    └────────────────────┴───────────────────────────────────┘
 ```
 
 ### 💥 1. 基于 Rust WebAssembly (Wasm) 的高维物理本构超速求解器

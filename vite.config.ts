@@ -30,13 +30,16 @@ export default defineConfig(() => {
       },
       build: {
         outDir: 'dist',
-        chunkSizeWarningLimit: 2000,
+        chunkSizeWarningLimit: 2500,
         rollupOptions: {
             output: {
                 manualChunks(id) {
                     if (id.includes('node_modules')) {
                         if (id.includes('echarts') || id.includes('zrender')) {
                             return 'vendor-echarts';
+                        }
+                        if (id.includes('lucide-react') || id.includes('motion')) {
+                            return 'vendor-ui-libs';
                         }
                         return 'vendor';
                     }
