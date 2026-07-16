@@ -1,107 +1,143 @@
-import { expect, test, describe } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { FormulaEngine } from '../../src/lib/formulaParser';
 import { FormulaConfig, Product } from '../../src/types/index';
 
-describe('🧪 FormulaEngine Scientific Calculations & Safety Sandbox Suite', () => {
+function createProduct(properties: Product['properties']): Product {
+  return {
+    id: 'p1',
+    gradeName: 'TestPP',
+    manufacturer: 'TestMaker',
+    manufacturerId: 'm1',
+    categoryIds: ['cat1'],
+    createdAt: '2026-06-17',
+    updatedAt: '2026-06-17',
+    properties,
+  };
+}
+
+describe('FormulaEngine scientific calculations and parser safety', () => {
   const engine = new FormulaEngine();
 
-  describe('1. Dependency Extraction', () => {
-    test('Should extract multiple nested bracket dependencies', () => {
-      const expr = "Props['密度'] * 100 + props['MFR'] / Props['弯曲模量']";
-      const deps = engine.extractDependencies(expr);
-      expect(deps).toEqual(['密度', 'MFR', '弯曲模量']);
+  describe('dependency extraction', () => {
+    test('extracts multiple bracket dependencies', () => {
+      const dependencies = engine.extractDependencies(
+        "Props['密度'] * 100 + props['MFR'] / Props['弯曲模量']",
+      );
+      expect(dependencies).toEqual(['密度', 'MFR', '弯曲模量']);
     });
 
-    test('Should return empty array when no bracket properties exist', () => {
-      const expr = "Math.sqrt(100) * 4.2";
-      const deps = engine.extractDependencies(expr);
-      expect(deps).toEqual([]);
-    });
-  });
-
-  describe('2. Expression Sanitization', () => {
-    test('Should convert Props brackets to internal dictionary accesses', () => {
-      const expr = "Props['Density'] * props['MFR']";
-      const sanitized = engine.sanitize(expr);
-      expect(sanitized).toBe("(p['Density'] || 0) * (p['MFR'] || 0)");
-    });
-
-    test('Should append Math prefix to standard mathematical functions', () => {
-      const expr = "sqrt(pow(Props['Density'], 2) + abs(-4))";
-      const sanitized = engine.sanitize(expr);
-      expect(sanitized).toBe("Math.sqrt(Math.pow((p['Density'] || 0), 2) + Math.abs(-4))");
+    test('returns an empty list when no property references exist', () => {
+      expect(engine.extractDependencies('Math.sqrt(100) * 4.2')).toEqual([]);
     });
   });
 
-  describe('3. Topological Sort & Cyclic Detection', () => {
-    test('Should correctly sort formulas by dependency hierarchy', () => {
+  describe('formula-editor preview normalization', () => {
+    test('converts property brackets to internal dictionary accesses', () => {
+      expect(engine.sanitize("Props['Density'] * props['MFR']")).toBe(
+        "(p['Density'] || 0) * (p['MFR'] || 0)",
+      );
+    });
+
+    test('adds Math prefixes to supported bare functions', () => {
+      expect(engine.sanitize("sqrt(pow(Props['Density'], 2) + abs(-4))")).toBe(
+        "Math.sqrt(Math.pow((p['Density'] || 0), 2) + Math.abs(-4))",
+      );
+    });
+  });
+
+  describe('topological ordering', () => {
+    test('sorts formulas by dependency hierarchy', () => {
       const formulas: FormulaConfig[] = [
-        { id: 'f1', name: 'VolumeScore', expression: "Props['Density'] * 10", unit: '' },
-        { id: 'f2', name: 'CompositeScore', expression: "Props['VolumeScore'] + Props['Density']", unit: '' }
+        {
+          id: 'f1',
+          name: 'VolumeScore',
+          expression: "Props['Density'] * 10",
+          unit: '',
+        },
+        {
+          id: 'f2',
+          name: 'CompositeScore',
+          expression: "Props['VolumeScore'] + Props['Density']",
+          unit: '',
+        },
       ];
 
-      const sorted = engine.buildTopologicalOrder(formulas);
-      expect(sorted.map(s => s.id)).toEqual(['f1', 'f2']);
+      expect(engine.buildTopologicalOrder(formulas).map((formula) => formula.id)).toEqual([
+        'f1',
+        'f2',
+      ]);
     });
 
-    test('Should throw error when cyclical reference is detected', () => {
+    test('rejects cyclical references', () => {
       const formulas: FormulaConfig[] = [
         { id: 'f1', name: 'A', expression: "Props['B'] * 2", unit: '' },
-        { id: 'f2', name: 'B', expression: "Props['A'] + 1", unit: '' }
+        { id: 'f2', name: 'B', expression: "Props['A'] + 1", unit: '' },
       ];
-
-      expect(() => engine.buildTopologicalOrder(formulas)).toThrow('Cyclic dependency detected');
+      expect(() => engine.buildTopologicalOrder(formulas)).toThrow(
+        'Cyclic dependency detected',
+      );
     });
   });
 
-  describe('4. Sandbox Security & Script Injection Guard', () => {
-    test('Should reject dangerous global objects (window, document, eval, fetch)', () => {
-      const dangerous1 = "window.alert(1)";
-      const dangerous2 = "eval('console.log(1)')";
-      const dangerous3 = "fetch('http://attacker.com')";
-      const dangerous4 = "Props['__proto__']";
-
-      expect(engine.validate(dangerous1)).toContain('Security violation');
-      expect(engine.validate(dangerous2)).toContain('Security violation');
-      expect(engine.validate(dangerous3)).toContain('Security violation');
-      expect(engine.validate(dangerous4)).toContain('Security violation');
+  describe('parser security boundary', () => {
+    test.each([
+      'window.alert(1)',
+      "eval('console.log(1)')",
+      "fetch('http://attacker.example')",
+      "Props['__proto__']",
+      'globalThis.constructor',
+    ])('rejects dangerous expression: %s', (expression) => {
+      expect(engine.validate(expression)).toContain('Security violation');
     });
 
-    test('Should accept valid mathematical equations', () => {
-      const valid = "Props['密度'] * 1.5 + sqrt(10)";
-      expect(engine.validate(valid)).toBeNull();
+    test.each([
+      '{}',
+      'Math.random()',
+      "Props['Density'].constructor('return 1')()",
+      "Props['Density'] ? 1 : 0",
+    ])('rejects syntax outside the numeric grammar: %s', (expression) => {
+      expect(engine.validate(expression)).not.toBeNull();
+    });
+
+    test('accepts supported arithmetic and white-listed functions', () => {
+      expect(engine.validate("Props['密度'] * 1.5 + sqrt(10)")).toBeNull();
+      expect(engine.validate('max(1, 2, 3) + 2^3 + Math.PI')).toBeNull();
     });
   });
 
-  describe('5. Execution & Compilation Plan', () => {
-    test('Should compute multiple dependent formulas in sequence', () => {
+  describe('compiled execution plan', () => {
+    test('computes dependent formulas in sequence', () => {
       const formulas: FormulaConfig[] = [
-        { id: 'f1', name: 'DoubleDensity', expression: "Props['密度'] * 2", unit: '' },
-        { id: 'f2', name: 'TripleDensity', expression: "Props['DoubleDensity'] + Props['密度']", unit: '' }
+        {
+          id: 'f1',
+          name: 'DoubleDensity',
+          expression: "Props['密度'] * 2",
+          unit: '',
+        },
+        {
+          id: 'f2',
+          name: 'TripleDensity',
+          expression: "Props['DoubleDensity'] + Props['密度']",
+          unit: '',
+        },
       ];
 
-      const product: Product = {
-        id: 'p1',
-        gradeName: 'TestPP',
-        manufacturer: 'TestMaker',
-        manufacturerId: 'm1',
-        categoryIds: ['cat1'],
-        createdAt: '2026-06-17',
-        updatedAt: '2026-06-17',
-        properties: {
-          '密度': { value: 0.9, unit: 'g/cm³' }
-        }
-      };
+      const results = engine.compileGraph(formulas)(
+        createProduct({ 密度: { value: 0.9, unit: 'g/cm³' } }),
+      );
+      expect(results.f1).toBeCloseTo(1.8);
+      expect(results.f2).toBeCloseTo(2.7);
+    });
 
-      const executor = engine.compileGraph(formulas);
-      const results = executor(product);
-
-      expect(results['f1']).toBeCloseTo(1.8);
-      expect(results['f2']).toBeCloseTo(2.7);
+    test('normalizes non-finite results to zero', () => {
+      const formulas: FormulaConfig[] = [
+        { id: 'division', name: 'Division', expression: '1 / 0', unit: '' },
+        { id: 'sqrt', name: 'Sqrt', expression: 'sqrt(-1)', unit: '' },
+      ];
+      expect(engine.compileGraph(formulas)(createProduct({}))).toEqual({
+        division: 0,
+        sqrt: 0,
+      });
     });
   });
 });
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed
