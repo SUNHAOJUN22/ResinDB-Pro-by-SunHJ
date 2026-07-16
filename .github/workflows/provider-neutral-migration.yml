@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -75,6 +78,8 @@ jobs:
           git commit -m 'refactor: remove Gemini integration and use configurable AI API'
           git push origin HEAD:main
 
-      - name: Delete obsolete temporary branch
+      - name: Delete obsolete temporary branches
         shell: bash
-        run: git push origin --delete agent/stabilize-security-readme-ci || true
+        run: |
+          git push origin --delete agent/stabilize-security-readme-ci || true
+          git push origin --delete migration-trigger || true
