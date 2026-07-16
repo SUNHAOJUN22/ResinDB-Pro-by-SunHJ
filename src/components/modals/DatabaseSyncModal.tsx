@@ -8,7 +8,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useToasts } from "@/contexts/ToastContext";
 import { useData } from "@/contexts/DataContext";
 import { PRODUCT_CATALOG } from "@/config/constants";
-import { aiService } from "@/services/geminiService";
+import { aiService } from "@/services/aiService";
 import { getValidPropertiesCount } from "@/utils/productUtils";
 
 interface DatabaseSyncModalProps {

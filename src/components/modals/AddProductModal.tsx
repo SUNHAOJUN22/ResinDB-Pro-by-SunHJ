@@ -17,7 +17,7 @@ import { Product, PropertyValue } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToasts } from "@/contexts/ToastContext";
 import { motion, AnimatePresence } from "motion/react";
-import { aiService } from "@/services/geminiService";
+import { aiService } from "@/services/aiService";
 
 interface AddProductModalProps {
   isOpen: boolean;

@@ -96,7 +96,7 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
       setIsAiLoading(true);
       setAiError(null);
       try {
-        const { getAiInsights } = await import("@/services/geminiService");
+        const { getAiInsights } = await import("@/services/aiService");
         const result = await getAiInsights(
           [displayProduct],
           `Provide a technical deep-dive into this specific material. Discuss its unique property balance and suggest the most challenging automotive or electrical application it would excel in.`,

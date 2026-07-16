@@ -17,7 +17,7 @@ import {
   CornerDownRight
 } from "lucide-react";
 import { Product, ProductUpdates } from '@/types/index';
-import { getAiInsights } from "@/services/geminiService";
+import { getAiInsights } from "@/services/aiService";
 import { logger } from "@/lib/logger";
 import { useLanguage } from "@/contexts/LanguageContext";
 import Markdown from "react-markdown";

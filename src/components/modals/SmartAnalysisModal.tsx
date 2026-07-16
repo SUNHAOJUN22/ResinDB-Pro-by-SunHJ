@@ -11,7 +11,7 @@ import {
 import { Product } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { motion, AnimatePresence } from "motion/react";
-import { aiService } from "@/services/geminiService";
+import { aiService } from "@/services/aiService";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -90,7 +90,7 @@ export const SmartAnalysisModal: React.FC<SmartAnalysisModalProps> = ({
                   <h3 className="text-base font-serif font-black text-white tracking-tight leading-none mb-1.5 flex items-center gap-2">
                     {t("smartAnalysis", "AI Smart Insights")}
                     <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full border border-white/10 font-mono text-purple-200 uppercase tracking-tighter">
-                      Gemini PRO
+                      AI PRO
                     </span>
                   </h3>
                   <p className="text-[10px] font-mono text-slate-400 uppercase tracking-[0.2em] truncate">
@@ -125,7 +125,7 @@ export const SmartAnalysisModal: React.FC<SmartAnalysisModalProps> = ({
                   <div className="space-y-2">
                     <h4 className="text-lg font-serif font-bold text-slate-900 dark:text-white">{language === "en" ? "Synthesizing Material Wisdom" : "正在提取材料智慧"}</h4>
                     <p className="text-xs font-mono text-slate-500 uppercase tracking-widest max-w-xs leading-relaxed">
-                      {language === "en" ? "Gemini is currently cross-referencing technical specifications with market trends and competitor portfolios..." : "Gemini 正在将技术规格参数与市场趋势及竞品数据进行交叉对比与分析..."}
+                      {language === "en" ? "AI is currently cross-referencing technical specifications with market trends and competitor portfolios..." : "AI 正在将技术规格参数与市场趋势及竞品数据进行交叉对比与分析..."}
                     </p>
                   </div>
                   <div className="flex gap-1.5">

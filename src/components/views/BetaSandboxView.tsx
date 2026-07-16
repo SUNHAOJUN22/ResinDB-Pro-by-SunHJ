@@ -1030,7 +1030,7 @@ export const BetaSandboxView: React.FC = () => {
         extractedModulus: tpl.modulus,
         matchCertainty: tpl.confidence
       });
-      addToast('success', `Gemini Multi-modal extracted specs for [${tpl.gradeName}]!`);
+      addToast('success', `AI Multi-modal extracted specs for [${tpl.gradeName}]!`);
     }, 2200);
   };
 
@@ -1356,7 +1356,7 @@ export const BetaSandboxView: React.FC = () => {
             {[
               { id: 'wasm' as const, icon: Cpu, name: t('sandboxWasmSolver') },
               { id: 'telemetry' as const, icon: Wifi, name: t('sandboxTelemetry') },
-              { id: 'gemini' as const, icon: Scan, name: t('sandboxGemini') },
+              { id: 'gemini' as const, icon: Scan, name: t('sandboxAI') },
               { id: 'grid' as const, icon: TableProperties, name: t('sandboxGrid') }
             ].map(tab => (
               <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
@@ -2715,7 +2715,7 @@ export const BetaSandboxView: React.FC = () => {
                 }`}>
                   <h3 className="text-[11px] font-bold tracking-wider font-mono uppercase text-purple-400 flex items-center gap-1.5">
                     <Scan size={13} className="text-purple-400" />
-                    Gemini Multimodal Spec Feed 机器视觉输入
+                    AI Multimodal Spec Feed 机器视觉输入
                   </h3>
                   <p className="text-[10px] text-slate-400 leading-normal leading-relaxed">
                     选择任一光谱图或检测报告模板。多模态大模型可即时解析分子曲线、峰值特征或手写试样记录，生成精确的物性结构化参数特征描述。 / Choose a spectroscopy template. The multimodal LLM parses the molecular curves or handwritten test books, generating structural specifications under zero shot logic.
@@ -2810,7 +2810,7 @@ export const BetaSandboxView: React.FC = () => {
                         <div className="space-y-2 text-slate-600">
                           <FileSearch size={24} className="mx-auto text-slate-800 animate-pulse" />
                           <p className="text-[8px] font-mono leading-relaxed uppercase tracking-wider max-w-[160px] mx-auto">
-                            请在左方提交光谱或检测文档模板以开启多模态人工智能分析。 / Submit a chemical spec document template on the left to activate Gemini Vision extraction.
+                            请在左方提交光谱或检测文档模板以开启多模态人工智能分析。 / Submit a chemical spec document template on the left to activate AI Vision extraction.
                           </p>
                         </div>
                       )}

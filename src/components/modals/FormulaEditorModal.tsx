@@ -35,7 +35,7 @@ import { DependencyHeatmap } from "@/components/features/Product/DependencyHeatm
 import { 
   getChemicalReplacementSuggestions, 
   AiSuggestionEngineResponse 
-} from "@/services/geminiService";
+} from "@/services/aiService";
 import { safeStorage } from "@/lib/utils";
 
 
@@ -1385,7 +1385,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                             Awaiting Trigger Parameters
                           </h4>
                           <p className="text-xs text-slate-400 leading-relaxed font-semibold">
-                            Select a target physical property from the left panel and click "Generate Durability suggestions" to launch the Gemini-powered scientific suggestion engine.
+                            Select a target physical property from the left panel and click "Generate Durability suggestions" to launch the AI-powered scientific suggestion engine.
                           </p>
                         </div>
                       </div>
