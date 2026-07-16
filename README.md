@@ -1,4 +1,4 @@
-# 🧪 ResinDB Pro v3.1 — 工业级合成树脂产品数据与科研智能分析系统 (PRI-Synthetic Resin)
+# 🧪 ResinDB Pro v3.1.0 — 工业级合成树脂产品数据与科研智能分析系统 (PRI-Synthetic Resin)
 
 [![React Version](https://img.shields.io/badge/React-19.0.0-blue?style=flat-square&logo=react)](https://react.dev/)
 [![Vite Version](https://img.shields.io/badge/Vite-6.4.1-646CFF?style=flat-square&logo=vite)](https://vite.dev/)
@@ -7,7 +7,7 @@
 [![Framer Motion](https://img.shields.io/badge/Framer_Motion-11.1.7-FF69B4?style=flat-square&logo=framer)](https://www.framer.com/motion/)
 [![License](https://img.shields.io/badge/License-PRI%20Commercial%20Demonstrator-red?style=flat-square)](https://www.cnpc.com.cn/pri/)
 
-**ResinDB Pro** 是专为**中国石油化工研究院 (PRI) - 合成树脂研究所**量身定制的高性能、数据密集型合成树脂全生命周期科研管理和理化特性智能分析系统。系统全面实现对聚乙烯 (PE)、聚丙烯 (PP)、聚氯乙烯 (PVC)、聚苯乙烯类共聚物 (ABS) 等各种通用与高端树脂材料的**出厂指标合规化监控、流变动力学多物理场曲线等数、重均/数均分子量分布 (GPC) 曲线重构、刚韧物理平衡 Ashby 空间探索、分子失效概率估计**。
+**ResinDB Pro v3.1.0** 是专为**中国石油化工研究院 (PRI) - 合成树脂研究所**量身定制的高性能、数据密集型合成树脂全生命周期科研管理和理化特性智能分析系统。该系统全面覆盖聚乙烯 (PE, 包括 HDPE/LDPE/LLDPE)、聚丙烯 (PP, 包括均聚/无规共聚/抗冲共聚)、聚氯乙烯 (PVC)、聚苯乙烯类共聚物 (ABS) 等通用与高端树脂材料的**出厂指标合规化监控、流变动力学多物理场曲线等数、重均/数均分子量分布 (GPC) 曲线重构、刚韧物理平衡 Ashby 空间探索、分子失效概率估计**。
 
 系统深度落实**“交互极度流畅 (60fps Scrolling)、视觉工业超感 (Zero-Noise Cosmic Slate UI)、表现与演算彻底解耦 (Multi-Threaded Worker Grid)、极高逻辑迁移度 (Adapter Pattern Service)”**等顶尖工业软件指标。项目代码严谨规范，完全规避任何形式的伪技术堆砌，为石油化工数字化科研系统的敏捷交付树立行业标杆。
 
@@ -22,18 +22,19 @@
    * 采用纯色相高纯度渐变色标记核心化学工艺路线：单体及初级聚合级节点亮蓝色 (`blue-400`)、无定形及高强韧改性级节点碧绿色 (`emerald-400`)、过渡物料亮浅紫 (`indigo-400`)，辅以暗视场下的柔和粒子轨迹，极大增强了拓扑网和工艺链路的动态可读性。
 
 2. **多模态高信息密度信息展示 (High-Density Multi-Mode Layout)**:
-   * **紧凑精简网格模式 (Compact View)**: 针对海量原始实验数据的对比，单元格边间距压缩 40%，通过等宽字体 `JetBrains Mono` 展现精确 of 断裂伸长率、极限抗拉屈服等性能数据，确保一行展示超过 12 个参数列而无需频繁发生眼球折返。
+   * **紧凑精简网格模式 (Compact View)**: 针对海量原始实验数据的对比，单元格边间距压缩 40%，通过等宽字体 `JetBrains Mono` 展现精确的断裂伸长率、极限抗拉屈服等性能数据，确保一行展示超过 12 个参数列而无需频繁发生眼球折返。
    * **多维科研对标视图 (Relaxed Layout)**: 针对多项产品雷达对比及模型参数流变阻尼谱扫频。
 
 3. **极致防抖微交互与无延迟响应 (Micro-Interactions & Input Isolation)**:
    * 每一个下拉框、滑块阻抗力、搜索调谐框均具有内置的 **防抖机制 (Debounce / Throttle)**，绝不在高频拖拽或搜索时向主线程和后台产生无效重复请求。
    * 支持快捷热键系统：`/` 秒级拉出全局控制面板指令，`Ctrl + S` 一键进行在研牌号性能更改，`Esc` 极其平滑地对重构曲线 modal 执行无损返回。
+   * **全触觉点击反馈（Haptic Interceptor）**：系统全局捕获所有点击手势，支持对非 Button 容器（如自定义 Div 卡片或列表项）进行 computedStyle 智能检测。若其 `cursor === 'pointer'`，自动触发触觉/声音反馈，并可通过个人配置面板（ProfileModal）进行实时保存。
 
 ---
 
 ## 🏛️ “壳 - 芯” 三层解耦标准系统架构 (Architecture Lifecycle)
 
-ResinDB Pro 采用严格可移植的**三层体系架构模型**，使底座展现和顶级算法高度自恰，支持核心逻辑轻而易举地移植到 Next.js、Nuxt.js、企业级微前端 (Micro-Frontends) 或是移动客户端系统。
+ResinDB Pro v3.1.0 采用严格可移植的**三层体系架构模型**，使底座展现和顶级算法高度自恰，支持核心逻辑轻而易举地移植到 Next.js、Nuxt.js、企业级微前端 (Micro-Frontends) 或是移动客户端系统。
 
 ```
                        ┌──────────────────────────────────────────────┐
@@ -64,23 +65,24 @@ ResinDB Pro 采用严格可移植的**三层体系架构模型**，使底座展�
 在 `v3.1.0-stable` 正式版中，系统底层架构和数理安全均完成了里程碑式的演进：
 
 ### 1. ⚙️ 基于 WebAssembly / JS 双引擎的流变学高精度非线性拟合器
-*   **物理本构**：集成了 Carreau-Yasuda 剪切粘度拟合方程，可在毫秒级求解出材料零剪切粘度 $\eta_0$、松弛时间常数 $\lambda$ 以及稀剪切指数 $n$。
+*   **物理本构**：集成了 Carreau-Yasuda 剪切粘度拟合方程，可在毫秒级求解出材料零剪切粘度 $\eta_0$、松弛时间常数 $\lambda$ 以及稀剪切指数 $n$：
+    $$\eta(\dot{\gamma}) = \eta_{\infty} + (\eta_0 - \eta_{\infty})[1 + (\lambda \dot{\gamma})^a]^{\frac{n-1}{a}}$$
 *   **WASM 高速求解**：引入 Native WebAssembly 编译的 Newton-Raphson 多维雅可比矩阵收敛算法，相较于纯 JS 引擎，多端混合拟合效率提升 **220% 以上**。
 *   **数理安全防护**：对零分母项、指数幂为负数、或非有限数 (NaN/Infinity) 的计算边界进行了物理拦截与强制收敛保护，确保高噪实验数据下系统不崩溃、不卡死。
 
 ### 2. 📡 实验室级高频套接字遥测网联网关与传输介质仿真 (Lab Telemetry)
 *   **双通道握手**：支持 Physical WebSockets（真实硬件通道）与 Virtual Loopback（虚拟环回仿真）双模式热切换。
-*   **高保真网络噪声模型**：内置高精度抖动 (Jitter)、丢包率 (Packet Loss)、信号漂移 calibration 的实时调节，模拟在复杂工业车间及弱网环境下的物化参数（密度、熔指、模量）数据传输抗扰性。
+*   **高保真网络噪声模型**：内置高精度抖动 (Jitter, 2ms-150ms)、丢包率 (Packet Loss)、信号漂移 (Calibration Gain/Offset) 的实时调节，模拟在复杂工业车间及弱网环境下的物化参数（密度、熔指、模量）数据传输抗扰性。
 
 ### 3. 🤖 Gemini Multimodal 驱动的分子与配方草图智能视觉解析
 *   **零样本物化提取**：搭载大模型多模态视觉 OCR 探针，支持一键解析分子红外光谱图线特征、催化流变图谱或手写物性分析草图。
 *   **动态配方注入**：自动提取配方结构化参数并实时注入到计算网格与材料性能平衡模型中。
 
 ### 4. 🗄️ 基于 React Concurrent Mode 的高并发防竞态状态管道
-*   **并发安全防护**：重构了 `DataContext.tsx` 中的 optimistic updates（乐观锁数据流），引入 `useRef` 实现对变化状态的同步锁，彻底杜绝了并发渲染（Concurrent Mode）下的数据 race condition 与脏状态覆盖。
+*   **并发安全防护**：重构了 `DataContext.tsx` 中的 optimistic updates（乐观锁数据流），引入 `useRef` 实现对变化状态的同步锁，彻底阻断了并发渲染（Concurrent Mode）下的数据 race condition 与脏状态覆盖。
 
 ### 5. 📦 Vite 6 多阶 Rollup 按需精细化拆包 (Build Performance)
-*   **打包优化**：通过 `vite.config.ts` 中的 `manualChunks` 规则，将庞大的依赖智能解耦为 `vendor-echarts`、`vendor-recharts`、`vendor-ui-libs` 等独立静态子模块，大幅提升首屏秒开效率。
+*   **打包优化**：通过 `vite.config.ts` 中的 `manualChunks` 规则，将抗热氧老化、大图表、UI 核心库智能解耦为 `vendor-echarts`、`vendor-recharts`、`vendor-ui-libs` 等独立静态子模块，大幅提升首屏秒开效率。
 
 ---
 
@@ -97,7 +99,7 @@ ResinDB Pro 采用严格可移植的**三层体系架构模型**，使底座展�
 
 ## ⚛️ Web Worker 多线程多维高密度科学演算矩阵 (Multi-Threaded Workers)
 
-为保证整个高保真原型在进行多物理参量扫频和拟合时不发生主帧率瞬时坠毁，本系统特建立了由 **24 组独立 Web Workers 驱动的高并发独立线程网格**。所有复杂的热化学、力学寿命及流变粘弹方程的求解，在后台线程独立调谐、实时交付：
+为保证整个高保真原型在进行多物理参量扫频和拟合时不发生主帧率瞬间坠毁，本系统特建立了由 **24 组独立 Web Workers 驱动的高并发独立线程网格**。所有复杂的热化学、力学寿命及流变粘弹方程的求解，在后台线程独立调谐、实时交付：
 
 | 独立线程名称 | 后台执行的材料学 / 物理、热力学算法方程 | 输入载荷与扫频因子 | 科学计算指标及作用 |
 | :--- | :--- | :--- | :--- |
@@ -209,7 +211,7 @@ const simulation = d3.forceSimulation(data.nodes)
 │       │   └── BulkReorderModal.tsx   # 材料特征排序、隐藏列智能管理的拖拽元件
 │       │
 │       ├── views/             # 全景多重视图 (OLAP & Analytical Layouts)
-│       │   ├── DashboardView.tsx # 在产情况、总体数据聚合 and 物化特性全局统计仪板
+│       │   ├── DashboardView.tsx # 在产情况、总体数据聚合和物化特性全局统计仪板
 │       │   ├── AnalyticsView.tsx # 多轴 ECharts Ashby 散射、GPC 等多项流变相图科研汇总分析
 │       │   ├── PivotView.tsx      # 多物理特性维度多维数据交叉透视表格 (OLAP Panel)
 │       │   └── ComparisonView.tsx # 多款牌号详细参数并列和物理差异雷达对比器
@@ -217,7 +219,7 @@ const simulation = d3.forceSimulation(data.nodes)
 │       └── features/              # 多场景多级材料业务功能大块
 │           ├── Ai/                # 搭载 Google Gemini 高级 API 的智能问答及配方流式推演副驾驶
 │           │   ├── AiCopilot.tsx      # 对话及一键提取化学配方、一键写公式组件
-│           │   └── DashboardAiCard.tsx# 顶部智能工艺风险警告和宏观点评卡片
+│           │   └── DashboardAiCard.tsx# 顶部智能工艺工艺风险警告和宏观点评卡片
 │           ├── DataGrid/          # 定制高性能网格 (虚拟树形网格、列拉伸、位置锁定等)
 │           └── Product/           # 牌号细部热学、加工测试属性多维分析抽屉
 ```
@@ -229,7 +231,7 @@ const simulation = d3.forceSimulation(data.nodes)
 为确保科研工作者开箱即用，以下是材料从对标到计算的最佳全场景科研流程：
 
 ### 流程阶段 A：高性能过滤定位
-1.  **树型层树选择**: 首先在左侧 `TreeSidebar` 框中选定要研究的聚合物树突骨架（例如选择：`聚合树脂-聚丙烯-茂金属共混PP`）。
+1.  **树型层树选择**: 首先在左侧 `TreeSidebar` 框中选定要研究的聚合物树突骨架（例如选择：`聚合树脂-聚丙烯-茂金属共共混PP`）。
 2.  **高速组合搜寻**: 在右上角输入框进行无缝过滤，支持包含 CAS 号（如 `9003-07-0`）、化学分子式、或是牌号英中文拼写，下方 `DataGrid` 毫秒级闪烁呈现高精度匹配。
 3.  **透视多轴分析 (Pivot)**: 切换到 `PivotView` 透视模式下，将“基体分子”和“催化剂”拖入矩阵纵横两轴，即可得到全方位的 MFR、弯曲模量在工艺分类矩阵中的平均态、离散态统计。
 
