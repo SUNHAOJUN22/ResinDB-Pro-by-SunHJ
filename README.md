@@ -7,7 +7,7 @@
 [![Framer Motion](https://img.shields.io/badge/Framer_Motion-11.1.7-FF69B4?style=flat-square&logo=framer)](https://www.framer.com/motion/)
 [![License](https://img.shields.io/badge/License-PRI%20Commercial%20Demonstrator-red?style=flat-square)](https://www.cnpc.com.cn/pri/)
 
-**ResinDB Pro v3.1.0** 是专为**中国石油化工研究院 (PRI) - 合成树脂研究所**量身定制的高性能、数据密集型合成树脂全生命周期科研管理和理化特性智能分析系统。该系统全面覆盖聚乙烯 (PE, 包括 HDPE/LDPE/LLDPE)、聚丙烯 (PP, 包括均聚/无规共聚/抗冲共聚)、聚氯乙烯 (PVC)、聚苯乙烯类共聚物 (ABS) 等通用与高端树脂材料的**出厂指标合规化监控、流变动力学多物理场曲线等数、重均/数均分子量分布 (GPC) 曲线重构、刚韧物理平衡 Ashby 空间探索、分子失效概率估计**。
+**ResinDB Pro v3.1.0** 是专为**中国石油化工研究院 (PRI) - 合成树脂研究所**量身定制的高性能、数据密集型合成树脂全生命周期科研管理和理化特性智能分析系统。该系统全面实现对聚乙烯 (PE, 包括 HDPE/LDPE/LLDPE)、聚丙烯 (PP, 包括均聚/无规共聚/抗冲共聚)、聚氯乙烯 (PVC)、聚苯乙烯类共聚物 (ABS) 等各种通用与高端树脂材料的**出厂指标合规化监控、流变动力学多物理场曲线等数、重均/数均分子量分布 (GPC) 曲线重构、刚韧物理平衡 Ashby 空间探索、分子失效概率估计**。
 
 系统深度落实**“交互极度流畅 (60fps Scrolling)、视觉工业超感 (Zero-Noise Cosmic Slate UI)、表现与演算彻底解耦 (Multi-Threaded Worker Grid)、极高逻辑迁移度 (Adapter Pattern Service)”**等顶尖工业软件指标。项目代码严谨规范，完全规避任何形式的伪技术堆砌，为石油化工数字化科研系统的敏捷交付树立行业标杆。
 
@@ -99,26 +99,55 @@ ResinDB Pro v3.1.0 采用严格可移植的**三层体系架构模型**，使底
 
 ## ⚛️ Web Worker 多线程多维高密度科学演算矩阵 (Multi-Threaded Workers)
 
-为保证整个高保真原型在进行多物理参量扫频和拟合时不发生主帧率瞬间坠毁，本系统特建立了由 **24 组独立 Web Workers 驱动的高并发独立线程网格**。所有复杂的热化学、力学寿命及流变粘弹方程的求解，在后台线程独立调谐、实时交付：
+为保证整个高保真原型在进行多物理参量扫频和拟合时不发生主帧率瞬时坠毁，本系统特建立了由 **24 组独立 Web Workers 驱动的高并发独立线程网格**。所有复杂的热化学、力学寿命及流变粘弹方程的求解，在后台线程独立调谐、实时交付：
 
-| 独立线程名称 | 后台执行的材料学 / 物理、热力学算法方程 | 输入载荷与扫频因子 | 科学计算指标及作用 |
-| :--- | :--- | :--- | :--- |
-| `carreauWorker.ts` | **Carreau-Yasuda 剪切流变流动本构通用拟合方程**:<br>$$\eta(\dot{\gamma}) = \eta_{\infty} + (\eta_0 - \eta_{\infty})[1 + (\lambda \dot{\gamma})^a]^{\frac{n-1}{a}}$$ | 动态剪切速率变温扫频振幅向量 | 精确解算出材料宏观零剪切粘度 $\eta_0$、松弛时间常数 $\lambda$，定量判定产品挤出拉膜抗表面破裂和鲨鱼皮特性。 |
-| `wlfWorker.ts` | **William-Landel-Ferry (WLF) 时温等效动力本构相平移变换**:<br>$$\log a_T = \frac{-C_1(T - T_g)}{C_2 + (T - T_g)}$$ | 多重扫温频率 DMA（动态热力学分析仪）阻尼损失因子谱 | 依靠时域频域温度相互换算，将试验局限频率（如 $100\text{Hz}$）拓宽拟合出 $10^{10}\text{Hz}$ 的高阻尼降噪与力学松弛谱线。 |
-| `pronyWorker.ts` | **Prony Series 时域蠕变粘弹性离散麦克斯韦应力松弛模型**:<br>$$G(t) = G_e + \sum_{i=1}^N G_i \exp\left(-\frac{t}{\tau_i}\right)$$ | DMA 特征松弛扫频阶数系数阵列 | 估计高分子复合材料在连续长载荷形变（蠕变）下的结构应力松弛时间谱线，用于汽车/压力管道安全评测。 |
-| `weibullWorker.ts` | **Weibull 二参数极限极限应变力学疲劳寿命失效概率分布**:<br>$$F(t) = 1 - \exp\left(-\left(\frac{t}{\eta}\right)^\beta\right)$$ | 树脂高频率断裂强度测试及高温持久蠕变寿命序列 | 算出长效疲劳破坏概率，输出失效形状参数 $\beta$。辅助合成室迅速辨别由结晶球晶尺寸引起的力学退化。 |
-| `arrheniusWorker.ts` | **Arrhenius 电化学/热氧化链解聚能量活化能热老化模型**:<br>$$k = A \exp\left(-\frac{E_a}{R T}\right)$$ | TGA 热分解终点质量残余、各温度下热氧损耗速率 | 解构当前高聚物大分子链化学共价键断键难度，判定该牌号产品的长周期实验室加速热氧老化衰减。 |
-| `kineticsWorker.ts` | **Avrami 升/降结晶动力学方程**:<br>$$1 - X_t = \exp(-k t^n)$$ | 熔体差示扫描量热计 (DSC) 降温晶粒形核与生长扫频谱 | 描绘出聚合产品在大规模后加工工艺中，结晶速度与晶核形成参数 $n$，为模具温控开合时间提供最合理的设定区间。 |
-| `bayesWorker.ts` | **贝叶斯不确定性多点位高分子物化性状联合估计模型** | 进料质量偏差、单体共聚比例高频波动谱 | 在缺乏实测取样阶段，输出产品实时在线熔指（MFR）、微观密度指标的在产均值变位概率。 |
-| `sobolWorker.ts` | **Sobol’ Global Sensitivity 全局一阶/全阶多变量敏感性分解分析** | 回收再生料掺杂比率、多抗氧剂助剂微克配比向量 | 定量判定各种主辅配方的细微波动对材料最核心物理指标（如拉伸强度、气味等级）产生的直接作用占比。 |
-| `monteCarloWorker.ts`| **高维多级多通道 Monte Carlo 配方容差不确定性投料推导引擎** | 原料单体挥发分、压强周期波动波动统计方差 | 历经 10 万次混沌步长高频率拟合计算，预测该在产牌号大规模出厂的 Cp 与 Cpk 材料质量稳定性指数。 |
-| `copulaWorker.ts` | **Copula 联合极限偏态非线性物理参数应力关联分析器** | 拉伸强度与耐划伤强度边缘分布散点矩阵 | 脱开简陋的 Pearson 线性假设，发现物理极限特性在材料中的内在耦合规律。|
-| `similarityWorker.ts`| **基于 Mahalanobis 马氏和欧氏特征向量加权的关联材料对标器** | 16 个反映热/力/加工特性的高维物理极坐标数组 | 采用多特征加权矩阵，秒级搜索系统全部谱库，完成物理替代品推荐。 |
-| `kmeansWorker.ts` | **K-Means 高维特征空间无监督高分子牌号智能划分聚类** | 全球/全国同类树脂牌号力学和经济学特征离散阵列 | 完成自动智能归类排版，为销售和研究提供大材料层级的精细对标聚类分析。 |
+### 📈 流变学与力学衰减 Workers
+*   **`carreauWorker.ts` (Carreau-Yasuda 剪切流变拟合)**:
+    $$\eta(\dot{\gamma}) = \eta_{\infty} + (\eta_0 - \eta_{\infty})[1 + (\lambda \dot{\gamma})^a]^{\frac{n-1}{a}}$$
+    *解算零剪切粘度 $\eta_0$、松弛时间常数 $\lambda$ 与稀剪切指数 $n$，定量评价熔体破裂。*
+*   **`wlfWorker.ts` (WLF 时温等效平移)**:
+    $$\log a_T = \frac{-C_1(T - T_g)}{C_2 + (T - T_g)}$$
+    *通过 DMA 扫温频率谱，拓宽阻尼损失谱线至超宽频段。*
+*   **`pronyWorker.ts` (Prony Series 离散麦克斯韦蠕变)**:
+    $$G(t) = G_e + \sum_{i=1}^N G_i \exp\left(-\frac{t}{\tau_i}\right)$$
+    *用于估算应力松弛与管道抗蠕变开裂寿命。*
+*   **`weibullWorker.ts` (Weibull 疲劳寿命寿命概率分布)**:
+    $$F(t) = 1 - \exp\left(-\left(\frac{t}{\eta}\right)^\beta\right)$$
+    *解算材料疲劳失效的形状参数 $\beta$ 与尺度参数 $\eta$。*
+*   **`arrheniusWorker.ts` (Arrhenius 热氧化链降解动力学)**:
+    $$k = A \exp\left(-\frac{E_a}{R T}\right)$$
+    *确定大分子断链能量活化能 $E_a$，评估加速老化因子。*
+*   **`kineticsWorker.ts` (Avrami 结晶动力学方程)**:
+    $$1 - X_t = \exp(-k t^n)$$
+    *评估聚合物在差示扫描量热法 (DSC) 降温过程中的晶形生长常数 $n$ 与速率 $k$。*
+
+### 📊 数据分析与过程控制 Workers
+*   **`kdeWorker.ts` (高斯核密度估计 Kernel Density Estimation)**:
+    $$\hat{f}_h(x) = \frac{1}{n h} \sum_{i=1}^n K\left(\frac{x - x_i}{h}\right), \quad K(u) = \frac{1}{\sqrt{2\pi}} \exp\left(-\frac{u^2}{2}\right)$$
+    *对高密度熔指 (MFR) 与拉伸屈服强度进行非参数概率密度重构。*
+*   **`spcWorker.ts` (统计过程控制 Statistical Process Control)**:
+    $$\text{UCL} = \bar{X} + 3\sigma, \quad \text{LCL} = \bar{X} - 3\sigma$$
+    *内置 Western Electric / Nelson 异常判定规则，监控在线生产异常漂移。*
+*   **`mooWorker.ts` (多目标优化与非支配排序 Pareto 排序)**:
+    *基于 NSGA-II 拥挤度距离评价体系，自动求解材料“刚性-韧性”平衡前沿（Pareto Frontier）：*
+    $$d_I(j) = \sum_{m=1}^M \frac{f_m(j+1) - f_m(j-1)}{f_m^{\max} - f_m^{\min}}$$
+*   **`forecastingWorker.ts` (Holt-Winters 三重指数平滑预测)**:
+    * Level: $L_t = \alpha(Y_t / S_{t-L}) + (1 - \alpha)(L_{t-1} + T_{t-1})$
+    * Trend: $T_t = \beta(L_t - L_{t-1}) + (1 - \beta)T_{t-1}$
+    * Seasonal: $S_t = \gamma(Y_t / L_t) + (1 - \gamma)S_{t-L}$
+    *结合加性/乘性混合时序算法预测后续批次理化特性波动区间。*
+*   **`bayesWorker.ts` (共聚单体进料贝叶斯风险评估模型)**:
+    *在实验室离线取样间歇期，利用连续进料变动估计熔指等特性的条件变位概率分布。*
+*   **`copulaWorker.ts` (高斯 Copula 联合分布非线性应力相关器)**:
+    *通过高维偏态边缘分布联合映射，发掘宏观拉伸模量与微观晶区形貌的内在耦合性。*
+*   **`similarityWorker.ts` (Mahalanobis 距离多特征牌号匹配器)**:
+    *计算高维协方差逆矩阵马氏距离，智能推荐物性最接近的替代牌号。*
+*   **`kmeansWorker.ts` (K-Means 聚类高维树脂划分)**:
+    *无监督机器学习算法，依据加工流动性与刚韧性能对全球在产牌号分类建档。*
 
 ---
 
-## 🕸️ D3.js 拓扑学级联动力学图谱引擎规约 (D3 Topology Core)
+## 🕸/🕸 D3.js 拓扑学级联动力学图谱引擎规约 (D3 Topology Core)
 
 本系统关联谱图的核心（位于 `/src/components/charts/DependencyMapD3.tsx`）采用定制级的 D3.js v7 进行设计开发，专为化学制造、改性塑料合成制备关系网研发：
 
@@ -231,7 +260,7 @@ const simulation = d3.forceSimulation(data.nodes)
 为确保科研工作者开箱即用，以下是材料从对标到计算的最佳全场景科研流程：
 
 ### 流程阶段 A：高性能过滤定位
-1.  **树型层树选择**: 首先在左侧 `TreeSidebar` 框中选定要研究的聚合物树突骨架（例如选择：`聚合树脂-聚丙烯-茂金属共共混PP`）。
+1.  **树型层树选择**: 首先在左侧 `TreeSidebar` 框中选定要研究的聚合物树突骨架（例如选择：`聚合树脂-聚丙烯-茂金属共混PP`）。
 2.  **高速组合搜寻**: 在右上角输入框进行无缝过滤，支持包含 CAS 号（如 `9003-07-0`）、化学分子式、或是牌号英中文拼写，下方 `DataGrid` 毫秒级闪烁呈现高精度匹配。
 3.  **透视多轴分析 (Pivot)**: 切换到 `PivotView` 透视模式下，将“基体分子”和“催化剂”拖入矩阵纵横两轴，即可得到全方位的 MFR、弯曲模量在工艺分类矩阵中的平均态、离散态统计。
 
@@ -294,5 +323,3 @@ npm run deploy-rules
 # 3. 极速把构建好的静态资源同步至高弹性 CDN
 npx firebase deploy --only hosting
 ```
-
-
