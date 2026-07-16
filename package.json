@@ -24,7 +24,6 @@
     "report": "bash scripts/generate-test-report.sh"
   },
   "dependencies": {
-    "@google/genai": "^1.50.1",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.2.2",
     "@tanstack/react-virtual": "^3.13.24",
