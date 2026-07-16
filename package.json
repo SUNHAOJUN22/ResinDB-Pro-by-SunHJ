@@ -1,12 +1,7 @@
 {
   "name": "resindb-pro-by-sunhj",
-  "version": "3.1.1",
-  "private": true,
+  "version": "3.0.0",
   "type": "module",
-  "engines": {
-    "node": ">=20.19.0",
-    "npm": ">=10.0.0"
-  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
