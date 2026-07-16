@@ -288,3 +288,4 @@ query MyDocs @auth(level: USER) {
 
 During development, set operations to `NO_ACCESS` until you implement proper authorization. Use emulator and VS Code extension for testing.
 
+

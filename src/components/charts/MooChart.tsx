@@ -129,3 +129,5 @@ export const MooChart: React.FC<MooChartProps> = React.memo(({ evaluatedCandidat
 });
 
 // v3.1.0-sync
+
+// v3.1.0-sync-fixed

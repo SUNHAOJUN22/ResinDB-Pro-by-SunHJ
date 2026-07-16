@@ -77,3 +77,5 @@ function processAll(dir) {
 
 processAll(srcDir);
 
+
+// v3.1.0-sync-fixed

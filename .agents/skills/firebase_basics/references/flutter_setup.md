@@ -101,3 +101,4 @@ When testing Firebase features locally on Chrome, requests to Google servers can
 In your `main.dart`, this call is mandatory before `Firebase.initializeApp()`. 
 *Why?* Because Firebase initialization requires communication across Flutter's native iOS/Android method channels. `ensureInitialized()` guarantees the Fluter engine is fully booted up and ready to handle these native platform calls before `runApp()` executes.
 
+

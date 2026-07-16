@@ -69,3 +69,4 @@ The MCP server allows GitHub Copilot to interact directly with Firebase projects
 1. **Restart VS Code**: Instruct the user to restart VS Code. **Stop and wait** for their confirmation before proceeding.
 2. **Confirm Connection**: Check the MCP server list in the VS Code Copilot UI to confirm that the Firebase MCP server is connected.
 
+

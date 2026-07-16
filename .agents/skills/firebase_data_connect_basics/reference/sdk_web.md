@@ -123,3 +123,4 @@ function MyComponent() {
 - GraphQL `Double` -> TypeScript `number`
 - GraphQL `Float` -> TypeScript `number`
 
+

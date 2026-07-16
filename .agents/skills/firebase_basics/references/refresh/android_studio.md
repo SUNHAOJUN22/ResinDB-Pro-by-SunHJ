@@ -26,3 +26,4 @@ Gemini in Android Studio expects skills to be located at `~/.agents/skills`.
    ```
    If manual installation was used, pull the latest changes from the `firebase/agent-skills` repository and copy the updated files to `~/.agents/skills`.
 
+

@@ -8,3 +8,4 @@ Use Claude Code's native plugin manager instead of `npx`.
    ```bash
    claude plugin update firebase@firebase
    ```
+

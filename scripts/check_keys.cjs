@@ -41,3 +41,5 @@ files.forEach(file => {
 });
 console.log(`Found ${missingKeys} missing keys.`);
 
+
+// v3.1.0-sync-fixed

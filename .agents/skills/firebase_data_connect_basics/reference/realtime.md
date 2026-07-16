@@ -178,3 +178,4 @@ query GetMovie($id: UUID!) @auth(level: PUBLIC) {
 
 To consume automatic refreshes on the client, use `subscribe()` instead of `execute()` — the same client pattern works regardless of whether the refresh is automatic or directive-driven.
 
+

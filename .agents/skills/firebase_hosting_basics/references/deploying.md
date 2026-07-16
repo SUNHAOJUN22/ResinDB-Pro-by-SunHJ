@@ -38,3 +38,4 @@ Clone the `feature-beta` channel on your default site to live:
 npx -y firebase-tools@latest hosting:clone my-project:feature-beta my-project:live
 ```
 
+

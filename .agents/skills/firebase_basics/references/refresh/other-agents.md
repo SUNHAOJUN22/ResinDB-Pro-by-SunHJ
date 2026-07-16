@@ -47,3 +47,4 @@ Replace `<AGENT_NAME>` with the actual agent name, which can be found in the [sk
    npx -y skills update --agent <AGENT_NAME> --global --yes
    ```
 
+

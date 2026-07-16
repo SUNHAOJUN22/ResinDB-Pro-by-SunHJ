@@ -15,3 +15,4 @@ The Firebase CLI documents itself. Use help commands to discover functionality.
   npx -y firebase-tools@latest firestore:indexes --help
   ```
 
+

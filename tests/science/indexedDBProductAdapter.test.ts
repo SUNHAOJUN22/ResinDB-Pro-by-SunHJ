@@ -251,3 +251,5 @@ describe('🧪 IndexedDBProductAdapter Cache & Index Query Planner Suite', () =>
 });
 
 // v3.1.0-sync
+
+// v3.1.0-sync-fixed

@@ -157,3 +157,4 @@ For complete, working code examples of schemas and operations, see
 
 For ready-to-use starter templates (CRUD, user-owned resources, many-to-many, YAML configs, SDK init), see **[templates.md](templates.md)**.
 
+

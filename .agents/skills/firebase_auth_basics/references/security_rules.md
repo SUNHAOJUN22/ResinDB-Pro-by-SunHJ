@@ -37,3 +37,4 @@ allow read, write: if request.auth != null && request.auth.uid == resource.data.
 allow create: if request.auth.token.email_verified == true;
 ```
 
+

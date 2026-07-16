@@ -115,3 +115,4 @@ final subscription = queryRef.subscribe().listen((result) {
 - GraphQL `Float` -> Dart `double`
 - GraphQL `Boolean` -> Dart `bool`
 
+

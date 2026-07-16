@@ -46,3 +46,4 @@ Configurable by setting `host` and `port` in the `emulators` block of `firebase.
 ```
 - **Env Var Injection**: Injects variables defined in `apphosting.yaml` and `apphosting.emulator.yaml` into the process.
 
+

@@ -54,3 +54,5 @@ function walkDir(dir) {
 
 walkDir(srcDir);
 
+
+// v3.1.0-sync-fixed

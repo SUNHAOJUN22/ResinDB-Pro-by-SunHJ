@@ -11,3 +11,5 @@ const updatedContent = content.replace(/\];\s*$/, ',\n' + newProducts + '\n];\n'
 fs.writeFileSync('constants.ts', updatedContent);
 console.log('Added PMMA product');
 
+
+// v3.1.0-sync-fixed

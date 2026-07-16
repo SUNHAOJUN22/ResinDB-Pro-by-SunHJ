@@ -55,3 +55,4 @@ To fully manage Firebase, the agent needs specific skills and the Firebase MCP s
 ---
 **CRITICAL AGENT RULE:** Do NOT proceed with any other Firebase tasks until EVERY step above has been successfully verified and completed.
 
+

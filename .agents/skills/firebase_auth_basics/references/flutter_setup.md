@@ -106,3 +106,4 @@ When running Flutter Web locally and using `signInWithPopup`, you might encounte
 - **CRITICAL**: Do NOT include the protocol or port number when adding the domain (e.g., use `localhost`, NOT `http://localhost:9090`). Flutter Web often runs on random ports or specific ports, but Firebase Auth only cares about the domain.
 
 
+

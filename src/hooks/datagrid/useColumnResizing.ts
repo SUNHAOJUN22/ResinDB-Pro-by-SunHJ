@@ -35,3 +35,5 @@ export function useColumnResizing(defaultWidths: Record<string, number>) {
 }
 
 // v3.1.0-sync
+
+// v3.1.0-sync-fixed

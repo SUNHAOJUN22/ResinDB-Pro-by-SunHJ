@@ -65,3 +65,4 @@ db.collection('landmarks/golden_gate_bridge/reviews').where('rating', '==', 5)`
 **Collection Group Query**: Find all 5-star reviews across *all* landmarks.
 `javascript db.collectionGroup('reviews').where('rating', '==', 5)`
 
+

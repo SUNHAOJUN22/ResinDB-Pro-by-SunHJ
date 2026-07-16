@@ -28457,3 +28457,4 @@ components/ShortcutsModal.tsx:                    {s.key
 components/ShortcutsModal.tsx:                      .split(s.key.includes("+") ? " + " : " / ")
 components/ShortcutsModal.tsx:                      .map((k, ki) => (
 components/ShortcutsModal.tsx:                          <kbd className="px-2.5 py-1.5 bg-white dark:
+

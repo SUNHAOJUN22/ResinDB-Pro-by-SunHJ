@@ -29,3 +29,4 @@ Check if the plugins are already installed before proceeding:
 ### 2. Restart and Verify Connection
 1. **Restart Claude Code**: Instruct the user to restart Claude Code. **Stop and wait** for their confirmation before proceeding.
 
+

@@ -1012,3 +1012,5 @@ const DependencyMapD3: React.FC = () => {
 export default DependencyMapD3;
 
 // v3.1.0-sync
+
+// v3.1.0-sync-fixed

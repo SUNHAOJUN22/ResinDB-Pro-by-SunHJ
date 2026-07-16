@@ -143,3 +143,5 @@ export const KineticsChart: React.FC<KineticsChartProps> = React.memo(({ points,
 });
 
 // v3.1.0-sync
+
+// v3.1.0-sync-fixed

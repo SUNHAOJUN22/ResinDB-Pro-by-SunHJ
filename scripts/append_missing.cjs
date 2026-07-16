@@ -48,3 +48,5 @@ const updatedContent = content.replace(/\];\s*$/, ',\n' + newProducts + '\n];\n'
 fs.writeFileSync('constants.ts', updatedContent);
 console.log('Added missing products');
 
+
+// v3.1.0-sync-fixed

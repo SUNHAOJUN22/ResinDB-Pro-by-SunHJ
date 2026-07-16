@@ -109,3 +109,5 @@ export const ArrheniusChart: React.FC<ArrheniusChartProps> = React.memo(({ point
 });
 
 // v3.1.0-sync
+
+// v3.1.0-sync-fixed

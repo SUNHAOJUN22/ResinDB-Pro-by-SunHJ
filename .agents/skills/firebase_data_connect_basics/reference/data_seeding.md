@@ -153,3 +153,4 @@ When working with a stable schema in production, you can use standard SQL tools 
 ### 🚨 Critical SQL Operations Constraint
 **Never modify your database schema directly using SQL tools.** Direct schema alterations (`ALTER TABLE`, `CREATE INDEX`, etc.) outside of your `schema.gql` file will bypass SQL Connect's schema compiler, breaking connector mappings, and causing active client SDK integrations to fail.
 
+

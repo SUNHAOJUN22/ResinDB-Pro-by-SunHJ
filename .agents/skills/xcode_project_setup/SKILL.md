@@ -86,3 +86,4 @@ swift run --package-path /Users/foo/.agents/skills/xcode-project-setup/scripts/x
 
 *Note: The script is idempotent. It will automatically skip linking files or packages that are already present in the project.*
 
+

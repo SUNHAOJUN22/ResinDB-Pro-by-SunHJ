@@ -174,3 +174,4 @@ const hybridModel = getGenerativeModel(ai, { mode: InferenceMode.PREFER_ON_DEVIC
 ```
 
 
+

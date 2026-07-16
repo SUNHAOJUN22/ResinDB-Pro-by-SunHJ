@@ -18,3 +18,4 @@ Ensure that the skills are installed or linked to the `~/.agents/skills` directo
 
 MCP setup is currently skipped for Android Studio as it only supports SSE transport, while the Firebase CLI MCP server uses stdio. Direct integration is not supported without an SSE-to-stdio proxy.
 
+

@@ -377,3 +377,5 @@ self.onmessage = (e: MessageEvent<ForecastingWorkerMessage>) => {
 };
 
 // v3.1.0-sync
+
+// v3.1.0-sync-fixed

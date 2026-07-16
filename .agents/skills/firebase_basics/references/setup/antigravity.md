@@ -62,3 +62,4 @@ The MCP server allows Antigravity to interact directly with Firebase projects. T
 1. **Restart Antigravity**: Instruct the user to restart the Antigravity application. **Stop and wait** for their confirmation before proceeding.
 2. **Confirm Connection**: Check the MCP server list in the Antigravity UI to confirm that the Firebase MCP server is connected.
 
+

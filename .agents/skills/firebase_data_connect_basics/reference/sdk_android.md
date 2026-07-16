@@ -106,3 +106,4 @@ val queryResult = queryRef.execute(QueryRef.FetchPolicy.SERVER_ONLY)
 - GraphQL `Int64` -> Kotlin `Long`
 - GraphQL `Any` -> Kotlin `com.google.firebase.dataconnect.AnyValue`
 
+

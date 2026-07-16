@@ -196,3 +196,5 @@ self.onmessage = (e: MessageEvent<KMeansMessage>) => {
 };
 
 // v3.1.0-sync
+
+// v3.1.0-sync-fixed

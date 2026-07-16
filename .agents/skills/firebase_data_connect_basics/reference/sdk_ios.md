@@ -139,3 +139,4 @@ struct ListMovieView: View {
 - GraphQL `Float` -> Swift `Double`
 - GraphQL `Boolean` -> Swift `Bool`
 
+
