@@ -33,14 +33,22 @@ jobs:
           cache: npm
 
       - name: Install exact dependencies
+        id: npm-ci
         shell: bash
         run: |
           set -euo pipefail
-          if ! npm ci > /tmp/npm-ci.log 2>&1; then
-            echo 'npm ci failed; showing the final diagnostic lines:'
+          npm ci > /tmp/npm-ci.log 2>&1 || {
             tail -n 120 /tmp/npm-ci.log
             exit 1
-          fi
+          }
+
+      - name: Upload npm diagnostics
+        if: failure() && steps.npm-ci.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-ci-diagnostics
+          path: /tmp/npm-ci.log
+          retention-days: 3
 
       - name: Validate repository
         run: npm run validate
