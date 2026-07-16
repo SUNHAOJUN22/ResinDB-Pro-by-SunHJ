@@ -520,7 +520,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     this.registerMutationDelete(ids);
   }
 
-  async exportReport(products: Product[], format: 'csv' | 'xlsx' | 'json' | 'xml'): Promise<Blob> {
+  async exportReport(products: Product[], format: 'csv' | 'json' | 'xml'): Promise<Blob> {
     await this.simulateLatency();
 
     if (products.length === 0) {
@@ -592,6 +592,3 @@ ${props}
   }
 }
 
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

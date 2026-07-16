@@ -8,7 +8,7 @@ interface SmartExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   filteredData: Product[];
-  handleExport: (format: 'csv' | 'xlsx' | 'json' | 'xml', selectedColumns?: string[]) => void;
+  handleExport: (format: 'csv' | 'json' | 'xml', selectedColumns?: string[]) => void;
   handleExportPdf: () => void;
 }
 
@@ -258,6 +258,3 @@ const FormatCard = ({
   );
 };
 
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

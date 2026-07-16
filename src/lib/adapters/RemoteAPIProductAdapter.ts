@@ -170,7 +170,7 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
 
   async exportReport(
     products: Product[],
-    format: 'csv' | 'xlsx' | 'json' | 'xml',
+    format: 'csv' | 'json' | 'xml',
   ): Promise<Blob> {
     return this.withReadFallback(
       async () => {

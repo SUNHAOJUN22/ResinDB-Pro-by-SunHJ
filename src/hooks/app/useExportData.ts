@@ -10,14 +10,14 @@ export function useExportData(
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExport = useCallback(async (
-    format: 'csv' | 'xlsx' | 'json' | 'xml' = 'csv',
+    format: 'csv' | 'json' | 'xml' = 'csv',
     selectedColumns?: string[] // if provided, only these attributes are included
   ) => {
     setIsExporting(true);
     try {
       const dataToExport = selectedColumns && selectedColumns.length > 0 
         ? filteredData.map(product => {
-            const filteredProps: Record<string, any> = {};
+            const filteredProps: Product["properties"] = {};
             selectedColumns.forEach(key => {
               if (product.properties[key]) {
                 filteredProps[key] = product.properties[key];
@@ -35,7 +35,7 @@ export function useExportData(
       const a = document.createElement("a");
       a.style.display = "none";
       a.href = url;
-      const ext = format === 'xlsx' ? 'xlsx' : format === 'json' ? 'json' : format === 'xml' ? 'xml' : 'csv';
+      const ext = format === 'json' ? 'json' : format === 'xml' ? 'xml' : 'csv';
       a.download = `ResinDB_Export_${new Date().toISOString().split("T")[0]}.${ext}`;
       document.body.appendChild(a);
       a.click();
@@ -61,6 +61,3 @@ export function useExportData(
   return { isExporting, handleExport };
 }
 
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

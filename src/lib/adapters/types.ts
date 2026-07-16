@@ -37,10 +37,7 @@ export interface IProductAdapter {
   batchUpdate(ids: string[], updates: ProductUpdates): Promise<void>;
   batchCreate(products: Partial<Product>[]): Promise<Product[]>;
   delete(ids: string[]): Promise<void>;
-  exportReport(products: Product[], format: 'csv' | 'xlsx' | 'json' | 'xml'): Promise<Blob>;
+  exportReport(products: Product[], format: 'csv' | 'json' | 'xml'): Promise<Blob>;
   restoreSnapshot(products: Product[]): Promise<void>;
 }
 
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

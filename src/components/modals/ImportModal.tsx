@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Papa from "papaparse";
-import * as XLSX from "xlsx";
 import {
   X,
   FileSpreadsheet,
@@ -242,13 +241,12 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
   };
 
   /**
-   * Universal Raw File Parser (CSV, JSON, XLSX)
+   * Universal Raw File Parser (CSV, JSON, TXT)
    * Populates the RawFileContent interface for Step 2 schema mapping
    */
   const parseRawFile = async (file: File, onProgress: (progress: number) => void): Promise<RawFileContent> => {
     return new Promise((resolve, reject) => {
-      const isExcel = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
-      const isJson = file.name.endsWith(".json");
+        const isJson = file.name.endsWith(".json");
 
       if (isJson) {
         const reader = new FileReader();
@@ -278,37 +276,8 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
           }
         };
         reader.readAsText(file);
-      } else if (isExcel) {
-        const reader = new FileReader();
-        reader.onprogress = (e) => {
-          if (e.lengthComputable) {
-            onProgress(Math.floor((e.loaded / e.total) * 50));
-          }
-        };
-        reader.onload = (e) => {
-          try {
-            const data = new Uint8Array(e.target?.result as ArrayBuffer);
-            const workbook = XLSX.read(data, { type: "array" });
-            const firstSheet = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheet];
-            const rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" }) as Record<string, unknown>[];
-
-            const keysSet = new Set<string>();
-            rows.forEach((r) => Object.keys(r).forEach((k) => keysSet.add(k)));
-            onProgress(100);
-            resolve({
-              fileName: file.name,
-              headers: Array.from(keysSet),
-              rows,
-            });
-          } catch {
-            reject(new Error("Excel 解析失败"));
-          }
-        };
-        reader.onerror = () => reject(new Error("文件读取失败"));
-        reader.readAsArrayBuffer(file);
       } else {
-        // Fallback standard CSV/TXT Papa parse
+        // Standard CSV/TXT Papa parse
         Papa.parse(file, {
           header: true,
           skipEmptyLines: true,
@@ -838,7 +807,7 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
                         ref={fileInputRef}
                         className="hidden"
                         multiple
-                        accept=".csv,.xlsx,.xls,.json,.txt"
+                        accept=".csv,.json,.txt"
                         onChange={(e) => {
                           if (e.target.files) addFiles(e.target.files);
                         }}
@@ -1718,6 +1687,3 @@ PP-M1600	中石油		0.910		1200`}
 
 ImportModal.displayName = "ImportModal";
 
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed
