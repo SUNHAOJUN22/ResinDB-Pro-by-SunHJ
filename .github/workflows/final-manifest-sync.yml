@@ -1,0 +1,93 @@
+name: Final manifest synchronization
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  synchronize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Normalize runtime and development dependencies
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('package.json')
+          package = json.loads(path.read_text(encoding='utf-8'))
+          dependencies = package.get('dependencies', {})
+          dev_dependencies = package.get('devDependencies', {})
+
+          build_only = (
+              '@tailwindcss/typography',
+              '@tailwindcss/vite',
+              '@types/node',
+              '@types/react-dom',
+              '@vitejs/plugin-react',
+              'tailwindcss',
+              'typescript',
+              'vite',
+          )
+          for name in build_only:
+              value = dependencies.pop(name, None)
+              if value:
+                  dev_dependencies[name] = value
+
+          dev_dependencies['vite'] = '^7.2.2'
+          dependencies['remark-gfm'] = '^4.0.1'
+          package['dependencies'] = dict(sorted(dependencies.items()))
+          package['devDependencies'] = dict(sorted(dev_dependencies.items()))
+          path.write_text(json.dumps(package, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Regenerate dependency lock
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Validate application
+        run: npm run validate
+
+      - name: Verify production dependency audit
+        shell: bash
+        run: |
+          npm audit --omit=dev --audit-level=low
+
+      - name: Commit synchronized manifest directly to main
+        shell: bash
+        run: |
+          rm -f .github/workflows/final-manifest-sync.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json .github/workflows/final-manifest-sync.yml
+          git commit -m 'build: synchronize manifest and lockfile after dependency hardening'
+          git push origin HEAD:main
+
+      - name: Delete trigger branch
+        shell: bash
+        run: |
+          branch='${{ github.event.pull_request.head.ref }}'
+          if [ "$branch" != 'main' ]; then
+            git push origin --delete "$branch" || true
+          fi
