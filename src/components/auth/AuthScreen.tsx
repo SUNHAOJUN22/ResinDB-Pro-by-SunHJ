@@ -134,7 +134,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
             <Sparkles size={14} className="text-amber-500" />
             CNPC ResinDB.pri
             <div className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-700"></div>
-            v3.0.0
+            v3.1.0
           </div>
         </div>
 

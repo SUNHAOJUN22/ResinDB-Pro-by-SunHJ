@@ -128,7 +128,7 @@ export const SystemNav: React.FC<{
                 </div>
                 <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
                   <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
-                    v3.0.0-stable
+                    v3.1.0-stable
                   </span>
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] font-mono text-slate-400/80 dark:text-slate-500">

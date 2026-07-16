@@ -1540,7 +1540,7 @@ export const BetaSandboxView: React.FC = () => {
                 <div className="bg-slate-950/40 border border-slate-900/80 rounded-xl p-3 font-mono text-[9px] text-indigo-300/80 space-y-1.5 shadow-inner">
                   <div className="text-[10px] font-bold text-slate-300 border-b border-indigo-950 pb-1.5 uppercase flex items-center justify-between">
                     <span>Mathematical Physics Formula</span>
-                    <span className="text-[8px] text-slate-500">Rheology Core v3.0.0</span>
+                    <span className="text-[8px] text-slate-500">Rheology Core v3.1.0</span>
                   </div>
                   <div>
                     <span className="text-teal-400 font-semibold"># Carreau-Yasuda Model:</span>
@@ -3283,7 +3283,7 @@ export const BetaSandboxView: React.FC = () => {
       <div className="border-t border-slate-800/60 pt-2.5 flex items-center justify-between text-[9px] font-mono text-slate-500 shrink-0">
         <div className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>{t("telemetryGateway")} (Future Workspace Engine v3.0.0)</span>
+          <span>{t("telemetryGateway")} (Future Workspace Engine v3.1.0)</span>
         </div>
         <div className="hidden sm:flex items-center gap-4">
           <span>{t("wasmStack")}</span>

@@ -189,7 +189,7 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
             whileTap={{ scale: 0.98 }}
             className="px-6 md:px-7 py-3 bg-slate-900/50 border border-slate-800 text-slate-400 hover:text-white rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-[0.2em] transition-all whitespace-nowrap text-center"
           >
-            v3.0.0 LOGS
+            v3.1.0 LOGS
           </motion.button>
         </div>
       </div>

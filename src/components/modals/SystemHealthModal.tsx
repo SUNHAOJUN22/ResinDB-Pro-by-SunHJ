@@ -352,7 +352,7 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({
                   <div className="relative z-10">
                     <h4 className="text-[9px] font-mono uppercase tracking-widest mb-4 text-primary-400 flex items-center gap-2">
                       <div className="w-2 h-2 bg-primary-500 rounded-full" />
-                      {t("sysHealthReleaseNotes")} (v3.0.0-PRO)
+                      {t("sysHealthReleaseNotes")} (v3.1.0-PRO)
                     </h4>
                     <div className="space-y-3">
                       {[

@@ -1,4 +1,4 @@
-# 🧪 ResinDB Pro v3.0 — 工业级合成树脂产品数据与科研智能分析系统 (PRI-Synthetic Resin)
+# 🧪 ResinDB Pro v3.1 — 工业级合成树脂产品数据与科研智能分析系统 (PRI-Synthetic Resin)
 
 [![React Version](https://img.shields.io/badge/React-19.0.0-blue?style=flat-square&logo=react)](https://react.dev/)
 [![Vite Version](https://img.shields.io/badge/Vite-6.4.1-646CFF?style=flat-square&logo=vite)](https://vite.dev/)
@@ -59,9 +59,9 @@ ResinDB Pro 采用严格可移植的**三层体系架构模型**，使底座展�
 
 ---
 
-## 🚀 v3.0.0 核心重大技术成果 (Core Technological Breakthroughs)
+## 🚀 v3.1.0 核心重大技术成果 (Core Technological Breakthroughs)
 
-在 `v3.0.0-stable` 正式版中，系统底层架构和数理安全均完成了里程碑式的演进：
+在 `v3.1.0-stable` 正式版中，系统底层架构和数理安全均完成了里程碑式的演进：
 
 ### 1. ⚙️ 基于 WebAssembly / JS 双引擎的流变学高精度非线性拟合器
 *   **物理本构**：集成了 Carreau-Yasuda 剪切粘度拟合方程，可在毫秒级求解出材料零剪切粘度 $\eta_0$、松弛时间常数 $\lambda$ 以及稀剪切指数 $n$。
