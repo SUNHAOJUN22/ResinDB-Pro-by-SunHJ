@@ -55,10 +55,23 @@ jobs:
       - name: Synchronize dependency lock
         run: npm install --package-lock-only --ignore-scripts
 
-      - name: Install and validate
-        run: |
-          npm ci
-          npm run validate
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Production HTTP smoke test
+        run: npm run smoke
 
       - name: Verify active project is provider-neutral
         shell: bash
