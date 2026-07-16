@@ -2,7 +2,7 @@
 
 # ResinDB Pro
 
-### 合成树脂产品数据管理与材料信息学分析前端
+### 合成树脂数据管理与材料信息学分析工作台
 
 **Synthetic Resin Data Management & Materials-Informatics Workbench**
 
@@ -11,10 +11,11 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)
 ![Storage](https://img.shields.io/badge/Default%20Storage-IndexedDB-5A0FC8)
+![Branch](https://img.shields.io/badge/Active%20Branch-main-181717?logo=github)
 
-面向合成树脂牌号、实验记录和理化性能数据的浏览器端研究工作台。项目集成数据表格、筛选、导入导出、图表分析、Web Worker 科学计算、可配置公式和可选的 Gemini 辅助分析。
+面向聚乙烯、聚丙烯、工程塑料及实验室树脂数据的浏览器端管理与分析系统。项目提供牌号数据库、批量导入导出、属性检索、材料对比、科学图表、Web Worker 计算、安全公式以及可选的用户自定义 AI API 接入。
 
-> **定位说明**：本仓库是研究与工程演示应用，不是经过认证的 LIMS、质量放行系统、法规判定工具或生产数据库。所有材料结论、AI 建议和计算结果都应由可追溯数据与实验方法复核。
+> **项目边界**：ResinDB Pro 是研究、数据治理和工程演示工具，不是经过认证的 LIMS、ERP、质量放行系统或法规判定系统。所有材料结论、预测结果和标准符合性判断必须由原始数据、测试方法与实验结果复核。
 
 </div>
 
@@ -22,164 +23,107 @@
 
 ## 目录
 
-- [项目状态](#项目状态)
-- [界面演示](#界面演示)
-- [核心能力](#核心能力)
-- [技术架构](#技术架构)
-- [实机运行演示](#实机运行演示)
-- [数据存储模式](#数据存储模式)
-- [AI 功能配置](#ai-功能配置)
-- [安全公式引擎](#安全公式引擎)
-- [质量验证](#质量验证)
-- [部署](#部署)
-- [已知限制](#已知限制)
-- [安全说明](#安全说明)
+- [一、当前版本做什么](#一当前版本做什么)
+- [二、界面实机截图](#二界面实机截图)
+- [三、快速启动](#三快速启动)
+- [四、完整实机操作演示](#四完整实机操作演示)
+- [五、AI API 自定义接入](#五ai-api-自定义接入)
+- [六、数据存储与远程后端](#六数据存储与远程后端)
+- [七、安全公式引擎](#七安全公式引擎)
+- [八、科学分析模块](#八科学分析模块)
+- [九、工程架构](#九工程架构)
+- [十、测试与质量门禁](#十测试与质量门禁)
+- [十一、生产部署](#十一生产部署)
+- [十二、安全与已知限制](#十二安全与已知限制)
+- [十三、分支与开发规则](#十三分支与开发规则)
 
 ---
 
-## 项目状态
+# 一、当前版本做什么
 
-| 模块 | 状态 | 客观说明 |
+| 能力 | 状态 | 实际说明 |
 |---|---:|---|
-| 产品目录、检索、筛选与列配置 | 已实现 | 浏览器端运行，默认使用 IndexedDB 持久化 |
-| CSV / XLSX / JSON 等导入导出 | 已实现 | 导入前仍应核对字段映射、单位与数据来源 |
-| Dashboard、对比、透视与分析视图 | 已实现 | 图表用于探索性分析，不等同于统计验证报告 |
-| Web Worker 科学计算 | 已实现 | 用于降低主线程阻塞；每个模型仍需独立验证数值边界 |
-| 用户自定义公式 | 已实现 | 使用白名单数值解析器，不执行任意 JavaScript |
-| Gemini 辅助分析 | 可选 | 本地演示可直接配置；生产环境应使用服务端代理 |
-| 远程 REST 数据适配器 | 接口已实现 | 本仓库不包含配套后端；写失败不会静默写入本地库 |
-| 登录与角色 | 演示模式 | 当前为内置角色选择，不是身份认证或访问控制系统 |
-| 法规、标准与产品认证 | 未提供 | 系统不会自动形成 ASTM、ISO、企业标准或质量放行结论 |
+| 树脂牌号数据库 | 已实现 | 管理牌号、制造商、分类、标签和多维物性字段 |
+| IndexedDB 本地持久化 | 默认启用 | 无服务器、无账号、无 API Key 也可直接运行 |
+| 搜索和高级筛选 | 已实现 | 支持文本、分类、完整度和数值条件过滤 |
+| 批量编辑与标签 | 已实现 | 支持选中记录后的批量属性与标签操作 |
+| CSV / XLSX / JSON 导入导出 | 已实现 | 使用前应确认字段名称、测试单位与标准条件 |
+| Dashboard / Comparison / Pivot | 已实现 | 用于数据概览、牌号对比和交叉统计 |
+| 科学图表与 Worker 计算 | 已实现 | 包含流变、动力学、寿命、聚类、统计过程等模块 |
+| 用户公式 | 已实现 | 使用白名单解析器，不执行任意 JavaScript |
+| AI API | 可选 | 不绑定供应商或默认模型，由用户自行填写配置 |
+| 远程 REST API | 前端适配器已实现 | 本仓库不包含服务器端数据库实现 |
+| 登录与角色 | 演示模式 | 内置角色选择不是正式身份认证 |
+| 质量认证与法规结论 | 未提供 | 不自动签发 ASTM、ISO、企业标准或合格证书 |
+
+系统在没有 AI、没有远程数据库和没有云服务的情况下仍可完成核心数据管理与分析流程。
 
 ---
 
-## 界面演示
+# 二、界面实机截图
 
-### 1. 数据仪表盘
+## 2.1 数据仪表盘
 
 ![ResinDB Pro dashboard](./docs/images/dashboard_demo.png)
 
-产品目录、指标概览、筛选和高密度数据浏览。
+仪表盘用于查看产品数量、属性概况、分类分布、数据质量和快捷分析入口。
 
-### 2. 材料分析工作区
+## 2.2 材料分析工作区
 
 ![ResinDB Pro analytics](./docs/images/analytics_demo.png)
 
-用于属性关系、分布、材料对比和探索性可视化。
+分析工作区用于属性分布、相关性、材料空间、趋势与多牌号比较。
 
-### 3. 科学计算沙箱
+## 2.3 科学计算沙箱
 
 ![ResinDB Pro sandbox](./docs/images/sandbox_demo.png)
 
-用于流变、动力学、寿命与统计模型的交互式试算。
+沙箱用于交互式输入参数，并通过独立 Web Worker 执行计算，避免长计算阻塞主界面。
 
 ---
 
-## 核心能力
+# 三、快速启动
 
-### 数据管理
+## 3.1 环境要求
 
-- 合成树脂牌号与制造商信息管理；
-- 多类别树、标签、完整度和高级过滤；
-- 批量编辑、批量标签、排序与历史快照；
-- 浏览器端 IndexedDB 数据适配器；
-- 可切换的远程 REST API 适配器；
-- CSV、XLSX、JSON、XML 等导入导出路径。
+推荐环境：
 
-### 材料信息学与可视化
-
-- 属性散点、分布、相关性和相似性分析；
-- Ashby 类材料空间探索；
-- GPC、流变、WLF、Prony、Weibull、Arrhenius、结晶动力学等交互模型；
-- SPC、聚类、多目标分析与预测类 Worker；
-- Dashboard、Comparison、Pivot、Analytics 和 Sandbox 视图。
-
-### 工程能力
-
-- React 19 + TypeScript 严格模式；
-- Vite 6 构建与代码分块；
-- 计算密集任务通过 Web Worker 与 UI 解耦；
-- Error Boundary、上下文状态、懒加载和本地持久化；
-- Vitest 科学计算测试与 GitHub Actions 质量门禁；
-- 生产构建后自动启动 HTTP 服务进行烟雾测试。
-
----
-
-## 技术架构
-
-```text
-index.html
-└── src/index.tsx                 # React 挂载与顶层错误边界
-    └── src/components/App.tsx    # 应用组合、视图路由与 Provider
-        ├── components/           # 页面、布局、图表、弹窗和控件
-        ├── contexts/             # Auth / Data / UI / Theme / Toast 等状态
-        ├── hooks/                # 数据、快捷键、导出与 Worker Hooks
-        ├── lib/
-        │   ├── adapters/         # IndexedDB 与 Remote REST 数据接口
-        │   ├── formulaParser.ts  # 白名单公式解析与拓扑执行
-        │   └── ...               # 筛选、数学与材料工具
-        ├── services/             # Gemini 与应用服务
-        └── workers/              # 后台科学计算任务
-```
-
-### 数据流
-
-```text
-UI Component
-    ↓ user action
-Context / Hook
-    ↓ typed adapter call
-IndexedDB Adapter  ──────────────── default local mode
-       or
-Remote API Adapter ─────────────── explicit remote mode
-    ↓
-state update / rollback / toast / history snapshot
-```
-
-### 设计原则
-
-1. **数据源必须明确**：本地库与远程库不可静默混写。
-2. **计算必须可审计**：公式仅允许受控数值语法；科学算法应有单元测试和适用范围。
-3. **AI 必须标注不确定性**：AI 输出是候选解释或实验假设，不是实测数据。
-4. **失败必须可见**：不通过全局覆盖 `console.warn` 隐藏运行时问题。
-5. **构建必须可复现**：CI 使用 `npm ci` 和已提交锁文件。
-
----
-
-## 实机运行演示
-
-### 0. 环境要求
-
-建议使用：
-
-- Node.js `20.19+` 或 Node.js `22 LTS`；
+- Node.js `22 LTS`；
 - npm `10+`；
-- Chrome、Edge 或 Firefox 的当前稳定版本；
-- 至少 4 GB 可用内存；大数据导入和多图表分析建议 8 GB 以上。
+- Chrome、Edge 或 Firefox 当前稳定版本；
+- Windows 10/11、macOS 或主流 Linux；
+- 建议至少 8 GB 内存用于大表格与多图表操作。
 
-检查环境：
+检查版本：
 
 ```bash
 node --version
 npm --version
 ```
 
-### 1. 获取代码
+## 3.2 获取项目
 
 ```bash
 git clone https://github.com/SUNHAOJUN22/ResinDB-Pro-by-SunHJ.git
 cd ResinDB-Pro-by-SunHJ
 ```
 
-### 2. 安装锁定依赖
+本仓库只维护 `main` 作为有效开发与发布分支：
+
+```bash
+git checkout main
+git pull origin main
+```
+
+## 3.3 安装依赖
 
 ```bash
 npm ci
 ```
 
-`npm ci` 不会改写锁文件；若该命令失败，应先修复 `package.json` 与 `package-lock.json` 的差异，而不是直接删除锁文件。
+使用 `npm ci` 而不是随意执行 `npm install`，可以确保本机安装结果与仓库锁文件一致。
 
-### 3. 配置本地环境
+## 3.4 创建本地环境文件
 
 macOS / Linux：
 
@@ -193,42 +137,50 @@ Windows PowerShell：
 Copy-Item .env.example .env.local
 ```
 
-默认 IndexedDB 模式无需填写任何密钥即可运行。AI 功能可保持为空。
+默认配置即可启动，AI API 相关字段可以保持空白。
 
-### 4. 启动开发服务器
+## 3.5 启动开发服务器
 
 ```bash
 npm run dev
 ```
 
-浏览器打开：
+浏览器访问：
 
 ```text
 http://localhost:3000
 ```
 
-### 5. 登录演示
+---
 
-启动页提供 `admin`、`editor`、`viewer` 三种内置演示角色。点击角色卡片即可进入，不需要密码。
+# 四、完整实机操作演示
 
-这只是 UI 权限演示：
+以下流程对应当前实际界面和运行逻辑。
 
-- 不会验证真实身份；
-- 不应暴露到不可信网络；
-- 不能替代 OAuth、OIDC、SSO、会话管理或服务端授权。
+## 4.1 第一次进入系统
 
-### 6. 数据浏览演示
+1. 启动 `npm run dev`；
+2. 浏览器打开 `http://localhost:3000`；
+3. 进入角色选择页；
+4. 选择 `admin`、`editor` 或 `viewer` 演示账号；
+5. 等待 Dashboard 和本地数据初始化。
+
+这些角色仅用于前端功能演示，不验证密码、Token 或真实用户身份。生产环境必须接入服务端认证与授权。
+
+## 4.2 浏览和检索产品
 
 进入 Dashboard 后：
 
-1. 使用顶部搜索框输入牌号、制造商、类别或属性关键词；
-2. 在左侧类别树选择 PE、PP 或其他材料分类；
-3. 调整完整度阈值，观察缺失字段记录的过滤；
-4. 打开列配置，固定或隐藏属性列；
-5. 选择多条记录，测试批量标签、编辑和导出；
-6. 刷新页面，验证 IndexedDB 数据仍然保留。
+1. 在顶部搜索框输入牌号，例如 `PP`、`PE` 或制造商名称；
+2. 在左侧分类树选择材料大类；
+3. 通过列管理隐藏不需要的属性；
+4. 拖动或调整列宽；
+5. 点击产品记录打开详细信息；
+6. 刷新浏览器，确认 IndexedDB 中的数据仍然存在。
 
-高级数值检索支持“属性:条件”形式。属性名必须与当前数据列或翻译标签匹配，例如：
+### 数值条件检索
+
+搜索框支持属性条件表达式：
 
 ```text
 Density:>0.94
@@ -236,88 +188,222 @@ MFR:0.5-2
 Tensile Strength:>=30
 ```
 
-### 7. 分析视图演示
+说明：
 
-1. 切换到 **Analytics**；
-2. 选择目标属性与分组；
-3. 查看分布、相关性或材料空间图；
-4. 切换到 **Comparison** 比较候选牌号；
-5. 切换到 **Sandbox** 输入模型参数并运行 Worker 计算；
-6. 对任何结论记录单位、样本量、测试标准和适用温度。
+- 属性名必须与数据库列名或当前语言标签匹配；
+- 范围写法为 `最小值-最大值`；
+- 多个普通关键词采用同时匹配逻辑；
+- 单位不会自动换算，比较前必须确认数据单位一致。
 
-### 8. 用户公式演示
+## 4.3 新增和编辑产品
 
-公式编辑器支持属性引用、算术运算和白名单数学函数：
+1. 点击新增产品按钮；
+2. 输入牌号、制造商、分类与基础属性；
+3. 保存后记录会写入当前数据适配器；
+4. 打开产品详情继续编辑扩展属性；
+5. 确认 `updatedAt`、单位和测试标准信息是否正确。
 
-```text
-Props['Density'] * 1000
-sqrt(pow(Props['Tensile Strength'], 2) + abs(Props['Impact Strength']))
-max(Props['MFR'], 0.01) / Props['Density']
-```
+本地 IndexedDB 模式下，数据只保存在当前浏览器配置文件中。
 
-循环依赖会在保存前被拒绝，例如：
+## 4.4 批量操作
 
-```text
-A = Props['B'] + 1
-B = Props['A'] + 1
-```
+1. 在数据表格中勾选多条记录；
+2. 打开批量编辑工具栏；
+3. 选择批量属性更新、标签追加、标签覆盖或删除；
+4. 提交前核对选中数量；
+5. 操作后查看 Toast 提示和历史快照。
 
-### 9. 生产构建与真实 HTTP 烟雾测试
+远程模式下，写入失败会明确报错，不会静默改写本地数据库。
 
-```bash
-npm run build
-npm run smoke
-```
+## 4.5 数据导入
 
-`npm run smoke` 会：
+支持 CSV、XLSX 和 JSON 等数据来源。建议导入前完成：
 
-1. 使用已生成的 `dist/`；
-2. 启动 `vite preview`；
-3. 请求 `http://127.0.0.1:4173`；
-4. 检查 HTTP 状态和 React `#root` 挂载节点；
-5. 自动停止预览服务。
+- 字段名标准化；
+- 数值和文本类型检查；
+- 单位统一；
+- 测试温度和标准补充；
+- 空值、重复值和异常值检查；
+- 预留一份原始文件备份。
 
-完整验证：
+典型操作：
 
-```bash
-npm run validate
-```
+1. 点击导入；
+2. 选择本地文件；
+3. 检查预览与字段映射；
+4. 确认导入；
+5. 使用搜索或分类检查新记录；
+6. 运行数据质量审计。
 
-执行顺序为：
+## 4.6 数据导出
 
-```text
-ESLint → TypeScript → Vitest → Vite production build → HTTP smoke test
-```
+1. 使用搜索和筛选得到目标数据集；
+2. 点击导出；
+3. 选择 CSV、XLSX、JSON 或其他可用格式；
+4. 打开导出文件核对记录数量；
+5. 对关键数据保留筛选条件、导出时间和版本信息。
+
+## 4.7 材料对比
+
+1. 选择两条或多条树脂牌号；
+2. 打开 Comparison 视图；
+3. 选择密度、MFR、拉伸、弯曲、冲击等指标；
+4. 检查缺失值和单位差异；
+5. 将图表作为候选材料筛选依据，而不是最终认证结论。
+
+## 4.8 Analytics 操作
+
+1. 切换到 Analytics；
+2. 选择 X、Y 属性或目标分析模块；
+3. 设置分类或制造商分组；
+4. 查看散点、分布、相关性或材料空间；
+5. 记录样本量和缺失值比例；
+6. 对异常点返回产品详情核查原始数据。
+
+## 4.9 Sandbox 操作
+
+1. 进入 Sandbox；
+2. 选择流变、动力学、寿命或统计模型；
+3. 输入参数与单位；
+4. 启动计算；
+5. 查看图形和数值输出；
+6. 将参数、假设和模型版本记录到实验笔记。
+
+科学计算模块主要用于探索、教学和研究前处理。正式科研结果应使用独立数据集和权威软件复算。
 
 ---
 
-## 数据存储模式
+# 五、AI API 自定义接入
 
-### IndexedDB：默认推荐的本地演示模式
+## 5.1 设计原则
+
+ResinDB Pro 当前：
+
+- 不内置 AI 供应商；
+- 不安装供应商专用 SDK；
+- 不预设任何模型名称；
+- 不要求安装额外 AI CLI；
+- AI 功能关闭时不影响数据库和分析模块；
+- 使用 OpenAI-compatible `chat/completions` 请求结构。
+
+用户需要自行提供：
+
+1. 完整 API Endpoint；
+2. 供应商要求的 Model Identifier；
+3. 可选 API Key。
+
+## 5.2 在界面直接填写
+
+1. 进入 Dashboard；
+2. 找到 **AI API Insights** 卡片；
+3. 点击齿轮按钮或 **API Settings**；
+4. 填入完整接口地址；
+5. 填入模型标识符；
+6. 填入 API Key；
+7. 点击 **Test**；
+8. 测试成功后点击 **Save**；
+9. 返回卡片点击刷新生成分析。
+
+示例 Endpoint 形式：
+
+```text
+https://provider.example/v1/chat/completions
+```
+
+项目不对具体供应商、域名和模型名称做默认选择。
+
+## 5.3 通过环境变量填写
 
 `.env.local`：
 
-```dotenv
+```bash
+VITE_AI_API_ENDPOINT=https://provider.example/v1/chat/completions
+VITE_AI_MODEL=your-model-id
+VITE_AI_API_KEY=your-restricted-development-key
+```
+
+启动或修改环境变量后需重新运行：
+
+```bash
+npm run dev
+```
+
+## 5.4 API 兼容要求
+
+服务端应接受类似请求：
+
+```json
+{
+  "model": "your-model-id",
+  "messages": [
+    { "role": "system", "content": "..." },
+    { "role": "user", "content": "..." }
+  ],
+  "temperature": 0.3
+}
+```
+
+优先支持以下响应结构：
+
+```json
+{
+  "choices": [
+    {
+      "message": {
+        "content": "response text"
+      }
+    }
+  ]
+}
+```
+
+客户端同时兼容常见的 `output_text`、`text` 和 `response` 文本字段。
+
+## 5.5 密钥安全
+
+界面保存的配置位于浏览器 `localStorage`。这适合本机开发和受控演示，不适合存放高权限生产密钥。
+
+生产推荐链路：
+
+```text
+Browser
+  ↓ authenticated request
+Company API Gateway / Backend
+  ↓ server-side secret
+Selected AI Provider
+```
+
+不要把无限制密钥提交到 Git、写入公开环境文件或直接发布到前端生产包。
+
+---
+
+# 六、数据存储与远程后端
+
+## 6.1 默认 IndexedDB 模式
+
+`.env.local`：
+
+```bash
 VITE_DATABASE_ADAPTER_TYPE=indexeddb
 ```
 
 特点：
 
-- 不需要服务器；
-- 数据保存在当前浏览器配置文件中；
-- 不会自动跨设备同步；
-- 清理站点数据或更换浏览器配置文件会丢失本地数据；
-- 适合演示、个人研究和前端开发。
+- 无需后端；
+- 数据保存在当前浏览器；
+- 适合个人研究、演示和离线使用；
+- 清理浏览器数据会删除本地数据库；
+- 不具备跨设备同步和集中权限控制。
 
-### Remote REST API：需要自行提供后端
+## 6.2 远程 REST API 模式
 
-```dotenv
+```bash
 VITE_DATABASE_ADAPTER_TYPE=remote_api
-VITE_REMOTE_API_BASE_URL=https://your-api.example.com/api
+VITE_REMOTE_API_BASE_URL=https://your-server.example/api
 VITE_REMOTE_READ_FALLBACK=false
 ```
 
-当前前端期望的主要端点包括：
+前端期望的主要接口包括：
 
 ```text
 GET    /products
@@ -326,217 +412,316 @@ PUT    /products/:id
 PATCH  /products/batch-update
 POST   /products/batch-create
 POST   /products/batch-delete
-POST   /products/export?format=...
+POST   /products/export
 POST   /products/restore-snapshot
 ```
 
-重要行为：
+远程写入失败时，系统不会把数据改写到 IndexedDB 并伪装成成功，因为这种行为会造成服务器与浏览器数据分叉。
 
-- 远程写入失败会向上抛出错误，供 UI 回滚；
-- 不会把失败写入静默转移到 IndexedDB；
-- `VITE_REMOTE_READ_FALLBACK=true` 仅允许查询和导出显式降级；
-- 生产后端必须实现鉴权、授权、输入校验、并发控制、审计日志和数据库事务。
+## 6.3 生产后端最低要求
+
+- 身份认证；
+- 服务端角色授权；
+- 输入 Schema 校验；
+- 单位和字段字典；
+- 数据库事务；
+- 操作审计日志；
+- 备份与恢复；
+- API 限流；
+- HTTPS；
+- 密钥和连接字符串托管。
 
 ---
 
-## AI 功能配置
+# 七、安全公式引擎
 
-### 本地演示
+公式引擎不使用 `eval` 或 `new Function` 执行用户输入，而是通过词法分析、递归下降解析和受控执行计算数值结果。
 
-```dotenv
-VITE_GEMINI_API_KEY=your_disposable_restricted_key
-VITE_GEMINI_FAST_MODEL=gemini-3.5-flash
-VITE_GEMINI_REASONING_MODEL=gemini-3.1-pro-preview
-```
+## 7.1 支持语法
 
-### 关键安全事实
-
-Vite 会把所有 `VITE_*` 环境变量打包到浏览器资源中，因此前端 API Key **不是秘密**。本地演示只能使用：
-
-- 可随时撤销的开发 Key；
-- 最小 API 权限；
-- 来源、配额和账单限制；
-- 不接触敏感数据的测试环境。
-
-生产环境推荐：
+属性引用：
 
 ```text
-Browser → authenticated application backend → AI gateway/provider
+Props['Density']
+Props['MFR']
 ```
 
-服务端至少应实现：
-
-- 用户身份与权限校验；
-- 请求大小和字段白名单；
-- Prompt 注入与数据泄漏防护；
-- 速率限制、配额和超时；
-- 模型版本配置；
-- 日志脱敏与审计；
-- 机密管理服务。
-
-### AI 输出边界
-
-AI 生成的属性值、替代材料和配方建议必须标记为估算或假设。不得直接作为：
-
-- 厂商正式规格；
-- 检测报告；
-- 安全合规结论；
-- 采购验收依据；
-- 工艺放大参数；
-- 产品质量放行依据。
-
----
-
-## 安全公式引擎
-
-旧式公式执行常使用 `eval` 或 `new Function`，黑名单无法可靠阻止原型链、构造器和全局对象逃逸。ResinDB Pro 的公式引擎现在使用受限解析器，只接受：
-
-- 数值与科学计数法；
-- `Props['property']` / `p['property']`；
-- `+ - * / % ^ **`；
-- 括号和逗号；
-- `PI`、`Math.PI`、`E`、`Math.E`；
-- `abs`、`sqrt`、`pow`、`log`、`log10`、`exp`、`sin`、`cos`、`tan`、`min`、`max`。
-
-下列内容会被拒绝：
+算术：
 
 ```text
-window
-fetch
-constructor
-__proto__
-object literals
-property chaining
-ternary expressions
-arbitrary function calls
++  -  *  /  %  ^
 ```
 
-非有限结果（如除以零或 `sqrt(-1)`）归一化为 `0`，避免污染后续公式图。
+函数：
+
+```text
+abs sqrt pow log log10 exp sin cos tan min max
+```
+
+常量：
+
+```text
+PI
+```
+
+## 7.2 示例
+
+```text
+Props['Density'] * 1000
+sqrt(pow(Props['Tensile Strength'], 2) + abs(Props['Impact Strength']))
+max(Props['MFR'], 0.01) / Props['Density']
+```
+
+## 7.3 循环依赖
+
+以下公式会被拒绝：
+
+```text
+A = Props['B'] + 1
+B = Props['A'] + 1
+```
+
+## 7.4 边界
+
+公式解析器降低了任意脚本执行风险，但不能替代：
+
+- 业务数据权限；
+- 服务端验证；
+- 单位系统；
+- 数值误差分析；
+- 科学模型验证。
 
 ---
 
-## 质量验证
+# 八、科学分析模块
 
-### 常用命令
+项目包含或预留的分析方向包括：
 
-| 命令 | 作用 |
-|---|---|
-| `npm run lint` | ESLint，任何 warning 均使任务失败 |
-| `npm run typecheck` | TypeScript 严格类型检查 |
-| `npm run test` | 全部 Vitest 测试 |
-| `npm run test:science` | 科学计算与数据适配器测试 |
-| `npm run test:coverage` | 生成覆盖率报告 |
-| `npm run build` | Vite 生产构建 |
-| `npm run smoke` | 生产构建 HTTP 烟雾测试 |
-| `npm run validate` | 完整质量门禁 |
+- Carreau-Yasuda 流变模型；
+- WLF 时温等效；
+- Prony 粘弹性级数；
+- Weibull 寿命分布；
+- Arrhenius 热降解；
+- 结晶动力学；
+- KDE 核密度估计；
+- SPC 统计过程控制；
+- K-Means 聚类；
+- Mahalanobis 距离；
+- 多目标 Pareto 分析；
+- 响应面和预测分析；
+- 相关性、相似性和材料空间可视化。
 
-### CI
+使用任何模型前必须确认：
 
-`.github/workflows/ci.yml` 在以下场景运行：
-
-- 推送到 `main`；
-- 推送到 `agent/**` 分支；
-- 针对 `main` 的 Pull Request。
-
-CI 使用 Node.js 22 和 `npm ci`，从而检测锁文件漂移、类型错误、测试失败、构建错误和生产入口不可访问等问题。
+- 参数定义；
+- 单位；
+- 数据来源；
+- 适用温度和应变范围；
+- 样本量；
+- 边界条件；
+- 与权威实现的对照结果。
 
 ---
 
-## 部署
+# 九、工程架构
 
-### 静态托管
+```text
+index.html
+└── src/index.tsx
+    └── src/components/App.tsx
+        ├── components/
+        │   ├── views/          页面与分析视图
+        │   ├── features/       DataGrid、AI、Analytics、Navigation
+        │   ├── charts/         D3、ECharts、Recharts 图表
+        │   ├── layout/         顶栏、侧栏、移动导航
+        │   └── modals/         导入、编辑、配置和审计弹窗
+        ├── contexts/           Auth、Data、UI、Theme、Toast、Modal
+        ├── hooks/              数据管理、快捷键、导出和 Worker Hooks
+        ├── lib/
+        │   ├── adapters/       IndexedDB 与 Remote REST Adapter
+        │   ├── formulaParser.ts
+        │   └── 数学、过滤、验证工具
+        ├── services/
+        │   └── aiService.ts    用户自定义通用 AI API 客户端
+        └── workers/            后台科学计算
+```
+
+核心数据流：
+
+```text
+User Action
+   ↓
+React Component
+   ↓
+Context / Hook
+   ↓
+Typed Adapter or Worker
+   ↓
+State Update / Rollback / Toast / History
+```
+
+工程原则：
+
+1. 数据源必须明确；
+2. 写入失败必须可见；
+3. 本地库与远程库不能静默混写；
+4. 用户公式不能执行任意脚本；
+5. AI 输出必须区分事实、计算和假设；
+6. 所有提交必须通过自动化质量门禁。
+
+---
+
+# 十、测试与质量门禁
+
+## 10.1 单独运行
 
 ```bash
-npm ci
+npm run lint
+npm run typecheck
+npm run test
 npm run build
+npm run smoke
 ```
 
-将 `dist/` 部署到支持静态资源的服务，例如 Nginx、Cloud Storage + CDN、Cloudflare Pages、Netlify 或 Vercel 静态站点。
+## 10.2 完整验证
 
-Nginx 最小示例：
-
-```nginx
-server {
-    listen 80;
-    server_name resindb.example.com;
-    root /var/www/resindb/dist;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /assets/ {
-        add_header Cache-Control "public, max-age=31536000, immutable";
-    }
-}
+```bash
+npm run validate
 ```
 
-### 生产检查清单
+执行链路：
 
-- [ ] 已撤销所有曾提交到 Git 的密钥；
-- [ ] 已接入真实身份认证和服务端授权；
-- [ ] 已关闭前端直连 AI Key；
-- [ ] 已固定允许的 API Origin 与 CSP；
-- [ ] 已配置 HTTPS、HSTS 和安全响应头；
-- [ ] 已定义数据库备份、恢复与迁移流程；
-- [ ] 已实现远程 API 幂等、事务和并发版本控制；
-- [ ] 已用代表性材料数据验证所有公式和 Worker；
-- [ ] 已记录单位、试验条件、标准与数据血缘；
-- [ ] `npm run validate` 与 GitHub Actions 均通过。
+```text
+ESLint
+  → TypeScript typecheck
+  → Vitest
+  → Vite production build
+  → production HTTP smoke test
+```
 
----
+## 10.3 烟雾测试做什么
 
-## 已知限制
+`npm run smoke` 会：
 
-1. 当前登录页是演示账户选择器，不提供真实鉴权。
-2. 默认数据库位于浏览器 IndexedDB，不适合多人协同或集中治理。
-3. 远程适配器只定义前端契约，后端服务不在本仓库内。
-4. 科学计算模块数量较多，不能由少量单元测试证明全部数值正确。
-5. 浏览器内大规模 XLSX、PDF 和图表处理受内存限制。
-6. AI 模型名称和可用性会随供应商生命周期变化，应通过配置与 CI 定期验证。
-7. 演示截图反映特定版本与数据状态，实际界面可能随数据和分辨率变化。
-8. 仓库尚未提供明确的开源许可证；在许可证补充前，不应假设可自由再分发或商用。
+1. 使用已经生成的 `dist/`；
+2. 启动 `vite preview`；
+3. 请求真实 HTTP 地址；
+4. 检查返回状态；
+5. 检查 React 根节点；
+6. 结束预览进程。
 
----
+## 10.4 GitHub Actions
 
-## 安全说明
-
-仓库历史中曾出现被提交的 API 凭据。当前代码树删除该文件并补充了 `.gitignore` 与安全文档，但删除文件不能撤销或自动清除历史密钥。
-
-仓库维护者必须立即：
-
-1. 在供应商控制台撤销旧 Key；
-2. 检查调用量、账单和异常来源；
-3. 创建受限的新 Key；
-4. 在生产中改用服务端 Secret Manager；
-5. 阅读 [SECURITY.md](./SECURITY.md)。
+`main` 的每次 Push 都会执行 CI。CI 未通过的提交不应作为发布版本部署。
 
 ---
 
-## 贡献与变更原则
+# 十一、生产部署
 
-提交前运行：
+## 11.1 构建
 
 ```bash
 npm ci
 npm run validate
 ```
 
-Pull Request 应说明：
+生产文件输出到：
 
-- 问题与复现步骤；
-- 数据或物理模型假设；
-- 修改范围；
-- 新增测试；
-- 兼容性与迁移影响；
-- 对安全、性能和数据一致性的影响。
+```text
+dist/
+```
 
-对于科学模型，请同时提供方程、单位、参数边界、参考实现或可复现对照数据。
+## 11.2 Nginx 示例
+
+```nginx
+server {
+    listen 80;
+    server_name resindb.example.com;
+
+    root /var/www/resindb/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8080/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+## 11.3 上线检查清单
+
+- [ ] `npm ci` 成功；
+- [ ] `npm run validate` 成功；
+- [ ] 不存在 `.env`、密钥或连接字符串提交；
+- [ ] 正式身份认证已接入；
+- [ ] 服务端授权已启用；
+- [ ] 数据库备份已验证；
+- [ ] HTTPS 已启用；
+- [ ] API 限流已启用；
+- [ ] AI 请求经过服务端网关；
+- [ ] 日志不包含敏感数据；
+- [ ] 导入字段和单位字典已固化；
+- [ ] 科学模型已完成独立验证。
+
+---
+
+# 十二、安全与已知限制
+
+## 12.1 安全
+
+详细策略参见 [`SECURITY.md`](./SECURITY.md)。
+
+禁止提交：
+
+- `.env`；
+- API Key；
+- 数据库密码；
+- 私钥；
+- 云服务凭据；
+- 内部实验或客户敏感数据。
+
+## 12.2 已知限制
+
+- 当前登录页是演示角色选择；
+- 默认数据库是浏览器 IndexedDB；
+- 仓库不包含正式远程后端；
+- AI API 配置保存在浏览器时不适合高权限密钥；
+- 图表和科学模型不自动完成实验验证；
+- 数据单位不会在所有模块中自动换算；
+- 浏览器存储容量由设备和浏览器策略决定；
+- 大规模数据集仍需后端分页、索引和服务端分析。
+
+---
+
+# 十三、分支与开发规则
+
+本仓库采用单主分支管理：
+
+```text
+main
+```
+
+规则：
+
+1. `main` 是唯一长期维护分支；
+2. 不保留功能分支、机器人分支或历史临时分支；
+3. 所有修改最终直接同步到 `main`；
+4. 提交后必须检查 GitHub Actions；
+5. 文档描述必须与实际代码和测试一致；
+6. 不使用无法验证的性能、认证或“工业级零缺陷”表述。
 
 ---
 
 <div align="center">
 
-**ResinDB Pro — evidence before claims, reproducibility before presentation.**
+**ResinDB Pro — make resin data searchable, auditable and experimentally verifiable.**
 
 </div>
