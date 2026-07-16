@@ -30,3 +30,5 @@ export function useMooWorker() {
   return { isCalculating, mooResult, error, runMooOpt };
 }
 
+
+// v3.1.0-sync

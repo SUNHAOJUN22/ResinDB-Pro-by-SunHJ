@@ -186,3 +186,5 @@ export const QuickEditOverlay: React.FC<QuickEditOverlayProps> = ({
     </motion.div>
   );
 };
+
+// v3.1.0-sync

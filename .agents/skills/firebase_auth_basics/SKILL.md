@@ -100,3 +100,4 @@ See [references/client_sdk_android.md](references/client_sdk_android.md).
 Secure your data using `request.auth` in Firestore/Storage rules.
 
 See [references/security_rules.md](references/security_rules.md).
+

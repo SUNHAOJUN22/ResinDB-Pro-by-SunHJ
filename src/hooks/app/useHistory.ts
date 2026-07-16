@@ -87,3 +87,5 @@ export function useHistory(
     restoreSnapshot
   };
 }
+
+// v3.1.0-sync

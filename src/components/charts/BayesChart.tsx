@@ -153,3 +153,5 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
 
   return <div ref={chartRef} className="w-full h-full" />;
 });
+
+// v3.1.0-sync

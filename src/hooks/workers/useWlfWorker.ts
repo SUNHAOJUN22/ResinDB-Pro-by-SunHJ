@@ -25,3 +25,5 @@ export function useWlfWorker() {
   return { isCalculating, wlfResult, error, calculateWLF };
 }
 
+
+// v3.1.0-sync

@@ -91,3 +91,5 @@ export function useClickFeedback() {
 
   return { triggerFeedback };
 }
+
+// v3.1.0-sync

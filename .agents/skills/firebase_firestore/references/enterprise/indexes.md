@@ -133,3 +133,4 @@ Define a unique index:
 
 Deploy indexes only: `bash npx firebase-tools@latest -y deploy --only
 firestore:indexes`
+

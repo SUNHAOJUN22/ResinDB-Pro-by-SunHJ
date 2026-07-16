@@ -22,3 +22,4 @@ productLines.forEach(line => {
 
 const emptyCategories = categoryIds.filter(id => !id.startsWith('m-') && !allProductCats.has(id));
 console.log("Empty categories:", emptyCategories);
+

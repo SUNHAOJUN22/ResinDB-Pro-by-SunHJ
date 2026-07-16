@@ -23,3 +23,5 @@ export function useWeibullWorker() {
   return { isCalculating, weibullResult, error, calculateWeibull };
 }
 
+
+// v3.1.0-sync

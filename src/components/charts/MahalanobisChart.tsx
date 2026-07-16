@@ -134,3 +134,5 @@ export const MahalanobisChart: React.FC<MahalanobisChartProps> = React.memo(({ d
         <div ref={chartRef} className="w-full h-full min-h-[400px]"></div>
     );
 });
+
+// v3.1.0-sync

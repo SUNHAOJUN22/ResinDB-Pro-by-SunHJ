@@ -194,3 +194,5 @@ self.onmessage = (e: MessageEvent<KMeansMessage>) => {
     self.postMessage({ type: 'ERROR', payload: { message: error instanceof Error ? error.message : 'Unknown error' } } as KMeansResponse);
   }
 };
+
+// v3.1.0-sync

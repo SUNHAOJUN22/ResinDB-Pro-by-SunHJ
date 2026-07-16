@@ -627,3 +627,4 @@ query GetNearbyActiveRestaurants($userLong: Float!, $userLat: Float!, $maxDistan
 }
 ```
 *After running the query using a client SDK, the result will be in `data.nearby`.*
+

@@ -122,3 +122,5 @@ export const DashboardStats: React.FC<DashboardStatsProps> = React.memo(
     );
   },
 );
+
+// v3.1.0-sync

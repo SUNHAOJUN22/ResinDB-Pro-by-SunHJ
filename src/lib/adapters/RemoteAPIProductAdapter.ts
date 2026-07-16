@@ -193,3 +193,5 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
     }
   }
 }
+
+// v3.1.0-sync

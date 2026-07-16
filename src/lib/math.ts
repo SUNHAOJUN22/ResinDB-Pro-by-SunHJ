@@ -45,3 +45,5 @@ export const getConfidenceInterval95 = (
   const marginOfError = z * (stdDev / safeSqrt);
   return { lower: mean - marginOfError, upper: mean + marginOfError };
 };
+
+// v3.1.0-sync

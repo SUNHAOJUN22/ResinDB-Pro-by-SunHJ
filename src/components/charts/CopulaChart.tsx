@@ -96,3 +96,5 @@ export const CopulaChart: React.FC<CopulaChartProps> = React.memo(({ grid, theme
 
   return <div ref={chartRef} className="w-full h-full" />;
 });
+
+// v3.1.0-sync

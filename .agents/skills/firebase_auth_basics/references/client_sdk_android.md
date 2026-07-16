@@ -155,3 +155,4 @@ To sign out a user, call `signOut()` on the `FirebaseAuth` instance:
 auth.signOut()
 // Navigate to login screen
 ```
+

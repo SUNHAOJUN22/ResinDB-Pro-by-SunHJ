@@ -406,3 +406,5 @@ export const ScientificChart: React.FC<ScientificChartProps> = React.memo(({
     </div>
   );
 });
+
+// v3.1.0-sync

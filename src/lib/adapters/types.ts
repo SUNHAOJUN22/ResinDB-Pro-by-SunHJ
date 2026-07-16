@@ -40,3 +40,5 @@ export interface IProductAdapter {
   exportReport(products: Product[], format: 'csv' | 'xlsx' | 'json' | 'xml'): Promise<Blob>;
   restoreSnapshot(products: Product[]): Promise<void>;
 }
+
+// v3.1.0-sync

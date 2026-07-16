@@ -9,3 +9,4 @@ Use the native Gemini CLI extension manager instead of `npx`.
    gemini extensions update firebase
    ```
    *Note: If the extension is named differently, replace `firebase` with the correct name from `gemini extensions list`.*
+

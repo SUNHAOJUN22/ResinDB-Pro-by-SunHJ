@@ -40,3 +40,4 @@ files.forEach(file => {
     });
 });
 console.log(`Found ${missingKeys} missing keys.`);
+

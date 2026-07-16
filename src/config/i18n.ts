@@ -1559,3 +1559,5 @@ export const propertyMap: Record<string, string> = {
   '冲击强度': 'Impact',
   '综合数据': 'Data Quality'
 };
+
+// v3.1.0-sync

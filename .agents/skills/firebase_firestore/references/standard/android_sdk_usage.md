@@ -187,3 +187,4 @@ db.collection("cities").document("DC")
     .addOnSuccessListener { Log.d(TAG, "DocumentSnapshot successfully deleted!") }
     .addOnFailureListener { e -> Log.w(TAG, "Error deleting document", e) }
 ```
+

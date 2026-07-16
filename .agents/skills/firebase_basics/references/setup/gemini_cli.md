@@ -37,3 +37,4 @@ If the user only wants to use the MCP server for the current project:
 
 ### 2. Restart and Verify Connection
 1. **Restart Gemini CLI**: Instruct the user to restart the Gemini CLI. **Stop and wait** for their confirmation before proceeding.
+

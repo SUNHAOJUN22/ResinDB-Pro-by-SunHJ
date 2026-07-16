@@ -265,3 +265,4 @@ Install "Firebase SQL Connect" extension for:
   "firebase.dataConnect.emulator.port": 9399
 }
 ```
+

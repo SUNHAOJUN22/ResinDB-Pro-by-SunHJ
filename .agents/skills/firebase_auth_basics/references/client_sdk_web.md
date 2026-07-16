@@ -292,3 +292,4 @@ signOut(auth).then(() => {
   // An error happened.
 });
 ```
+

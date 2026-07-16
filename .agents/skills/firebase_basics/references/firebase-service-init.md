@@ -16,3 +16,4 @@ The CLI will guide you through:
 - Selecting features (Firestore, Functions, Hosting, etc.).
 - Associating with an existing project or creating a new one.
 - Configuring files (e.g. `firebase.json`, `.firebaserc`).
+

@@ -32,3 +32,5 @@ export function useArrheniusWorker() {
   return { isCalculating, arrheniusResult, error, calculateArrhenius, getPredictedLife };
 }
 
+
+// v3.1.0-sync

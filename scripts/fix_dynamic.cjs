@@ -76,3 +76,4 @@ function processAll(dir) {
 }
 
 processAll(srcDir);
+

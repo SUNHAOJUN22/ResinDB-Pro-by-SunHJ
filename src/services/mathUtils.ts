@@ -106,3 +106,5 @@ export function findSimilarProducts(
 
   return results.sort((a, b) => b.score - a.score); // Sort by highest score
 }
+
+// v3.1.0-sync

@@ -294,3 +294,4 @@ npm run deploy-rules
 # 3. 极速把构建好的静态资源同步至高弹性 CDN
 npx firebase deploy --only hosting
 ```
+

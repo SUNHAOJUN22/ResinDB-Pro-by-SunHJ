@@ -63,3 +63,4 @@ The MCP server allows the agent to interact directly with Firebase projects.
 ### 3. Restart and Verify Connection
 1. **Restart Agent**: Instruct the user to restart the agent application. **Stop and wait** for their confirmation before proceeding.
 2. **Confirm Connection**: Check the MCP server list in the agent's UI to confirm that the Firebase MCP server is connected.
+

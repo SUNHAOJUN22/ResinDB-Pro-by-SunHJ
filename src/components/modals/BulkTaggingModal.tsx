@@ -394,3 +394,5 @@ export const BulkTaggingModal: React.FC<BulkTaggingModalProps> = ({
     </AnimatePresence>
   );
 };
+
+// v3.1.0-sync

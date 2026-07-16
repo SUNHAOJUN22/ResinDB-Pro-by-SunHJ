@@ -135,3 +135,5 @@ self.onmessage = (e: MessageEvent<MonteCarloMessage>) => {
     });
   }
 };
+
+// v3.1.0-sync

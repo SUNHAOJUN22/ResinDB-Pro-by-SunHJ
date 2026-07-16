@@ -85,3 +85,5 @@ export function evaluateFilterGroup(
   const predicate = compileFilterGroup(group);
   return predicate(product);
 }
+
+// v3.1.0-sync

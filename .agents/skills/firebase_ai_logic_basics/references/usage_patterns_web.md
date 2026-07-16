@@ -173,3 +173,4 @@ import {getGenerativeModel, InferenceMode } from "firebase/ai";
 const hybridModel = getGenerativeModel(ai, { mode: InferenceMode.PREFER_ON_DEVICE });
 ```
 
+

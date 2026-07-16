@@ -791,3 +791,5 @@ export const DependencyHeatmap: React.FC<DependencyHeatmapProps> = ({
     </div>
   );
 };
+
+// v3.1.0-sync

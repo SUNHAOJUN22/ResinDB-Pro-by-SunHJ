@@ -929,3 +929,5 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
     </AnimatePresence>
   );
 });
+
+// v3.1.0-sync

@@ -99,3 +99,4 @@ To apply values from the cloud, you must fetch them and then activate them.
         val message = remoteConfig.getString("welcome_message")
     }
     ```
+

@@ -295,3 +295,5 @@ self.onmessage = (e: MessageEvent<QualityWorkerMessage>) => {
     } as QualityWorkerResponse);
   }
 };
+
+// v3.1.0-sync

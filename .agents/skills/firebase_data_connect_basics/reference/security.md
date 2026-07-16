@@ -287,3 +287,4 @@ query MyDocs @auth(level: USER) {
 ### ❌ Don't Use PUBLIC/USER for Prototyping
 
 During development, set operations to `NO_ACCESS` until you implement proper authorization. Use emulator and VS Code extension for testing.
+

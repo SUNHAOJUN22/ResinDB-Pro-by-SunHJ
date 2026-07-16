@@ -11,3 +11,5 @@ const adapter: IProductAdapter = adapterType === 'remote_api'
 
 export default adapter;
 export * from "@/lib/adapters/types";
+
+// v3.1.0-sync

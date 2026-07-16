@@ -99,3 +99,5 @@ export class PCA {
       return { projected: scores, loadingVectors };
   }
 }
+
+// v3.1.0-sync

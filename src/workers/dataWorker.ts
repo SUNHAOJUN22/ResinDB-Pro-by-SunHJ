@@ -195,3 +195,5 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
     } as WorkerResponse);
   }
 };
+
+// v3.1.0-sync

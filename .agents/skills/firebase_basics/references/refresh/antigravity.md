@@ -44,3 +44,4 @@ Antigravity relies on `npx skills`. Updates should prioritize the global level; 
    # Update global-level skills
    npx -y skills update --agent antigravity --global --yes
    ```
+

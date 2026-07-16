@@ -401,3 +401,5 @@ const generateCatalog = (): Product[] => {
 };
 
 export const PRODUCT_CATALOG: Product[] = generateCatalog();
+
+// v3.1.0-sync

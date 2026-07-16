@@ -53,3 +53,4 @@ function walkDir(dir) {
 }
 
 walkDir(srcDir);
+

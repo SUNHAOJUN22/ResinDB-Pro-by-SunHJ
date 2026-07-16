@@ -29,3 +29,5 @@ export function useParetoWorker() {
   return { paretoFrontIds, computePareto, isComputingPareto: isComputing };
 }
 
+
+// v3.1.0-sync

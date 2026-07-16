@@ -47,3 +47,4 @@ const content = fs.readFileSync('constants.ts', 'utf8');
 const updatedContent = content.replace(/\];\s*$/, ',\n' + newProducts + '\n];\n');
 fs.writeFileSync('constants.ts', updatedContent);
 console.log('Added missing products');
+

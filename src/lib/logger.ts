@@ -39,3 +39,5 @@ class Logger {
 }
 
 export const logger = new Logger();
+
+// v3.1.0-sync

@@ -134,3 +134,5 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({
     </AnimatePresence>
   );
 };
+
+// v3.1.0-sync

@@ -189,3 +189,5 @@ export function useDataGrid({ data, columns, activeFilters = [], selectedIds: co
     clearSelection
   };
 }
+
+// v3.1.0-sync

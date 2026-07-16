@@ -141,3 +141,4 @@ if let functionCall = response.functionCalls.first {
     print("Model requested function: \(functionCall.name) with args: \(functionCall.args)")
 }
 ```
+

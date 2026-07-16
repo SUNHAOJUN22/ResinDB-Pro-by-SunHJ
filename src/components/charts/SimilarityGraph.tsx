@@ -123,3 +123,5 @@ export const SimilarityGraph: React.FC<SimilarityGraphProps> = React.memo(({ nod
 
   return <div ref={chartRef} className="w-full h-full" />;
 });
+
+// v3.1.0-sync

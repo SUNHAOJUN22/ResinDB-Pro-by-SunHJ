@@ -270,3 +270,5 @@ self.onmessage = (e: MessageEvent<BayesMessage>) => {
         });
     }
 };
+
+// v3.1.0-sync

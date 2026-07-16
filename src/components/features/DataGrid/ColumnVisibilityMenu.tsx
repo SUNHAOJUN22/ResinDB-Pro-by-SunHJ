@@ -163,3 +163,5 @@ export const ColumnVisibilityMenu: React.FC<ColumnVisibilityMenuProps> = ({
     </div>
   );
 };
+
+// v3.1.0-sync

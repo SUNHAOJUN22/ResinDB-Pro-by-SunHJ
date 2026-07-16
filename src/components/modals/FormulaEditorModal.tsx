@@ -1575,3 +1575,5 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
     </div>
   );
 });
+
+// v3.1.0-sync

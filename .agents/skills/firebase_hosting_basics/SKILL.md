@@ -44,3 +44,4 @@ To test your app locally:
 npx -y firebase-tools@latest emulators:start --only hosting
 ```
 This serves your app at `http://localhost:5000` by default.
+

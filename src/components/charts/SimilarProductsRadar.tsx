@@ -121,3 +121,5 @@ export const SimilarProductsRadar: React.FC<SimilarProductsRadarProps> = ({
     </div>
   );
 };
+
+// v3.1.0-sync

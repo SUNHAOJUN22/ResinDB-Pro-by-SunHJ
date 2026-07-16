@@ -99,3 +99,4 @@ Controls trailing slashes in static content URLs.
   }
 }
 ```
+

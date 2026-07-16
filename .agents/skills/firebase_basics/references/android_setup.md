@@ -32,3 +32,4 @@ Validate that the project was created and registered successfully:
 `npx -y firebase-tools@latest apps:list --project <PROJECT_ID>`
 
 ---
+

@@ -220,3 +220,5 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
     </div>
   );
 };
+
+// v3.1.0-sync

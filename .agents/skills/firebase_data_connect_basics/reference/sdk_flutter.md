@@ -114,3 +114,4 @@ final subscription = queryRef.subscribe().listen((result) {
 - GraphQL `UUID` -> Dart `string`
 - GraphQL `Float` -> Dart `double`
 - GraphQL `Boolean` -> Dart `bool`
+
