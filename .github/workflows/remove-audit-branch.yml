@@ -1,4 +1,4 @@
-name: Remove temporary audit branch
+name: Remove temporary cleanup branches
 
 on:
   pull_request:
@@ -8,9 +8,14 @@ permissions:
   contents: write
 
 jobs:
-  remove-branch:
-    if: github.event.pull_request.head.ref == 'audit-trigger'
+  remove-branches:
     runs-on: ubuntu-latest
     steps:
-      - name: Delete temporary branch
-        run: git push https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git --delete audit-trigger
+      - name: Delete temporary branches
+        shell: bash
+        run: |
+          remote="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git push "$remote" --delete audit-trigger || true
+          if [ "${{ github.event.pull_request.head.ref }}" != "main" ]; then
+            git push "$remote" --delete "${{ github.event.pull_request.head.ref }}" || true
+          fi
