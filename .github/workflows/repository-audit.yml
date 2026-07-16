@@ -1,0 +1,262 @@
+name: One-time repository audit
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/repository-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build repository inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+          git ls-files > audit/tracked-files.txt
+          find . -path './.git' -prune -o -type f -printf '%s\t%p\n' | sort -nr > audit/files-by-size.tsv
+          find . -path './.git' -prune -o -type d -print | sort > audit/directories.txt
+          find . -path './.git' -prune -o -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.gif' -o -iname '*.webp' -o -iname '*.bmp' -o -iname '*.svg' -o -iname '*.ico' \) -print | sort > audit/image-files.txt
+          while IFS= read -r path; do
+            [ -z "$path" ] && continue
+            printf '%s\t' "$path"
+            file "$path"
+          done < audit/image-files.txt > audit/image-metadata.tsv
+          git status --short > audit/git-status.txt
+          du -sh . > audit/repository-size.txt
+
+      - name: Analyze references, duplicates, and source reachability
+        shell: bash
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import os
+          import re
+          from collections import defaultdict, deque
+          from pathlib import Path
+
+          root = Path('.').resolve()
+          audit = root / 'audit'
+          tracked = [Path(line.strip()) for line in (audit / 'tracked-files.txt').read_text().splitlines() if line.strip()]
+          image_exts = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.ico'}
+          text_exts = {
+              '.ts', '.tsx', '.js', '.jsx', '.cjs', '.mjs', '.json', '.md', '.html', '.css', '.scss',
+              '.yml', '.yaml', '.txt', '.sh', '.rules', '.example', '.gitignore'
+          }
+
+          text_files: dict[Path, str] = {}
+          for rel in tracked:
+              path = root / rel
+              if not path.is_file() or path.stat().st_size > 3_000_000:
+                  continue
+              if path.suffix.lower() in text_exts or path.name in {'.gitignore', '.env.example'}:
+                  try:
+                      text_files[rel] = path.read_text(encoding='utf-8')
+                  except UnicodeDecodeError:
+                      pass
+
+          image_rows = []
+          for rel in tracked:
+              if rel.suffix.lower() not in image_exts:
+                  continue
+              posix = rel.as_posix()
+              basename = rel.name
+              references = []
+              for candidate, content in text_files.items():
+                  if candidate == rel:
+                      continue
+                  if posix in content or basename in content:
+                      references.append(candidate.as_posix())
+              image_rows.append({
+                  'path': posix,
+                  'bytes': (root / rel).stat().st_size,
+                  'references': sorted(references),
+              })
+          (audit / 'image-reference-report.json').write_text(json.dumps(image_rows, ensure_ascii=False, indent=2), encoding='utf-8')
+          with (audit / 'unreferenced-images.txt').open('w', encoding='utf-8') as handle:
+              for row in image_rows:
+                  if not row['references']:
+                      handle.write(f"{row['bytes']}\t{row['path']}\n")
+
+          hashes: dict[str, list[str]] = defaultdict(list)
+          for rel in tracked:
+              path = root / rel
+              if not path.is_file():
+                  continue
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              hashes[digest].append(rel.as_posix())
+          duplicate_groups = [paths for paths in hashes.values() if len(paths) > 1]
+          duplicate_groups.sort(key=lambda paths: (-len(paths), paths))
+          (audit / 'duplicate-files.json').write_text(json.dumps(duplicate_groups, ensure_ascii=False, indent=2), encoding='utf-8')
+
+          suspicious = []
+          for rel in tracked:
+              lower = rel.as_posix().lower()
+              reasons = []
+              if rel.suffix.lower() in {'.tgz', '.zip', '.tar', '.gz', '.7z', '.rar'}:
+                  reasons.append('archive committed to source repository')
+              if 'prompt_history' in lower or 'migrated_prompt' in lower:
+                  reasons.append('prompt/migration history')
+              if rel.suffix.lower() == '.md' and lower.startswith('src/'):
+                  reasons.append('documentation misplaced under src')
+              if any(part in {'screenshots', 'screenshot'} for part in rel.parts):
+                  reasons.append('screenshot directory')
+              if rel.name.lower().startswith(('copy of ', 'untitled', 'image ', 'screenshot ')):
+                  reasons.append('generic generated filename')
+              if reasons:
+                  suspicious.append({'path': rel.as_posix(), 'bytes': (root / rel).stat().st_size, 'reasons': reasons})
+          (audit / 'suspicious-files.json').write_text(json.dumps(suspicious, ensure_ascii=False, indent=2), encoding='utf-8')
+
+          source_files = {rel for rel in tracked if rel.parts and rel.parts[0] == 'src' and rel.suffix in {'.ts', '.tsx'}}
+          extensions = ['', '.ts', '.tsx', '.js', '.jsx']
+          index_names = ['index.ts', 'index.tsx', 'index.js', 'index.jsx']
+          import_re = re.compile(r"(?:from\s+|import\s*\(|import\s+|export\s+[^;]*?from\s+)[\"']([^\"']+)[\"']")
+          worker_re = re.compile(r"new\s+URL\(\s*[\"']([^\"']+)[\"']\s*,\s*import\.meta\.url")
+
+          def resolve(spec: str, current: Path) -> Path | None:
+              if spec.startswith('@/'):
+                  base = Path('src') / spec[2:]
+              elif spec.startswith('.'):
+                  base = current.parent / spec
+              else:
+                  return None
+              candidates = []
+              if base.suffix:
+                  candidates.append(base)
+              else:
+                  candidates.extend(Path(str(base) + ext) for ext in extensions if ext)
+                  candidates.extend(base / name for name in index_names)
+              for candidate in candidates:
+                  normalized = Path(os.path.normpath(candidate.as_posix()))
+                  if normalized in source_files:
+                      return normalized
+              return None
+
+          graph: dict[Path, set[Path]] = defaultdict(set)
+          for rel in source_files:
+              content = text_files.get(rel)
+              if content is None:
+                  try:
+                      content = (root / rel).read_text(encoding='utf-8')
+                  except Exception:
+                      continue
+              specs = import_re.findall(content) + worker_re.findall(content)
+              for spec in specs:
+                  target = resolve(spec, rel)
+                  if target:
+                      graph[rel].add(target)
+
+          entries = [Path('src/index.tsx')]
+          reachable: set[Path] = set()
+          queue = deque(entry for entry in entries if entry in source_files)
+          while queue:
+              current = queue.popleft()
+              if current in reachable:
+                  continue
+              reachable.add(current)
+              queue.extend(graph.get(current, ()))
+
+          likely_orphans = sorted(
+              rel for rel in source_files
+              if rel not in reachable
+              and not rel.name.endswith('.d.ts')
+              and '__tests__' not in rel.parts
+          )
+          (audit / 'source-reachability.json').write_text(json.dumps({
+              'entries': [p.as_posix() for p in entries],
+              'source_file_count': len(source_files),
+              'reachable_count': len(reachable),
+              'likely_orphans': [p.as_posix() for p in likely_orphans],
+          }, ensure_ascii=False, indent=2), encoding='utf-8')
+
+          root_files = sorted(rel.as_posix() for rel in tracked if len(rel.parts) == 1)
+          docs = sorted(rel.as_posix() for rel in tracked if rel.suffix.lower() == '.md')
+          report = {
+              'tracked_file_count': len(tracked),
+              'root_files': root_files,
+              'markdown_files': docs,
+              'image_count': len(image_rows),
+              'unreferenced_image_count': sum(not row['references'] for row in image_rows),
+              'duplicate_group_count': len(duplicate_groups),
+              'suspicious_file_count': len(suspicious),
+              'source_file_count': len(source_files),
+              'likely_orphan_source_count': len(likely_orphans),
+          }
+          (audit / 'summary.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Capture code-smell indicators
+        shell: bash
+        run: |
+          set +e
+          git grep -nE 'TODO|FIXME|HACK|XXX' -- ':!package-lock.json' > audit/todos.txt
+          git grep -nE 'console\.(log|warn|error|debug)' -- 'src/**' > audit/console-usage.txt
+          git grep -nE '\bany\b' -- 'src/**/*.ts' 'src/**/*.tsx' > audit/explicit-any.txt
+          git grep -nE 'Math\.random\(|Date\.now\(' -- 'src/**' > audit/nondeterminism.txt
+          git grep -nE 'localStorage|sessionStorage' -- 'src/**' > audit/browser-storage.txt
+          exit 0
+
+      - name: Install exact dependencies
+        shell: bash
+        run: |
+          set +e
+          npm ci > audit/npm-ci.log 2>&1
+          echo $? > audit/npm-ci.exit
+          exit 0
+
+      - name: Run quality gates independently
+        shell: bash
+        run: |
+          set +e
+          : > audit/quality-status.tsv
+          run_check() {
+            name="$1"
+            shift
+            "$@" > "audit/${name}.log" 2>&1
+            code=$?
+            printf '%s\t%s\n' "$name" "$code" >> audit/quality-status.tsv
+          }
+          if [ "$(cat audit/npm-ci.exit)" = "0" ]; then
+            run_check lint npm run lint
+            run_check typecheck npm run typecheck
+            run_check test npm run test
+            run_check build npm run build
+            run_check smoke npm run smoke
+            npm audit --omit=dev --json > audit/npm-audit.json 2> audit/npm-audit.stderr
+            echo $? > audit/npm-audit.exit
+          else
+            printf 'lint\t125\ntypecheck\t125\ntest\t125\nbuild\t125\nsmoke\t125\n' >> audit/quality-status.tsv
+          fi
+          exit 0
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: repository-audit-report
+          path: audit
+          retention-days: 3
