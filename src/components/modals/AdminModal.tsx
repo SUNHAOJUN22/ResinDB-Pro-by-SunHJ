@@ -586,14 +586,16 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
                             {t("dataMigrationDesc").replace("{count}", String(PRODUCT_CATALOG.length))}
                           </p>
                         </div>
-                        <button
+                        <motion.button
+                          whileHover={isSeeding ? {} : { scale: 1.02 }}
+                          whileTap={isSeeding ? {} : { scale: 0.98 }}
                           onClick={handleSeedData}
                           disabled={isSeeding}
-                          className="px-4 py-2 bg-primary-600 text-white rounded-xl text-xs font-bold font-mono tracking-widest uppercase hover:bg-primary-500 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
+                          className="px-4 py-2 bg-primary-600 text-white rounded-xl text-xs font-bold font-mono tracking-widest uppercase hover:bg-primary-500 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                         >
                           {isSeeding ? <Loader2 size={14} className="animate-spin" /> : <UploadCloud size={14} />}
                           {isSeeding ? `${seedProgress}%` : t("seedDatabase")}
-                        </button>
+                        </motion.button>
                       </motion.div>
 
                       <motion.div

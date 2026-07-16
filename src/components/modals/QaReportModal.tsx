@@ -131,12 +131,14 @@ export const QaReportModal: React.FC<QaReportModalProps> = ({ isOpen, onClose, p
                 </p>
               </div>
             </div>
-            <button
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
               onClick={onClose}
-              className="p-1.5 hover:bg-slate-50 dark:hover:bg-slate-850 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              className="p-1.5 hover:bg-slate-50 dark:hover:bg-slate-850 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
             >
               <X size={18} />
-            </button>
+            </motion.button>
           </div>
 
           {/* Modal Body: Left column configuration, right column preview */}
@@ -257,7 +259,6 @@ export const QaReportModal: React.FC<QaReportModalProps> = ({ isOpen, onClose, p
                     {t("认证参考法规 & 环保条款", "Certificates & Compliances")}
                   </h3>
                 </div>
-
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     "ISO 9001",
@@ -269,11 +270,13 @@ export const QaReportModal: React.FC<QaReportModalProps> = ({ isOpen, onClose, p
                   ].map((std) => {
                     const selected = standards.includes(std);
                     return (
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         key={std}
                         type="button"
                         onClick={() => toggleStandard(std)}
-                        className={`flex items-center gap-2 p-2 border rounded-xl text-left transition-all outline-none focus:ring-0 ${
+                        className={`flex items-center gap-2 p-2 border rounded-xl text-left transition-all outline-none focus:ring-0 cursor-pointer ${
                           selected
                             ? "bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-400 text-indigo-700 dark:text-indigo-400"
                             : "bg-transparent border-slate-200 dark:border-slate-850 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-900"
@@ -281,7 +284,7 @@ export const QaReportModal: React.FC<QaReportModalProps> = ({ isOpen, onClose, p
                       >
                         <ShieldCheck size={14} className={selected ? "text-indigo-500" : "text-slate-350"} />
                         <span className="text-[11px] font-mono font-bold leading-none">{std}</span>
-                      </button>
+                      </motion.button>
                     );
                   })}
                 </div>
@@ -306,10 +309,12 @@ export const QaReportModal: React.FC<QaReportModalProps> = ({ isOpen, onClose, p
 
               {/* Build CTA Action */}
               <div className="pt-2">
-                <button
+                <motion.button
+                  whileHover={isGenerating || products.length === 0 ? {} : { scale: 1.01 }}
+                  whileTap={isGenerating || products.length === 0 ? {} : { scale: 0.99 }}
                   onClick={handleExportPDF}
                   disabled={isGenerating || products.length === 0}
-                  className="w-full py-3 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-xs border border-primary-700 cursor-pointer"
+                  className="w-full py-3 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-xs border border-primary-700 cursor-pointer"
                 >
                   {isGenerating ? (
                     <>
@@ -322,7 +327,7 @@ export const QaReportModal: React.FC<QaReportModalProps> = ({ isOpen, onClose, p
                       {t(`签发并下载 PDF 质检和规格评估报告 (${products.length}款)`, `Sign & Download PDF QA Report (${products.length} Items)`)}
                     </>
                   )}
-                </button>
+                </motion.button>
               </div>
             </div>
 

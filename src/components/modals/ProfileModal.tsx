@@ -341,30 +341,34 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
                         {t("darkMode")}
                       </span>
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.08 }}
+                        whileTap={{ scale: 0.92 }}
                         type="button"
                         onClick={toggleTheme}
-                        className="p-1.5 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-primary-500 transition-colors shadow-sm"
+                        className="p-1.5 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-primary-500 transition-colors shadow-sm cursor-pointer"
                       >
                          {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
-                      </button>
+                      </motion.button>
                     </div>
 
                     <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
                       <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
                         {t("clickFeedbackTitle")}
                       </span>
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
                         type="button"
                         onClick={() => setClickFeedbackEnabled(!clickFeedbackEnabled)}
-                        className={`px-3 py-1.5 rounded-lg border text-[10px] font-mono font-bold uppercase transition-all ${
+                        className={`px-3 py-1.5 rounded-lg border text-[10px] font-mono font-bold uppercase transition-all cursor-pointer ${
                           clickFeedbackEnabled
                             ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
                             : 'bg-white dark:bg-slate-950 text-slate-500 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900'
                         }`}
                       >
                         {clickFeedbackEnabled ? t("statusOn") : t("statusOff")}
-                      </button>
+                      </motion.button>
                     </div>
                   </div>
 

@@ -1,3 +1,4 @@
+import { motion } from 'motion/react';
 import React, { useMemo, useState } from 'react';
 import {
   Line,
@@ -82,24 +83,24 @@ export const PredictiveTrends: React.FC = () => {
         </div>
         
         <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-          <button 
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
             onClick={() => setActiveChart('combined')}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeChart === 'combined' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}`}
           >
             {language === 'zh' ? '综合趋势' : 'Combined'}
-          </button>
-          <button 
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
             onClick={() => setActiveChart('demand')}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeChart === 'demand' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}`}
           >
              {language === 'zh' ? '需求量' : 'Demand'}
-          </button>
-          <button 
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
             onClick={() => setActiveChart('pricing')}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${activeChart === 'pricing' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-400'}`}
           >
              {language === 'zh' ? '价格' : 'Pricing'}
-          </button>
+          </motion.button>
         </div>
       </div>
 

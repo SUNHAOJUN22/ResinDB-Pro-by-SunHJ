@@ -24,7 +24,9 @@ export const AnalyticsView: React.FC = () => {
         <div className="h-full w-full flex flex-col space-y-4">
             {/* View Tab Selector */}
             <div className="flex border-b border-slate-200 dark:border-slate-800 shrink-0 select-none overflow-x-auto">
-                <button
+                <motion.button
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => setSubTab('charts')}
                     className={`px-4 sm:px-6 py-3 text-xs font-black uppercase tracking-wider border-b-2 transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                         subTab === 'charts' 
@@ -34,8 +36,10 @@ export const AnalyticsView: React.FC = () => {
                 >
                     <BarChart3 size={14} />
                     <span>{t("scientificCharts")}</span>
-                </button>
-                <button
+                </motion.button>
+                <motion.button
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => setSubTab('quality')}
                     className={`px-4 sm:px-6 py-3 text-xs font-black uppercase tracking-wider border-b-2 transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                         subTab === 'quality' 
@@ -45,8 +49,10 @@ export const AnalyticsView: React.FC = () => {
                 >
                     <ShieldAlert size={14} />
                     <span>{t("dataQualityDiagnostics")}</span>
-                </button>
-                <button
+                </motion.button>
+                <motion.button
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => setSubTab('forecasting')}
                     className={`px-4 sm:px-6 py-3 text-xs font-black uppercase tracking-wider border-b-2 transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                         subTab === 'forecasting' 
@@ -56,8 +62,10 @@ export const AnalyticsView: React.FC = () => {
                 >
                     <TrendingUp size={14} />
                     <span>{t("materialDurabilityForecast")}</span>
-                </button>
-                <button
+                </motion.button>
+                <motion.button
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => setSubTab('predictive-trends')}
                     className={`px-4 sm:px-6 py-3 text-xs font-black uppercase tracking-wider border-b-2 transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                         subTab === 'predictive-trends' 
@@ -67,8 +75,10 @@ export const AnalyticsView: React.FC = () => {
                 >
                     <LineChart size={14} />
                     <span>{t("predictiveTrends")}</span>
-                </button>
-                <button
+                </motion.button>
+                <motion.button
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => setSubTab('capacity-forecast')}
                     className={`px-4 sm:px-6 py-3 text-xs font-black uppercase tracking-wider border-b-2 transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                         subTab === 'capacity-forecast' 
@@ -78,7 +88,7 @@ export const AnalyticsView: React.FC = () => {
                 >
                     <Factory size={14} />
                     <span>{t("resinCapacityForecast")}</span>
-                </button>
+                </motion.button>
             </div>
 
             {/* Render Views Dynamically */}

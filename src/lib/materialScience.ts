@@ -191,12 +191,12 @@ export const materialEngine = {
       sumNiMi3 += ni * Math.pow(mi, 3);
     }
 
-    if (sumNi === 0 || sumNiMi === 0) return null;
+    if (sumNi === 0 || sumNiMi === 0 || sumNiMi2 === 0) return null;
 
     const mn = sumNiMi / sumNi;
     const mw = sumNiMi2 / sumNiMi;
     const mz = sumNiMi3 / sumNiMi2;
-    const pdi = mw / mn;
+    const pdi = mn > 0 ? mw / mn : 0;
 
     return { mn, mw, mz, pdi };
   },
@@ -573,42 +573,55 @@ export const materialEngine = {
     const sign = corr.slope >= 0 ? "+" : "-";
     return `y = ${corr.slope.toFixed(4)}x ${sign} ${Math.abs(corr.intercept).toFixed(2)} (R² = ${corr.r2.toFixed(3)})`;
   },
-  generateExpertInsight: (chartType: string): Insight => {
+  generateExpertInsight: (chartType: string, lang: 'zh' | 'en' = 'zh'): Insight => {
+    const isEn = lang === 'en';
     switch (chartType) {
       case 'radar':
         return {
-          title: "性能均衡性分析",
-          content: "雷达图显示了当前选定牌号的维度平衡。注意：所有维度已针对当前筛选集进行了相对归一化。较大的包络面代表该牌号在当前组中具有更强的竞争优势。",
+          title: isEn ? "Performance Balance Analysis" : "性能均衡性分析",
+          content: isEn 
+            ? "The radar chart illustrates the balance of dimensions for the selected grade. Note: All dimensions are normalized relative to the current filter selection. A larger envelope area indicates a stronger competitive advantage for the grade in this group."
+            : "雷达图显示了当前选定牌号的维度平衡。注意：所有维度已针对当前筛选集进行了相对归一化。较大的包络面代表该牌号在当前组中具有更强的竞争优势。",
           type: 'info'
         };
       case 'ashby':
         return {
-          title: "Stiffness-Toughness Trade-off",
-          content: "这是高分子材料经典的“刚韧平衡”映射。左上角代表高刚性低韧性，右下角代表跨向弹性体。远离原点的牌号通常具有更好的比强度。",
+          title: isEn ? "Stiffness-Toughness Trade-off" : "刚韧平衡分析 (Stiffness-Toughness Trade-off)",
+          content: isEn
+            ? "This is the classic stiffness-toughness trade-off map for polymer materials. The upper-left quadrant represents high stiffness and low toughness, while the lower-right represents elastomeric properties. Grades further from the origin typically offer superior specific strength."
+            : "这是高分子材料经典的“刚韧平衡”映射。左上角代表高刚性低韧性，右下角代表跨向弹性体。远离原点的牌号通常具有更好的比强度。",
           type: 'success'
         };
       case 'mfr_density':
         return {
-          title: "分子链结构分布",
-          content: "密度决定结晶度，MFR决定链长。该分布图揭示了不同生产工艺（如气相 vs 淤浆）在分子量控制稳定性上的差异。",
+          title: isEn ? "Molecular Chain Structure Distribution" : "分子链结构分布",
+          content: isEn
+            ? "Density determines crystallinity, and MFR determines molecular chain length. This distribution map reveals differences in molecular weight control stability among various polymerization processes (e.g., gas phase vs. slurry)."
+            : "密度决定结晶度，MFR决定链长。该分布图揭示了不同生产工艺（如气相 vs 淤浆）在分子量控制稳定性上的差异。",
           type: 'info'
         };
       case 'gpc':
         return {
-          title: "分子量分布解读",
-          content: "峰值位置（Mp）对应平均分子量。分布越宽（MWD大），加工流动性越好但冲击强度通常会略降。双峰分布通常意味着更好的综合性能。",
+          title: isEn ? "Molecular Weight Distribution Insights" : "分子量分布解读",
+          content: isEn
+            ? "The peak position (Mp) corresponds to the average molecular weight. A wider distribution (larger MWD) improves processing flowability but typically reduces impact strength. Bimodal distributions usually represent a better overall balance of properties."
+            : "峰值位置（Mp）对应平均分子量。分布越宽（MWD大），加工流动性越好但冲击强度通常会略降。双峰分布通常意味着更好的综合性能。",
           type: 'warning'
         };
       case 'rheology':
         return {
-          title: "动态加工窗口",
-          content: "剪切变稀行为（Shear Thinning）在此清晰可见。高温下的粘度下降幅度反映了材料的热软化敏感性，对注塑和吹塑成型逻辑至关重要。",
+          title: isEn ? "Dynamic Processing Window" : "动态加工窗口",
+          content: isEn
+            ? "Shear thinning behavior is clearly visible here. The magnitude of viscosity drop at high temperatures reflects the thermal softening sensitivity of the material, which is critical for injection and blow molding processing logic."
+            : "剪切变稀行为（Shear Thinning）在此清晰可见。高温下的粘度下降幅度反映了材料的热软化敏感性，对注塑和吹塑成型逻辑至关重要。",
           type: 'info'
         };
       default:
         return {
-          title: "数据深度洞察",
-          content: "通过多维构效分析，揭示材料微观结构与宏观性能之间的映射规律。",
+          title: isEn ? "Deep Data Insights" : "数据深度洞察",
+          content: isEn
+            ? "Unveils mapping rules between material microstructure and macroscopic performance through multidimensional structure-property relationship analysis."
+            : "通过多维构效分析，揭示材料微观结构与宏观性能之间的映射规律。",
           type: 'info'
         };
     }

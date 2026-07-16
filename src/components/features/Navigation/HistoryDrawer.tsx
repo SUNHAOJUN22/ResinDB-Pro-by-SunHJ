@@ -36,12 +36,12 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({ isOpen, onClose })
                   Version History
                 </h2>
               </div>
-              <button
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 onClick={onClose}
                 className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <X size={16} />
-              </button>
+              </motion.button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
@@ -76,13 +76,13 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({ isOpen, onClose })
                         <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-3 break-words">
                           {record.description}
                         </p>
-                        <button
+                        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                           onClick={() => restoreSnapshot(record.id)}
                           className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold text-primary-600 bg-primary-50 hover:bg-primary-100 dark:text-primary-400 dark:bg-primary-900/30 dark:hover:bg-primary-900/50 rounded transition-colors w-full justify-center"
                         >
                           <Undo2 size={12} />
                           Restore this version
-                        </button>
+                        </motion.button>
                       </div>
                     </motion.div>
                   ))}

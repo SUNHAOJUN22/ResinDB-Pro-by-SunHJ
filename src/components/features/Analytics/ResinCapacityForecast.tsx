@@ -1,3 +1,4 @@
+import { motion } from 'motion/react';
 import React, { useMemo, useState } from 'react';
 import { useData } from '@/contexts/DataContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -420,7 +421,7 @@ export const ResinCapacityForecast: React.FC = () => {
               </label>
               <div className="flex gap-2">
                 {[3, 4, 6, 12].map(w => (
-                  <button
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                     key={w}
                     onClick={() => setRollingWindow(w)}
                     className={`flex-1 py-1.5 text-xs font-mono font-bold rounded-lg border transition-all ${
@@ -430,7 +431,7 @@ export const ResinCapacityForecast: React.FC = () => {
                     }`}
                   >
                     {w}M
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             </div>

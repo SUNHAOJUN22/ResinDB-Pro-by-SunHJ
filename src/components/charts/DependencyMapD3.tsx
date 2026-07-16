@@ -680,18 +680,18 @@ const DependencyMapD3: React.FC = () => {
             className="w-full pl-9 pr-4 py-2.5 bg-white/90 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-xl text-sm shadow-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/50 backdrop-blur-md"
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
               <X className="w-4 h-4" />
-            </button>
+            </motion.button>
           )}
         </div>
-        <button 
+        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
           onClick={() => setShowSettings(!showSettings)}
           className={`p-2.5 rounded-xl shadow-lg transition-all border backdrop-blur-md ${showSettings ? 'bg-indigo-500 text-white border-indigo-600' : 'bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
           title={t('settings', 'Settings')}
         >
           <Settings2 className="w-5 h-5" />
-        </button>
+        </motion.button>
       </div>
 
       <AnimatePresence>
@@ -710,28 +710,28 @@ const DependencyMapD3: React.FC = () => {
               <div className="space-y-2">
                 <p className="text-xs font-mono text-slate-500 mb-1">{t('layoutMode', 'Layout Mode')}</p>
                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-                  <button onClick={() => setParams(p => ({ ...p, layout: 'force' }))} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-all ${params.layout === 'force' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setParams(p => ({ ...p, layout: 'force' }))} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-all ${params.layout === 'force' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                     <Network size={14} />
                     {t('layoutForce', 'Force')}
-                  </button>
-                  <button onClick={() => setParams(p => ({ ...p, layout: 'layered' }))} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-all ${params.layout === 'layered' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
+                  </motion.button>
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setParams(p => ({ ...p, layout: 'layered' }))} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-all ${params.layout === 'layered' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                     <Layers size={14} />
                     {t('layoutLayered', 'Layered')}
-                  </button>
+                  </motion.button>
                 </div>
               </div>
               
               <div className="space-y-2">
                 <p className="text-xs font-mono text-slate-500 mb-1">{t('linkStyle', 'Link Style')}</p>
                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-                  <button onClick={() => setParams(p => ({ ...p, linkStyle: 'straight' }))} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-all ${params.linkStyle === 'straight' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setParams(p => ({ ...p, linkStyle: 'straight' }))} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-all ${params.linkStyle === 'straight' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                     <GitBranch size={14} />
                     {t('linkStraight', 'Straight')}
-                  </button>
-                  <button onClick={() => setParams(p => ({ ...p, linkStyle: 'curved' }))} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-all ${params.linkStyle === 'curved' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
+                  </motion.button>
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setParams(p => ({ ...p, linkStyle: 'curved' }))} className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-all ${params.linkStyle === 'curved' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                     <RotateCcw size={14} />
                     {t('linkCurved', 'Curved')}
-                  </button>
+                  </motion.button>
                 </div>
               </div>
               
@@ -769,15 +769,15 @@ const DependencyMapD3: React.FC = () => {
                 </label>
                 {params.traceMode && (
                   <div className="flex gap-2">
-                    <button onClick={() => setParams(p => ({ ...p, traceDirection: 'upstream' }))} className={`flex-1 py-1 text-[10px] font-bold rounded uppercase tracking-wider ${params.traceDirection === 'upstream' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setParams(p => ({ ...p, traceDirection: 'upstream' }))} className={`flex-1 py-1 text-[10px] font-bold rounded uppercase tracking-wider ${params.traceDirection === 'upstream' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
                       {t('traceUpstream', 'Upstream')}
-                    </button>
-                    <button onClick={() => setParams(p => ({ ...p, traceDirection: 'both' }))} className={`flex-1 py-1 text-[10px] font-bold rounded uppercase tracking-wider ${params.traceDirection === 'both' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
+                    </motion.button>
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setParams(p => ({ ...p, traceDirection: 'both' }))} className={`flex-1 py-1 text-[10px] font-bold rounded uppercase tracking-wider ${params.traceDirection === 'both' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
                       {t('traceBoth', 'Both')}
-                    </button>
-                    <button onClick={() => setParams(p => ({ ...p, traceDirection: 'downstream' }))} className={`flex-1 py-1 text-[10px] font-bold rounded uppercase tracking-wider ${params.traceDirection === 'downstream' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
+                    </motion.button>
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setParams(p => ({ ...p, traceDirection: 'downstream' }))} className={`flex-1 py-1 text-[10px] font-bold rounded uppercase tracking-wider ${params.traceDirection === 'downstream' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
                       {t('traceDownstream', 'Downstream')}
-                    </button>
+                    </motion.button>
                   </div>
                 )}
                 <label className="flex items-center justify-between cursor-pointer">
@@ -798,51 +798,51 @@ const DependencyMapD3: React.FC = () => {
 
       <div className="absolute bottom-6 right-6 z-10 flex gap-2 pointer-events-auto">
         <div className="flex flex-col gap-2">
-          <button 
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
             onClick={() => svgRef.current && d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 1.3)}
             className="p-2.5 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md text-slate-700 dark:text-slate-200 rounded-xl shadow-lg hover:shadow-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700"
             title={t('zoomIn', 'Zoom In')}
           >
             <ZoomIn className="w-4 h-4" />
-          </button>
-          <button 
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
             onClick={() => svgRef.current && d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 0.77)}
             className="p-2.5 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md text-slate-700 dark:text-slate-200 rounded-xl shadow-lg hover:shadow-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700"
             title={t('zoomOut', 'Zoom Out')}
           >
             <ZoomOut className="w-4 h-4" />
-          </button>
+          </motion.button>
         </div>
         
         <div className="flex shadow-lg rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden backdrop-blur-md">
-          <button 
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
             onClick={handleExportJSON}
             className="p-2.5 bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all border-r border-slate-200 dark:border-slate-700"
             title={t('exportJson', 'Export JSON')}
           >
             <FileJson className="w-4 h-4" />
-          </button>
-          <button 
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
             onClick={handleExportPNG}
             className="p-2.5 bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all border-r border-slate-200 dark:border-slate-700"
             title={t('exportPng', 'Export High-Res PNG')}
           >
             <ImageIcon className="w-4 h-4" />
-          </button>
-          <button 
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
             onClick={() => resetZoomRef.current?.()}
             className="p-2.5 bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all border-r border-slate-200 dark:border-slate-700"
             title={t('resetView', 'Reset View')}
           >
             <RotateCcw className="w-4 h-4" />
-          </button>
-          <button 
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
             onClick={toggleFullscreen}
             className="p-2.5 bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
             title={isFullscreen ? t('exitFullscreen', 'Exit Fullscreen') : t('enterFullscreen', 'Fullscreen Mode')}
           >
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-          </button>
+          </motion.button>
         </div>
       </div>
 
@@ -869,14 +869,14 @@ const DependencyMapD3: React.FC = () => {
               const isPinned = node && node.fx !== null && node.fx !== undefined;
               return (
                 <div className="py-1">
-                  <button 
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                     onClick={() => handlePinNode(contextMenu.nodeId, !isPinned)}
                     className="w-full text-left px-3 py-1.5 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-2"
                   >
                     <MousePointerClick className="w-4 h-4" />
                     {isPinned ? t('unpinNode', 'Unpin Node') : t('pinNode', 'Pin Node')}
-                  </button>
-                  <button 
+                  </motion.button>
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                     onClick={() => {
                        setSelectedNodeId(contextMenu.nodeId);
                        setContextMenu(null);
@@ -885,8 +885,8 @@ const DependencyMapD3: React.FC = () => {
                   >
                     <Info className="w-4 h-4" />
                     {t('viewDetails', 'View Details')}
-                  </button>
-                  <button 
+                  </motion.button>
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                     onClick={() => {
                         window.open(t('wikipediaUrlPrefix', 'https://en.wikipedia.org/wiki/') + encodeURIComponent(getDisplayName(contextMenu.nodeId)), '_blank');
                         setContextMenu(null);
@@ -895,7 +895,7 @@ const DependencyMapD3: React.FC = () => {
                   >
                     <Globe className="w-4 h-4" />
                     {t('wikipedia', 'Wikipedia lookup')}
-                  </button>
+                  </motion.button>
                 </div>
               );
             })()}
@@ -952,12 +952,12 @@ const DependencyMapD3: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <button 
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                 onClick={() => setSelectedNodeId(null)}
                 className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-400 transition-colors"
               >
                 <X size={16} />
-              </button>
+              </motion.button>
             </div>
 
             <div className="p-5 flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-5">

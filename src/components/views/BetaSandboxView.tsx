@@ -142,9 +142,14 @@ export const BetaSandboxView: React.FC = () => {
 
   // Carreau-Yasuda Formula Solver: η = η0 * [1 + (λ * γ)^2]^((n-1)/2)
   const calculatedViscosity = useMemo(() => {
-    const term = 1 + Math.pow(lambda * shearRate, 2);
-    const exponent = (nParameter - 1) / 2;
-    return etaZero * Math.pow(term, exponent);
+    const l = isNaN(lambda) || !isFinite(lambda) ? 0.155 : lambda;
+    const g = isNaN(shearRate) || !isFinite(shearRate) ? 10 : shearRate;
+    const n = isNaN(nParameter) || !isFinite(nParameter) ? 0.35 : nParameter;
+    const e = isNaN(etaZero) || !isFinite(etaZero) ? 2400 : etaZero;
+    const term = 1 + Math.pow(l * g, 2);
+    const exponent = (n - 1) / 2;
+    const res = e * Math.pow(term, exponent);
+    return isNaN(res) || !isFinite(res) ? 0 : res;
   }, [shearRate, lambda, nParameter, etaZero]);
 
   const fitterCurvePath = useMemo(() => {
@@ -156,7 +161,7 @@ export const BetaSandboxView: React.FC = () => {
       const visFit = etaZero * Math.pow(factorTerm, expVal);
       // Normalize point positions values
       const normX = (i / 50) * 500;
-      const normY = 200 - (visFit / 5000) * 200;
+      const normY = isNaN(visFit) || !isFinite(visFit) ? 200 : Math.max(0, Math.min(200, 200 - (visFit / 5000) * 200));
       return `${normX},${normY}`;
     }).join(' L ');
   }, [lambda, nParameter, etaZero]);
@@ -352,7 +357,8 @@ export const BetaSandboxView: React.FC = () => {
       let localRx = 0;
       let byteCounter = 0;
 
-      const intervalDelay = 1000 / streamHz;
+      const hz = Math.max(0.1, isNaN(streamHz) || !isFinite(streamHz) ? 1 : streamHz);
+      const intervalDelay = 1000 / hz;
       const streamTimer = setInterval(() => {
         // Packet Loss simulation
         if (simPacketLossRate > 0 && Math.random() * 100 < simPacketLossRate) {
@@ -713,7 +719,8 @@ export const BetaSandboxView: React.FC = () => {
         };
 
         // Automatic stream transmitting loop over real websockets
-        const intervalDelay = 1000 / streamHz;
+        const hz = Math.max(0.1, isNaN(streamHz) || !isFinite(streamHz) ? 1 : streamHz);
+      const intervalDelay = 1000 / hz;
         const streamTimer = setInterval(() => {
           if (wsClient.readyState !== WebSocket.OPEN) return;
 
@@ -1318,7 +1325,7 @@ export const BetaSandboxView: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2 shrink-0 w-full lg:w-auto justify-between lg:justify-end">
           {/* Density Toggle Standard */}
           <div className="flex bg-slate-950/90 border border-slate-800/80 p-0.5 rounded-lg text-slate-400 font-mono text-[9px] shadow-inner">
-            <button
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={() => {
                 setIsCompact(true);
                 safeStorage.local.setItem("resindb-compact", "true");
@@ -1329,8 +1336,8 @@ export const BetaSandboxView: React.FC = () => {
               }`}
             >
               {t('viewCompact')}
-            </button>
-            <button
+            </motion.button>
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={() => {
                 setIsCompact(false);
                 safeStorage.local.setItem("resindb-compact", "false");
@@ -1341,7 +1348,7 @@ export const BetaSandboxView: React.FC = () => {
               }`}
             >
               {t('viewRelaxed')}
-            </button>
+            </motion.button>
           </div>
 
           {/* ACTIVE TABS SELECT PANEL */}
@@ -1352,7 +1359,7 @@ export const BetaSandboxView: React.FC = () => {
               { id: 'gemini' as const, icon: Scan, name: t('sandboxGemini') },
               { id: 'grid' as const, icon: TableProperties, name: t('sandboxGrid') }
             ].map(tab => (
-              <button
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded transition-all cursor-pointer ${
@@ -1363,7 +1370,7 @@ export const BetaSandboxView: React.FC = () => {
               >
                 <tab.icon size={11} className={activeTab === tab.id ? "text-indigo-400" : "text-slate-500"} />
                 <span>{tab.name}</span>
-              </button>
+              </motion.button>
             ))}
           </div>
         </div>
@@ -1400,22 +1407,22 @@ export const BetaSandboxView: React.FC = () => {
                       {t('rheologyTuner')}
                     </h3>
                     <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 shrink-0 text-[8px] font-mono shadow-inner">
-                      <button
+                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                         onClick={() => setSolverMode('js')}
                         className={`px-1.5 py-0.5 rounded font-bold transition-all ${
                           solverMode === 'js' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'text-slate-500 hover:text-slate-300'
                         }`}
                       >
                         V8 JS
-                      </button>
-                      <button
+                      </motion.button>
+                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                         onClick={() => setSolverMode('wasm')}
                         className={`px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5 transition-all ${
                           solverMode === 'wasm' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'text-slate-500 hover:text-slate-300'
                         }`}
                       >
                         <Cpu size={7} /> WASM
-                      </button>
+                      </motion.button>
                     </div>
                   </div>
 
@@ -1490,7 +1497,7 @@ export const BetaSandboxView: React.FC = () => {
                   </div>
 
                   {/* Solver Fire Action */}
-                  <button
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                     onClick={runFittingSolver}
                     disabled={isSolving}
                     className="w-full relative group overflow-hidden bg-gradient-to-r from-indigo-600 to-indigo-800 hover:from-indigo-500 hover:to-indigo-750 text-white font-mono font-bold py-2 px-3 rounded-lg shadow-md active:scale-[0.99] transition-all flex items-center justify-center gap-1.5 cursor-pointer text-[10px] uppercase tracking-wider mt-2.5"
@@ -1502,7 +1509,7 @@ export const BetaSandboxView: React.FC = () => {
                       <Calculator size={11} className="text-indigo-200" />
                     )}
                     <span>{t('runNewtonSolver')}</span>
-                  </button>
+                  </motion.button>
 
                   {/* Timings Scoreboard */}
                   <div className="grid grid-cols-2 gap-2 mt-2 bg-slate-950 p-2.5 rounded-lg border border-slate-900 font-mono text-[9px] shadow-sm">
@@ -1635,12 +1642,12 @@ export const BetaSandboxView: React.FC = () => {
                     <span className="flex items-center gap-1 text-indigo-400">
                       <Terminal size={12} /> {t("dampingSpectrum")}
                     </span>
-                    <button
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                       onClick={() => setWasmPerformanceLog([])}
                       className="text-[9px] text-slate-500 hover:text-slate-300 transition-colors uppercase"
                     >
                       Clear
-                    </button>
+                    </motion.button>
                   </div>
 
                   <div className="flex-1 overflow-y-auto space-y-1 font-mono text-[9px] leading-relaxed custom-scrollbar text-slate-300 pr-1">
@@ -1715,7 +1722,7 @@ export const BetaSandboxView: React.FC = () => {
 
                   {/* Sockets Sub Tabs Navigation */}
                   <div className="grid grid-cols-3 gap-1 p-0.5 bg-slate-950 rounded-lg border border-slate-900">
-                    <button
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                       onClick={() => setSocketSubTab('conn')}
                       className={`py-1.5 px-1 text-center font-mono text-[9px] rounded font-bold cursor-pointer transition-all flex flex-col items-center justify-center gap-0.5 ${
                         socketSubTab === 'conn'
@@ -1725,8 +1732,8 @@ export const BetaSandboxView: React.FC = () => {
                     >
                       <Database size={10} className={socketSubTab === 'conn' ? 'text-teal-400' : 'text-slate-600'} />
                       <span>{t("connTopology")}</span>
-                    </button>
-                    <button
+                    </motion.button>
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                       onClick={() => setSocketSubTab('calib')}
                       className={`py-1.5 px-1 text-center font-mono text-[9px] rounded font-bold cursor-pointer transition-all flex flex-col items-center justify-center gap-0.5 ${
                         socketSubTab === 'calib'
@@ -1736,8 +1743,8 @@ export const BetaSandboxView: React.FC = () => {
                     >
                       <Sliders size={10} className={socketSubTab === 'calib' ? 'text-teal-400' : 'text-slate-600'} />
                       <span>{t("telemetryCalib")}</span>
-                    </button>
-                    <button
+                    </motion.button>
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                       onClick={() => setSocketSubTab('sim')}
                       className={`py-1.5 px-1 text-center font-mono text-[9px] rounded font-bold cursor-pointer transition-all flex flex-col items-center justify-center gap-0.5 ${
                         socketSubTab === 'sim'
@@ -1747,7 +1754,7 @@ export const BetaSandboxView: React.FC = () => {
                     >
                       <Activity size={10} className={socketSubTab === 'sim' ? 'text-teal-400' : 'text-slate-600'} />
                       <span>{t("jitterSim")}</span>
-                    </button>
+                    </motion.button>
                   </div>
 
                   {/* ==================== SUB-TAB 1: CONNECTION TOPO ==================== */}
@@ -1759,7 +1766,7 @@ export const BetaSandboxView: React.FC = () => {
                           WS Connection Profile / 套接字通信信道
                         </span>
                         <div className="grid grid-cols-2 gap-1.5 p-0.5 bg-slate-900 rounded-lg border border-slate-900">
-                          <button
+                          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                             onClick={() => {
                               setUseVirtualSocket(true);
                               if (telemetryActive) {
@@ -1774,8 +1781,8 @@ export const BetaSandboxView: React.FC = () => {
                             }`}
                           >
                             {t("virtualLoopback")}
-                          </button>
-                          <button
+                          </motion.button>
+                          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                             onClick={() => {
                               setUseVirtualSocket(false);
                               if (telemetryActive) {
@@ -1790,7 +1797,7 @@ export const BetaSandboxView: React.FC = () => {
                             }`}
                           >
                             {t("physicalWebSockets")}
-                          </button>
+                          </motion.button>
                         </div>
                       </div>
 
@@ -1809,7 +1816,7 @@ export const BetaSandboxView: React.FC = () => {
                               placeholder="wss://echo.websocket.org"
                               className="flex-1 bg-slate-900 border border-slate-850 text-[10.5px] font-mono px-2 py-1 rounded text-teal-300 focus:outline-none focus:border-teal-500 transition-colors"
                             />
-                            <button
+                            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                               onClick={() => {
                                 setWsUrl('wss://echo.websocket.org');
                                 addToast('info', 'Reset endpoint profile with echo backup');
@@ -1817,7 +1824,7 @@ export const BetaSandboxView: React.FC = () => {
                               className="px-2 py-1 bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-slate-200 border border-slate-800 rounded text-[9px] font-mono cursor-pointer transition-colors"
                             >
                               Reset / 重置
-                            </button>
+                            </motion.button>
                           </div>
                         </div>
                       ) : (
@@ -1851,7 +1858,7 @@ export const BetaSandboxView: React.FC = () => {
                           <span className="text-slate-500 uppercase font-black">Tx Frequency / 变送刷新频率</span>
                           <div className="grid grid-cols-4 gap-1 p-0.5 bg-slate-950 border border-slate-900 rounded h-[23px] items-center">
                             {[1, 2, 5, 10].map(hz => (
-                              <button
+                              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                                 key={hz}
                                 onClick={() => {
                                   setStreamHz(hz);
@@ -1864,7 +1871,7 @@ export const BetaSandboxView: React.FC = () => {
                                 }`}
                               >
                                 {hz}Hz
-                              </button>
+                              </motion.button>
                             ))}
                           </div>
                         </div>
@@ -1883,7 +1890,7 @@ export const BetaSandboxView: React.FC = () => {
                             { id: 'spike' as const, label_en: 'Spikes', label_cn: '瞬态尖峰' },
                             { id: 'calib' as const, label_en: 'Calib', label_cn: '零漂基线' }
                           ].map(profile => (
-                            <button
+                            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                               key={profile.id}
                               onClick={() => {
                                 setSignalProfile(profile.id);
@@ -1897,7 +1904,7 @@ export const BetaSandboxView: React.FC = () => {
                             >
                               <div className="font-bold text-[8.5px]">{profile.label_en}</div>
                               <div className="text-[7.5px] opacity-75 scale-90">{profile.label_cn}</div>
-                            </button>
+                            </motion.button>
                           ))}
                         </div>
                       </div>
@@ -2105,7 +2112,7 @@ export const BetaSandboxView: React.FC = () => {
                       </div>
 
                       {/* Quick Reset Calibration button */}
-                      <button
+                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                         onClick={() => {
                           setMfrCalibrationGain(1.0);
                           setMfrCalibrationOffset(0.0);
@@ -2118,7 +2125,7 @@ export const BetaSandboxView: React.FC = () => {
                         className="w-full py-1 text-center font-mono text-[8.5px] uppercase font-bold tracking-wider text-slate-400 hover:text-slate-200 bg-slate-950 border border-slate-900 rounded hover:border-slate-800 transition-all cursor-pointer"
                       >
                         Reset Calibration Channels / 复位传感器标定通道
-                      </button>
+                      </motion.button>
                     </div>
                   )}
 
@@ -2250,7 +2257,7 @@ export const BetaSandboxView: React.FC = () => {
                           <span>历史累计告警: <strong className="text-rose-400 font-bold">{totalAlarmsTriggered}</strong> 次</span>
                         </div>
                         
-                        <button
+                        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                           onClick={() => setIsAlarmMuted(!isAlarmMuted)}
                           className={`px-2.5 py-1 text-[8.5px] font-bold rounded flex items-center gap-1 transition-all cursor-pointer ${
                             isAlarmMuted
@@ -2269,7 +2276,7 @@ export const BetaSandboxView: React.FC = () => {
                               <span>有频警报 Alert Active</span>
                             </>
                           )}
-                        </button>
+                        </motion.button>
                       </div>
 
                       {/* Logger log level filter */}
@@ -2282,7 +2289,7 @@ export const BetaSandboxView: React.FC = () => {
                             { id: 'ALERT' as const, label: 'WARN (告警)' },
                             { id: 'SWAP' as const, label: 'GRID (注入)' }
                           ].map(item => (
-                            <button
+                            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                               key={item.id}
                               onClick={() => {
                                 setLogFilterLevel(item.id);
@@ -2295,7 +2302,7 @@ export const BetaSandboxView: React.FC = () => {
                               }`}
                             >
                               {item.id}
-                            </button>
+                            </motion.button>
                           ))}
                         </div>
                       </div>
@@ -2335,7 +2342,7 @@ export const BetaSandboxView: React.FC = () => {
                   </div>
 
                   {/* Control Button */}
-                  <button
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                     onClick={() => {
                       setTelemetryActive(!telemetryActive);
                       addToast(
@@ -2362,7 +2369,7 @@ export const BetaSandboxView: React.FC = () => {
                         <span>连接实验室仪表网关 Establish Sockets / Active Handshake</span>
                       </>
                     )}
-                  </button>
+                  </motion.button>
                 </div>
               </div>
 
@@ -2596,7 +2603,7 @@ export const BetaSandboxView: React.FC = () => {
                     <span className="flex items-center gap-1.5 text-teal-400 font-bold font-black">
                       <Terminal size={12} className="text-teal-400 animate-pulse" /> Sockets Diagnostic Stream Logs 诊断反馈信息流
                     </span>
-                    <button
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                       onClick={() => {
                         setTelemetryLogs([]);
                         addToast('info', 'Console logs cleared');
@@ -2604,7 +2611,7 @@ export const BetaSandboxView: React.FC = () => {
                       className="text-[8px] text-slate-650 hover:text-slate-300 tracking-wider transition-colors uppercase font-bold"
                     >
                       {t('clearTerminal')}
-                    </button>
+                    </motion.button>
                   </div>
 
                   {/* Terminal text field */}
@@ -2658,7 +2665,7 @@ export const BetaSandboxView: React.FC = () => {
                       />
                       
                       {/* Prepopulated Payload Fast Snippet Injectors */}
-                      <button
+                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                         onClick={() => {
                           setCustomTermCommand(
                             JSON.stringify({
@@ -2674,14 +2681,14 @@ export const BetaSandboxView: React.FC = () => {
                         title="Randomize payload template"
                       >
                         Random / 随机
-                      </button>
+                      </motion.button>
 
-                      <button
+                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                         onClick={handleSendCustomFrame}
                         className="bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-[9px] font-bold py-1 px-3 rounded inline-block shrink-0 shadow-sm transition-colors cursor-pointer uppercase"
                       >
                         Send Frame / 发送套接字
-                      </button>
+                      </motion.button>
                     </div>
                   </div>
                 </div>
@@ -2716,7 +2723,7 @@ export const BetaSandboxView: React.FC = () => {
 
                   <div className={`space-y-2 pt-1 overflow-y-auto custom-scrollbar ${isCompact ? 'max-h-[220px]' : 'max-h-[300px]'}`}>
                     {scanTemplates.map(tpl => (
-                      <button
+                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                         key={tpl.id}
                         onClick={() => handleScanTemplate(tpl)}
                         disabled={isScanning}
@@ -2735,7 +2742,7 @@ export const BetaSandboxView: React.FC = () => {
                           <div className="text-[10.5px] font-mono font-bold text-slate-200">光谱图 / Sample Spec: {tpl.title}</div>
                           <div className="text-[8px] font-mono text-purple-400 bg-purple-500/5 px-1 py-0.5 rounded border border-purple-500/10 inline-block">目标材料 / Target Lot: {tpl.gradeName}</div>
                         </div>
-                      </button>
+                      </motion.button>
                     ))}
                   </div>
                 </div>
@@ -2850,13 +2857,13 @@ export const BetaSandboxView: React.FC = () => {
  
                     {/* Bridge Action to grid */}
                     {scanResult && (
-                      <button
+                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                         onClick={handleInjectScannedLot}
                         className="w-full mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-mono text-[9px] font-bold py-1.5 rounded-lg flex items-center justify-center gap-1 shadow-md active:scale-[0.98] transition-all cursor-pointer uppercase shrink-0"
                       >
                         <TableProperties size={10} />
                         <span>数据热注入下方评估矩阵 / Inject into Evaluation Formula Grid</span>
-                      </button>
+                      </motion.button>
                     )}
                   </div>
  
@@ -2914,7 +2921,7 @@ export const BetaSandboxView: React.FC = () => {
                         { label: '[modulus]', val: ' [modulus]' },
                         { label: '[crystallinity]', val: ' [crystallinity]' }
                       ].map(item => (
-                        <button
+                        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                           key={item.label}
                           onClick={() => {
                             setCustomFormulaExpr(prev => prev + item.val);
@@ -2923,7 +2930,7 @@ export const BetaSandboxView: React.FC = () => {
                           className="bg-indigo-500/5 hover:bg-indigo-500/15 text-indigo-400 px-1 py-0.5 rounded border border-indigo-500/25 transition-colors cursor-pointer"
                         >
                           {item.label}
-                        </button>
+                        </motion.button>
                       ))}
                     </div>
                     <span>支持标准算术运算符 (`+`, `-`, `*`, `/`) / Supports arithmetic operators</span>
@@ -2944,7 +2951,7 @@ export const BetaSandboxView: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <button
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                       onClick={() => setIsAuditModeActive(!isAuditModeActive)}
                       className={`px-2 py-1 rounded font-mono text-[8.5px] font-bold transition-all border flex items-center gap-1 cursor-pointer ${
                         isAuditModeActive 
@@ -2954,9 +2961,9 @@ export const BetaSandboxView: React.FC = () => {
                     >
                       <span className={`w-1 h-1 rounded-full ${isAuditModeActive ? 'bg-amber-400 animate-pulse' : 'bg-slate-500'}`} />
                       {isAuditModeActive ? '审计校验已激活 / Audit Display ACTIVE' : '激活质量审计 / Enable Quality Audit'}
-                    </button>
+                    </motion.button>
                     {isAuditModeActive && (
-                      <button
+                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                         onClick={() => setHideNormalLots(!hideNormalLots)}
                         className={`px-2 py-1 rounded font-mono text-[8.5px] font-bold transition-all border cursor-pointer ${
                           hideNormalLots 
@@ -2965,7 +2972,7 @@ export const BetaSandboxView: React.FC = () => {
                         }`}
                       >
                         {hideNormalLots ? '🔍 仅看异常批次开启 / Anomalous Only' : '🔍 显示所有批次 / Show All'}
-                      </button>
+                      </motion.button>
                     )}
                   </div>
                 </div>
@@ -3014,24 +3021,24 @@ export const BetaSandboxView: React.FC = () => {
                     <span className="text-[8px] bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 text-slate-300">Crystallinity: {crystallinityWarningRange.min}%-{crystallinityWarningRange.max}%</span>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap mt-1.5 sm:mt-0">
-                    <button
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                       onClick={handleInjectAnomalies}
                       className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/25 px-2 py-0.5 rounded text-[8px] transition-all cursor-pointer flex items-center gap-1"
                     >
                       <span>⚡ 注入异常数据 / Inject Anomalies</span>
-                    </button>
-                    <button
+                    </motion.button>
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                       onClick={handleAutoRepairMissing}
                       className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/25 px-2 py-0.5 rounded text-[8px] transition-all cursor-pointer flex items-center gap-1"
                     >
                       <span>🛠️ 自动填补缺失 / Fill Missing</span>
-                    </button>
-                    <button
+                    </motion.button>
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                       onClick={handleClampOutliers}
                       className="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 px-2 py-0.5 rounded text-[8px] transition-all cursor-pointer flex items-center gap-1"
                     >
                       <span>🛡️ 自动钳制越界 / Clamp Outliers</span>
-                    </button>
+                    </motion.button>
                   </div>
                 </div>
               </div>

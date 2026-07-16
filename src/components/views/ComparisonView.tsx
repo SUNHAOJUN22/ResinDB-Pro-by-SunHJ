@@ -593,7 +593,9 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
                                   {rec.manufacturer}
                                 </span>
                               </div>
-                              <button
+                              <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
                                 onClick={() => {
                                   if (onAddProduct) {
                                     onAddProduct(rec.id);
@@ -603,7 +605,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
                                 className="px-2.5 py-1.5 text-[9px] font-mono font-bold bg-sky-600 hover:bg-sky-500 text-white border border-sky-700 rounded-md shadow-sm select-none transition-all cursor-pointer whitespace-nowrap"
                               >
                                 {t("alignInstantly")}
-                              </button>
+                              </motion.button>
                             </div>
                           ))}
                         </div>

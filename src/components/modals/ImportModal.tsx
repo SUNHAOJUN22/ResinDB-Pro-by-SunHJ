@@ -781,7 +781,9 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
 
                   {/* Ingestion Source Switcher Tabs */}
                   <div className="flex border border-slate-200 dark:border-slate-805 p-1 bg-slate-50 dark:bg-slate-900 rounded-xl gap-1">
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.97 }}
                       type="button"
                       onClick={() => setImportSourceTab("file")}
                       className={`flex-1 py-1.5 font-serif font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -791,8 +793,10 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
                       }`}
                     >
                       📁 多格式物理文件拖拉上传 (File Drop)
-                    </button>
-                    <button
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.97 }}
                       type="button"
                       onClick={() => setImportSourceTab("clipboard")}
                       className={`flex-1 py-1.5 font-serif font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
@@ -802,7 +806,7 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
                       }`}
                     >
                       📋 剪贴板 Excel 表格网格粘贴 (Clipboard Paste)
-                    </button>
+                    </motion.button>
                   </div>
 
                   {importSourceTab === "file" ? (
@@ -986,7 +990,9 @@ PP-M1600	中石油		0.910		1200`}
 
                   {/* Shortcut accordion for direct key manual entry */}
                   <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-900/30">
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.005 }}
+                      whileTap={{ scale: 0.995 }}
                       type="button"
                       onClick={() => setIsManualFormOpen(!isManualFormOpen)}
                       className="w-full flex items-center justify-between px-4 py-3 bg-slate-100 dark:bg-slate-900/60 text-left cursor-pointer"
@@ -997,7 +1003,7 @@ PP-M1600	中石油		0.910		1200`}
                       <span className="text-[10px] font-mono font-semibold text-primary-600 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-2 py-0.5 rounded hover:bg-slate-50">
                         {isManualFormOpen ? "隐藏快速表单" : "录入单条"}
                       </span>
-                    </button>
+                    </motion.button>
 
                     {isManualFormOpen && (
                       <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-3 animate-in slide-in-from-top-1">
@@ -1062,14 +1068,16 @@ PP-M1600	中石油		0.910		1200`}
                         </div>
 
                         <div className="pt-1 flex justify-end">
-                          <button
+                          <motion.button
+                            whileHover={!manualGradeName.trim() ? {} : { scale: 1.03 }}
+                            whileTap={!manualGradeName.trim() ? {} : { scale: 0.97 }}
                             type="button"
                             onClick={handleSaveManualRecord}
                             disabled={!manualGradeName.trim()}
-                            className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-40 text-white font-mono font-bold text-[9px] uppercase tracking-widest cursor-pointer shadow-sm rounded-lg"
+                            className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-mono font-bold text-[9px] uppercase tracking-widest cursor-pointer shadow-sm rounded-lg"
                           >
                             🚀 生成单条并前往校验
-                          </button>
+                          </motion.button>
                         </div>
                       </div>
                     )}
@@ -1272,13 +1280,15 @@ PP-M1600	中石油		0.910		1200`}
                   {/* Accordion to dynamically add arbitrary custom variables schema mappings */}
                   <div className="group border border-dashed border-slate-300 dark:border-slate-800 rounded-xl p-3 bg-slate-50/50 dark:bg-slate-900/10">
                     {!showCustomColumnInput ? (
-                      <button
+                      <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
                         type="button"
                         onClick={() => setShowCustomColumnInput(true)}
                         className="text-[10px] font-mono font-bold text-primary-600 dark:text-primary-450 hover:underline hover:text-primary-700 flex items-center gap-1.5 uppercase tracking-wide focus:outline-none cursor-pointer"
                       >
                         <PlusCircle size={14} /> + 手动声明新增非标特种参数字段 (Map a custom property)
-                      </button>
+                      </motion.button>
                     ) : (
                       <div className="flex gap-2 items-center">
                         <input
@@ -1291,20 +1301,24 @@ PP-M1600	中石油		0.910		1200`}
                             if (e.key === "Enter") handleAddCustomColumn();
                           }}
                         />
-                        <button
+                        <motion.button
+                          whileHover={{ scale: 1.04 }}
+                          whileTap={{ scale: 0.96 }}
                           type="button"
                           onClick={handleAddCustomColumn}
                           className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 font-mono font-bold text-[10px] text-white uppercase tracking-wider rounded-lg cursor-pointer"
                         >
                           确认添加
-                        </button>
-                        <button
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.04 }}
+                          whileTap={{ scale: 0.96 }}
                           type="button"
                           onClick={() => setShowCustomColumnInput(false)}
                           className="px-3.5 py-1.5 bg-slate-205 dark:bg-slate-800 text-slate-600 dark:text-slate-350 hover:bg-slate-300 text-[10px] font-mono uppercase tracking-wider rounded-lg cursor-pointer"
                         >
                           取消
-                        </button>
+                        </motion.button>
                       </div>
                     )}
                   </div>
@@ -1455,13 +1469,15 @@ PP-M1600	中石油		0.910		1200`}
                         />
                       </div>
                       {sandboxSearch && (
-                        <button
+                        <motion.button
+                          whileHover={{ scale: 1.04 }}
+                          whileTap={{ scale: 0.96 }}
                           type="button"
                           onClick={() => setSandboxSearch("")}
                           className="px-3 py-1.5 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:text-slate-800 hover:bg-slate-200 text-xs font-mono font-semibold rounded-lg cursor-pointer"
                         >
                           {t("clearFilter", "清除过滤")}
-                        </button>
+                        </motion.button>
                       )}
                     </div>
 

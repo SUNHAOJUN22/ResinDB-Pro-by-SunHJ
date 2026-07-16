@@ -256,18 +256,20 @@ export const SystemHealthModal: React.FC<SystemHealthModalProps> = ({
                       {t("sysHealthLatency")}
                     </p>
                   </div>
-                  <button
+                  <motion.button
+                    whileHover={isRefreshing ? {} : { scale: 1.05 }}
+                    whileTap={isRefreshing ? {} : { scale: 0.95 }}
                     onClick={refreshData}
                     disabled={isRefreshing}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold tracking-widest uppercase transition-all ${
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold tracking-widest uppercase transition-all cursor-pointer disabled:cursor-not-allowed ${
                       isRefreshing
-                        ? 'bg-primary-100 text-primary-500 dark:bg-primary-900/30 dark:text-primary-400 cursor-not-allowed'
-                        : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 cursor-pointer shadow-sm'
+                        ? 'bg-primary-100 text-primary-500 dark:bg-primary-900/30 dark:text-primary-400'
+                        : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 shadow-sm'
                     }`}
                   >
                     <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
                     {isRefreshing ? t("syncing") : t("syncNow")}
-                  </button>
+                  </motion.button>
                 </div>
 
                 {/* Progress Bar Container */}

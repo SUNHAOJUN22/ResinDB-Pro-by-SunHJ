@@ -1,3 +1,4 @@
+import { motion } from 'motion/react';
 import React, { useEffect, useState, useMemo } from 'react';
 import { useForecastingWorker } from '@/hooks/workers/useForecastingWorker';
 import { Product } from '@/types/index';
@@ -272,14 +273,14 @@ export const MaterialTrendForecaster: React.FC<MaterialTrendForecasterProps> = (
             )}
 
             {/* Quick action button just to manual trigger if they need */}
-            <button
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={triggerFreshForecast}
               disabled={isProjecting || !selectedProperty}
               className="w-full py-2.5 px-4 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/35 text-indigo-600 dark:text-indigo-400 border border-indigo-150 dark:border-indigo-900/40 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
             >
               <RefreshCw size={12} className={`${isProjecting ? 'animate-spin' : ''}`} />
               <span>Force Re-Simulate</span>
-            </button>
+            </motion.button>
 
             <div className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-850 rounded-2xl flex items-center gap-3">
               <Cpu className="text-indigo-500 shrink-0" size={16} />

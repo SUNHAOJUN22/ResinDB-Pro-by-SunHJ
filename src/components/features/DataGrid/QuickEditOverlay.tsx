@@ -110,12 +110,14 @@ export const QuickEditOverlay: React.FC<QuickEditOverlayProps> = ({
             {colLabel}
           </span>
         </div>
-        <button
+        <motion.button
+          whileHover={{ scale: 1.15 }}
+          whileTap={{ scale: 0.85 }}
           onClick={handleCancelClick}
-          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0 outline-none transition-colors"
+          className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0 outline-none transition-colors cursor-pointer"
         >
           <X size={12} />
-        </button>
+        </motion.button>
       </div>
 
       {/* Input Field */}
@@ -162,19 +164,23 @@ export const QuickEditOverlay: React.FC<QuickEditOverlayProps> = ({
           {t("Enter 保存 / Esc 取消", "Enter to Save / Esc")}
         </span>
         <div className="flex items-center gap-1.5">
-          <button
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={handleCancelClick}
-            className="px-2.5 py-1 text-[10px] font-black border border-slate-200 dark:border-slate-800 rounded-md text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-850 dark:text-slate-400 outline-none"
+            className="px-2.5 py-1 text-[10px] font-black border border-slate-200 dark:border-slate-800 rounded-md text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-850 dark:text-slate-400 outline-none cursor-pointer"
           >
             {t("取消", "Cancel")}
-          </button>
-          <button
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={handleSaveClick}
-            className="px-2.5 py-1 text-[10px] font-black bg-primary-600 text-white rounded-md hover:bg-primary-500 shadow-sm outline-none flex items-center gap-0.5"
+            className="px-2.5 py-1 text-[10px] font-black bg-primary-600 text-white rounded-md hover:bg-primary-500 shadow-sm outline-none flex items-center gap-0.5 cursor-pointer"
           >
             <Check size={10} />
             {t("保存", "Save")}
-          </button>
+          </motion.button>
         </div>
       </div>
     </motion.div>

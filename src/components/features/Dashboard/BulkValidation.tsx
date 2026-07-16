@@ -100,10 +100,11 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
   formulas,
   onViewProduct
 }) => {
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const { addToast } = useToasts();
 
-  const t = (zh: string, en: string) => (language === 'zh' ? zh : en);
+  /** Local bilingual inline helper for strings not yet in i18n.ts */
+  const tLocal = (zh: string, en: string) => (language === 'zh' ? zh : en);
 
   // States
   const [selectedFormulaIds, setSelectedFormulaIds] = useState<Set<string>>(() => {
@@ -364,7 +365,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
 
         {/* Action Controllers */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <button
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
             onClick={() => setShowConfig(!showConfig)}
             className={`px-3.5 py-2 border rounded-xl text-xs font-black flex items-center gap-1.5 transition-all outline-none ${
               showConfig 
@@ -374,9 +375,9 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
           >
             <Settings size={13} className={showConfig ? "animate-spin text-primary-500" : ""} />
             {t("bulkValidateThresholdConfig")}
-          </button>
+          </motion.button>
           
-          <button
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
             onClick={runTrigger}
             disabled={isEvaluating}
             className="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5 active:scale-95 transition-all disabled:opacity-55"
@@ -392,7 +393,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                 {t("bulkValidateRunScan")}
               </>
             )}
-          </button>
+          </motion.button>
         </div>
       </div>
 
@@ -411,13 +412,13 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
               <div className="space-y-3 p-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-850 rounded-xl shadow-sm">
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
                   <Sliders size={11} className="text-amber-500" />
-                  {t("熔体流动速率因子 (MFR)", "Rheology Melt Flow (MFR) Limits")}
+                  {tLocal("熔体流动速率因子 (MFR)", "Rheology Melt Flow (MFR) Limits")}
                 </span>
                 
                 <div className="space-y-3 pt-1">
                   <div className="space-y-1">
                     <div className="flex justify-between text-[11px] font-bold text-slate-650 dark:text-slate-400">
-                      <span>{t("熔体溢流上界 (Max MFR)", "Upper Flash Risk (Max MFR)")}</span>
+                      <span>{tLocal("熔体溢流上界 (Max MFR)", "Upper Flash Risk (Max MFR)")}</span>
                       <span className="font-mono text-slate-900 dark:text-white font-black">{maxMfr} g/10min</span>
                     </div>
                     <input 
@@ -433,7 +434,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
 
                   <div className="space-y-1">
                     <div className="flex justify-between text-[11px] font-bold text-slate-650 dark:text-slate-400">
-                      <span>{t("熔体难充填下界 (Min MFR)", "Lower Viscous flow (Min MFR)")}</span>
+                      <span>{tLocal("熔体难充填下界 (Min MFR)", "Lower Viscous flow (Min MFR)")}</span>
                       <span className="font-mono text-slate-900 dark:text-white font-black">{minMfr} g/10min</span>
                     </div>
                     <input 
@@ -453,13 +454,13 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
               <div className="space-y-3 p-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-850 rounded-xl shadow-sm">
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
                   <Beaker size={11} className="text-rose-500" />
-                  {t("承应力刚度安全线 (Tensile)", "Structural Tensile Thresholds")}
+                  {tLocal("承应力刚度安全线 (Tensile)", "Structural Tensile Thresholds")}
                 </span>
                 
                 <div className="space-y-4 pt-1">
                   <div className="space-y-1">
                     <div className="flex justify-between text-[11px] font-bold text-slate-650 dark:text-slate-400">
-                      <span>{t("抗拉屈服最低安全线", "Min Safety Tensile Strength")}</span>
+                      <span>{tLocal("抗拉屈服最低安全线", "Min Safety Tensile Strength")}</span>
                       <span className="font-mono text-rose-600 dark:text-rose-450 font-black">{minTensile} MPa</span>
                     </div>
                     <input 
@@ -473,7 +474,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                     />
                   </div>
                   <p className="text-[9.5px] text-slate-400 italic">
-                    {t("* 拉伸屈服强度低于此标准的树脂将被列为结构断裂风险等红线极高缺陷级。", "* Products with strength below this is flagged as critical fracture load risks.")}
+                    {tLocal("* 拉伸屈服强度低于此标准的树脂将被列为结构断裂风险等红线极高缺陷级。", "* Products with strength below this is flagged as critical fracture load risks.")}
                   </p>
                 </div>
               </div>
@@ -482,12 +483,12 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
               <div className="space-y-3 p-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-850 rounded-xl shadow-sm">
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
                   <Sparkles size={11} className="text-indigo-500" />
-                  {t("公式计算表现容差 (Computed Index)", "Computed Formula Boundaries")}
+                  {tLocal("公式计算表现容差 (Computed Index)", "Computed Formula Boundaries")}
                 </span>
                 
                 <div className="space-y-2.5 pt-1">
                   <div className="flex items-center justify-between pb-1">
-                    <label className="text-[10px] font-bold text-slate-500">{t("启用公式结果验证", "Validate output bounds")}</label>
+                    <label className="text-[10px] font-bold text-slate-500">{tLocal("启用公式结果验证", "Validate output bounds")}</label>
                     <input 
                       type="checkbox" 
                       checked={enableFormulaBounds}
@@ -498,7 +499,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
 
                   <div className="space-y-1">
                     <div className="flex justify-between text-[10px] font-bold text-slate-650">
-                      <span>{t("计算容许上限 (Max Cap)", "Max Allowable Limit")}</span>
+                      <span>{tLocal("计算容许上限 (Max Cap)", "Max Allowable Limit")}</span>
                       <span className="font-mono font-bold text-slate-850 dark:text-white">{formulaMaxBoundary}</span>
                     </div>
                     <input 
@@ -515,7 +516,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
 
                   <div className="space-y-1">
                     <div className="flex justify-between text-[10px] font-bold text-slate-650">
-                      <span>{t("计算容许下限 (Min Cap)", "Min Allowable Limit")}</span>
+                      <span>{tLocal("计算容许下限 (Min Cap)", "Min Allowable Limit")}</span>
                       <span className="font-mono font-bold text-slate-850 dark:text-white">{formulaMinBoundary}</span>
                     </div>
                     <input 
@@ -541,35 +542,35 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
       <div className="space-y-2.5 pt-1 border-t border-slate-100 dark:border-slate-800">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-            {t("已选定的分析公式系列 (勾选以验证)", "Select Formulas to evaluate in batch")}
+            {tLocal("已选定的分析公式系列 (勾选以验证)", "Select Formulas to evaluate in batch")}
           </span>
           <div className="flex items-center gap-3">
-            <button
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={selectAllFormulas}
               className="text-[9px] font-black text-indigo-500 hover:text-indigo-600 uppercase"
             >
-              {t("全部选择", "Select All")}
-            </button>
+              {tLocal("全部选择", "Select All")}
+            </motion.button>
             <span className="text-slate-350">|</span>
-            <button
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={deselectAllFormulas}
               className="text-[9px] font-black text-slate-450 hover:text-slate-600 uppercase"
             >
-              {t("全部取消", "Clear Selection")}
-            </button>
+              {tLocal("全部取消", "Clear Selection")}
+            </motion.button>
           </div>
         </div>
 
         {formulas.length === 0 ? (
           <div className="p-4 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400">
-            {t("暂无任何公式可以使用，请先在下方库中创建自定义计算公式。", "No custom formulas available. Try adding one in the Editor.")}
+            {tLocal("暂无任何公式可以使用，请先在下方库中创建自定义计算公式。", "No custom formulas available. Try adding one in the Editor.")}
           </div>
         ) : (
           <div className="flex flex-wrap gap-2.5">
             {formulas.map(f => {
               const isSelected = selectedFormulaIds.has(f.id);
               return (
-                <button
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   key={f.id}
                   onClick={() => toggleFormulaSelection(f.id)}
                   className={`px-3 py-1.5 rounded-full border text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 ${
@@ -583,7 +584,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                   <span className="text-[9px] font-mono opacity-60 bg-slate-100 dark:bg-slate-850 px-1 rounded">
                     {f.unit || 'Index'}
                   </span>
-                </button>
+                </motion.button>
               );
             })}
           </div>
@@ -595,51 +596,51 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
         
         {/* Core resin health index */}
         <div className="p-4 bg-indigo-50/45 dark:bg-indigo-950/15 border border-indigo-100/70 dark:border-indigo-900/30 rounded-2xl flex flex-col justify-between">
-          <span className="text-[9px] font-black text-indigo-500 uppercase tracking-wider block">{t("合规率指标", "Formulation Health")}</span>
+          <span className="text-[9px] font-black text-indigo-500 uppercase tracking-wider block">{tLocal("合规率指标", "Formulation Health")}</span>
           <div className="flex items-baseline gap-1 mt-3">
             <span className="text-3xl font-black font-sans leading-none text-indigo-650 dark:text-indigo-400">{stats.healthPercent}%</span>
           </div>
-          <span className="text-[10px] text-slate-400/90 font-bold block mt-2">{t("全树脂无阀值偏离率", "Of products safe & compliant")}</span>
+          <span className="text-[10px] text-slate-400/90 font-bold block mt-2">{tLocal("全树脂无阀值偏离率", "Of products safe & compliant")}</span>
         </div>
 
         {/* Checked Formulas */}
         <div className="p-4 bg-slate-50 dark:bg-slate-950/20 border border-slate-150 dark:border-slate-850 rounded-2xl flex flex-col justify-between">
-          <span className="text-[9px] font-black text-slate-550 dark:text-slate-400 uppercase tracking-wider block">{t("选检公式组件", "Formulas Activated")}</span>
+          <span className="text-[9px] font-black text-slate-550 dark:text-slate-400 uppercase tracking-wider block">{tLocal("选检公式组件", "Formulas Activated")}</span>
           <div className="flex items-baseline gap-1 mt-3">
             <span className="text-3xl font-black font-sans leading-none">{selectedFormulaIds.size}</span>
             <span className="text-xs text-slate-400">/ {formulas.length}</span>
           </div>
-          <span className="text-[10px] text-slate-400/90 font-bold block mt-2">{t("进入流程的多因子数量", "Formulation variables checked")}</span>
+          <span className="text-[10px] text-slate-400/90 font-bold block mt-2">{tLocal("进入流程的多因子数量", "Formulation variables checked")}</span>
         </div>
 
         {/* Flagged Products total */}
         <div className="p-4 bg-slate-50 dark:bg-slate-950/20 border border-slate-150 dark:border-slate-850 rounded-2xl flex flex-col justify-between">
-          <span className="text-[9px] font-black text-slate-550 dark:text-slate-400 uppercase tracking-wider block">{t("触发拦截产品", "Total Flagged")}</span>
+          <span className="text-[9px] font-black text-slate-550 dark:text-slate-400 uppercase tracking-wider block">{tLocal("触发拦截产品", "Total Flagged")}</span>
           <div className="flex items-baseline gap-1 mt-3">
             <span className="text-3xl font-black font-sans leading-none text-slate-800 dark:text-white">
               {allProducts.length - stats.cleanProductsCount}
             </span>
             <span className="text-xs text-slate-400">/ {allProducts.length}</span>
           </div>
-          <span className="text-[10px] text-slate-400/90 font-bold block mt-2">{t("偏离设定限度的树脂", "Materials with violations")}</span>
+          <span className="text-[10px] text-slate-400/90 font-bold block mt-2">{tLocal("偏离设定限度的树脂", "Materials with violations")}</span>
         </div>
 
         {/* Warning Violations */}
         <div className="p-4 bg-amber-50/20 dark:bg-amber-950/10 border border-amber-100/50 dark:border-amber-900/10 rounded-2xl flex flex-col justify-between">
-          <span className="text-[9px] font-black text-amber-500 uppercase tracking-wider block">{t("一般预警偏离 (Warn)", "Warnings Flagged")}</span>
+          <span className="text-[9px] font-black text-amber-500 uppercase tracking-wider block">{tLocal("一般预警偏离 (Warn)", "Warnings Flagged")}</span>
           <div className="flex items-baseline gap-1 mt-3">
             <span className="text-3xl font-black font-sans leading-none text-amber-600 dark:text-amber-450">{stats.warningCount}</span>
           </div>
-          <span className="text-[10px] text-slate-400/90 font-bold block mt-2">{t("处于亚健康阈值带", "Moderate range deviations")}</span>
+          <span className="text-[10px] text-slate-400/90 font-bold block mt-2">{tLocal("处于亚健康阈值带", "Moderate range deviations")}</span>
         </div>
 
         {/* Critical Violations */}
         <div className="p-4 bg-rose-50/20 dark:bg-rose-950/10 border border-rose-100/40 dark:border-rose-900/20 rounded-2xl col-span-2 lg:col-span-1 flex flex-col justify-between">
-          <span className="text-[9px] font-black text-rose-500 uppercase tracking-wider block">{t("严重风险偏置 (Crit)", "Critical Hazards")}</span>
+          <span className="text-[9px] font-black text-rose-500 uppercase tracking-wider block">{tLocal("严重风险偏置 (Crit)", "Critical Hazards")}</span>
           <div className="flex items-baseline gap-1 mt-3">
             <span className="text-3xl font-black font-sans leading-none text-rose-600 dark:text-rose-450">{stats.criticalCount}</span>
           </div>
-          <span className="text-[10px] text-slate-400/90 font-bold block mt-2">{t("强度缺失/反应不匹配", "Severe structure/syntax risks")}</span>
+          <span className="text-[10px] text-slate-400/90 font-bold block mt-2">{tLocal("强度缺失/反应不匹配", "Severe structure/syntax risks")}</span>
         </div>
 
       </div>
@@ -649,7 +650,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
         {/* Tab Filters and labels */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5 gap-3">
           <div className="flex items-center gap-1.5 bg-slate-100/70 dark:bg-slate-900/60 p-1 rounded-xl">
-            <button
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={() => setFilterType('all')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 filterType === 'all' 
@@ -657,9 +658,9 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                   : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
               }`}
             >
-              {t("全部数据", "All Results")} ({validationResults.length})
-            </button>
-            <button
+              {tLocal("全部数据", "All Results")} ({validationResults.length})
+            </motion.button>
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={() => setFilterType('critical')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 filterType === 'critical' 
@@ -667,9 +668,9 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                   : 'text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-450'
               }`}
             >
-              {t("红色缺陷", "Critical Alerts")} ({stats.criticalCount})
-            </button>
-            <button
+              {tLocal("红色缺陷", "Critical Alerts")} ({stats.criticalCount})
+            </motion.button>
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={() => setFilterType('warning')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 filterType === 'warning' 
@@ -677,9 +678,9 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                   : 'text-slate-500 hover:text-amber-650 dark:text-slate-400'
               }`}
             >
-              {t("黄色预警", "Warnings")} ({stats.warningCount})
-            </button>
-            <button
+              {tLocal("黄色预警", "Warnings")} ({stats.warningCount})
+            </motion.button>
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={() => setFilterType('clean')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 filterType === 'clean' 
@@ -687,13 +688,13 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                   : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
               }`}
             >
-              {t("完美配方", "Compliant")} ({stats.cleanProductsCount})
-            </button>
+              {tLocal("完美配方", "Compliant")} ({stats.cleanProductsCount})
+            </motion.button>
           </div>
 
           <div className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
             <Info size={12} className="text-primary-500" />
-            <span>{t("点击任一产品名可调出其配方编辑或基本性能信息", "Click product's grade name to view detailed molecular properties")}</span>
+            <span>{tLocal("点击任一产品名可调出其配方编辑或基本性能信息", "Click product's grade name to view detailed molecular properties")}</span>
           </div>
         </div>
 
@@ -707,7 +708,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                 exit={{ opacity: 0 }}
                 className="py-12 border border-dashed border-slate-205 dark:border-slate-800 rounded-2xl text-center text-xs text-slate-400"
               >
-                {t("在此过滤器下未检测到符合条件的配方产品。", "No matching items detected in this category.")}
+                {tLocal("在此过滤器下未检测到符合条件的配方产品。", "No matching items detected in this category.")}
               </motion.div>
             ) : (
               filteredResults.map((r, pIdx) => {
@@ -731,12 +732,12 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                     <div className="space-y-2 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         {onViewProduct ? (
-                          <button
+                          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                             onClick={() => onViewProduct(r.product)}
                             className="text-xs font-black text-slate-850 dark:text-white hover:text-primary-500 text-left outline-none hover:underline"
                           >
                             {r.product.gradeName}
-                          </button>
+                          </motion.button>
                         ) : (
                           <span className="text-xs font-black text-slate-850 dark:text-white leading-none">
                             {r.product.gradeName}
@@ -751,18 +752,18 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                           r.violations.some(v => v.severity === 'critical') ? (
                             <span className="text-[9px] bg-rose-500/10 text-rose-600 dark:text-rose-400 px-1.5 py-0.5 rounded font-black uppercase tracking-wider flex items-center gap-0.5">
                               <ShieldAlert size={10} />
-                              {t("严重危险缺陷", "CRITICAL")}
+                              {tLocal("严重危险缺陷", "CRITICAL")}
                             </span>
                           ) : (
                             <span className="text-[9px] bg-amber-500/10 text-amber-600 dark:text-amber-450 px-1.5 py-0.5 rounded font-black uppercase tracking-wider flex items-center gap-0.5">
                               <AlertTriangle size={10} />
-                              {t("一般限制预警", "WARNING")}
+                              {tLocal("一般限制预警", "WARNING")}
                             </span>
                           )
                         ) : (
                           <span className="text-[9px] bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 px-1.5 py-0.5 rounded font-black uppercase tracking-wider flex items-center gap-0.5">
                             <CheckCircle size={10} />
-                            {t("极致健康达边", "COMPLIANT")}
+                            {tLocal("极致健康达边", "COMPLIANT")}
                           </span>
                         )}
                       </div>
@@ -774,13 +775,13 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                             <div key={vIdx} className="flex items-start gap-1.5 text-[11px] leading-relaxed font-semibold">
                               <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${v.severity === 'critical' ? 'bg-rose-500' : 'bg-amber-500'}`} />
                               <span className="text-slate-650 dark:text-slate-350">
-                                {t(v.messageZh, v.messageEn)}
+                                {tLocal(v.messageZh, v.messageEn)}
                               </span>
                             </div>
                           ))
                         ) : (
                           <div className="text-[11px] text-slate-450 italic font-semibold">
-                            {t("✓ 合规通过：公式解析均吻合化学计量且配方物性参数完整在预设安全范围内。", "✓ All systems clear: stoichiometry matches and formulation metrics operate fully within healthy ranges.")}
+                            {tLocal("✓ 合规通过：公式解析均吻合化学计量且配方物性参数完整在预设安全范围内。", "✓ All systems clear: stoichiometry matches and formulation metrics operate fully within healthy ranges.")}
                           </div>
                         )}
                       </div>
@@ -792,10 +793,10 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                         {r.violations.map((v, vIdx) => (
                           <div key={vIdx} className="p-2.5 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-150/45 dark:border-slate-850 text-right min-w-[120px]">
                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider block">
-                              {t(v.metricLabelZh, v.metricLabelEn)}
+                              {tLocal(v.metricLabelZh, v.metricLabelEn)}
                             </span>
                             <span className="text-[10px] font-bold text-slate-400 block mt-0.5">
-                              {t("限值", "Limit")}: {v.expectedRange}
+                              {tLocal("限值", "Limit")}: {v.expectedRange}
                             </span>
                             <span className={`text-xs font-black font-mono mt-1 block flex items-center justify-end gap-1 ${
                               v.severity === 'critical' ? 'text-rose-600 dark:text-rose-450' : 'text-amber-600 dark:text-amber-450'

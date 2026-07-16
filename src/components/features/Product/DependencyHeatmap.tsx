@@ -54,12 +54,36 @@ const evaluatePhysicalModel = (
   formulas: FormulaConfig[]
 ): number => {
   const getValue = (k: string): number => {
-    const raw = tempProduct.properties?.[k]?.value;
-    const num = typeof raw === 'number' ? raw : parseFloat(String(raw));
-    return isNaN(num) ? 0 : num;
+    const getValFromKeys = (keys: string[]): number | null => {
+      for (const key of keys) {
+        const raw = tempProduct.properties?.[key]?.value;
+        if (raw !== undefined && raw !== null) {
+          const num = typeof raw === 'number' ? raw : parseFloat(String(raw));
+          if (!isNaN(num)) return num;
+        }
+      }
+      return null;
+    };
+
+    let val: number | null = null;
+    if (k === 'density') {
+      val = getValFromKeys(['密度', 'density', 'Density']);
+    } else if (k === 'mfr') {
+      val = getValFromKeys(['熔体质量流动速率', 'mfr', 'MFR']);
+    } else if (k === 'tensileYield') {
+      val = getValFromKeys(['拉伸屈服应力', '拉伸断裂应力', 'tensileYield', 'tensile', 'Tensile Strength']);
+    } else if (k === 'flexuralModulus') {
+      val = getValFromKeys(['弯曲模量', 'flexuralModulus', '弯曲弹性模量', 'Flexural Modulus']);
+    } else if (k === 'izodImpact') {
+      val = getValFromKeys(['简支梁缺口冲击强度', '悬臂梁缺口冲击强度', 'izodImpact', '冲击强度', 'Izod Impact']);
+    } else {
+      val = getValFromKeys([k]);
+    }
+    
+    return val !== null ? val : 0;
   };
 
-  const dens = getValue('density') || 0.95;
+  const dens = Math.max(0, getValue('density') || 0.95);
   const mfrVal = getValue('mfr') || 2.0;
   const tensileVal = getValue('tensileYield') || 25.0;
   const flexVal = getValue('flexuralModulus') || 1200.0;
@@ -400,16 +424,18 @@ export const DependencyHeatmap: React.FC<DependencyHeatmapProps> = ({
         <div className="flex flex-wrap items-center gap-3">
           {/* Reference Product Dropdown */}
           <div className="relative">
-            <button
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setShowProductDropdown(!showProductDropdown)}
-              className="px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2 h-9 outline-none focus:ring-2 focus:ring-primary-500/20 active:scale-95 transition-all shadow-sm"
+              className="px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-2 h-9 outline-none focus:ring-2 focus:ring-primary-500/20 active:scale-95 transition-all shadow-sm cursor-pointer"
             >
               <Beaker size={12} className="text-indigo-500" />
               <span className="max-w-[120px] truncate">
                 {referenceProduct ? `${referenceProduct.gradeName}` : t('未选产品', 'No reference')}
               </span>
               <ChevronsUpDown size={12} className="text-slate-400" />
-            </button>
+            </motion.button>
 
             <AnimatePresence>
               {showProductDropdown && (
@@ -434,13 +460,15 @@ export const DependencyHeatmap: React.FC<DependencyHeatmapProps> = ({
                       {filteredProducts.map((p) => {
                         const idx = allProducts.findIndex(ap => ap.id === p.id);
                         return (
-                          <button
+                          <motion.button
+                            whileHover={{ x: 3, backgroundColor: 'rgba(99, 102, 241, 0.05)' }}
+                            whileTap={{ scale: 0.99 }}
                             key={p.id}
                             onClick={() => {
                               setSelectedProductIndex(idx);
                               setShowProductDropdown(false);
                             }}
-                            className={`w-full text-left p-2.5 text-[11px] font-bold border-b border-slate-50 dark:border-slate-900/10 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors ${
+                            className={`w-full text-left p-2.5 text-[11px] font-bold border-b border-slate-50 dark:border-slate-900/10 transition-colors cursor-pointer ${
                               idx === selectedProductIndex ? 'bg-primary-50/30 text-primary-600 dark:text-primary-400' : 'text-slate-700 dark:text-slate-300'
                             }`}
                           >
@@ -450,7 +478,7 @@ export const DependencyHeatmap: React.FC<DependencyHeatmapProps> = ({
                                 {p.manufacturer}
                               </span>
                             </div>
-                          </button>
+                          </motion.button>
                         );
                       })}
                     </div>
@@ -608,12 +636,14 @@ export const DependencyHeatmap: React.FC<DependencyHeatmapProps> = ({
                     <span className="px-2 py-0.5 bg-primary-100 dark:bg-primary-950/40 border border-primary-200 text-primary-700 dark:text-primary-400 rounded-md text-[9px] font-black uppercase tracking-wide">
                       {t('材料机理分析', 'SPECTRUM ANALYSIS')}
                     </span>
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.05, color: '#4f46e5' }}
+                      whileTap={{ scale: 0.95 }}
                       onClick={() => setSelectedCell(null)}
-                      className="text-[10px] text-slate-400 hover:text-slate-600 uppercase font-black tracking-tight"
+                      className="text-[10px] text-slate-400 hover:text-slate-650 dark:hover:text-slate-200 uppercase font-black tracking-tight cursor-pointer"
                     >
                       Reset
-                    </button>
+                    </motion.button>
                   </div>
 
                   {/* Relationship definition banner */}

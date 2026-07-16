@@ -266,7 +266,7 @@ export const ChemicalSimilaritySearch: React.FC<ChemicalSimilaritySearchProps> =
 
         {/* Algorithm Settings Selector */}
         <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950 p-1.5 rounded-xl border border-slate-200/40 dark:border-slate-800">
-          <button
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
             onClick={() => setMetric('cosine')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               metric === 'cosine'
@@ -275,8 +275,8 @@ export const ChemicalSimilaritySearch: React.FC<ChemicalSimilaritySearchProps> =
             }`}
           >
             {translate('余弦相似度', 'Cosine Sim')}
-          </button>
-          <button
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
             onClick={() => setMetric('euclidean')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               metric === 'euclidean'
@@ -285,7 +285,7 @@ export const ChemicalSimilaritySearch: React.FC<ChemicalSimilaritySearchProps> =
             }`}
           >
             {translate('欧氏距离', 'Euclidean Dist')}
-          </button>
+          </motion.button>
         </div>
       </div>
 
@@ -373,7 +373,7 @@ export const ChemicalSimilaritySearch: React.FC<ChemicalSimilaritySearchProps> =
                 <SlidersHorizontal size={13} />
                 {translate('2. 配方向量特征与比重 (Weights)', '2. Select Vector Weights')}
               </label>
-              <button
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 onClick={() => {
                   const resetFeatures: Record<string, boolean> = {};
                   const resetWeights: Record<string, number> = {};
@@ -387,7 +387,7 @@ export const ChemicalSimilaritySearch: React.FC<ChemicalSimilaritySearchProps> =
                 className="text-[10px] font-black text-primary-600 dark:text-primary-400 uppercase tracking-tight flex items-center gap-1 hover:underline"
               >
                 <RefreshCw size={10} /> Reset
-              </button>
+              </motion.button>
             </div>
 
             <div className="space-y-3 pt-2 max-h-72 overflow-y-auto pr-1 py-1 custom-scrollbar">
@@ -505,13 +505,13 @@ export const ChemicalSimilaritySearch: React.FC<ChemicalSimilaritySearchProps> =
                           </div>
 
                           {onViewProduct && (
-                            <button
+                            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                               onClick={() => onViewProduct(result.product)}
                               title="Compare details and specifications"
                               className="p-2 bg-slate-100 dark:bg-slate-850 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 rounded-xl transition-all active:scale-95 border border-slate-200/20"
                             >
                               <ArrowUpRight size={14} />
-                            </button>
+                            </motion.button>
                           )}
                         </div>
                       </div>

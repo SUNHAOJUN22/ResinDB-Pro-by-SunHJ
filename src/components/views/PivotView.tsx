@@ -156,7 +156,9 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
             </label>
             <div className="space-y-2">
               {availableCols.map(col => (
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
                   key={col.key}
                   onClick={() => {
                     setRowGroups(prev => 
@@ -175,7 +177,7 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
                       {rowGroups.indexOf(col.key) + 1}
                     </span>
                   )}
-                </button>
+                </motion.button>
               ))}
             </div>
           </div>
@@ -199,7 +201,9 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
             </select>
             <div className="space-y-2 pt-2">
               {numericCols.map(col => (
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
                   key={col.key}
                   onClick={() => {
                     setValueMetrics(prev => 
@@ -213,7 +217,7 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
                   }`}
                 >
                   {tProp(col.label)}
-                </button>
+                </motion.button>
               ))}
             </div>
           </div>
@@ -236,18 +240,22 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
           </div>
           
           <div className="flex bg-white dark:bg-slate-900 rounded-2xl p-1 border border-slate-200 dark:border-slate-800 shadow-sm">
-            <button 
+            <motion.button 
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => setViewMode("table")}
               className={`px-4 py-2 ${viewMode === "table" ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"} rounded-xl text-sm font-bold flex items-center gap-2 transition-all`}
             >
               <TableIcon size={16} /> {t("table")}
-            </button>
-            <button 
+            </motion.button>
+            <motion.button 
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => setViewMode("chart")}
               className={`px-4 py-2 ${viewMode === "chart" ? "bg-primary-500 text-white shadow-lg shadow-primary-500/20" : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"} rounded-xl text-sm font-bold flex items-center gap-2 transition-all`}
             >
               <BarChart3 size={16} /> {t("chart")}
-            </button>
+            </motion.button>
           </div>
         </div>
 
@@ -365,12 +373,14 @@ const PivotRows: React.FC<{
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center gap-2" style={{ paddingLeft: row._level * 24 }}>
                   {hasChildren ? (
-                    <button 
+                    <motion.button 
+                      whileHover={{ scale: 1.15 }}
+                      whileTap={{ scale: 0.85 }}
                       onClick={() => toggleExpand(currentPath)}
                       className="p-1 text-slate-400 hover:text-primary-500 transition-colors"
                     >
                       {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    </button>
+                    </motion.button>
                   ) : (
                     <div className="w-5" />
                   )}

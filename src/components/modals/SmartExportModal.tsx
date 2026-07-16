@@ -98,12 +98,12 @@ export const SmartExportModal: React.FC<SmartExportModalProps> = ({
                 </p>
               </div>
             </div>
-            <button
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={onClose}
               className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
             >
               <X size={20} />
-            </button>
+            </motion.button>
           </div>
 
           <div className="p-6 overflow-y-auto space-y-6 flex-1">
@@ -147,7 +147,7 @@ export const SmartExportModal: React.FC<SmartExportModalProps> = ({
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                   {t('selectExportColumns')}
                 </h3>
-                <button 
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                   onClick={handleToggleAll}
                   className="text-xs flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors"
                 >
@@ -161,7 +161,7 @@ export const SmartExportModal: React.FC<SmartExportModalProps> = ({
                     <Square size={14} />
                   )}
                   {t('selectAllNone')}
-                </button>
+                </motion.button>
               </div>
 
               <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg border border-slate-200 dark:border-slate-800 max-h-[250px] overflow-y-auto">
@@ -209,20 +209,20 @@ export const SmartExportModal: React.FC<SmartExportModalProps> = ({
           </div>
 
           <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex justify-end gap-3 flex-shrink-0">
-            <button
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
             >
               {t('cancel')}
-            </button>
-            <button
+            </motion.button>
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={onExportSubmit}
               disabled={selectedColumns.length === 0 && exportFormat !== 'pdf'}
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Download size={16} />
               {t('startExport')}
-            </button>
+            </motion.button>
           </div>
         </motion.div>
       </div>
@@ -242,7 +242,7 @@ const FormatCard = ({
   onClick: () => void 
 }) => {
   return (
-    <button
+    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
       onClick={onClick}
       className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${
         selected 
@@ -254,6 +254,6 @@ const FormatCard = ({
         {icon}
       </div>
       <span className="text-sm font-medium">{title}</span>
-    </button>
+    </motion.button>
   );
 };

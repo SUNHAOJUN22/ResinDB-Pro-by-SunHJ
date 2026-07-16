@@ -726,7 +726,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
     }, [currentChartData, filteredData]);
 
     const activeInsight = useMemo(() => {
-      const insight = materialEngine.generateExpertInsight(activeChart);
+      const insight = materialEngine.generateExpertInsight(activeChart, language);
       
       const chartData = currentChartData as { series?: { name: string; data: [number, number][] }[] };
       
@@ -753,83 +753,44 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
             const spearman = materialEngine.calculateSpearman(allPoints);
             const integrity = materialEngine.analyzeDatalineIntegrity(allPoints, corr.slope, corr.intercept);
             
-            if (language === 'en') {
-              insight.content += `\n\n[Advanced Mathematical Statistics Report]`;
-              insight.content += `\n- Linear Correlation (Pearson r): ${pearson.toFixed(4)}`;
-              insight.content += `\n- Monotonic Correlation (Spearman ρ): ${spearman.toFixed(4)}`;
-              insight.content += `\n- Statistical Significance (P-Value): ${pValue < 0.001 ? "< 0.001" : pValue.toFixed(4)}`;
-              insight.content += `\n- Goodness of Fit (R²): ${(corr.r2 * 100).toFixed(1)}%`;
-              
-              if (pValue < 0.05) {
-                const relType = Math.abs(pearson - spearman) > 0.2 ? "Non-linear Monotonic" : "Highly Linear";
-                insight.content += `\n- Physical Logic: There is a ${relType} positive correlation`;
-              } else {
-                insight.content += `\n- Strength of Conclusion: Statistically insignificant (data may be dominated by experimental error)`;
-              }
-
-              if (ci) {
-                insight.content += `\n- Slope 95% Confidence Interval: [${ci.lower.toFixed(2)}, ${ci.upper.toFixed(2)}]`;
-              }
-
-              if (integrity.healthScore < 80) {
-                insight.content += `\n- ⚠️ Robustness Notice: Model is dominated by ${integrity.influentialPointsCount} high-leverage feature points, limiting confidence.`;
-              }
-              
-              // Robust Outlier Detection
-              const xValues = allPoints.map(p => p[0]);
-              const iqrOutliers = materialEngine.findOutliersIQR(xValues);
-              if (iqrOutliers.length > 0) {
-                insight.content += `\n- Outlier Screening: Detected ${iqrOutliers.length} experimental outlier(s) flagged via IQR.`;
-              }
-
-              // Enhanced Distribution Analysis
-              const stats = materialEngine.getStats(xValues);
-              if (stats) {
-                const momentsX = materialEngine.calculateDistributionMoments(xValues);
-                const isNormal = Math.abs(momentsX?.skewness || 0) < 0.5;
-                insight.content += `\n- Sample Normality: ${isNormal ? "Conforms to Normal Distribution" : "Presents Skewed Distribution"}${!isNormal ? ` (SK: ${momentsX?.skewness.toFixed(2)})` : ""}`;
-              }
-
-              insight.content += `\n- Decision Suggestion: ${pearson > 0.7 && pValue < 0.05 ? "The model possesses high physical predictive capability and can be directly used for backing out formulations." : "Weak mathematical correlation, recommended to exclude disturbances or increase sample size."}`;
+            insight.content += `\n\n[${t("regressionReportTitle")}]`;
+            insight.content += `\n- ${t("linearCorrelation")}: ${pearson.toFixed(4)}`;
+            insight.content += `\n- ${t("monotonicCorrelation")}: ${spearman.toFixed(4)}`;
+            insight.content += `\n- ${t("statSignificance")}: ${pValue < 0.001 ? "< 0.001" : pValue.toFixed(4)}`;
+            insight.content += `\n- ${t("goodnessOfFit")}: ${(corr.r2 * 100).toFixed(1)}%`;
+            
+            if (pValue < 0.05) {
+              const relType = Math.abs(pearson - spearman) > 0.2 ? t("nonlinearMonotonic") : t("highlyLinear");
+              insight.content += `\n- ${t("physicalLogic")}: ${t("positiveCorrelation").replace("{type}", relType)}`;
             } else {
-              insight.content += `\n\n[高阶数理统计报告]`;
-              insight.content += `\n- 线性关联 (Pearson r): ${pearson.toFixed(4)}`;
-              insight.content += `\n- 单调关联 (Spearman ρ): ${spearman.toFixed(4)}`;
-              insight.content += `\n- 统计显著性 (P-Value): ${pValue < 0.001 ? "< 0.001" : pValue.toFixed(4)}`;
-              insight.content += `\n- 拟合置信度 (R²): ${(corr.r2 * 100).toFixed(1)}%`;
-              
-              if (pValue < 0.05) {
-                const relType = Math.abs(pearson - spearman) > 0.2 ? "非线性单调" : "高度线性";
-                insight.content += `\n- 物理逻辑判定: 存在${relType}正相关`;
-              } else {
-                insight.content += `\n- 结论强度: 统计不显著 (数据可能受实验误差主导)`;
-              }
-
-              if (ci) {
-                insight.content += `\n- 斜率置信区间 (95%): [${ci.lower.toFixed(2)}, ${ci.upper.toFixed(2)}]`;
-              }
-
-              if (integrity.healthScore < 80) {
-                insight.content += `\n- ⚠️ 稳健性提示: 模型受 ${integrity.influentialPointsCount} 个高槓杆特征点主导，置信度受限。`;
-              }
-              
-              // Robust Outlier Detection
-              const xValues = allPoints.map(p => p[0]);
-              const iqrOutliers = materialEngine.findOutliersIQR(xValues);
-              if (iqrOutliers.length > 0) {
-                insight.content += `\n- 离群值排查: 检测到 ${iqrOutliers.length} 个实验偏离点，已通过 IQR 算法标记。`;
-              }
-
-              // Enhanced Distribution Analysis
-              const stats = materialEngine.getStats(xValues);
-              if (stats) {
-                const momentsX = materialEngine.calculateDistributionMoments(xValues);
-                const isNormal = Math.abs(momentsX?.skewness || 0) < 0.5;
-                insight.content += `\n- 样本数理性: ${isNormal ? "符合正态分布" : "呈现偏态分布"}${!isNormal ? ` (SK: ${momentsX?.skewness.toFixed(2)})` : ""}`;
-              }
-
-              insight.content += `\n- 决策建议: ${pearson > 0.7 && pValue < 0.05 ? "模型具备高度物理预测力，可直接用于牌号配方反推。" : "数理关联一般，建议排除干扰项或增加样本量。"}`;
+              insight.content += `\n- ${t("conclusionStrength")}: ${t("decisionInsignificant")}`;
             }
+
+            if (ci) {
+              insight.content += `\n- ${t("slopeConfidenceInterval")}: [${ci.lower.toFixed(2)}, ${ci.upper.toFixed(2)}]`;
+            }
+
+            if (integrity.healthScore < 80) {
+              insight.content += `\n- ${t("robustnessNoticeText").replace("{count}", String(integrity.influentialPointsCount))}`;
+            }
+            
+            // Robust Outlier Detection
+            const xValues = allPoints.map(p => p[0]);
+            const iqrOutliers = materialEngine.findOutliersIQR(xValues);
+            if (iqrOutliers.length > 0) {
+              insight.content += `\n- ${t("outlierScreeningText").replace("{count}", String(iqrOutliers.length))}`;
+            }
+
+            // Enhanced Distribution Analysis
+            const stats = materialEngine.getStats(xValues);
+            if (stats) {
+              const momentsX = materialEngine.calculateDistributionMoments(xValues);
+              const isNormal = Math.abs(momentsX?.skewness || 0) < 0.5;
+              const distType = isNormal ? t("normalDistribution") : t("skewedDistribution");
+              insight.content += `\n- ${t("sampleNormality")}: ${distType}${!isNormal && momentsX ? ` (SK: ${momentsX.skewness.toFixed(2)})` : ""}`;
+            }
+
+            insight.content += `\n- ${t("decisionSuggestion")}: ${pearson > 0.7 && pValue < 0.05 ? t("decisionPredictive") : t("decisionWeak")}`;
           }
         }
       }
@@ -838,28 +799,18 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
       const chartObj = currentChartData as { series?: { name: string; value: number[] }[] };
       if (activeChart === 'radar' && chartObj?.series) {
         const series = chartObj.series;
-        if (language === 'en') {
-          insight.content += `\n\n[Material Performance Balance Evaluation]`;
-          series.forEach((s) => {
-            if (Array.isArray(s.value)) {
-              const pi = materialEngine.calculatePerformanceIndex(s.value);
-              const typeLabel = pi > 80 ? "(All-rounder)" : pi > 50 ? "(Balanced)" : "(Specialized)";
-              insight.content += `\n- ${s.name}: Balance Score ${pi.toFixed(1)} ${typeLabel}`;
-            }
-          });
-        } else {
-          insight.content += `\n\n[材料性能均衡性评价]`;
-          series.forEach((s) => {
-            if (Array.isArray(s.value)) {
-              const pi = materialEngine.calculatePerformanceIndex(s.value);
-              insight.content += `\n- ${s.name}: 均衡分 ${pi.toFixed(1)} ${pi > 80 ? "(全能型)" : pi > 50 ? "(平衡型)" : "(专业/偏科型)"}`;
-            }
-          });
-        }
+        insight.content += `\n\n[${t("materialPerfBalance")}]`;
+        series.forEach((s) => {
+          if (Array.isArray(s.value)) {
+            const pi = materialEngine.calculatePerformanceIndex(s.value);
+            const typeLabel = pi > 80 ? t("allRounder") : pi > 50 ? t("balanced") : t("specialized");
+            insight.content += `\n- ${s.name}: ${t("balanceScore")} ${pi.toFixed(1)} (${typeLabel})`;
+          }
+        });
       }
       
       return insight;
-    }, [activeChart, currentChartData, language]);
+    }, [activeChart, currentChartData, language, t]);
 
     return (
       <div className="flex flex-col lg:flex-row h-full gap-4 overflow-y-auto lg:overflow-hidden custom-scrollbar">
@@ -1062,7 +1013,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                     {language === "en" ? "Axis Mapping" : "轴映射 (Axes)"}
                   </div>
                   <div className="space-y-4">
-                    <button
+                    <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => {
                            setScatterXKey("PC1");
                            setScatterYKey("PC2");
@@ -1070,8 +1023,10 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                         className="w-full py-2 bg-purple-500 text-white rounded font-bold text-xs hover:bg-purple-600 transition-colors"
                     >
                        🔮 Auto PCA Projection
-                    </button>
-                    <button
+                    </motion.button>
+                    <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => {
                            if (Object.keys(clusters).length > 0) {
                               computeKMeans([], []);
@@ -1095,7 +1050,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                         }`}
                     >
                        🤖 {isComputingKMeans ? (language === "en" ? "Computing..." : "计算中...") : Object.keys(clusters).length > 0 ? (language === "en" ? "Clear Clusters" : "清除聚类") : (language === "en" ? "K-Means Auto Grouping" : "K-Means 自动聚类分组")}
-                    </button>
+                    </motion.button>
                     <div>
                       <label className="text-xs font-bold text-slate-500 block mb-2">{language === "en" ? "X Axis" : "X 轴映射"}</label>
                       <select 
@@ -1263,7 +1218,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                             <label className="text-xs font-bold text-slate-500 block mb-1">Dimensions ({similarityFeatures.length} selected)</label>
                             <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto custom-scrollbar p-1 border border-slate-200 dark:border-slate-700 rounded-lg">
                                 {numericProperties.map(prop => (
-                                    <button 
+                                    <motion.button 
+                                       whileHover={{ scale: 1.05 }}
+                                       whileTap={{ scale: 0.95 }}
                                        key={prop}
                                        onClick={() => setSimilarityFeatures(prev => prev.includes(prop) ? prev.filter(f => f !== prop) : [...prev, prop])}
                                        className={`px-2 py-1 text-[10px] uppercase font-bold rounded-md transition-colors ${
@@ -1271,7 +1228,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                        }`}
                                     >
                                        {tProp(prop)}
-                                    </button>
+                                    </motion.button>
                                 ))}
                             </div>
                          </div>
@@ -1325,7 +1282,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     {numericProperties.map(key => <option key={key} value={key}>{key}</option>)}
                                 </select>
                             </div>
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => {
                                     if (rsmX1Key && rsmX2Key && rsmYKey && rsmX1Key !== rsmX2Key) {
                                         const rsmData = filteredData.map(p => ({
@@ -1346,7 +1305,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 className="w-full py-2 bg-indigo-500 text-white rounded font-bold text-xs hover:bg-indigo-600 transition-colors disabled:opacity-50"
                             >
                                 {isCalculatingRsm ? (language === "en" ? 'Fitting...' : '拟合中...') : (language === "en" ? 'Start RSM Fitting Calculation 🚀' : '开始 RSM 拟合计算 🚀')}
-                            </button>
+                            </motion.button>
                         </div>
                     </div>
                 </div>
@@ -1371,7 +1330,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     {numericProperties.map(key => <option key={key} value={key}>{key}</option>)}
                                 </select>
                             </div>
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => {
                                     if (fiTargetKey) {
                                         const featureNames = numericProperties.filter(k => k !== fiTargetKey);
@@ -1392,7 +1353,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 className="w-full py-2 bg-rose-500 text-white rounded font-bold text-xs hover:bg-rose-600 transition-colors disabled:opacity-50"
                             >
                                 {isCalculatingFI ? (language === "en" ? 'Calculating...' : '计算中...') : (language === "en" ? 'Run Feature Sensitivity Analysis' : '运行特征敏感度分析')}
-                            </button>
+                            </motion.button>
                         </div>
                     </div>
                 </div>
@@ -1431,7 +1392,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     {numericProperties.map(key => <option key={key} value={key}>{key}</option>)}
                                 </select>
                             </div>
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => {
                                     if (kdeXKey && kdeYKey) {
                                         const pts = filteredData.map(p => ({
@@ -1450,7 +1413,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 className="w-full py-2 bg-orange-500 text-white rounded font-bold text-xs hover:bg-orange-600 transition-colors disabled:opacity-50"
                             >
                                 {isCalculatingKDE ? (language === "en" ? 'Calculating Kernel Convolution...' : '核卷积计算中...') : (language === "en" ? 'Generate Topological Density Map' : '生成拓扑等高密度映射')}
-                            </button>
+                            </motion.button>
                         </div>
                     </div>
                 </div>
@@ -1478,7 +1441,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     {numericProperties.map(key => <option key={key} value={key}>{key}</option>)}
                                 </select>
                             </div>
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => {
                                     if (weibullKey) {
                                         const values = filteredData.map(p => getVal(p, weibullKey)).filter(v => !isNaN(v) && v > 0);
@@ -1493,7 +1458,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 className="w-full py-2 bg-cyan-500 text-white rounded font-bold text-xs hover:bg-cyan-600 transition-colors disabled:opacity-50"
                             >
                                 {isCalculatingWeibull ? (language === "en" ? 'Empirical CDF Fitting...' : '经验分布函数拟合中...') : (language === "en" ? 'Generate Weibull Log-Log Plot' : '生成 Weibull 双对数图')}
-                            </button>
+                            </motion.button>
                         </div>
                     </div>
                 </div>
@@ -1522,7 +1487,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     )) : <option value="210">210 °C</option>}
                                 </select>
                             </div>
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => {
                                     if (filteredData.length !== 1) {
                                         alert(language === "en" 
@@ -1557,7 +1524,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 {isCalculatingWLF 
                                   ? (language === "en" ? 'Combining shift factors...' : '平移因子叠合计算中...') 
                                   : (language === "en" ? 'Generate Multi-Scale Master Curve' : '叠合 TTS 全尺度主曲线')}
-                            </button>
+                            </motion.button>
                         </div>
                     </div>
                 </div>
@@ -1592,7 +1559,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     {numericProperties.map(key => <option key={key} value={key}>{key}</option>)}
                                 </select>
                             </div>
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => {
                                     if (copulaXKey && copulaYKey) {
                                         const pts = filteredData.map(p => ({
@@ -1614,7 +1583,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 className="w-full py-2 bg-fuchsia-500 text-white rounded font-bold text-xs hover:bg-fuchsia-600 transition-colors disabled:opacity-50"
                             >
                                 {isCalculatingCopula ? (language === "en" ? 'Likelihood estimating...' : '似然估计中...') : (language === "en" ? 'Generate Copula Density' : '生成 Copula 概率密度')}
-                            </button>
+                            </motion.button>
                         </div>
                     </div>
                 </div>
@@ -1633,7 +1602,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 <p className="text-[10px] text-orange-800 dark:text-orange-400 mb-2 font-bold leading-tight">
                                   {language === "en" ? "Click 'Extract' to automatically read from temperature-specific attributes of the selected product, or enter manually." : "可以点击“提取”从当前选中牌号的名字带温度的属性中自动提取，或手动输入。"}
                                 </p>
-                                <button 
+                                <motion.button
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
                                     onClick={() => {
                                         if(filteredData.length !== 1) return alert(language === "en" ? "Please filter down to exactly 1 product first!" : "请在左侧筛选面板中只保留1款牌号数据！");
                                         const p = filteredData[0];
@@ -1653,7 +1624,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     className="w-full bg-white dark:bg-slate-800 border border-orange-200 dark:border-orange-700 text-orange-600 dark:text-orange-400 text-[10px] py-1 rounded hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors"
                                 >
                                   {language === "en" ? "Smart Extract from Attributes" : "从产品属性智能提取"}
-                                </button>
+                                </motion.button>
                             </div>
 
                             <div className="space-y-2">
@@ -1684,31 +1655,37 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                             }}
                                             className="col-span-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs px-1 py-1 rounded text-center outline-none" 
                                         />
-                                        <button 
+                                        <motion.button
+                                            whileHover={{ scale: 1.1 }}
+                                            whileTap={{ scale: 0.9 }}
                                             onClick={() => setArrheniusPoints(arrheniusPoints.filter(p => p.id !== pt.id))}
                                             className="col-span-2 text-slate-400 hover:text-rose-500"
-                                        >×</button>
+                                        >×</motion.button>
                                     </div>
                                 ))}
                             </div>
                             
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => setArrheniusPoints([...arrheniusPoints, {id: Date.now(), temp: 100, time: 1000}])}
                                 className="w-full border border-dashed border-slate-300 dark:border-slate-600 text-slate-500 text-xs py-1.5 rounded hover:bg-slate-50 dark:hover:bg-slate-800"
                             >
                               {language === "en" ? "+ Add Test Point" : "+ 添加测试点"}
-                            </button>
+                            </motion.button>
 
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => {
-                                    if(arrheniusPoints.length >= 2) calculateArrhenius(arrheniusPoints.map(p => ({tempC: p.temp, time: p.time})));
+                                    if (arrheniusPoints.length >= 2) calculateArrhenius(arrheniusPoints.map(p => ({tempC: p.temp, time: p.time})));
                                     else alert(language === "en" ? "Arrhenius analysis requires at least 2 data points for curve fitting." : "阿伦尼乌斯需要至少 2 个实验数据点进行拟合运算。");
                                 }}
                                 disabled={isCalculatingArrhenius}
                                 className="w-full py-2 bg-orange-600 text-white rounded font-bold text-xs hover:bg-orange-700 transition-colors disabled:opacity-50 mt-2 block"
                             >
                                 {isCalculatingArrhenius ? (language === "en" ? 'Extrapolating...' : '拟合中...') : (language === "en" ? 'Run Lifetime Decay Model' : '启动寿命衰退模型')}
-                            </button>
+                            </motion.button>
                         </div>
                     </div>
                 </div>
@@ -1790,7 +1767,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 </div>
                             </div>
 
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => {
                                     if(!sobolTargetFormulaId) return alert(language === "en" ? "Please select target formula" : "请选择目标公式");
                                     if(filteredData.length !== 1) return alert(language === "en" ? "Please keep exactly 1 baseline grade in data table for perturbation!" : "请在右侧数据表中仅保留 1 款基准牌号进行方差扰动（可以通过搜索或筛选）！");
@@ -1802,7 +1781,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 className="w-full py-2 bg-indigo-600 text-white rounded font-bold text-xs hover:bg-indigo-700 transition-colors disabled:opacity-50 mt-2 block"
                             >
                                 {isCalculatingSobol ? (language === "en" ? "Monte Carlo Calculating..." : "蒙特卡洛计算中...") : (language === "en" ? "Run Variance Decomposition" : "运行方差分解")}
-                            </button>
+                            </motion.button>
                         </div>
                     </div>
                 </div>
@@ -1860,7 +1839,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 </div>
                             </div>
                             
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => {
                                     if(!spcTargetKey) return alert(language === "en" ? "Please specify monitoring property" : "请指定监控特征");
                                     if(spcUSL === "" || spcLSL === "" || Number(spcUSL) <= Number(spcLSL)) {
@@ -1874,7 +1855,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 className="w-full py-2 bg-emerald-600 text-white rounded font-bold text-xs hover:bg-emerald-700 transition-colors disabled:opacity-50 mt-2 block"
                             >
                                 {isCalculatingSpc ? (language === "en" ? 'Processing samples...' : '样本流处理中...') : (language === "en" ? 'Generate SPC Statistical Report' : '生成 SPC 统计报告')}
-                            </button>
+                            </motion.button>
                         </div>
                     </div>
                 </div>
@@ -1933,18 +1914,24 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                             <div className="flex items-center justify-between border border-slate-200 dark:border-slate-700 rounded p-2 bg-slate-50 dark:bg-slate-800/50">
                                 <span className="text-[10px] uppercase font-bold text-slate-500">{language === "en" ? "Direction" : "优化方向"}</span>
                                 <div className="flex gap-2 text-xs font-bold">
-                                    <button 
+                                    <motion.button 
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
                                         onClick={() => setBayesMaximize(true)}
                                         className={`px-3 py-1 rounded ${bayesMaximize ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/50 dark:text-pink-400' : 'text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
-                                    >{language === "en" ? "Maximize" : "最大化"}</button>
-                                    <button 
+                                    >{language === "en" ? "Maximize" : "最大化"}</motion.button>
+                                    <motion.button 
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
                                         onClick={() => setBayesMaximize(false)}
                                         className={`px-3 py-1 rounded ${!bayesMaximize ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-400' : 'text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
-                                    >{language === "en" ? "Minimize" : "最小化"}</button>
+                                    >{language === "en" ? "Minimize" : "最小化"}</motion.button>
                                 </div>
                             </div>
                             
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => {
                                     if(bayesFeatures.length === 0) return alert(language === "en" ? "Please select at least one independent design variable (X)" : "请至少选择一个设计自变量(X)");
                                     if(!bayesTarget) return alert(language === "en" ? "Please specify optimization target (y)" : "请指定优化目标(y)");
@@ -1971,7 +1958,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 className="w-full py-2 bg-pink-600 text-white rounded font-bold text-xs hover:bg-pink-700 transition-colors disabled:opacity-50 mt-2 block"
                             >
                                 {isCalculatingBayes ? (language === "en" ? "GP modeling & searching..." : "构建高斯过程并搜索中...") : (language === "en" ? "Recommend Next Formulation" : "逆向推荐下一组材料配方")}
-                            </button>
+                            </motion.button>
                         </div>
                     </div>
                 </div>
@@ -2032,7 +2019,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                                 <option value="" disabled>{language === "en" ? "Select feature..." : "选择特征..."}</option>
                                                 {numericProperties.map(k => <option key={k} value={k}>{k}</option>)}
                                             </select>
-                                            <button 
+                                            <motion.button 
+                                                whileHover={{ scale: 1.05 }}
+                                                whileTap={{ scale: 0.95 }}
                                                 onClick={() => {
                                                     const nw = [...mooTargets];
                                                     nw[idx].maximize = !nw[idx].maximize;
@@ -2041,20 +2030,24 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                                 className={`w-16 text-[10px] py-1 rounded font-bold ${t.maximize ? 'bg-pink-100 text-pink-700 dark:bg-pink-900/50 dark:text-pink-400' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-400'}`}
                                             >
                                                 {t.maximize ? (language === "en" ? "Maximize" : "最大化") : (language === "en" ? "Minimize" : "最小化")}
-                                            </button>
-                                            <button 
+                                            </motion.button>
+                                            <motion.button 
+                                                whileHover={{ scale: 1.1 }}
+                                                whileTap={{ scale: 0.9 }}
                                                 onClick={() => {
                                                     setMooTargets(mooTargets.filter((_, i) => i !== idx));
                                                 }}
                                                 className="text-slate-400 hover:text-red-500 w-4 pl-1"
-                                            >×</button>
+                                            >×</motion.button>
                                         </div>
                                     ))}
                                     {mooTargets.length < 2 && (
-                                         <button 
+                                         <motion.button 
+                                            whileHover={{ scale: 1.02 }}
+                                            whileTap={{ scale: 0.98 }}
                                             onClick={() => setMooTargets([...mooTargets, { name: "", maximize: true }])}
                                             className="w-full py-1 border border-dashed border-orange-300 dark:border-orange-800 text-orange-600 dark:text-orange-400 text-xs rounded hover:bg-orange-50 dark:hover:bg-orange-900/30"
-                                         >{language === "en" ? "+ Add Sub-Target" : "+ 添加子目标"}</button>
+                                         >{language === "en" ? "+ Add Sub-Target" : "+ 添加子目标"}</motion.button>
                                     )}
                                     {mooTargets.length === 2 && (
                                          <div className="text-[10px] text-slate-400 text-center py-1">
@@ -2064,7 +2057,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 </div>
                             </div>
                             
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => {
                                     if(mooFeatures.length === 0) return alert(language === "en" ? "Please select at least one design variable (X)" : "请至少选择一个设计自变量(X)");
                                     if(mooTargets.length < 2) return alert(language === "en" ? "MOO Pareto optimization requires at least 2 target criteria!" : "MOO 帕累托优化至少需要 2 个目标成分！");
@@ -2095,7 +2090,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 className="w-full py-2 bg-orange-600 text-white rounded font-bold text-xs hover:bg-orange-700 transition-colors disabled:opacity-50 mt-2 block"
                             >
                                 {isCalculatingMoo ? (language === "en" ? "Constructing parallel GP models..." : "构建并行 GP 与寻找帕累托边界中...") : (language === "en" ? "Generate Pareto Frontier" : "生成多目标妥协前沿")}
-                            </button>
+                            </motion.button>
                         </div>
                     </div>
                 </div>
@@ -2140,18 +2135,24 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     {language === "en" ? "Detection Sensitivity (Alpha)" : "检测灵敏度 (α 水平)"}
                                 </span>
                                 <div className="flex gap-2 text-xs font-bold">
-                                    <button 
+                                    <motion.button 
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
                                         onClick={() => setMahalanobisAlpha(0.05)}
                                         className={`px-2 py-1 rounded ${mahalanobisAlpha === 0.05 ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-400' : 'text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
-                                    >0.05</button>
-                                    <button 
+                                    >0.05</motion.button>
+                                    <motion.button 
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
                                         onClick={() => setMahalanobisAlpha(0.01)}
                                         className={`px-2 py-1 rounded ${mahalanobisAlpha === 0.01 ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-400' : 'text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
-                                    >0.01</button>
+                                    >0.01</motion.button>
                                 </div>
                             </div>
                             
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => {
                                     if(mahalanobisFeatures.length < 2) return alert(language === "en" ? "Please select at least two features" : "请至少选择两个监控特征");
                                     const dataRecord: (Record<string, number> & { _id: string, name: string })[] = [];
@@ -2175,7 +2176,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 className="w-full py-2 bg-rose-600 text-white rounded font-bold text-xs hover:bg-rose-700 transition-colors disabled:opacity-50 mt-2 block"
                             >
                                 {isCalculatingMahalanobis ? (language === "en" ? "Calculating covariance matrix..." : "多维协方差阵算力接入中...") : (language === "en" ? "Generate Joint Anomaly Profile" : "生成特征联合异常排查图谱")}
-                            </button>
+                            </motion.button>
                         </div>
                     </div>
                 </div>
@@ -2222,19 +2223,23 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                                 }}
                                                 className="w-full text-xs font-mono px-1 py-1 tabular-nums border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900" 
                                             />
-                                            <button 
+                                            <motion.button 
+                                                whileHover={{ scale: 1.1 }}
+                                                whileTap={{ scale: 0.9 }}
                                                 onClick={() => {
                                                     const newData = kineticsData.filter((_, i) => i !== idx);
                                                     setKineticsData(newData);
                                                 }}
                                                 className="text-slate-400 hover:text-red-500"
-                                            ><X size={12}/></button>
+                                            ><X size={12}/></motion.button>
                                         </div>
                                     ))}
-                                    <button 
+                                    <motion.button 
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
                                         onClick={() => setKineticsData([...kineticsData, { beta: 0, tp: 0 }])}
                                         className="w-full py-1 border border-dashed border-teal-300 dark:border-teal-800 text-teal-600 dark:text-teal-400 text-xs rounded hover:bg-teal-50 dark:hover:bg-teal-900/30"
-                                    >{language === "en" ? "+ Add Point" : "+ 添加数据点"}</button>
+                                    >{language === "en" ? "+ Add Point" : "+ 添加数据点"}</motion.button>
                                 </div>
                             </div>
 
@@ -2250,7 +2255,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 />
                             </div>
 
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => {
                                     const validData = kineticsData.filter(d => d.beta > 0 && d.tp > 0);
                                     if(validData.length < 3) return alert(language === "en" ? "Kissinger kinetics fitting requires at least 3 valid DSC heating datasets!" : "Kissinger 模型拟合至少需要 3 组完整有效数据点！");
@@ -2260,7 +2267,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 className="w-full py-2 bg-teal-600 text-white rounded font-bold text-xs hover:bg-teal-700 transition-colors disabled:opacity-50 mt-2 block"
                             >
                                 {isCalculatingKinetics ? (language === "en" ? "Kinetics fitting center computing..." : "动力学特征拟合中心计算中...") : (language === "en" ? "OLS Fit & Isothermal Simulation" : "OLS 拟合与生成固化预测")}
-                            </button>
+                            </motion.button>
                         </div>
                     </div>
                 </div>
@@ -2318,19 +2325,23 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                                 }}
                                                 className="w-full text-xs font-mono px-1 py-1 tabular-nums border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900" 
                                             />
-                                            <button 
+                                            <motion.button 
+                                                whileHover={{ scale: 1.1 }}
+                                                whileTap={{ scale: 0.9 }}
                                                 onClick={() => {
                                                     const newData = pronyData.filter((_, i) => i !== idx);
                                                     setPronyData(newData);
                                                 }}
                                                 className="text-slate-400 hover:text-red-500"
-                                            ><X size={12}/></button>
+                                            ><X size={12}/></motion.button>
                                         </div>
                                     ))}
-                                    <button 
+                                    <motion.button 
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
                                         onClick={() => setPronyData([...pronyData, { omega: 0, storage: 0, loss: 0 }])}
                                         className="w-full py-1 border border-dashed border-purple-300 dark:border-purple-800 text-purple-600 dark:text-purple-400 text-xs rounded hover:bg-purple-50 dark:hover:bg-purple-900/30"
-                                    >{language === "en" ? "+ Add Observation" : "+ 添加观测点"}</button>
+                                    >{language === "en" ? "+ Add Observation" : "+ 添加观测点"}</motion.button>
                                 </div>
                             </div>
 
@@ -2350,7 +2361,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 </div>
                             </div>
 
-                            <button
+                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => {
                                     const validData = pronyData.filter(d => d.omega > 0 && d.storage > 0 && d.loss > 0);
                                     if(validData.length < Math.max(3, pronyTerms)) return alert(language === "en" ? "Insufficient observation points! Total observations must be >= target Prony term sizes." : "数据点不足！有效观测点数量必须 ≥ 模型阶数及其基础要求。");
@@ -2360,7 +2373,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 className="w-full py-2 bg-purple-600 text-white rounded font-bold text-xs hover:bg-purple-700 transition-colors disabled:opacity-50 mt-2 block"
                             >
                                 {isCalculatingProny ? (language === "en" ? "Solving with NNLS fitting..." : "非负约束最小二乘法拟合中...") : (language === "en" ? "Extract Prony Viscoelastic Coordinates" : "提取 Prony 级数参数")}
-                            </button>
+                            </motion.button>
                         </div>
                     </div>
                 </div>
@@ -3014,9 +3027,11 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                                 />
                                             </div>
                                             
-                                            <button 
-                                                onClick={() => {
-                                                    if (copulaThreshX !== "" && copulaThreshY !== "") {
+                                            <motion.button
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => {
+                                    if (copulaThreshX !== "" && copulaThreshY !== "") {
                                                         const p = getJointFailureProb(Number(copulaThreshX), Number(copulaThreshY));
                                                         setJointFailureProb(p);
                                                     }
@@ -3024,7 +3039,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                                 className="w-full bg-fuchsia-500 hover:bg-fuchsia-600 text-white font-bold text-[10px] uppercase tracking-wider py-1.5 rounded transition shadow-sm"
                                             >
                                                 {language === "en" ? "Compute Joint Probability ∫∫" : "计算联合概率积分 ∫∫"}
-                                            </button>
+                                            </motion.button>
                                         </div>
                                         
                                         {jointFailureProb !== null && (
@@ -3577,15 +3592,17 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     <div className="flex-1 bg-slate-900 rounded-xl p-4 flex flex-col border border-slate-700">
                                         <div className="flex justify-between items-center mb-2">
                                             <h4 className="font-black text-xs uppercase text-slate-400 tracking-wider">{language === "en" ? "Abaqus / Ansys Material Card" : "Abaqus / Ansys 材料仿真卡片预演"}</h4>
-                                            <button 
-                                                onClick={() => {
-                                                    navigator.clipboard.writeText(pronyResult.abaqusCard);
+                                            <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => {
+                                    navigator.clipboard.writeText(pronyResult.abaqusCard);
                                                     alert(language === "en" ? "Copied to clipboard" : "已复制到剪贴板");
                                                 }}
                                                 className="text-white hover:text-teal-400 text-xs px-3 py-1 bg-slate-800 rounded shadow border border-slate-600"
                                             >
                                                 复制卡片 / Copy Data
-                                            </button>
+                                            </motion.button>
                                         </div>
                                         <textarea 
                                             readOnly 

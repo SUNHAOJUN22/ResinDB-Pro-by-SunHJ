@@ -1,3 +1,4 @@
+import { motion } from 'motion/react';
 import React, { useEffect, useState, useMemo } from 'react';
 import { useDataQualityWorker } from '@/hooks/workers/useDataQualityWorker';
 import { Product } from '@/types/index';
@@ -90,12 +91,12 @@ export const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({ products
         <div>
           <h3 className="text-sm font-black text-rose-800 dark:text-rose-400 uppercase tracking-wider">Quality Monitor Error</h3>
           <p className="text-xs text-rose-600 dark:text-rose-450 mt-1">{error}</p>
-          <button 
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
             onClick={() => runQualityCheck(products, { zThreshold, iqrMultiplier })}
             className="mt-3 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all"
           >
             Retry Diagnostics
-          </button>
+          </motion.button>
         </div>
       </div>
     );
@@ -230,7 +231,7 @@ export const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({ products
 
       {/* 3. Section Tabs */}
       <div className="flex border-b border-slate-200 dark:border-slate-800">
-        <button
+        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
           onClick={() => { setActiveTab('outliers'); setSearchQuery(''); }}
           className={`px-5 py-3 text-xs font-black tracking-tight border-b-2 transition-all ${
             activeTab === 'outliers' 
@@ -239,8 +240,8 @@ export const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({ products
           }`}
         >
           🚨 FLAGGED OUTLIERS ({result?.totalOutliersCount})
-        </button>
-        <button
+        </motion.button>
+        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
           onClick={() => { setActiveTab('missing'); setSearchQuery(''); }}
           className={`px-5 py-3 text-xs font-black tracking-tight border-b-2 transition-all ${
             activeTab === 'missing' 
@@ -249,8 +250,8 @@ export const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({ products
           }`}
         >
           🔍 MISSING SPEC DIAGNOSTICS ({result?.missing?.length})
-        </button>
-        <button
+        </motion.button>
+        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
           onClick={() => { setActiveTab('stats'); setSearchQuery(''); }}
           className={`px-5 py-3 text-xs font-black tracking-tight border-b-2 transition-all ${
             activeTab === 'stats' 
@@ -259,7 +260,7 @@ export const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({ products
           }`}
         >
           🔬 MATRIX PROPERTY BOUNDS
-        </button>
+        </motion.button>
       </div>
 
       {/* Search and Filters panel */}

@@ -754,7 +754,7 @@ export const DatabaseSyncModal: React.FC<DatabaseSyncModalProps> = ({ isOpen, on
                         {t("fetchPropsBtn")}
                       </>
                     )}
-                  </button>
+                  </motion.button>
                 </div>
 
                 {/* Query Results outcome */}
@@ -808,10 +808,12 @@ export const DatabaseSyncModal: React.FC<DatabaseSyncModalProps> = ({ isOpen, on
                         </p>
                       </div>
 
-                      <button
+                      <motion.button
+                        whileHover={isSavingQuery ? {} : { scale: 1.02 }}
+                        whileTap={isSavingQuery ? {} : { scale: 0.98 }}
                         onClick={handleSaveToDB}
                         disabled={isSavingQuery}
-                        className="px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 shadow-md rounded-xl flex items-center gap-1.5 shrink-0 transition-all disabled:opacity-50"
+                        className="px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 shadow-md rounded-xl flex items-center gap-1.5 shrink-0 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                       >
                         {isSavingQuery ? (
                           <Loader2 size={12} className="animate-spin" />
@@ -819,7 +821,7 @@ export const DatabaseSyncModal: React.FC<DatabaseSyncModalProps> = ({ isOpen, on
                           <Plus size={14} />
                         )}
                         {t("saveCommitBtn")}
-                      </button>
+                      </motion.button>
                     </div>
                   </div>
                 ) : (
@@ -836,12 +838,14 @@ export const DatabaseSyncModal: React.FC<DatabaseSyncModalProps> = ({ isOpen, on
 
                 {/* Footer buttons */}
                 <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800 font-sans">
-                  <button
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={onClose}
-                    className="px-5 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-800 transition-colors"
+                    className="px-5 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-800 transition-colors cursor-pointer"
                   >
                     {t("close")}
-                  </button>
+                  </motion.button>
                 </div>
               </div>
             )}

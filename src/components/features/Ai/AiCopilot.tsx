@@ -1027,7 +1027,7 @@ The system marked the following anomalies and warnings based on composite benchm
 
             {/* Header Tabs */}
             <div className="flex border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-950/20 px-2 shrink-0">
-              <button
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 onClick={() => setActiveTab("chat")}
                 className={`flex-1 py-2.5 text-[10px] font-mono font-bold uppercase tracking-wider text-center border-b-2 transition-all cursor-pointer ${
                   activeTab === "chat"
@@ -1036,8 +1036,8 @@ The system marked the following anomalies and warnings based on composite benchm
                 }`}
               >
                 {t("aiCopilotChatTab")}
-              </button>
-              <button
+              </motion.button>
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 onClick={() => setActiveTab("mcp")}
                 className={`flex-1 py-2.5 text-[10px] font-mono font-bold uppercase tracking-wider text-center border-b-2 transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   activeTab === "mcp"
@@ -1047,7 +1047,7 @@ The system marked the following anomalies and warnings based on composite benchm
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${mcpConnected ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
                 {t("aiCopilotMcpTab")}
-              </button>
+              </motion.button>
             </div>
 
             {/* Main view logic based on Tab selection */}
@@ -1191,15 +1191,15 @@ The system marked the following anomalies and warnings based on composite benchm
                   {imageBase64 && (
                     <div className="relative w-16 h-16 rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-700">
                       <img src={imageBase64} alt="Upload preview" className="w-full h-full object-cover" />
-                      <button onClick={clearImage} className="absolute top-1 right-1 p-0.5 bg-black/50 text-white rounded-full hover:bg-black/80 transition-colors cursor-pointer">
+                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={clearImage} className="absolute top-1 right-1 p-0.5 bg-black/50 text-white rounded-full hover:bg-black/80 transition-colors cursor-pointer">
                         <X size={10} />
-                      </button>
+                      </motion.button>
                     </div>
                   )}
                   
                   {/* Toolbar */}
                   <div className="flex items-center justify-between mb-1">
-                    <button
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                       onClick={() => setIsDeepThinking(!isDeepThinking)}
                       className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded transition-colors cursor-pointer ${
                         isDeepThinking 
@@ -1209,7 +1209,7 @@ The system marked the following anomalies and warnings based on composite benchm
                     >
                       <Brain size={12} />
                       {t("aiCopilotDeepThinking")}
-                    </button>
+                    </motion.button>
                     <div className="flex gap-1">
                       <input
                         type="file"
@@ -1218,12 +1218,12 @@ The system marked the following anomalies and warnings based on composite benchm
                         onChange={handleImageUpload}
                         className="hidden"
                       />
-                      <button
+                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                         onClick={() => fileInputRef.current?.click()}
                         className="p-1.5 text-slate-400 hover:text-primary-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors cursor-pointer"
                       >
                         <ImageIcon size={14} />
-                      </button>
+                      </motion.button>
                     </div>
                   </div>
 
@@ -1391,7 +1391,7 @@ The system marked the following anomalies and warnings based on composite benchm
                                     { name: "PS (Polystyrene)", smiles: "c1ccccc1C(C)C" },
                                     { name: "PVC (Vinyl)", smiles: "CC(Cl)" }
                                   ].map((pOpt) => (
-                                    <button 
+                                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                                       key={pOpt.name}
                                       onClick={() => setMcpSmiles(pOpt.smiles)}
                                       className={`px-1.5 py-0.5 text-[8px] font-mono rounded cursor-pointer transition-colors border ${
@@ -1401,7 +1401,7 @@ The system marked the following anomalies and warnings based on composite benchm
                                       }`}
                                     >
                                       {pOpt.name.split(" ")[0]}
-                                    </button>
+                                    </motion.button>
                                   ))}
                                 </div>
                               </div>
@@ -1464,7 +1464,7 @@ The system marked the following anomalies and warnings based on composite benchm
                               <div className="p-2.5 bg-slate-50 dark:bg-slate-950/60 rounded-xl space-y-2 border border-slate-205 dark:border-slate-805/40">
                                 <div className="flex items-center justify-between">
                                   <span className="text-[8px] font-mono text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold">Compound Vectors</span>
-                                  <button 
+                                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                                     onClick={() => {
                                       if (data && data.length > 0) {
                                         const first = data[0];
@@ -1482,7 +1482,7 @@ The system marked the following anomalies and warnings based on composite benchm
                                     className="px-1.5 py-0.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 dark:text-indigo-400 flex items-center gap-1 text-[8px] font-mono rounded cursor-pointer transition-colors"
                                   >
                                     <Sparkles size={8} /> Pull First Record
-                                  </button>
+                                  </motion.button>
                                 </div>
                                 <div className="grid grid-cols-3 gap-1.5">
                                   <div className="flex flex-col gap-0.5">
@@ -1533,12 +1533,12 @@ The system marked the following anomalies and warnings based on composite benchm
                                 animate={{ opacity: 1, scale: 1 }}
                                 className="p-3 bg-slate-100 dark:bg-slate-950 rounded-xl border border-slate-205 dark:border-slate-805/70 relative"
                               >
-                                <button 
+                                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                                   onClick={() => setToolOutputs(p => { const next = {...p}; delete next[tool.id]; return next; })}
                                   className="absolute top-2 right-2 text-slate-400 hover:text-rose-500 cursor-pointer p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-900"
                                 >
                                   <X size={12} />
-                                </button>
+                                </motion.button>
                                 <pre className="text-[8.5px] font-mono text-slate-700 dark:text-slate-300 overflow-x-auto whitespace-pre-wrap select-all max-h-48 custom-scrollbar leading-relaxed">
                                   {typeof output === 'string' ? output : JSON.stringify(output, null, 2)}
                                 </pre>
@@ -1547,7 +1547,7 @@ The system marked the following anomalies and warnings based on composite benchm
                                   <span className="text-[8px] font-mono font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none">
                                     Micro-Sim Output
                                   </span>
-                                  <button
+                                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                                     onClick={() => {
                                       setActiveTab("chat");
                                       const promptText = `Please analyze the scientific simulation outputs from ${tool.title}:\n\n` + 
@@ -1560,7 +1560,7 @@ The system marked the following anomalies and warnings based on composite benchm
                                     className="px-2 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 text-[8px] font-mono font-black rounded-lg cursor-pointer transition-colors flex items-center gap-1 uppercase tracking-wider"
                                   >
                                     <Sparkles size={8} /> {t("aiCopilotAnalyzeWithAi")}
-                                  </button>
+                                  </motion.button>
                                 </div>
                               </motion.div>
                             )}
@@ -1582,12 +1582,12 @@ The system marked the following anomalies and warnings based on composite benchm
                       <Terminal size={12} className="text-emerald-500 animate-pulse" />
                       {t("aiCopilotMcpTerminalHeader")}
                     </label>
-                    <button 
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                       onClick={() => setMcpConsoleLogs([])}
                       className="text-[8px] font-mono font-black uppercase tracking-wider text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 cursor-pointer transition-colors"
                     >
                       {t("aiCopilotMcpTerminalClear")}
-                    </button>
+                    </motion.button>
                   </div>
                   <div className="h-36 overflow-y-auto bg-slate-950 p-2.5 rounded-xl border border-slate-850 font-mono text-[9px] leading-relaxed text-slate-300 select-all custom-scrollbar">
                     {mcpConsoleLogs.map((log, lIdx) => {
@@ -1613,7 +1613,7 @@ The system marked the following anomalies and warnings based on composite benchm
                       <Terminal size={14} className="text-indigo-400 animate-pulse" />
                       {t("aiCopilotMcpBlueprintTitle")}
                     </div>
-                    <button
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                       onClick={() => {
                         const blueprintScript = `# mcp_scientific_bridge.py
 # A professional Materials Informatics MCP Server for resin databases
@@ -1670,7 +1670,7 @@ if __name__ == "__main__":
                       <span className="text-[8px] font-mono font-bold uppercase tracking-wider">
                         {copiedPrompt ? (language === "zh" ? "已复制" : "Copied") : (language === "zh" ? "复制蓝图" : "Copy Blueprint")}
                       </span>
-                    </button>
+                    </motion.button>
                   </div>
 
                   <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed font-mono">

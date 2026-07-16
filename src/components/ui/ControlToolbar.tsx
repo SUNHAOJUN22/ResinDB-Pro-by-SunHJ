@@ -75,13 +75,13 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = React.memo(
               className="pl-9 pr-8 py-2 h-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full text-sm font-medium w-36 focus:w-64 xl:focus:w-80 transition-[width,box-shadow] duration-300 ease-in-out outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 shadow-sm hover:shadow-md"
             />
             {localQuery && (
-              <button
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 onClick={handleClearSearch}
                 className="absolute right-3 text-slate-400 hover:text-rose-500 focus:outline-none z-10 p-0.5 rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
                 title={t("clearSearch", "Clear")}
               >
                 <X size={14} />
-              </button>
+              </motion.button>
             )}
           </div>
 

@@ -251,7 +251,9 @@ export const BulkReorderModal: React.FC<BulkReorderModalProps> = ({
 
                         {/* Micro action buttons */}
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pl-2 shrink-0">
-                          <button
+                          <motion.button
+                            whileHover={{ scale: 1.15, color: '#4f46e5' }}
+                            whileTap={{ scale: 0.85 }}
                             type="button"
                             title={isZh ? "置顶" : "Move to Top"}
                             disabled={index === 0}
@@ -259,11 +261,13 @@ export const BulkReorderModal: React.FC<BulkReorderModalProps> = ({
                               e.stopPropagation();
                               moveItem(index, "top");
                             }}
-                            className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded disabled:opacity-30 disabled:hover:bg-transparent"
+                            className="p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed"
                           >
                             <ChevronsUp size={14} />
-                          </button>
-                          <button
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.15, color: '#4f46e5' }}
+                            whileTap={{ scale: 0.85 }}
                             type="button"
                             title={isZh ? "上移" : "Move Up"}
                             disabled={index === 0}
@@ -271,11 +275,13 @@ export const BulkReorderModal: React.FC<BulkReorderModalProps> = ({
                               e.stopPropagation();
                               moveItem(index, "up");
                             }}
-                            className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded disabled:opacity-30 disabled:hover:bg-transparent"
+                            className="p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed"
                           >
                             <ChevronUp size={14} />
-                          </button>
-                          <button
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.15, color: '#4f46e5' }}
+                            whileTap={{ scale: 0.85 }}
                             type="button"
                             title={isZh ? "下移" : "Move Down"}
                             disabled={index === items.length - 1}
@@ -283,11 +289,13 @@ export const BulkReorderModal: React.FC<BulkReorderModalProps> = ({
                               e.stopPropagation();
                               moveItem(index, "down");
                             }}
-                            className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded disabled:opacity-30 disabled:hover:bg-transparent"
+                            className="p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed"
                           >
                             <ChevronDown size={14} />
-                          </button>
-                          <button
+                          </motion.button>
+                          <motion.button
+                            whileHover={{ scale: 1.15, color: '#4f46e5' }}
+                            whileTap={{ scale: 0.85 }}
                             type="button"
                             title={isZh ? "置底" : "Move to Bottom"}
                             disabled={index === items.length - 1}
@@ -295,10 +303,10 @@ export const BulkReorderModal: React.FC<BulkReorderModalProps> = ({
                               e.stopPropagation();
                               moveItem(index, "bottom");
                             }}
-                            className="p-1 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded disabled:opacity-30 disabled:hover:bg-transparent"
+                            className="p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed"
                           >
                             <ChevronsDown size={14} />
-                          </button>
+                          </motion.button>
                         </div>
                       </Reorder.Item>
                     ))}

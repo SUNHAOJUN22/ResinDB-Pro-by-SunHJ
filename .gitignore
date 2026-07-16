@@ -28,3 +28,23 @@ node_modules
 node_modules/
 dist/
 coverage/
+
+# Local AI/IDE generated files
+.agents/
+.antigravity/
+
+# Generated reports and inspection artifacts
+outputs/
+*.inspect.ndjson
+*.pptx
+*.tgz
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+dist/
+coverage/

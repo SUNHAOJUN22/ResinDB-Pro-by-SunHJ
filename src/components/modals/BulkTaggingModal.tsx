@@ -249,13 +249,15 @@ export const BulkTaggingModal: React.FC<BulkTaggingModalProps> = ({
                         }`}
                       >
                         {tag}
-                        <button
+                        <motion.button
+                          whileHover={{ scale: 1.15 }}
+                          whileTap={{ scale: 0.85 }}
                           type="button"
                           onClick={() => removeTag(idx)}
-                          className="hover:text-rose-500 rounded-full transition-colors focus:outline-none"
+                          className="hover:text-rose-500 rounded-full transition-colors focus:outline-none cursor-pointer"
                         >
                           <X size={12} strokeWidth={2.5} />
-                        </button>
+                        </motion.button>
                       </span>
                     ))
                   )}

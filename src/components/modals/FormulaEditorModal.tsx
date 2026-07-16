@@ -627,35 +627,35 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
               </p>
             </div>
           </div>
-          <button
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
             onClick={onClose}
             className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
           >
             <X size={20} className="text-slate-400" />
-          </button>
+          </motion.button>
         </div>
 
         <div className="flex-1 overflow-hidden flex">
           {/* Sidebar: Formula List */}
           <div className="w-64 border-r border-slate-100 dark:border-slate-800 flex flex-col bg-slate-50/30 dark:bg-slate-950/20">
             <div className="p-4 space-y-3 flex-1 overflow-y-auto">
-              <button
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                 onClick={() => setEditingId(null)}
                 className={`w-full flex items-center gap-2 p-3 rounded-2xl text-sm font-bold transition-all border ${editingId === null ? "bg-primary-600 text-white border-transparent" : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800"}`}
               >
                 <Plus size={16} /> New Formula
-              </button>
+              </motion.button>
 
               <div className="space-y-1">
                 {formulas.map((f) => (
                   <div key={f.id} className="group relative">
-                    <button
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                       onClick={() => setEditingId(f.id)}
                       className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all ${editingId === f.id ? "bg-primary-50 dark:bg-primary-900/20 text-primary-600" : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"}`}
                     >
                       {f.name}
-                    </button>
-                    <button
+                    </motion.button>
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                       onClick={(e) => {
                         e.stopPropagation();
                         onRemove(f.id);
@@ -663,7 +663,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                       className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 opacity-0 group-hover:opacity-100 hover:text-rose-500 transition-all"
                     >
                       <Trash2 size={12} />
-                    </button>
+                    </motion.button>
                   </div>
                 ))}
               </div>
@@ -675,43 +675,43 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
             {/* Tabs & Share/Export Controls */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-slate-800 shrink-0 pb-1 sm:pb-0 gap-2">
               <div className="flex">
-                <button 
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                   onClick={() => setActiveTab('editor')} 
                   className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'editor' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                 >
                   Editor
-                </button>
-                <button 
+                </motion.button>
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                   onClick={() => setActiveTab('templates')} 
                   className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'templates' ? 'border-primary-500 text-primary-600 dark:text-primary-450' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                 >
                   Templates
-                </button>
-                <button 
+                </motion.button>
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                   onClick={() => setActiveTab('heatmap')} 
                   className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'heatmap' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                 >
                   Dependencies Heatmap
-                </button>
-                <button 
+                </motion.button>
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                   onClick={() => setActiveTab('suggestions')} 
                   className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'suggestions' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'} flex items-center gap-1.5`}
                 >
                   <Beaker size={14} className="text-primary-500" /> AI Suggestions
-                </button>
+                </motion.button>
                 {editingId && (
-                  <button 
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                     onClick={() => setActiveTab('history')} 
                     className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'history' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
                   >
                     Change History
-                  </button>
+                  </motion.button>
                 )}
               </div>
 
               {/* Share & Export controls */}
               <div className="flex items-center gap-1.5 px-2 pb-1 sm:pb-0">
-                <button
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   onClick={handleCopyShareText}
                   title="Copy formatted template to share with teammates"
                   className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
@@ -727,9 +727,9 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                       <span>Copy Share</span>
                     </>
                   )}
-                </button>
+                </motion.button>
 
-                <button
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   onClick={handleCopyJson}
                   title="Copy full config JSON with history to clipboard"
                   className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
@@ -745,16 +745,16 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                       <span>Copy JSON</span>
                     </>
                   )}
-                </button>
+                </motion.button>
 
-                <button
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   onClick={handleDownloadJson}
                   title="Download configuration JSON file"
                   className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
                 >
                   <Download size={12} />
                   <span>Download</span>
-                </button>
+                </motion.button>
               </div>
             </div>
 
@@ -798,12 +798,12 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-mono focus:ring-2 focus:ring-primary-500/20 outline-none transition-all resize-none"
                     />
                     <div className="absolute right-3 bottom-3 flex gap-2">
-                      <button
+                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                         onClick={handleTest}
                         className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 rounded-xl text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/10 transition-all shadow-sm flex items-center gap-1.5 text-[10px] font-black"
                       >
                         <Play size={10} /> TEST
-                      </button>
+                      </motion.button>
                     </div>
                   </div>
                   {error && !realtimeError && (
@@ -859,7 +859,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                   </h3>
                   <div className="flex flex-wrap gap-1.5 h-40 lg:h-48 overflow-y-auto custom-scrollbar p-1">
                     {availableProps.map((prop) => (
-                      <button
+                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                         key={prop}
                         onClick={() =>
                           setExpression((prev) => prev.endsWith("props['") ? prev + `${prop}']` : prev + `props['${prop}']`)
@@ -867,7 +867,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                         className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] font-mono text-slate-500 hover:border-primary-500 hover:text-primary-600 rounded-lg transition-all"
                       >
                         {prop}
-                      </button>
+                      </motion.button>
                     ))}
                   </div>
                   <div className="pt-2 border-t border-indigo-100 dark:border-indigo-900/30 flex items-center gap-3 text-[10px] text-indigo-500/60 font-bold italic">
@@ -897,13 +897,13 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                     
                     {/* Monte Carlo Simulator Toggle */}
                     <div className="border-t border-emerald-200/50 dark:border-emerald-800/50 pt-3">
-                       <button 
+                       <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                          onClick={() => setShowMonteCarlo(!showMonteCarlo)}
                          className="flex items-center justify-between w-full text-xs font-bold text-emerald-700 dark:text-emerald-500 hover:bg-emerald-100/50 dark:hover:bg-emerald-900/30 p-2 rounded-lg transition-colors"
                        >
                            <span className="flex items-center gap-1.5"><Activity size={14}/> Monte Carlo Uncertainty Simulator</span>
                            {showMonteCarlo ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                       </button>
+                       </motion.button>
                     </div>
                     
                     <AnimatePresence>
@@ -937,7 +937,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                                      </div>
                                   </div>
                                   
-                                  <button
+                                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                                      onClick={() => {
                                         if (allProducts[0] && expression) {
                                             const tempConfig = { id: name || "temp", name, expression, unit };
@@ -950,7 +950,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                                   >
                                       {isSimulating ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} 
                                       {isSimulating ? "Simulating..." : "Run 5000 Permutations"}
-                                  </button>
+                                  </motion.button>
                                   
                                   {mcError && <p className="text-[10px] text-rose-500 font-bold">{mcError}</p>}
                                   
@@ -999,12 +999,12 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                         placeholder="Template Name (e.g. My Formula)"
                         className="px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary-500/20 w-48"
                       />
-                      <button
+                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                         onClick={handleSaveAsTemplate}
                         className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-black shadow-md shadow-primary-500/10 transition-all flex items-center gap-1 active:scale-95"
                       >
                         <Plus size={12} /> Save Template
-                      </button>
+                      </motion.button>
                     </div>
                   </div>
                 )}
@@ -1073,13 +1073,13 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                                     {tpl.name}
                                   </h4>
                                 </div>
-                                <button
+                                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                                   onClick={(e) => handleRemoveCustomTemplate(tpl.id, e)}
                                   className="absolute right-3 top-3 p-1.5 text-slate-400 hover:text-rose-500 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all"
                                   title="Delete custom template"
                                 >
                                   <Trash2 size={13} />
-                                </button>
+                                </motion.button>
                               </div>
                               <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
                                 {tpl.description}
@@ -1155,12 +1155,12 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                             </div>
                           </div>
 
-                          <button
+                          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                             onClick={handleApplyTemplate}
                             className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black shadow-lg shadow-indigo-600/10 transition-all flex items-center justify-center gap-1.5 active:scale-95"
                           >
                             <Check size={14} /> Apply Template Parameters
-                          </button>
+                          </motion.button>
                         </div>
                       </div>
                     ) : (
@@ -1237,7 +1237,9 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                       />
                     </div>
 
-                    <button
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                       id="generateSuggestionsBtn"
                       onClick={handleGenerateSuggestions}
                       disabled={isGeneratingSuggestions || !expression}
@@ -1254,7 +1256,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                           <span>Generate Durability suggestions</span>
                         </>
                       )}
-                    </button>
+                    </motion.button>
                     {!expression && (
                       <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold px-2 text-center leading-relaxed">
                         ⚠️ Please write or apply a formula in the Editor tab to load variables.
@@ -1352,7 +1354,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                                     <span className="text-[10px] font-black text-slate-450 uppercase tracking-wider block">
                                       Formula Representation Adjustments
                                     </span>
-                                    <button
+                                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                                       onClick={() => {
                                         setExpression(item.formulaUpdate!);
                                         setActiveTab('editor');
@@ -1362,7 +1364,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                                     >
                                       <Check size={11} />
                                       <span>Apply Update</span>
-                                    </button>
+                                    </motion.button>
                                   </div>
                                   <pre className="p-3 bg-slate-950 text-emerald-450 rounded-xl font-mono text-[10px] overflow-x-auto border border-slate-850 leading-relaxed select-all">
                                     {item.formulaUpdate}
@@ -1396,18 +1398,18 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                 {comparingHistory ? (
                   <div className="flex flex-col h-full space-y-4 overflow-hidden">
                     <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2 rounded-xl shrink-0">
-                      <button 
+                      <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                         onClick={() => setComparingHistory(null)}
                         className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg text-slate-500 transition-colors"
                       >
                         <ArrowLeft size={16} />
-                      </button>
+                      </motion.button>
                       <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                         <GitCompare size={16} className="text-primary-500" />
                         Comparing Versions
                       </h3>
                       <div className="ml-auto flex items-center gap-2">
-                        <button
+                        <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                             onClick={() => {
                                setName(comparingHistory.name);
                                setExpression(comparingHistory.expression);
@@ -1419,7 +1421,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                             className="px-3 py-1.5 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-800 rounded-lg text-xs font-bold hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors"
                         >
                           Revert to this version
-                        </button>
+                        </motion.button>
                       </div>
                     </div>
                     
@@ -1506,13 +1508,13 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-slate-500">{new Date(h.date).toLocaleString()}</span>
                           <div className="flex items-center gap-2">
-                              <button
+                              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                                 onClick={() => setComparingHistory(h)}
                                 className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors flex items-center gap-1 opacity-0 group-hover:opacity-100"
                               >
                                 <GitCompare size={12} /> Compare
-                              </button>
-                              <button
+                              </motion.button>
+                              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                                 onClick={() => {
                                    setName(h.name);
                                    setExpression(h.expression);
@@ -1523,7 +1525,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                                 className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-primary-600 dark:text-primary-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                               >
                                 Revert
-                              </button>
+                              </motion.button>
                           </div>
                         </div>
                         <div className="space-y-1">
@@ -1554,19 +1556,19 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
             automatically added to the Data Grid and Analytics charts.
           </p>
           <div className="flex gap-3 w-full sm:w-auto">
-            <button
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={onClose}
               className="flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors"
             >
               Cancel
-            </button>
-            <button
+            </motion.button>
+            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={handleSave}
               disabled={!name || !expression}
               className="flex-1 sm:flex-none px-8 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-2xl text-sm font-black shadow-lg shadow-primary-500/20 transition-all active:scale-95"
             >
               Save Formula
-            </button>
+            </motion.button>
           </div>
         </div>
       </motion.div>
