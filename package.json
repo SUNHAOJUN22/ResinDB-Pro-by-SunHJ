@@ -19,9 +19,7 @@
     "test:fuzz": "vitest run tests/fuzz",
     "test:regression": "vitest run tests/regression",
     "test:coverage": "vitest run --coverage",
-    "quality-gate": "bash scripts/quality-gate.sh",
-    "validate": "npm run lint && npm run typecheck && npm run test && npm run build && npm run smoke",
-    "report": "bash scripts/generate-test-report.sh"
+    "validate": "npm run lint && npm run typecheck && npm run test && npm run build && npm run smoke"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",
@@ -46,7 +44,7 @@
     "react-dom": "^19.2.3",
     "react-markdown": "^10.1.0",
     "recharts": "^3.9.2",
-    "remark-gfm": "^4.0.1",
+    "remark-gfm": "^4.1.0",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.2",
     "typescript": "~5.8.2",
