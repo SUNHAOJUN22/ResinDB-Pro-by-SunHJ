@@ -1,0 +1,50 @@
+name: One-time cleanup validation
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate-cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out proposed cleanup
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Regenerate dependency lock
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm run test
+      - name: Build
+        run: npm run build
+      - name: Production HTTP smoke test
+        run: npm run smoke
+      - name: Capture production dependency audit
+        if: always()
+        shell: bash
+        run: |
+          npm audit --omit=dev --json > npm-audit.json || true
+      - name: Upload generated lock and audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cleanup-validation-output
+          path: |
+            package-lock.json
+            npm-audit.json
+          retention-days: 3
