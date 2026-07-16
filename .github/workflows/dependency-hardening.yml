@@ -1,0 +1,133 @@
+name: One-time dependency hardening
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out proposed branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Remove unused and unsupported dependencies
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          package_path = Path('package.json')
+          package = json.loads(package_path.read_text(encoding='utf-8'))
+          dependencies = package.get('dependencies', {})
+          dev_dependencies = package.get('devDependencies', {})
+
+          for name in ('firebase', 'framer-motion', 'xlsx'):
+              dependencies.pop(name, None)
+          dev_dependencies.pop('docx', None)
+          dependencies['echarts'] = '^6.1.0'
+          dev_dependencies['vite'] = '^7.2.2'
+          package['dependencies'] = dict(sorted(dependencies.items()))
+          package['devDependencies'] = dict(sorted(dev_dependencies.items()))
+          package_path.write_text(json.dumps(package, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          import_path = Path('src/components/modals/ImportModal.tsx')
+          text = import_path.read_text(encoding='utf-8')
+          text = text.replace('import * as XLSX from "xlsx";\n', '')
+          text = text.replace('Universal Raw File Parser (CSV, JSON, XLSX)', 'Universal Raw File Parser (CSV, JSON, TXT)')
+          text = text.replace('    const isExcel = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");\n', '')
+          excel_block = re.compile(r'''\n      \} else if \(isExcel\) \{.*?\n      \} else \{\n        // Fallback standard CSV/TXT Papa parse''', re.S)
+          text, count = excel_block.subn('\n      } else {\n        // Standard CSV/TXT Papa parse', text, count=1)
+          if count != 1:
+              raise SystemExit('Expected XLSX parser block was not found exactly once')
+          text = text.replace('accept=".csv,.xlsx,.xls,.json,.txt"', 'accept=".csv,.json,.txt"')
+          text = text.replace('\n// v3.1.0-sync\n\n// v3.1.0-sync-fixed\n', '\n')
+          import_path.write_text(text, encoding='utf-8')
+
+          replacements = {
+              'src/components/modals/SmartExportModal.tsx': [
+                  ("'csv' | 'xlsx' | 'json' | 'xml'", "'csv' | 'json' | 'xml'"),
+              ],
+              'src/hooks/app/useExportData.ts': [
+                  ("'csv' | 'xlsx' | 'json' | 'xml'", "'csv' | 'json' | 'xml'"),
+                  ("const filteredProps: Record<string, any> = {};", 'const filteredProps: Product["properties"] = {};'),
+                  ("const ext = format === 'xlsx' ? 'xlsx' : format === 'json' ? 'json' : format === 'xml' ? 'xml' : 'csv';", "const ext = format === 'json' ? 'json' : format === 'xml' ? 'xml' : 'csv';"),
+              ],
+              'src/lib/adapters/types.ts': [
+                  ("'csv' | 'xlsx' | 'json' | 'xml'", "'csv' | 'json' | 'xml'"),
+              ],
+              'src/lib/adapters/RemoteAPIProductAdapter.ts': [
+                  ("'csv' | 'xlsx' | 'json' | 'xml'", "'csv' | 'json' | 'xml'"),
+              ],
+              'src/lib/adapters/IndexedDBProductAdapter.ts': [
+                  ("'csv' | 'xlsx' | 'json' | 'xml'", "'csv' | 'json' | 'xml'"),
+              ],
+          }
+          for file_name, pairs in replacements.items():
+              path = Path(file_name)
+              body = path.read_text(encoding='utf-8')
+              for old, new in pairs:
+                  if old not in body:
+                      raise SystemExit(f'Expected text not found in {file_name}: {old}')
+                  body = body.replace(old, new)
+              body = body.replace('\n// v3.1.0-sync\n\n// v3.1.0-sync-fixed\n', '\n')
+              path.write_text(body, encoding='utf-8')
+
+          readme = Path('README.md')
+          body = readme.read_text(encoding='utf-8')
+          body = body.replace('CSV、XLSX、JSON；导入前提供字段映射与预览', 'CSV、JSON、TXT；导入前提供字段映射与预览')
+          body = body.replace('- 固定供应商 AI SDK、CLI 和伪造 MCP/仪器遥测逻辑；', '- 固定供应商 AI SDK、CLI 和伪造 MCP/仪器遥测逻辑；\n- 未使用的 Firebase 运行时依赖和不再维护的浏览器 XLSX 解析器；')
+          body = body.replace('2. 选择 CSV、XLSX 或 JSON；', '2. 选择 CSV、JSON 或 TXT；')
+          body = body.replace('生产或敏感数据场景优先使用 CSV。导入 XLSX 前应去除宏、外部链接、隐藏工作表和公式，并在导入预览中核对字段、单位与数值。', 'XLS/XLSX 不再由浏览器直接解析。请先使用可信办公软件转换为 CSV，并在导入预览中核对字段、单位与数值。')
+          readme.write_text(body, encoding='utf-8')
+          PY
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Regenerate dependency lock
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Apply compatible audit fixes
+        run: npm audit fix --package-lock-only --ignore-scripts || true
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Validate application
+        run: npm run validate
+
+      - name: Audit production dependencies
+        shell: bash
+        run: |
+          npm audit --omit=dev --json > dependency-audit.json || true
+          node -e "const a=require('./dependency-audit.json'); console.log(a.metadata?.vulnerabilities || {})"
+
+      - name: Upload validation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-hardening-output
+          path: dependency-audit.json
+          retention-days: 3
+
+      - name: Commit validated dependency hardening
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'security: remove unused vulnerable dependencies and browser XLSX parsing'
+          git push origin HEAD:dependency-hardening
