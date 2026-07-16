@@ -1,97 +1,82 @@
-import { useCallback, useRef } from "react";
-import { safeStorage } from "@/lib/utils";
-import { useUI } from "@/contexts/UIContext";
+import { useCallback, useRef } from 'react';
+import { safeStorage } from '@/lib/utils';
+import { useOptionalUI } from '@/contexts/UIContext';
 
-let globalAudioCtx: AudioContext | null = null;
+let globalAudioContext: AudioContext | null = null;
+
+function readStoredPreference(): boolean {
+  try {
+    const stored = safeStorage.local.getItem('resindb-click-feedback');
+    return stored === null ? true : stored === 'true';
+  } catch {
+    return true;
+  }
+}
 
 export function useClickFeedback() {
-  const isEnabledRef = useRef<boolean>(true);
+  const ui = useOptionalUI();
+  const enabledRef = useRef(readStoredPreference());
 
-  /**
-   * Attempt to subscribe to UIContext's reactive state.
-   * Falls back to localStorage for environments without UIProvider (e.g. unit tests).
-   */
-  let contextEnabled: boolean | null = null;
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const { clickFeedbackEnabled } = useUI();
-    contextEnabled = clickFeedbackEnabled;
-  } catch {
-    // UIProvider not mounted (unit test environment) — will use localStorage fallback
-  }
-
-  // Read setting dynamically, preferring reactive Context over synchronous I/O
-  const checkEnabled = useCallback(() => {
-    if (contextEnabled !== null) {
-      isEnabledRef.current = contextEnabled;
-      return contextEnabled;
+  const isEnabled = useCallback(() => {
+    if (ui) {
+      enabledRef.current = ui.clickFeedbackEnabled;
+    } else {
+      enabledRef.current = readStoredPreference();
     }
-    // Fallback: direct localStorage read (only in test environments)
-    try {
-      const stored = safeStorage.local.getItem("resindb-click-feedback");
-      if (stored !== null) {
-        isEnabledRef.current = stored === "true";
-      }
-    } catch {
-      isEnabledRef.current = true;
-    }
-    return isEnabledRef.current;
-  }, [contextEnabled]);
+    return enabledRef.current;
+  }, [ui]);
 
   const triggerFeedback = useCallback(() => {
-    if (!checkEnabled()) return;
+    if (!isEnabled() || typeof window === 'undefined') return;
 
-    // 1. Tactile Haptic Vibration
-    if (typeof window !== "undefined" && window.navigator && typeof window.navigator.vibrate === "function") {
+    if (typeof window.navigator?.vibrate === 'function') {
       try {
         window.navigator.vibrate(15);
       } catch {
-        // Silently catch security/browser blocks
+        // Vibration may be blocked by the browser or device policy.
       }
     }
 
-    // 2. Synthesize High-Fidelity Clean Click Sound via Web Audio API
-    if (typeof window === "undefined" || !("AudioContext" in window || "webkitAudioContext" in window)) {
-      return;
-    }
+    const AudioContextConstructor =
+      window.AudioContext ??
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+    if (!AudioContextConstructor) return;
 
     try {
-      if (!globalAudioCtx) {
-        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        globalAudioCtx = new AudioContextClass();
+      globalAudioContext ??= new AudioContextConstructor();
+      const context = globalAudioContext;
+
+      if (context.state === 'suspended') {
+        void context.resume().catch(() => undefined);
       }
 
-      const ctx = globalAudioCtx;
-      if (ctx.state === "suspended") {
-        ctx.resume();
-      }
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const startTime = context.currentTime;
 
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(1400, startTime);
+      oscillator.frequency.exponentialRampToValueAtTime(800, startTime + 0.04);
+      gain.gain.setValueAtTime(0.04, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.04);
 
-      osc.type = "sine";
-      // Pure clean high frequency tone (1400Hz)
-      osc.frequency.setValueAtTime(1400, ctx.currentTime);
-      // Fast exponential pitch decay for an acoustic click sound
-      osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.04);
-
-      // Fast volume envelope decay (0.05s) to avoid pops or long rings
-      gain.gain.setValueAtTime(0.04, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.04);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.05);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.addEventListener(
+        'ended',
+        () => {
+          oscillator.disconnect();
+          gain.disconnect();
+        },
+        { once: true },
+      );
+      oscillator.start(startTime);
+      oscillator.stop(startTime + 0.05);
     } catch {
-      // Silently catch audio context initialization blocks
+      // Audio feedback is optional and must never break the primary interaction.
     }
-  }, [checkEnabled]);
+  }, [isEnabled]);
 
   return { triggerFeedback };
 }
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed
