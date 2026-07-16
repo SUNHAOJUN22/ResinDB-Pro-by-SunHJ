@@ -89,10 +89,20 @@ jobs:
       - name: Verify active project is provider-neutral
         shell: bash
         run: |
-          if grep -RInE '(@google/genai|VITE_GEMINI|geminiService|Gemini CLI|gemini-3)' README.md SECURITY.md metadata.json package.json package-lock.json .env.example src .agents/skills/firebase_basics; then
+          if grep -RInE '(@google/genai|VITE_GEMINI|geminiService|Gemini CLI|gemini-3)' README.md SECURITY.md metadata.json package.json package-lock.json .env.example src .agents/skills/firebase_basics > /tmp/provider-scan.log; then
+            cat /tmp/provider-scan.log
             echo 'Provider-specific references remain in active project files.'
             exit 1
           fi
+          : > /tmp/provider-scan.log
+
+      - name: Upload provider scan diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-neutral-scan-diagnostics
+          path: /tmp/provider-scan.log
+          retention-days: 3
 
       - name: Commit migration directly to main
         shell: bash
