@@ -59,7 +59,20 @@ jobs:
         run: npm ci
 
       - name: Lint
-        run: npm run lint
+        shell: bash
+        run: |
+          if ! npm run lint > /tmp/lint.log 2>&1; then
+            tail -n 200 /tmp/lint.log
+            exit 1
+          fi
+
+      - name: Upload lint diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-neutral-lint-diagnostics
+          path: /tmp/lint.log
+          retention-days: 3
 
       - name: Typecheck
         run: npm run typecheck
