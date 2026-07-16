@@ -1,9 +1,12 @@
 import { Product, PropertyValue } from '@/types/index';
 import { logger } from '@/lib/logger';
 
-const STORAGE_KEY = 'resindb-ai-api-config';
+const PERSISTENT_STORAGE_KEY = 'resindb-ai-api-config';
+const SESSION_KEY_STORAGE_KEY = 'resindb-ai-api-session-key';
 const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_CONTEXT_PRODUCTS = 20;
+const MAX_RESPONSE_CHARS = 100_000;
+const MAX_PROMPT_CHARS = 80_000;
 
 export interface AiApiConfig {
   endpoint: string;
@@ -42,40 +45,53 @@ interface ChatRequestOptions {
   imagePart?: AiInsightOptions['imagePart'];
 }
 
-function readStoredConfig(): Partial<AiApiConfig> {
+function readPersistentConfig(): Partial<AiApiConfig> {
   if (typeof window === 'undefined') return {};
   try {
-    const value = window.localStorage.getItem(STORAGE_KEY);
+    const value = window.localStorage.getItem(PERSISTENT_STORAGE_KEY);
     return value ? (JSON.parse(value) as Partial<AiApiConfig>) : {};
   } catch (error) {
-    logger.warn('Unable to read AI API configuration', error);
+    logger.warn('Unable to read persistent AI API configuration', error);
     return {};
   }
 }
 
+function readSessionApiKey(): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    return window.sessionStorage.getItem(SESSION_KEY_STORAGE_KEY)?.trim() || '';
+  } catch (error) {
+    logger.warn('Unable to read the session AI API key', error);
+    return '';
+  }
+}
+
 export function getAiConfig(): AiApiConfig {
-  const stored = readStoredConfig();
+  const stored = readPersistentConfig();
   return {
     endpoint: stored.endpoint?.trim() || import.meta.env.VITE_AI_API_ENDPOINT?.trim() || '',
-    apiKey: stored.apiKey?.trim() || import.meta.env.VITE_AI_API_KEY?.trim() || '',
+    apiKey: readSessionApiKey() || import.meta.env.VITE_AI_API_KEY?.trim() || '',
     model: stored.model?.trim() || import.meta.env.VITE_AI_MODEL?.trim() || '',
   };
 }
 
 export function saveAiConfig(config: AiApiConfig): void {
   if (typeof window === 'undefined') return;
-  const normalized: AiApiConfig = {
-    endpoint: config.endpoint.trim(),
-    apiKey: config.apiKey.trim(),
-    model: config.model.trim(),
-  };
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+  const endpoint = config.endpoint.trim();
+  const model = config.model.trim();
+  const apiKey = config.apiKey.trim();
+  window.localStorage.setItem(PERSISTENT_STORAGE_KEY, JSON.stringify({ endpoint, model }));
+  if (apiKey) {
+    window.sessionStorage.setItem(SESSION_KEY_STORAGE_KEY, apiKey);
+  } else {
+    window.sessionStorage.removeItem(SESSION_KEY_STORAGE_KEY);
+  }
 }
 
 export function clearAiConfig(): void {
-  if (typeof window !== 'undefined') {
-    window.localStorage.removeItem(STORAGE_KEY);
-  }
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(PERSISTENT_STORAGE_KEY);
+  window.sessionStorage.removeItem(SESSION_KEY_STORAGE_KEY);
 }
 
 export function isAiConfigured(): boolean {
@@ -91,12 +107,21 @@ function requireConfig(): AiApiConfig {
   if (!config.model) {
     throw new Error('AI model is not configured. Open AI API Settings and enter the model identifier required by your provider.');
   }
+
+  let endpoint: URL;
   try {
-    new URL(config.endpoint);
+    endpoint = new URL(config.endpoint);
   } catch {
     throw new Error('AI API endpoint must be a valid absolute URL.');
   }
-  return config;
+  const localHost = endpoint.hostname === 'localhost' || endpoint.hostname === '127.0.0.1' || endpoint.hostname === '[::1]';
+  if (endpoint.protocol !== 'https:' && !(localHost && endpoint.protocol === 'http:')) {
+    throw new Error('AI API endpoint must use HTTPS. HTTP is allowed only for localhost development.');
+  }
+  if (endpoint.username || endpoint.password) {
+    throw new Error('Do not embed credentials in the AI API endpoint URL.');
+  }
+  return { ...config, endpoint: endpoint.toString() };
 }
 
 function summarizeProducts(products: Product[], limit = MAX_CONTEXT_PRODUCTS) {
@@ -161,7 +186,7 @@ function extractResponseText(payload: unknown): string {
 async function requestChat(options: ChatRequestOptions): Promise<string> {
   const config = requireConfig();
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = globalThis.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   const userContent: string | Array<Record<string, unknown>> = options.imagePart
     ? [
@@ -174,6 +199,11 @@ async function requestChat(options: ChatRequestOptions): Promise<string> {
         },
       ]
     : options.prompt;
+
+  const promptLength = options.system.length + options.prompt.length;
+  if (promptLength > MAX_PROMPT_CHARS) {
+    throw new Error('AI request context is too large. Reduce the selected data or shorten the question.');
+  }
 
   try {
     const response = await fetch(config.endpoint, {
@@ -193,7 +223,7 @@ async function requestChat(options: ChatRequestOptions): Promise<string> {
       signal: controller.signal,
     });
 
-    const raw = await response.text();
+    const raw = (await response.text()).slice(0, MAX_RESPONSE_CHARS);
     if (!response.ok) {
       throw new Error(`AI API request failed (${response.status}): ${raw.slice(0, 500) || response.statusText}`);
     }
@@ -214,7 +244,7 @@ async function requestChat(options: ChatRequestOptions): Promise<string> {
     }
     throw error;
   } finally {
-    window.clearTimeout(timer);
+    globalThis.clearTimeout(timer);
   }
 }
 

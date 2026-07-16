@@ -2,15 +2,13 @@ import { useState, useMemo, useDeferredValue, useEffect, useCallback, useRef } f
 import { Product, FilterGroup, Category, Toast, SyncEvent } from '@/types/index';
 import { compileFilterGroup } from '@/lib/filterUtils';
 import { calculateCompleteness, getLower } from '@/utils/productUtils';
-import { CATEGORY_TREE, PRODUCT_CATALOG } from '@/config/constants';
+import { CATEGORY_TREE } from '@/config/constants';
 import { debounce } from 'lodash';
 import api from '@/lib/adapters';
 import { useColumns } from '@/hooks/datagrid/useColumns';
 import { propertyMap } from '@/config/i18n';
-import { safeStorage } from '@/lib/utils';
+import { generateId, safeStorage } from '@/lib/utils';
 
-// Module-level WeakMap: Provides O(1) GC-safe caching for massive product tokens.
-// Avoids regenerating strings per object across 2.5 MILLION deep iterations per keystroke!
 const __globalProductTextIndex = new WeakMap<Product, string>();
 
 export function useDatabase(
@@ -28,7 +26,7 @@ export function useDatabase(
       try {
         return JSON.parse(saved);
       } catch {
-        // ignore
+        // Ignore malformed local history.
       }
     }
     return [];
@@ -37,9 +35,9 @@ export function useDatabase(
   const addSyncEvent = useCallback((event: Omit<SyncEvent, 'id' | 'timestamp'>) => {
     setSyncEvents(prev => {
       const newEvents = [
-        { ...event, id: Date.now().toString(), timestamp: Date.now() },
+        { ...event, id: generateId(), timestamp: Date.now() },
         ...prev
-      ].slice(0, 50); // Keep last 50 events
+      ].slice(0, 50);
       safeStorage.local.setItem('resindb-sync-events', JSON.stringify(newEvents));
       return newEvents;
     });
@@ -47,7 +45,6 @@ export function useDatabase(
 
   const columnManagement = useColumns(allProducts);
   const { columns } = columnManagement;
-
   const columnsRef = useRef(columns);
   useEffect(() => {
     columnsRef.current = columns;
@@ -57,79 +54,67 @@ export function useDatabase(
     (label: string): string | null => {
       const cleanLabel = label.toLowerCase();
       const directMatch = columnsRef.current.find(
-        (c) =>
-          c.key.toLowerCase() === cleanLabel ||
-          tProp(c.label).toLowerCase() === cleanLabel,
+        (c) => c.key.toLowerCase() === cleanLabel || tProp(c.label).toLowerCase() === cleanLabel,
       );
       if (directMatch) return directMatch.key;
       const reverseKey = Object.keys(propertyMap).find(
-        (k) =>
-          k.toLowerCase() === cleanLabel ||
-          propertyMap[k].toLowerCase() === cleanLabel,
+        (key) => key.toLowerCase() === cleanLabel || propertyMap[key].toLowerCase() === cleanLabel,
       );
-      if (reverseKey) return reverseKey;
-      return null;
+      return reverseKey || null;
     },
     [tProp],
   );
 
   const fetchRequestId = useRef(0);
-
-  const fetchProducts = useCallback(async (query: string = "", categoryId: string | null = null, silent: boolean = false) => {
+  const fetchProducts = useCallback(async (
+    query = '',
+    categoryId: string | null = null,
+    silent = false,
+  ): Promise<boolean> => {
     const requestId = ++fetchRequestId.current;
     if (!silent) setIsLoading(true);
     try {
       const data = await api.search(query, categoryId);
-      if (requestId === fetchRequestId.current) {
-        setAllProducts(data);
-      }
+      if (requestId === fetchRequestId.current) setAllProducts(data);
+      return true;
     } catch (error) {
       if (requestId === fetchRequestId.current) {
-        addToast(
-          "error",
-          t("fetchDataError") + (error instanceof Error ? error.message : t("unknownError")),
-        );
-        setAllProducts(PRODUCT_CATALOG);
+        addToast('error', t('fetchDataError') + (error instanceof Error ? error.message : t('unknownError')));
       }
+      return false;
     } finally {
-      if (requestId === fetchRequestId.current && !silent) {
-        setIsLoading(false);
-      }
+      if (requestId === fetchRequestId.current && !silent) setIsLoading(false);
     }
   }, [addToast, t]);
 
   const refreshData = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await fetchProducts("", null, true);
-      addToast("success", t("dataRefreshed"));
-      addSyncEvent({ status: 'success', message: t("dataRefreshed", "Data refreshed successfully") });
-    } catch (error) {
-      addSyncEvent({ status: 'error', message: error instanceof Error ? error.message : "Unknown error during sync" });
+      const refreshed = await fetchProducts('', null, true);
+      if (refreshed) {
+        addToast('success', t('dataRefreshed'));
+        addSyncEvent({ status: 'success', message: t('dataRefreshed', 'Data refreshed successfully') });
+      } else {
+        addSyncEvent({ status: 'error', message: t('fetchDataError', 'Data refresh failed') });
+      }
     } finally {
       setIsRefreshing(false);
     }
   }, [fetchProducts, addToast, t, addSyncEvent]);
 
   useEffect(() => {
-    fetchProducts();
+    void fetchProducts();
   }, [fetchProducts]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-
-  const debouncedSetQuery = useMemo(
-      () => debounce((q: string) => setDebouncedSearchQuery(q), 300),
-      []
-  );
-
+  const debouncedSetQuery = useMemo(() => debounce((query: string) => setDebouncedSearchQuery(query), 300), []);
   useEffect(() => {
-      debouncedSetQuery(searchQuery);
-      return () => debouncedSetQuery.cancel();
+    debouncedSetQuery(searchQuery);
+    return () => debouncedSetQuery.cancel();
   }, [searchQuery, debouncedSetQuery]);
 
   const deferredSearchQuery = useDeferredValue(debouncedSearchQuery);
-// ... update filteredData to use deferredSearchQuery ...
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(new Set());
   const [advancedFilterGroup, setAdvancedFilterGroup] = useState<FilterGroup>({
     id: 'root',
@@ -137,94 +122,87 @@ export function useDatabase(
     logic: 'AND',
     conditions: []
   });
-  const [minCompleteness, setMinCompleteness] = useState<number>(0);
+  const [minCompleteness, setMinCompleteness] = useState(0);
 
   const allExpandedSelectedCategoryIds = useMemo(() => {
     if (selectedCategoryIds.size === 0) return new Set<string>();
     const ids = new Set<string>();
-    const traverse = (cats: Category[], forceAdd = false) => {
-      cats.forEach(c => {
-        const shouldAdd = forceAdd || selectedCategoryIds.has(c.id);
-        if (shouldAdd) ids.add(c.id);
-        if (c.children) traverse(c.children, shouldAdd);
+    const traverse = (categories: Category[], forceAdd = false) => {
+      categories.forEach((category) => {
+        const shouldAdd = forceAdd || selectedCategoryIds.has(category.id);
+        if (shouldAdd) ids.add(category.id);
+        if (category.children) traverse(category.children, shouldAdd);
       });
     };
     traverse(CATEGORY_TREE);
     return ids;
   }, [selectedCategoryIds]);
 
-  // Background Indexing: Warm up the O(1) text search index during idle time to prevent first-keystroke stutter.
+  const buildProductTextIndex = useCallback((product: Product): string => {
+    const chunks: string[] = [getLower(product.gradeName), getLower(product.manufacturer)];
+    product.categoryIds.forEach((id) => {
+      const category = categoryNameMap.get(id);
+      if (category) chunks.push(getLower(category));
+    });
+    for (const [key, property] of Object.entries(product.properties)) {
+      chunks.push(getLower(key));
+      const translatedKey = getLower(tProp(key));
+      if (translatedKey && translatedKey !== getLower(key)) chunks.push(translatedKey);
+      chunks.push(getLower(String(property.value)));
+      if (property.unit) chunks.push(getLower(property.unit));
+    }
+    return chunks.join(' | ');
+  }, [categoryNameMap, tProp]);
+
   useEffect(() => {
     if (!allProducts.length) return;
-    
+
+    let cancelled = false;
     let currentIndex = 0;
+    let idleHandle: number | null = null;
+    let intervalHandle: ReturnType<typeof setInterval> | null = null;
     const batchSize = 250;
-    
-    const indexBatch = (deadline: IdleDeadline) => {
-      while (deadline.timeRemaining() > 0 && currentIndex < allProducts.length) {
-        const end = Math.min(currentIndex + batchSize, allProducts.length);
-        for (let i = currentIndex; i < end; i++) {
-          const product = allProducts[i];
-          if (!__globalProductTextIndex.has(product)) {
-            const chunks: string[] = [
-              getLower(product.gradeName),
-              getLower(product.manufacturer)
-            ];
-            product.categoryIds.forEach(id => {
-              const c = categoryNameMap.get(id);
-              if (c) chunks.push(getLower(c));
-            });
-            for (const k in product.properties) {
-              chunks.push(getLower(k));
-              // Skip expensive translation logic during idle indexing to keep it light
-              const v = product.properties[k];
-              chunks.push(getLower(String(v.value)));
-              if (v.unit) chunks.push(getLower(v.unit));
-            }
-            __globalProductTextIndex.set(product, chunks.join(' | '));
-          }
-        }
-        currentIndex = end;
-      }
-      
-      if (currentIndex < allProducts.length) {
-        if ('requestIdleCallback' in window) {
-           (window as Window & { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback(indexBatch);
+
+    const processBatch = () => {
+      const end = Math.min(currentIndex + batchSize, allProducts.length);
+      for (let index = currentIndex; index < end; index += 1) {
+        const product = allProducts[index];
+        if (!__globalProductTextIndex.has(product)) {
+          __globalProductTextIndex.set(product, buildProductTextIndex(product));
         }
       }
+      currentIndex = end;
     };
 
-    if ('requestIdleCallback' in window) {
-      (window as Window & { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback(indexBatch);
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: (deadline: IdleDeadline) => void) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    if (idleWindow.requestIdleCallback) {
+      const run = (deadline: IdleDeadline) => {
+        if (cancelled) return;
+        while (deadline.timeRemaining() > 0 && currentIndex < allProducts.length) processBatch();
+        if (currentIndex < allProducts.length) idleHandle = idleWindow.requestIdleCallback?.(run) ?? null;
+      };
+      idleHandle = idleWindow.requestIdleCallback(run);
     } else {
-      // Fallback for Safari
-      const interval = setInterval(() => {
-        const end = Math.min(currentIndex + batchSize, allProducts.length);
-        for (let i = currentIndex; i < end; i++) {
-          const product = allProducts[i];
-          if (!__globalProductTextIndex.has(product)) {
-            const chunks: string[] = [
-              getLower(product.gradeName),
-              getLower(product.manufacturer)
-            ];
-            product.categoryIds.forEach(id => {
-              const c = categoryNameMap.get(id);
-              if (c) chunks.push(getLower(c));
-            });
-            for (const k in product.properties) {
-              chunks.push(getLower(k));
-              const v = product.properties[k];
-              chunks.push(getLower(String(v.value)));
-              if (v.unit) chunks.push(getLower(v.unit));
-            }
-            __globalProductTextIndex.set(product, chunks.join(' | '));
-          }
+      intervalHandle = setInterval(() => {
+        if (cancelled) return;
+        processBatch();
+        if (currentIndex >= allProducts.length && intervalHandle) {
+          clearInterval(intervalHandle);
+          intervalHandle = null;
         }
-        currentIndex = end;
-        if (currentIndex >= allProducts.length) clearInterval(interval);
       }, 50);
     }
-  }, [allProducts, categoryNameMap]);
+
+    return () => {
+      cancelled = true;
+      if (intervalHandle) clearInterval(intervalHandle);
+      if (idleHandle !== null) idleWindow.cancelIdleCallback?.(idleHandle);
+    };
+  }, [allProducts, buildProductTextIndex]);
 
   const filteredData = useMemo(() => {
     const syntaxRegex = /([^:\s]+(?:\s+[^:\s]+)*):([<>]=?|[^:\s]+)/g;
@@ -232,146 +210,89 @@ export function useDatabase(
     const filterMatches: { start: number, end: number }[] = [];
     let match;
     while ((match = syntaxRegex.exec(deferredSearchQuery)) !== null) {
-        const [full, label, condition] = match;
-        let key = resolvePropKey(label.trim());
-        let matchedLabel = label.trim();
-        if (!key) {
-            const parts = label.trim().split(/\s+/);
-            for (let i = 1; i < parts.length; i++) {
-                const subLabel = parts.slice(i).join(' ');
-                key = resolvePropKey(subLabel);
-                if (key) {
-                    matchedLabel = subLabel;
-                    break;
-                }
-            }
+      const [full, label, condition] = match;
+      let key = resolvePropKey(label.trim());
+      let matchedLabel = label.trim();
+      if (!key) {
+        const parts = label.trim().split(/\s+/);
+        for (let index = 1; index < parts.length; index += 1) {
+          const subLabel = parts.slice(index).join(' ');
+          key = resolvePropKey(subLabel);
+          if (key) {
+            matchedLabel = subLabel;
+            break;
+          }
         }
-        if (key) {
-            const filterPart = `${matchedLabel}:${condition}`;
-            const filterStart = match.index + full.lastIndexOf(filterPart);
-            filterMatches.push({ start: filterStart, end: filterStart + filterPart.length });
-            if (condition.includes('-') && !condition.startsWith('-')) {
-                const parts = condition.split('-');
-                syntaxFilters.push({ key, operator: 'range', value: parseFloat(parts[0]), max: parseFloat(parts[1]) });
-            } else if (condition.match(/^[<>]=?/)) {
-                const op = condition.match(/^[<>]=?/)?.[0] || '';
-                const val = parseFloat(condition.replace(op, ''));
-                syntaxFilters.push({ key, operator: op, value: val });
-            } else {
-                const numVal = parseFloat(condition);
-                syntaxFilters.push({ key, operator: '=', value: isNaN(numVal) ? getLower(condition) : numVal });
-            }
+      }
+      if (key) {
+        const filterPart = `${matchedLabel}:${condition}`;
+        const filterStart = match.index + full.lastIndexOf(filterPart);
+        filterMatches.push({ start: filterStart, end: filterStart + filterPart.length });
+        if (condition.includes('-') && !condition.startsWith('-')) {
+          const parts = condition.split('-');
+          syntaxFilters.push({ key, operator: 'range', value: parseFloat(parts[0]), max: parseFloat(parts[1]) });
+        } else if (condition.match(/^[<>]=?/)) {
+          const operator = condition.match(/^[<>]=?/)?.[0] || '';
+          syntaxFilters.push({ key, operator, value: parseFloat(condition.replace(operator, '')) });
+        } else {
+          const numeric = parseFloat(condition);
+          syntaxFilters.push({ key, operator: '=', value: Number.isNaN(numeric) ? getLower(condition) : numeric });
         }
+      }
     }
 
     let processedQuery = '';
     let lastIndex = 0;
-    filterMatches.sort((a, b) => a.start - b.start).forEach(m => {
-        processedQuery += deferredSearchQuery.substring(lastIndex, m.start);
-        lastIndex = m.end;
+    filterMatches.sort((a, b) => a.start - b.start).forEach((item) => {
+      processedQuery += deferredSearchQuery.substring(lastIndex, item.start);
+      lastIndex = item.end;
     });
     processedQuery += deferredSearchQuery.substring(lastIndex);
 
-    const textKeywords = processedQuery.toLowerCase().split(' ').filter(k => k.trim());
-
-    // Cache translated property keys and match results to avoid O(N * M) dictionary lookups
-    const propTranslationCache = new Map<string, string>();
-    const getTranslatedProp = (key: string) => {
-        let val = propTranslationCache.get(key);
-        if (val === undefined) {
-            val = tProp(key).toLowerCase();
-            propTranslationCache.set(key, val);
-        }
-        return val;
-    };
-
-    // Pre-calculate advanced filter predicate ONCE for this run
+    const textKeywords = processedQuery.toLowerCase().split(' ').filter((keyword) => keyword.trim());
     const advancedPredicate = compileFilterGroup(advancedFilterGroup);
     const hasAdvancedFilters = advancedFilterGroup.conditions.length > 0;
 
-    return allProducts.filter(product => {
-        // 1. Completeness fast-bail
-        if (minCompleteness > 0) {
-            const score = calculateCompleteness(product);
-            if (score < minCompleteness) return false;
-        }
+    return allProducts.filter((product) => {
+      if (minCompleteness > 0 && calculateCompleteness(product) < minCompleteness) return false;
 
-        // 2. Category fast-bail
-        if (allExpandedSelectedCategoryIds.size > 0) {
-            const pCats = Array.isArray(product.categoryIds) ? product.categoryIds : [];
-            let catFound = false;
-            for (let i = 0; i < pCats.length; i++) {
-                if (allExpandedSelectedCategoryIds.has(pCats[i])) {
-                    catFound = true;
-                    break;
-                }
-            }
-            if (!catFound) return false;
-        }
+      if (allExpandedSelectedCategoryIds.size > 0) {
+        const categories = Array.isArray(product.categoryIds) ? product.categoryIds : [];
+        if (!categories.some((category) => allExpandedSelectedCategoryIds.has(category))) return false;
+      }
 
-        // 3. Text Keywords (via Indexed WeakMap)
-        if (textKeywords.length > 0) {
-            const tokens = __globalProductTextIndex.get(product);
-            let searchTokens = tokens;
-            if (searchTokens === undefined) {
-                const chunks: string[] = [
-                    getLower(product.gradeName),
-                    getLower(product.manufacturer)
-                ];
-                product.categoryIds.forEach(id => {
-                    const c = categoryNameMap.get(id);
-                    if (c) chunks.push(getLower(c));
-                });
-                for (const k in product.properties) {
-                    chunks.push(getLower(k));
-                    const transKey = getTranslatedProp(k);
-                    if (transKey && getLower(transKey) !== getLower(k)) chunks.push(getLower(transKey));
-                    const v = product.properties[k];
-                    chunks.push(getLower(String(v.value)));
-                    if (v.unit) chunks.push(getLower(v.unit));
-                }
-                searchTokens = chunks.join(' | ');
-                __globalProductTextIndex.set(product, searchTokens);
-            }
-            
-            for (let i = 0; i < textKeywords.length; i++) {
-                if (!searchTokens.includes(textKeywords[i])) return false;
-            }
+      if (textKeywords.length > 0) {
+        let searchTokens = __globalProductTextIndex.get(product);
+        if (searchTokens === undefined) {
+          searchTokens = buildProductTextIndex(product);
+          __globalProductTextIndex.set(product, searchTokens);
         }
+        if (textKeywords.some((keyword) => !searchTokens.includes(keyword))) return false;
+      }
 
-        // 4. Syntax Filters (Calculated numeric comparisons)
-        if (syntaxFilters.length > 0) {
-            for (let i = 0; i < syntaxFilters.length; i++) {
-                const f = syntaxFilters[i];
-                const propVal = product.properties[f.key]?.value;
-                const val = typeof propVal === 'number' ? propVal : parseFloat(String(propVal));
-                
-                let match = false;
-                if (isNaN(val) || typeof f.value === 'string') {
-                    match = getLower(String(propVal)).includes(f.value as string);
-                } else {
-                    switch(f.operator) {
-                        case '>': match = val > (f.value as number); break;
-                        case '<': match = val < (f.value as number); break;
-                        case '>=': match = val >= (f.value as number); break;
-                        case '<=': match = val <= (f.value as number); break;
-                        case 'range': match = val >= (f.value as number) && val <= (f.max || Infinity); break;
-                        case '=': match = val === (f.value as number); break;
-                        default: match = true;
-                    }
-                }
-                if (!match) return false;
-            }
+      for (const filter of syntaxFilters) {
+        const propertyValue = product.properties[filter.key]?.value;
+        const numericValue = typeof propertyValue === 'number' ? propertyValue : parseFloat(String(propertyValue));
+        let matches = false;
+        if (Number.isNaN(numericValue) || typeof filter.value === 'string') {
+          matches = getLower(String(propertyValue)).includes(filter.value as string);
+        } else {
+          switch (filter.operator) {
+            case '>': matches = numericValue > (filter.value as number); break;
+            case '<': matches = numericValue < (filter.value as number); break;
+            case '>=': matches = numericValue >= (filter.value as number); break;
+            case '<=': matches = numericValue <= (filter.value as number); break;
+            case 'range': matches = numericValue >= (filter.value as number) && numericValue <= (filter.max ?? Infinity); break;
+            case '=': matches = numericValue === (filter.value as number); break;
+            default: matches = true;
+          }
         }
+        if (!matches) return false;
+      }
 
-        // 5. Advanced Rule Engine (Pre-compiled Predicate)
-        if (hasAdvancedFilters) {
-            if (!advancedPredicate(product)) return false;
-        }
-
-        return true;
+      return !hasAdvancedFilters || advancedPredicate(product);
     });
-  }, [allProducts, deferredSearchQuery, allExpandedSelectedCategoryIds, resolvePropKey, advancedFilterGroup, minCompleteness, categoryNameMap, tProp]);
+  }, [allProducts, deferredSearchQuery, allExpandedSelectedCategoryIds, resolvePropKey, advancedFilterGroup, minCompleteness, buildProductTextIndex]);
 
   return useMemo(() => ({
     searchQuery,
@@ -410,7 +331,3 @@ export function useDatabase(
     columnManagement
   ]);
 }
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed
