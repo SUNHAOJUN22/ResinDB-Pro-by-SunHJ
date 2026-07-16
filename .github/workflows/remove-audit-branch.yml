@@ -1,0 +1,16 @@
+name: Remove temporary audit branch
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  remove-branch:
+    if: github.event.pull_request.head.ref == 'audit-trigger'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete temporary branch
+        run: git push https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git --delete audit-trigger
