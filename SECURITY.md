@@ -2,7 +2,7 @@
 
 ## Supported branch
 
-Security fixes are developed against `main`. This repository is a research and demonstration application; it is not a certified production database, laboratory information management system, or regulatory decision engine.
+Security fixes are developed directly against `main`. This repository is a research and demonstration application; it is not a certified production database, laboratory information management system, or regulatory decision engine.
 
 ## Reporting a vulnerability
 
@@ -16,17 +16,27 @@ Do not publish credentials, private datasets, exploit payloads, or personally id
 
 ## Credential incident response
 
-A Gemini API credential was previously committed in `.env`. Removing the file from the current tree does **not** invalidate the credential or erase it from Git history. The repository owner must:
+An API credential was previously committed in `.env`. Removing the file from the current tree does **not** invalidate the credential or erase it from Git history. The repository owner must:
 
-1. revoke the exposed key in the provider console immediately;
-2. create a replacement key with the minimum required API and origin restrictions;
-3. never commit `.env`, `.env.local`, service-account files, or exported cloud credentials;
-4. consider rewriting repository history only after coordinating with all collaborators;
-5. review provider usage and billing logs for unauthorized activity.
+1. revoke the exposed credential in the provider console immediately;
+2. create a replacement credential with the minimum required API, origin and quota restrictions;
+3. never commit `.env`, `.env.local`, service-account files, private keys or exported cloud credentials;
+4. consider rewriting repository history only after coordinating with every collaborator and deployment;
+5. review provider usage, access and billing logs for unauthorized activity.
 
-## Frontend environment variables
+## Frontend AI API configuration
 
-Vite embeds `VITE_*` variables into browser assets. A browser-delivered key is therefore not a secret. `VITE_GEMINI_API_KEY` is supported only for local demonstration with a disposable, restricted key. Production deployments should use an authenticated server-side proxy, rate limiting, request validation, audit logging, and secret management.
+Vite embeds every `VITE_*` variable into browser assets. A browser-delivered API key is therefore not a secret. `VITE_AI_API_KEY` and the in-app AI API Settings panel are intended only for restricted local-development credentials.
+
+Production deployments should use an authenticated server-side gateway with:
+
+- secret management;
+- rate limiting;
+- request and response validation;
+- user-level authorization;
+- audit logging;
+- provider allow-lists;
+- usage and cost controls.
 
 ## Formula execution boundary
 
