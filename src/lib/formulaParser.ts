@@ -1,227 +1,489 @@
 import { logger } from '@/lib/logger';
-import { Product, FormulaConfig } from '@/types/index';
+import { FormulaConfig, Product } from '@/types/index';
 
-/**
- * Fast, sandboxed formula evaluator using Directed Acyclic Graph (DAG) for safe topological evaluation.
- * Compiles a set of user-defined string expressions into a high-performance execution plan.
- */
+type PropertyDictionary = Record<string, number>;
+type Evaluator = (properties: PropertyDictionary) => number;
+
+type TokenType =
+  | 'number'
+  | 'property'
+  | 'identifier'
+  | 'operator'
+  | 'leftParen'
+  | 'rightParen'
+  | 'comma'
+  | 'eof';
+
+interface Token {
+  type: TokenType;
+  value: string;
+  position: number;
+}
+
+const UNARY_FUNCTIONS: Readonly<Record<string, (value: number) => number>> = {
+  abs: Math.abs,
+  sqrt: Math.sqrt,
+  log: Math.log,
+  log10: Math.log10,
+  exp: Math.exp,
+  sin: Math.sin,
+  cos: Math.cos,
+  tan: Math.tan,
+};
+
+function tokenize(expression: string): Token[] {
+  const tokens: Token[] = [];
+  let position = 0;
+
+  while (position < expression.length) {
+    const source = expression.slice(position);
+    const whitespace = source.match(/^\s+/);
+    if (whitespace) {
+      position += whitespace[0].length;
+      continue;
+    }
+
+    const property = source.match(/^(?:props|p)\[(['"])(.*?)\1\]/i);
+    if (property) {
+      tokens.push({ type: 'property', value: property[2], position });
+      position += property[0].length;
+      continue;
+    }
+
+    const number = source.match(/^(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/i);
+    if (number) {
+      tokens.push({ type: 'number', value: number[0], position });
+      position += number[0].length;
+      continue;
+    }
+
+    const identifier = source.match(/^[A-Za-z_][A-Za-z0-9_.]*/);
+    if (identifier) {
+      tokens.push({ type: 'identifier', value: identifier[0], position });
+      position += identifier[0].length;
+      continue;
+    }
+
+    if (source.startsWith('**')) {
+      tokens.push({ type: 'operator', value: '**', position });
+      position += 2;
+      continue;
+    }
+
+    const character = expression[position];
+    if ('+-*/%^'.includes(character)) {
+      tokens.push({ type: 'operator', value: character, position });
+      position += 1;
+      continue;
+    }
+    if (character === '(') {
+      tokens.push({ type: 'leftParen', value: character, position });
+      position += 1;
+      continue;
+    }
+    if (character === ')') {
+      tokens.push({ type: 'rightParen', value: character, position });
+      position += 1;
+      continue;
+    }
+    if (character === ',') {
+      tokens.push({ type: 'comma', value: character, position });
+      position += 1;
+      continue;
+    }
+
+    throw new Error(`Unsupported token at position ${position}: ${character}`);
+  }
+
+  tokens.push({ type: 'eof', value: '', position: expression.length });
+  return tokens;
+}
+
+class ArithmeticParser {
+  private readonly tokens: Token[];
+  private cursor = 0;
+
+  constructor(expression: string) {
+    this.tokens = tokenize(expression);
+  }
+
+  parse(): Evaluator {
+    const evaluator = this.parseAdditive();
+    this.expect('eof');
+    return evaluator;
+  }
+
+  private current(): Token {
+    return this.tokens[this.cursor];
+  }
+
+  private consume(): Token {
+    const token = this.current();
+    this.cursor += 1;
+    return token;
+  }
+
+  private match(type: TokenType, value?: string): boolean {
+    const token = this.current();
+    if (token.type !== type || (value !== undefined && token.value !== value)) {
+      return false;
+    }
+    this.cursor += 1;
+    return true;
+  }
+
+  private expect(type: TokenType, value?: string): Token {
+    const token = this.current();
+    if (token.type !== type || (value !== undefined && token.value !== value)) {
+      const expected = value === undefined ? type : `${type} "${value}"`;
+      throw new Error(
+        `Expected ${expected} at position ${token.position}, received ${token.type} "${token.value}"`,
+      );
+    }
+    return this.consume();
+  }
+
+  private parseAdditive(): Evaluator {
+    let left = this.parseMultiplicative();
+
+    while (
+      this.current().type === 'operator' &&
+      (this.current().value === '+' || this.current().value === '-')
+    ) {
+      const operator = this.consume().value;
+      const right = this.parseMultiplicative();
+      const previous = left;
+      left =
+        operator === '+'
+          ? (properties) => previous(properties) + right(properties)
+          : (properties) => previous(properties) - right(properties);
+    }
+
+    return left;
+  }
+
+  private parseMultiplicative(): Evaluator {
+    let left = this.parsePower();
+
+    while (
+      this.current().type === 'operator' &&
+      ['*', '/', '%'].includes(this.current().value)
+    ) {
+      const operator = this.consume().value;
+      const right = this.parsePower();
+      const previous = left;
+
+      if (operator === '*') {
+        left = (properties) => previous(properties) * right(properties);
+      } else if (operator === '/') {
+        left = (properties) => previous(properties) / right(properties);
+      } else {
+        left = (properties) => previous(properties) % right(properties);
+      }
+    }
+
+    return left;
+  }
+
+  private parsePower(): Evaluator {
+    const left = this.parseUnary();
+    if (
+      this.current().type === 'operator' &&
+      (this.current().value === '**' || this.current().value === '^')
+    ) {
+      this.consume();
+      const right = this.parsePower();
+      return (properties) => Math.pow(left(properties), right(properties));
+    }
+    return left;
+  }
+
+  private parseUnary(): Evaluator {
+    if (this.match('operator', '+')) return this.parseUnary();
+    if (this.match('operator', '-')) {
+      const operand = this.parseUnary();
+      return (properties) => -operand(properties);
+    }
+    return this.parsePrimary();
+  }
+
+  private parsePrimary(): Evaluator {
+    const token = this.current();
+
+    if (token.type === 'number') {
+      this.consume();
+      const value = Number(token.value);
+      return () => value;
+    }
+
+    if (token.type === 'property') {
+      this.consume();
+      const propertyName = token.value;
+      return (properties) => properties[propertyName] ?? 0;
+    }
+
+    if (token.type === 'leftParen') {
+      this.consume();
+      const expression = this.parseAdditive();
+      this.expect('rightParen');
+      return expression;
+    }
+
+    if (token.type === 'identifier') {
+      this.consume();
+      const normalized = token.value.replace(/^Math\./, '');
+      if (normalized === 'PI') return () => Math.PI;
+      if (normalized === 'E') return () => Math.E;
+
+      this.expect('leftParen');
+      const args: Evaluator[] = [];
+      if (!this.match('rightParen')) {
+        do {
+          args.push(this.parseAdditive());
+        } while (this.match('comma'));
+        this.expect('rightParen');
+      }
+
+      if (normalized in UNARY_FUNCTIONS) {
+        if (args.length !== 1) {
+          throw new Error(`${normalized} expects exactly one argument`);
+        }
+        const fn = UNARY_FUNCTIONS[normalized];
+        return (properties) => fn(args[0](properties));
+      }
+      if (normalized === 'pow') {
+        if (args.length !== 2) throw new Error('pow expects exactly two arguments');
+        return (properties) => Math.pow(args[0](properties), args[1](properties));
+      }
+      if (normalized === 'min' || normalized === 'max') {
+        if (args.length === 0) throw new Error(`${normalized} expects at least one argument`);
+        const fn = normalized === 'min' ? Math.min : Math.max;
+        return (properties) => fn(...args.map((argument) => argument(properties)));
+      }
+
+      throw new Error(`Unsupported identifier: ${token.value}`);
+    }
+
+    throw new Error(`Unexpected token "${token.value}" at position ${token.position}`);
+  }
+}
+
 export class FormulaEngine {
-  private static readonly MATH_FUNCS = [
-    "abs", "sqrt", "pow", "log", "log10", "exp", "sin", "cos", "tan", "min", "max", "PI",
+  private static readonly MATH_FUNCTIONS = [
+    'abs',
+    'sqrt',
+    'pow',
+    'log',
+    'log10',
+    'exp',
+    'sin',
+    'cos',
+    'tan',
+    'min',
+    'max',
   ];
 
-  private static readonly MATH_REGEXES = FormulaEngine.MATH_FUNCS.map(func => ({
-    regex: new RegExp(`\\b${func}\\(`, "g"),
-    replacement: `Math.${func}(`
-  }));
+  private cachedPlan: {
+    formulasRef: FormulaConfig[];
+    executor: (product: Product) => Record<string, number>;
+  } | null = null;
 
-  /**
-   * Extracts dependent property names or computed column names from an expression.
-   */
   public extractDependencies(expression: string): string[] {
-    const deps = new Set<string>();
-    const regex = /(?:props|Props|p|P)\[['"](.+?)['"]\]/gi;
-    let match;
+    const dependencies = new Set<string>();
+    const regex = /(?:props|p)\[['"](.+?)['"]\]/gi;
+    let match: RegExpExecArray | null;
     while ((match = regex.exec(expression)) !== null) {
-      if (match[1]) deps.add(match[1]);
+      if (match[1]) dependencies.add(match[1]);
     }
-    return Array.from(deps);
+    return Array.from(dependencies);
   }
 
   /**
-   * Translates a formula like "Props['Density'] * 10" into a safe internal expression.
+   * Kept for backwards-compatible previews in the formula editor. Execution no
+   * longer uses this string; formulas are parsed into a numeric evaluator.
    */
   public sanitize(expression: string): string {
     let sanitized = expression.replace(
-      /(?:props|Props|p|P)\[['"](.+?)['"]\]/gi,
-      (_, pName) => {
-        const safePName = pName.replace(/'/g, "\\'");
-        return `(p['${safePName}'] || 0)`;
-      },
+      /(?:props|p)\[['"](.+?)['"]\]/gi,
+      (_, propertyName: string) => `(p['${propertyName.replace(/'/g, "\\'")}'] || 0)`,
     );
 
-    sanitized = sanitized.replace(/[;<>{} `$]/g, (match) => {
-      return match === " " ? " " : "";
-    });
-
-    FormulaEngine.MATH_REGEXES.forEach(({ regex, replacement }) => {
-      sanitized = sanitized.replace(regex, replacement);
-    });
-
+    for (const functionName of FormulaEngine.MATH_FUNCTIONS) {
+      sanitized = sanitized.replace(
+        new RegExp(`(^|[^.\\w])${functionName}\\(`, 'g'),
+        `$1Math.${functionName}(`,
+      );
+    }
+    sanitized = sanitized.replace(/(^|[^.\w])PI\b/g, '$1Math.PI');
     return sanitized;
   }
 
-  /**
-   * Compiles the DAG of all formulas to ensure there are no cycles, and returns a topologically sorted list.
-   * Throws an error with the cycle path if a cyclic dependency is detected.
-   */
   public buildTopologicalOrder(formulas: FormulaConfig[]): FormulaConfig[] {
     const graph = new Map<string, string[]>();
-    const formulaNames = new Set(formulas.map(f => f.name));
-    const formulaMap = new Map<string, FormulaConfig>();
+    const formulaNames = new Set(formulas.map((formula) => formula.name));
+    const formulaMap = new Map(formulas.map((formula) => [formula.name, formula]));
 
-    for (const f of formulas) {
-      formulaMap.set(f.name, f);
-      // Depenencies are only those that refer to other formulas
-      const deps = this.extractDependencies(f.expression).filter(d => formulaNames.has(d));
-      graph.set(f.name, deps);
+    for (const formula of formulas) {
+      graph.set(
+        formula.name,
+        this.extractDependencies(formula.expression).filter((dependency) =>
+          formulaNames.has(dependency),
+        ),
+      );
     }
 
     const visited = new Set<string>();
     const visiting = new Set<string>();
     const order: FormulaConfig[] = [];
 
-    const dfs = (node: string, path: string[]) => {
+    const visit = (node: string, path: string[]) => {
       if (visiting.has(node)) {
-        throw new Error(`Cyclic dependency detected: ${path.join(' -> ')} -> ${node}`);
+        throw new Error(`Cyclic dependency detected: ${[...path, node].join(' -> ')}`);
       }
       if (visited.has(node)) return;
 
       visiting.add(node);
-      path.push(node);
-
-      const deps = graph.get(node) || [];
-      for (const dep of deps) {
-        dfs(dep, path);
+      for (const dependency of graph.get(node) || []) {
+        visit(dependency, [...path, node]);
       }
-
-      path.pop();
       visiting.delete(node);
       visited.add(node);
-      
-      const config = formulaMap.get(node);
-      if (config) order.push(config);
+
+      const formula = formulaMap.get(node);
+      if (formula) order.push(formula);
     };
 
-    for (const [node] of graph) {
-      if (!visited.has(node)) {
-         dfs(node, []);
-      }
-    }
-
+    for (const node of graph.keys()) visit(node, []);
     return order;
   }
 
-  /**
-   * Validates a single expression against the current set of formulas to ensure no cycles are created.
-   * Returns a string error message if invalid, or null if valid.
-   */
-  public validate(expression: string, currentName?: string, allFormulas: FormulaConfig[] = []): string | null {
-    if (!expression.trim()) return "Expression cannot be empty";
-    
+  public validate(
+    expression: string,
+    currentName?: string,
+    allFormulas: FormulaConfig[] = [],
+  ): string | null {
+    if (!expression.trim()) return 'Expression cannot be empty';
+
     const forbiddenKeywords = [
-      'window', 'document', 'globalThis', 'fetch', 'XMLHttpRequest', 'eval', 
-      'Function', 'setTimeout', 'setInterval', 'alert', 'cookie', 'localStorage', 
-      'sessionStorage', 'indexedDB', 'constructor', '__proto__', 'prototype'
+      'window',
+      'document',
+      'globalThis',
+      'fetch',
+      'XMLHttpRequest',
+      'eval',
+      'Function',
+      'setTimeout',
+      'setInterval',
+      'alert',
+      'cookie',
+      'localStorage',
+      'sessionStorage',
+      'indexedDB',
+      'constructor',
+      '__proto__',
+      'prototype',
     ];
-    for (const kw of forbiddenKeywords) {
-      const regex = new RegExp(`\\b${kw}\\b`, 'i');
-      if (regex.test(expression)) {
-        return `Security violation: Forbidden keyword "${kw}" detected`;
+
+    for (const keyword of forbiddenKeywords) {
+      if (new RegExp(`\\b${keyword}\\b`, 'i').test(expression)) {
+        return `Security violation: Forbidden keyword "${keyword}" detected`;
       }
     }
 
-    const body = this.sanitize(expression);
     try {
-      new Function("p", `return ${body}`);
-    } catch (err) {
-      return err instanceof Error ? err.message : "Invalid syntax";
+      new ArithmeticParser(expression).parse();
+    } catch (error) {
+      return error instanceof Error ? error.message : 'Invalid expression';
     }
 
     if (currentName) {
-      const tempFormulas = [
-        ...allFormulas.filter(f => f.name !== currentName),
-        { id: "temp_test_id", name: currentName, expression, unit: "" } as FormulaConfig
-      ];
+      const candidate: FormulaConfig = {
+        id: 'formula-validation-candidate',
+        name: currentName,
+        expression,
+        unit: '',
+      };
       try {
-        this.buildTopologicalOrder(tempFormulas);
-      } catch (err) {
-        return err instanceof Error ? err.message : "Cyclical dependency error";
+        this.buildTopologicalOrder([
+          ...allFormulas.filter((formula) => formula.name !== currentName),
+          candidate,
+        ]);
+      } catch (error) {
+        return error instanceof Error ? error.message : 'Cyclical dependency error';
       }
     }
 
     return null;
   }
 
-  // Caching the execution plan
-  private _cachedPlan: {
-    formulasRef: FormulaConfig[];
-    executor: (product: Product) => Record<string, number>;
-  } | null = null;
-
-  private areFormulasEqual(a: FormulaConfig[], b: FormulaConfig[]): boolean {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-      if (
-        a[i].id !== b[i].id ||
-        a[i].name !== b[i].name ||
-        a[i].expression !== b[i].expression ||
-        a[i].unit !== b[i].unit
-      ) {
-        return false;
-      }
-    }
-    return true;
+  private areFormulasEqual(left: FormulaConfig[], right: FormulaConfig[]): boolean {
+    return (
+      left.length === right.length &&
+      left.every(
+        (formula, index) =>
+          formula.id === right[index].id &&
+          formula.name === right[index].name &&
+          formula.expression === right[index].expression &&
+          formula.unit === right[index].unit,
+      )
+    );
   }
 
-  /**
-   * Creates an execution plan for evaluating a product across all compiled formulas.
-   */
-  public compileGraph(formulas: FormulaConfig[]): (product: Product) => Record<string, number> {
-    if (this._cachedPlan && (this._cachedPlan.formulasRef === formulas || this.areFormulasEqual(this._cachedPlan.formulasRef, formulas))) {
-      return this._cachedPlan.executor;
+  public compileGraph(
+    formulas: FormulaConfig[],
+  ): (product: Product) => Record<string, number> {
+    if (
+      this.cachedPlan &&
+      (this.cachedPlan.formulasRef === formulas ||
+        this.areFormulasEqual(this.cachedPlan.formulasRef, formulas))
+    ) {
+      return this.cachedPlan.executor;
     }
 
-    let order: FormulaConfig[] = [];
+    let orderedFormulas: FormulaConfig[];
     try {
-      order = this.buildTopologicalOrder(formulas);
-    } catch (e) {
-      logger.error(e);
-      order = formulas; // Fallback to raw if cyclic exists (though validate should prevent this)
+      orderedFormulas = this.buildTopologicalOrder(formulas);
+    } catch (error) {
+      logger.error('Formula graph compilation failed', error);
+      const failedExecutor = () =>
+        Object.fromEntries(formulas.map((formula) => [formula.id, 0]));
+      this.cachedPlan = { formulasRef: formulas, executor: failedExecutor };
+      return failedExecutor;
     }
 
-    const compiledFns = order.map(f => {
-       const body = this.sanitize(f.expression);
-       const fn = new Function(
-         "p",
-         `try { const res = Number(${body}); return Number.isFinite(res) ? res : 0; } catch(e) { return 0; }`
-       ) as (p: Record<string, number>) => number;
-       return { id: f.id, name: f.name, fn };
-    });
+    const compiled = orderedFormulas.map((formula) => ({
+      id: formula.id,
+      name: formula.name,
+      evaluate: new ArithmeticParser(formula.expression).parse(),
+    }));
 
     const executor = (product: Product) => {
-      const pDict: Record<string, number> = {};
-      // Base properties
-      for (const key in product.properties) {
-        const val = product.properties[key].value;
-        pDict[key] = typeof val === "number" ? val : parseFloat(String(val)) || 0;
+      const properties: PropertyDictionary = {};
+      for (const [key, property] of Object.entries(product.properties)) {
+        const numericValue =
+          typeof property.value === 'number'
+            ? property.value
+            : Number.parseFloat(String(property.value));
+        properties[key] = Number.isFinite(numericValue) ? numericValue : 0;
       }
 
       const results: Record<string, number> = {};
-      // Evaluate in topological order
-      for (const step of compiledFns) {
-         const val = step.fn(pDict);
-         pDict[step.name] = val; // Store back in dict for subsequent formulas to consume via Props['name']
-         results[step.id] = val;
+      for (const step of compiled) {
+        const calculated = step.evaluate(properties);
+        const value = Number.isFinite(calculated) ? calculated : 0;
+        properties[step.name] = value;
+        results[step.id] = value;
       }
       return results;
     };
 
-    this._cachedPlan = {
-      formulasRef: formulas,
-      executor
-    };
-
+    this.cachedPlan = { formulasRef: formulas, executor };
     return executor;
   }
 
-  public clearCache() {
-    this._cachedPlan = null;
+  public clearCache(): void {
+    this.cachedPlan = null;
   }
 }
 
 export const formulaEngine = new FormulaEngine();
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed
