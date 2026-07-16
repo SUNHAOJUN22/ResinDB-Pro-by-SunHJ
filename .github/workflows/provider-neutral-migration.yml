@@ -49,6 +49,7 @@ jobs:
           PY
 
           rm -f src/services/geminiService.ts
+          rm -f 'src/workers/ResinDB_Pro_技术实现_参数配置与部署说明报告.md'
           rm -f .agents/skills/firebase_basics/references/setup/gemini_cli.md
           rm -f .agents/skills/firebase_basics/references/refresh/gemini-cli.md
 
