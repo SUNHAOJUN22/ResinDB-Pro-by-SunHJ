@@ -5,7 +5,7 @@ on:
     branches:
       - agent/resindb-pro-full-hardening
     paths:
-      - .github/agent-hardening-patch/part-04
+      - .github/agent-hardening-patch/part-15
 
 permissions:
   contents: write
