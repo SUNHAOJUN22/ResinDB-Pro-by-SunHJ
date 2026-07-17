@@ -101,88 +101,94 @@ ResinDB Pro v3.1.0 采用严格可移植的**三层体系架构模型**，使底
 
 本系统的核心计算内核与 24 组独立 Web Workers 网格均基于严谨的物理高分子动力学与数理统计模型。以下为系统所集成的关键物理数学模型推导：
 
-### 1. Carreau-Yasuda 剪切流变本构模型 (Rheological Constitutive Model)
-在高剪切扫频拟合（`carreauWorker.ts`）中，系统用于重构高分子熔体表观黏度与剪切速率关系的本构方程为：
-$$\eta(\dot{\gamma}) = \eta_{\infty} + (\eta_0 - \eta_{\infty})\left[1 + (\lambda \dot{\gamma})^a\right]^\frac{n-1}{a}$$
-*   **$\eta(\dot{\gamma})$**：对应剪切速率 $\dot{\gamma}$ 下的表观黏度 ($\text{Pa·s}$)。
-*   **$\eta_0$**：零剪切黏度 ($\text{Pa·s}$)，表征高分子长链纠缠网在静态极限下的变形抗力。
-*   **$\eta_{\infty}$**：无穷剪切黏度 ($\text{Pa·s}$)，代表长链网络完全解纠缠取向后的极限溶剂化黏度，热塑性熔体计算中通常设为 0。
-*   **$\lambda$**：材料特征松弛时间 ($\text{s}$)，其倒数 $1/\lambda$ 表征了流体由牛顿区向幂律区过渡的临界剪切速率。
-*   **$a$**：Yasuda 无量纲参数，调控过渡区黏度下降的弯折曲率（系统在 standard Carreau 算子中取 $a=2$）。
-*   **$n$**：非牛顿指数（剪切稀释指数，当 $0 < n < 1$ 时呈拟塑性流体特征，其值越小表明剪切变稀敏感度越高）。
+### 1. Carreau-Yasuda 剪切流变本构方程与 Gauss-Newton 非线性数值拟合
+在剪切流变数值拟合（`carreauWorker.ts`）中，高分子熔体表观黏度拟合的目标是最小化如下的加权相对残差平方和：
+$$\min_{\theta} \chi^2(\theta) = \sum_{i=1}^M \left[ \frac{\eta_{i} - f(\dot{\gamma}_i; \theta)}{\eta_{i}} \right]^2, \quad \theta = [\eta_0, \lambda, n]^T$$
+本构方程的物理展开式为：
+$$f(\dot{\gamma}; \theta) = \eta_0 \left[1 + (\lambda \dot{\gamma})^2\right]^\frac{n-1}{2}$$
+其中 $\eta_0$ 为零剪切黏度（$\text{Pa·s}$），$\lambda$ 为链特征松弛时间（$\text{s}$），$n$ 为非牛顿剪切稀释指数。
+Gauss-Newton（或 Levenberg-Marquardt）法求解需要求解雅可比矩阵 $\mathbf{J} \in \mathbb{R}^{M \times 3}$ 的偏导分量：
+*   **对 $\eta_0$ 的敏感度导数**：
+    $$\frac{\partial f}{\partial \eta_0} = \left[ 1 + (\lambda \dot{\gamma})^2 \right]^{\frac{n-1}{2}}$$
+*   **对 $\lambda$ 的敏感度导数**：
+    $$\frac{\partial f}{\partial \lambda} = \eta_0 (n-1) \lambda \dot{\gamma}^2 \left[ 1 + (\lambda \dot{\gamma})^2 \right]^{\frac{n-3}{2}}$$
+*   **对 $n$ 的敏感度导数**：
+    $$\frac{\partial f}{\partial n} = \frac{1}{2} \eta_0 \ln\left[ 1 + (\lambda \dot{\gamma})^2 \right] \left[ 1 + (\lambda \dot{\gamma})^2 \right]^{\frac{n-1}{2}}$$
+参数通过以下牛顿法迭代更新：
+$$\theta^{(k+1)} = \theta^{(k)} - \left( \mathbf{J}^T \mathbf{J} + \mu \mathbf{I} \right)^{-1} \mathbf{J}^T \mathbf{r}$$
+其中 $\mathbf{r}$ 为相对残差向量，$\mu$ 为阻尼因子，系统对其有防非有限值（NaN/Infinity）的保护。
 
-### 2. William-Landel-Ferry (WLF) 温时等效平移方程 (TTS Viscoelasticity)
-在动态热力学阻尼松弛扫频中（`wlfWorker.ts`），利用自由体积理论描述非晶态高分子在玻璃化转变温度 $T_g$ 附近的松弛时间温时对等关系：
-$$\log_{10} a_T = \frac{-C_1(T - T_0)}{C_2 + (T - T_0)}$$
-*   **$a_T$**：水平位移因子，在流变测试中定义为温度 $T$ 与参考温度 $T_0$ 下的黏度及密度绝对比值：
+### 2. William-Landel-Ferry (WLF) 温时等效平移方程及参数换算
+利用自由体积理论描述非晶态高分子在玻璃化转变温度 $T_g$ 附近的松弛时间温时对等关系（`wlfWorker.ts`）：
+$$\log_{10} a_T = \frac{-C_1^0 (T - T_0)}{C_2^0 + (T - T_0)}$$
+*   **$a_T$**：水平平移因子，即温度 $T$ 与参考温度 $T_0$ 下的黏度及密度绝对比值：
     $$a_T = \frac{\eta(T)\rho_0 T_0}{\eta(T_0)\rho T} \approx \frac{\eta(T)}{\eta(T_0)}$$
-*   **$C_1, C_2$**：系统特定参考温度 $T_0$ 下的半经验系数。若以玻璃化温度 $T_g$ 作为参考温度，多数非结晶高聚物符合普适常数：
-    $$C_1^g \approx 17.44, \quad C_2^g \approx 51.6 \text{ K}$$
-*   **参考温度平移换算公式**：当参考温度由 $T_g$ 平移切换至任意基准温度 $T_0$ 时，对应的系数 $C_1^0$ 与 $C_2^0$ 的严密转换公式为：
+*   **参考温度转换公式**：若已知以 $T_g$ 为基准的通用 WLF 系数 $C_1^g \approx 17.44$ 和 $C_2^g \approx 51.6 \text{ K}$，则转换到实验室任意选择的参考温度 $T_0$ 时的系数值为：
     $$C_1^0 = \frac{C_1^g C_2^g}{C_2^g + (T_0 - T_g)}, \quad C_2^0 = C_2^g + (T_0 - T_g)$$
 
-### 3. Prony 剪切松弛模量麦克斯韦衰减谱模型 (Maxwell Relaxation)
-时域弹性蠕变与长效刚度评估（`pronyWorker.ts`）基于广义 Maxwell 粘弹性模型：
+### 3. Prony 剪切松弛模量麦克斯韦谱模型与频域动态重构
+时域粘弹性描述（`pronyWorker.ts`）基于广义 Maxwell 粘弹性模型：
 $$G(t) = G_e + \sum_{i=1}^N G_i \exp\left(-\frac{t}{\tau_i}\right)$$
-*   **$G_e$**：平衡剪切模量（$t \to \infty$ 极限刚度，未交联线性树脂 $G_e = 0$）。
-*   **$G_i$**：第 $i$ 阶 Maxwell 单元的松弛弹性强度因子（模量贡献）。
-*   **$\tau_i = \eta_i / G_i$**：第 $i$ 阶子单元的特征松弛时间常数。
-*   **频域转换傅里叶积分对齐**：通过 Prony 谱系数，将正弦角频率 $\omega$ 扫频下的储能模量 $G'$ 和损耗模量 $G''$ 实时重构解出：
-    $$G'(\omega) = G_e + \sum_{i=1}^N \frac{G_i \omega^2 \tau_i^2}{1 + \omega^2 \tau_i^2}, \quad G''(\omega) = \sum_{i=1}^N \frac{G_i \omega \tau_i}{1 + \omega^2 \tau_i^2}$$
+其中 $G_e$ 是平衡剪切模量，$G_i$ 为第 $i$ 阶 Maxwell 单元的剪切松弛强度，$\tau_i$ 为特征松弛时间。
+频域动态流变扫频的储能模量 $G'(\omega)$ 与损耗模量 $G''(\omega)$ 由时域 Prony 谱参数经傅里叶积分变换精确重构：
+$$G'(\omega) = G_e + \sum_{i=1}^N \frac{G_i \omega^2 \tau_i^2}{1 + \omega^2 \tau_i^2}, \quad G''(\omega) = \sum_{i=1}^N \frac{G_i \omega \tau_i}{1 + \omega^2 \tau_i^2}$$
 
-### 4. Weibull 极限抗拉强度与力学疲劳破坏概率分布 (Mechanical Reliability)
-在材料抗疲劳长周期评估（`weibullWorker.ts`）中，采用双参数 Weibull 分布刻画高分子断裂失效几率：
+### 4. GPC 分子量分布 (MWD) 统计重构模型 (Molecular Weight Distribution)
+凝胶渗透色谱法 (GPC) 曲线在 `productUtils.ts` 中的数学重构基于高斯对数正态分布 (Lognormal / Wesslau Distribution) 模型，表征高聚物链长的宽分散性：
+$$w(M) = \frac{1}{M \sigma \sqrt{2\pi}} \exp\left[ -\frac{(\ln M - \ln M_0)^2}{2\sigma^2} \right]$$
+*   **$w(M)$**：分子量为 $M$ 的高分子链质量分数密度分布函数。
+*   **$M_0$**：对数中位数分子量。
+*   **$\sigma$**：对数标准差。它与分子量分布多分散指数（$\text{PDI} = M_w / M_n$）的关系为：
+    $$\sigma = \sqrt{\ln(\text{PDI})}$$
+数均分子量 $M_n$ 和重均分子量 $M_w$ 由密度函数的各阶矩推导所得：
+$$M_n = M_0 \exp\left(-\frac{\sigma^2}{2}\right), \quad M_w = M_0 \exp\left(\frac{\sigma^2}{2}\right)$$
+
+### 5. 刚韧平衡 Ashby 空间边界与 Pareto 最优前沿 (Ashby Space & Pareto Frontier)
+在材料对标（`ComparisonView.tsx` 与 `AnalyticsView.tsx`）中，高分子“刚性”（以弯曲弹性模量 $E_f$ 为指标）与“韧性”（以悬臂梁缺口冲击强度 $a_k$ 为指标）往往呈相反的演变。
+二者的性能边界在双对数 Ashby 坐标空间中由材料性能指数 (Material Performance Index, $I_{\text{刚韧}}$) 决定：
+$$I_{\text{刚韧}} = E_f^\alpha \cdot a_k^\beta \implies \log a_k = -\frac{\alpha}{\beta} \log E_f + \frac{1}{\beta} \log I_{\text{刚韧}}$$
+Pareto 最优前沿 $\mathcal{P}$ 的数学定义为：
+$$\mathcal{P} = \left\{ x^* \in \mathcal{S} \;\middle|\; \nexists x \in \mathcal{S}: (E_f(x) \ge E_f(x^*) \land a_k(x) > a_k(x^*)) \lor (E_f(x) > E_f(x^*) \land a_k(x) \ge a_k(x^*)) \right\}$$
+系统通过扫描全球竞品牌号数据库自动生成此 Pareto 边界，以协助开发新型改性材料。
+
+### 6. Weibull 机械力学寿命与破坏累积几率分布
+在抗疲劳长周期评估（`weibullWorker.ts`）中，采用双参数 Weibull 累积分布函数刻画树脂在恒定疲劳载荷下的破坏概率：
 $$F(t) = 1 - R(t) = 1 - \exp\left[ -\left(\frac{t}{\eta}\right)^\beta \right]$$
-*   **$F(t)$**：失效累积概率（即在时间 $t$ 之前发生脆性/韧性力学疲劳断裂的概率）。
-*   **$R(t)$**：生存几率（可靠度函数）。
-*   **$\eta$**：尺度参数（特征寿命），即失效发生概率达到 $1 - e^{-1} \approx 63.2\%$ 时的持续受载时间。
-*   **$\beta$**：无量纲形状参数（Weibull 斜率）。其物理意义定义为：
-    *   $\beta < 1$：早期失效（浴盆曲线早期衰退期，通常源自熔接痕或大尺寸杂质）。
-    *   $\beta = 1$：偶然断裂失效（符合指数随机衰减，无疲劳累积）。
-    *   $\beta > 1$：疲劳磨损失效（随时间累积断裂几率激增，源于球晶界面微裂纹扩展）。
+*   **$F(t)$**：失效累积概率；$R(t)$ 为可靠度（生存概率）函数。
+*   **$\eta$**：特征寿命参数（失效概率达 $63.2\%$ 的时间），$\beta$ 为 Weibull 形状参数（斜率）。
+*   当 $\beta < 1$ 表征早期浴盆曲线失稳失效，$\beta = 1$ 表征偶然断裂，$\beta > 1$ 表征材料进入渐进式微裂纹疲劳扩展磨损失效期。
 
-### 5. Arrhenius 热氧化降解活化能模型 (Thermal Degradation Kinetics)
-用于聚合物热氧加速老化及加工防降解评估（`arrheniusWorker.ts`），其降解反应速率常数 $k(T)$ 遵循 Arrhenius 定律：
-$$k(T) = A \exp\left(-\frac{E_a}{R T}\right)$$
-*   **$A$**：指前因子（碰撞频率因子，$\text{s}^{-1}$）。
-*   **$E_a$**：氧化热解链键断裂活化能 ($\text{J/mol}$)，表征主链碳碳键热解的能量难易度。
-*   **$R$**：摩尔气体常数 ($8.314\text{ J/(mol·K)}$)。
-*   **$T$**：开氏绝对温度 ($\text{K}$)。
-*   **加速老化外推方程**：设服务温度下长周期破坏时间为 $t_f$ (对应温度 $T_s$)，加速试验下破坏时间为 $t_a$ (对应温度 $T_a$)，则寿命折算服从：
-    $$\ln\left(\frac{t_f}{t_a}\right) = \frac{E_a}{R}\left(\frac{1}{T_s} - \frac{1}{T_a}\right)$$
+### 7. Arrhenius 热氧化降解活化能反应模型
+热老化降解速率常数 $k(T)$ 遵循 Arrhenius 定律（`arrheniusWorker.ts`）：
+$$k(T) = A \exp\left(-\frac{E_a}{R T}\right) \implies \ln k(T) = \ln A - \frac{E_a}{R}\left(\frac{1}{T}\right)$$
+通过测量加速老化温度 $T_a$ 下的劣化常数，外推到长期服役常温 $T_s$ 的聚合物工作寿命 $t_f$：
+$$\ln\left(\frac{t_f}{t_a}\right) = \frac{E_a}{R}\left(\frac{1}{T_s} - \frac{1}{T_a}\right)$$
+其中 $E_a$ 是主碳碳键断键活化能，系统将其作为评价高端聚烯烃长周期防老化性能的核心依据。
 
-### 6. Avrami 结晶动力学演变模型 (Isothermal Crystallization Kinetics)
-用于高分子冷却成型晶粒生长预测（`kineticsWorker.ts`），相对结晶度随时间演变的动力学规律符合：
-$$X(t) = 1 - \exp(-k t^n)$$
-*   **$X(t)$**：等温冷却时间 $t$ 下的相对结晶度（$0 \le X(t) \le 1$）。
-*   **$k$**：结晶速率常数 ($\text{s}^{-n}$)，由温度决定的成核率与晶体生长速率复合决定。
-*   **$n$**：Avrami 指数，表征空间晶体成核类型与生长几何维度的无量纲数（如 $n=3$ 表征偶发性成核的球晶三维生长）。
-*   **Avrami 双对数动力学线性变换**：
-    $$\ln\left[-\ln(1 - X(t))\right] = \ln k + n \ln t$$
+### 8. 非等温 Avrami-Jeziorny 晶粒核化与结晶动力学
+流道结晶动力学（`kineticsWorker.ts`）在非等温冷却速率 $\phi = \frac{dT}{dt}$ 下，采用 Jeziorny 修正模型描述相对结晶度 $X(t)$ 随温度及冷却速率的演化：
+$$X(t) = 1 - \exp\left( -K_c t^n \right) \implies \ln\left[-\ln(1 - X(t))\right] = \ln K_c + n \ln t$$
+其中 $K_c$ 为非等温结晶速率参数。用冷却速率 $\phi$ 修正后，结晶速度特征常数 $K_p$ 为：
+$$\log K_p = \frac{\log K_c}{\phi}$$
+Avrami 指数 $n$ 代表晶粒生长几何学特征（如 $n=3$ 表征偶发性成核球晶三维生长）。
 
-### 7. Sobol' 全局敏感性多因子方差贡献分解 (Sensitivity Decomposition)
-在多元配方助剂投料比波动分析中（`sobolWorker.ts`），将总物性响应方差 $V(Y)$ 投影分解为各配方单项及协同交互方差之和：
+### 9. Sobol' 全局敏感性多因子方差贡献分解
+多组分投料比例不确定性估计（`sobolWorker.ts`）基于全局方差分解，解构输出物性总方差 $V(Y)$：
 $$V(Y) = \sum_{i=1}^p V_i + \sum_{i<j}^p V_{ij} + \dots + V_{12\dots p}$$
-*   **第一级主要敏感性指数 (First-Order Main Effect Index, $S_i$)**：表示单项变量 $X_i$ 对输出方差的直接贡献占比：
+*   **一阶主效果敏感度指数 $S_i$**：
     $$S_i = \frac{V_i}{V(Y)} = \frac{V_{X_i}\left( E_{X_{\sim i}}(Y \mid X_i) \right)}{V(Y)}$$
-*   **总敏感性指数 (Total Effect Index, $S_{Ti}$)**：包含该变量自身以及与其他配方成分间全部交互作用所产生的方差比例总和：
+*   **全交互总效果敏感度指数 $S_{Ti}$**：
     $$S_{Ti} = 1 - \frac{V_{X_{\sim i}}\left( E_{X_i}(Y \mid X_{\sim i}) \right)}{V(Y)}$$
 
-### 8. 强关联多维物性 Gaussian Copula 联合分布估计 (Joint Dependency)
-在多维性能雷达刚韧平衡度量中（`copulaWorker.ts`），根据 Sklar 定理，多元联合累积概率 CDF $F(x_1, x_2, \dots, x_p)$ 与其边缘分布 $F_i(x_i)$ 解耦为 Copula 函数 $C$：
-$$F(x_1, x_2, \dots, x_p) = C\left(F_1(x_1), F_2(x_2), \dots, F_p(x_p)\right) = C(u_1, u_2, \dots, u_p)$$
-*   **高斯 Copula 联合测定表达**：利用联合正态空间变换解构极限物性间的依赖：
-    $$C_{\mathbf{R}}(u_1, u_2, \dots, u_p) = \Phi_{\mathbf{R}}\left(\Phi^{-1}(u_1), \Phi^{-1}(u_2), \dots, \Phi^{-1}(u_p)\right)$$
-    其中 $\Phi^{-1}$ 为标准正态累积分布函数的逆函数（分位数函数），$\Phi_{\mathbf{R}}$ 为相关系数矩阵为 $\mathbf{R}$ 的多元标准正态累积分布函数。
+### 10. 高斯 Copula 联合极限物性偏态分布函数
+为了表征刚韧平衡等参数之间的非线性边缘概率依赖关系（`copulaWorker.ts`），建立 Gaussian Copula 联合累积分布函数：
+$$F(x_1, x_2, \dots, x_p) = C_{\mathbf{R}}\left(F_1(x_1), F_2(x_2), \dots, F_p(x_p)\right) = \Phi_{\mathbf{R}}\left(\Phi^{-1}(u_1), \dots, \Phi^{-1}(u_p)\right)$$
+其中 $u_i = F_i(x_i)$ 为单项物性边缘分布概率，$\Phi^{-1}$ 为一维标准正态累积分布函数的逆，$\Phi_{\mathbf{R}}$ 为多元联合正态分布函数，相关矩阵 $\mathbf{R}$ 控制极限物性分布的对称长尾关联。
 
-### 9. 基于 Wilson-Hilferty 变换的马氏距离多元异常检测 (Mahalanobis Outliers)
-在牌号物性偏离监控中（`mahalanobisWorker.ts`），计算高维牌号点向量 $x = [x_1, x_2, \dots, x_p]^T$ 到样本均值向量 $\mu$ 的协方差加权距离（马氏距离）：
-$$D_M^2(x) = (x - \mu)^T \mathbf{\Sigma}^{-1} (x - \mu)$$
-*   **显著性极限截断阈值**：假定数据服从多元正态分布，马氏平方距离 $D_M^2(x)$ 服从自由度为特征数 $p$ 的卡方分布：
-    $$D_M^2(x) \sim \chi^2(p)$$
-*   **Wilson-Hilferty 近似转换计算式**：利用正态分布分位数 $Z_{1-\alpha}$ 求解卡方截断阈值 $\chi^2_{1-\alpha}(p)$，确保在海量高维矩阵下计算不发生偏离：
-    $$\chi^2_{1-\alpha}(p) \approx p \left( 1 - \frac{2}{9p} + Z_{1-\alpha}\sqrt{\frac{2}{9p}} \right)^3$$
-    其中 $\alpha$ 为显著性水平（系统缺省取 $0.01$，对应 $Z_{0.99} \approx 2.32635$）。
+### 11. 马氏距离高维偏离度与卡方 Wilson-Hilferty 正态近似检验
+对检测样本高维物性偏离度估计（`mahalanobisWorker.ts`），其马氏平方距离 $D_M^2$ 遵循卡方分布 $D_M^2 \sim \chi^2(p)$，利用 Wilson-Hilferty 近似转换计算式估计其偏离极限显著性阈值：
+$$D_M^2 = (x - \mu)^T \mathbf{\Sigma}^{-1} (x - \mu) > \chi^2_{1-\alpha}(p) \approx p \left( 1 - \frac{2}{9p} + Z_{1-\alpha}\sqrt{\frac{2}{9p}} \right)^3$$
+其中 $\mathbf{\Sigma}^{-1}$ 为样本物理协方差逆矩阵，$\alpha$ 为偏离置信度水平（系统取 $0.01$，对应标准正态偏离常数 $Z_{0.99} \approx 2.32635$）。
 
 ---
 
@@ -261,7 +267,7 @@ const simulation = d3.forceSimulation(data.nodes)
 │   ├── productUtils.ts        # 共聚物分子量分布及拉伸强韧拟合基础转换等物理材料工具脚本 
 │   │
 │   ├── services/              # 外部或 API 服务转发层 (Port Adapter API)
-│   │   ├── aiService.ts       # 负责与用户配置的 AI Endpoint 进行双向加密参数交换
+│   │   ├── aiService.ts       # 负责与用户配置 of AI Endpoint 进行双向加密参数交换
 │   │   └── productApi.ts      # 提供异步、防抖和错误熔断恢复机制的高质量数据接口
 │   │
 │   ├── contexts/              # 全局业务控制上下文 (React Context)
