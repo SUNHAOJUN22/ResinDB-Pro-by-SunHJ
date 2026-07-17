@@ -1,0 +1,575 @@
+--- a/.gitignore
++++ b/.gitignore
+@@ -17,6 +17,8 @@
+ pnpm-debug.log*
+ outputs/
+ *.inspect.ndjson
++*-audit.json
++*.trigger
+ 
+ # Editors and operating systems
+ .vscode/*
+--- a/README.md
++++ b/README.md
+@@ -9,57 +9,73 @@
+ [![CI](https://github.com/SUNHAOJUN22/ResinDB-Pro-by-SunHJ/actions/workflows/ci.yml/badge.svg)](https://github.com/SUNHAOJUN22/ResinDB-Pro-by-SunHJ/actions/workflows/ci.yml)
+ ![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
+ ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
++![Tests](https://img.shields.io/badge/tests-48%20passing-2F855A)
+ ![Storage](https://img.shields.io/badge/default-IndexedDB-5A0FC8)
+ ![Branch](https://img.shields.io/badge/branch-main-181717?logo=github)
+ 
+-面向树脂牌号、实验记录和多维物性数据的浏览器端管理、检索、比较和探索性分析应用。
++用于树脂牌号、实验记录和多维物性数据的浏览器端管理、检索、比较与探索性分析。
+ 
+ </div>
+ 
+-> **使用边界**：本项目是研究和工程演示工具，不是经过认证的 LIMS、ERP、质量放行系统或法规判定系统。界面计算、演示数据和 AI 输出均不得替代原始检测报告、标准方法或专业审核。
+-
+-## 1. 当前能力
+-
+-| 模块 | 状态 | 说明 |
++> [!IMPORTANT]
++> ResinDB Pro 是研究与工程演示工具，不是经过认证的 LIMS、ERP、质量放行系统、制造商牌号库或法规判定系统。范围筛查、确定性演示值和 AI 输出均不能替代原始检测报告、标准方法、计量溯源或专业审核。
++
++## 1. 当前能力与边界
++
++| 模块 | 状态 | 客观说明 |
+ |---|---:|---|
+-| 牌号数据管理 | 可用 | 新增、编辑、删除、批量编辑、标签和优先级 |
+-| 本地持久化 | 默认启用 | IndexedDB，无服务器也可使用 |
+-| 检索与筛选 | 可用 | 文本、分类、完整度、数值条件和高级筛选 |
+-| 导入 | 可用 | CSV、JSON、TXT；导入前提供字段映射与预览 |
+-| 导出 | 可用 | CSV、JSON、XML、PDF |
+-| 分析与比较 | 可用 | Dashboard、Analytics、Pivot、牌号比较、关系图 |
+-| 公式引擎 | 可用 | 白名单数值语法，不执行任意 JavaScript |
+-| 本地计算沙箱 | 可用 | Carreau、WLF、Weibull 透明公式计算 |
+-| AI API | 可选 | 用户自行填写 OpenAI-compatible endpoint 和模型 |
+-| 远程数据库 | 仅前端适配器 | 本仓库不包含服务端实现 |
+-| 登录角色 | 演示模式 | 不是正式身份认证或授权系统 |
+-
+-仓库内置的是小规模演示数据集。其用途是验证界面流程，不应被视为制造商完整牌号库。
+-
+-## 2. 本轮工程治理
+-
+-仓库已移除不属于产品源码的内容，包括：
+-
+-- 大体积 AI 会话和迁移历史；
+-- IDE/Agent 自动生成目录；
+-- 重复 DOCX、日志、检查结果和临时修复脚本；
+-- README 专用截图和无运行价值的图片资产；
+-- 未使用的 Firebase 项目配置；
+-- 重复认证组件和不可达源码；
+-- 固定供应商 AI SDK、CLI 和伪造 MCP/仪器遥测逻辑；
+-- 未使用的 Firebase 运行时依赖和不再维护的浏览器 XLSX 解析器；
+-
+-关键行为也已收敛：刷新失败不再显示成功或覆盖当前数据；沙箱不再声称执行外部软件、连接真实仪器或生成虚假实验日志。
++| 牌号数据管理 | 可用 | 新增、编辑、删除、批量编辑、标签、优先级和历史快照 |
++| 本地持久化 | 默认启用 | IndexedDB；数据保存在当前浏览器配置文件中 |
++| 检索与筛选 | 可用 | 文本、分类、完整度、数值表达式和高级条件 |
++| 导入 | 可用 | CSV、JSON、TXT；字段映射、预览、唯一 ID 处理 |
++| 导出 | 可用 | CSV、JSON、XML、PDF；XML 特殊字符安全转义 |
++| 比较与分析 | 可用 | Dashboard、Analytics、Pivot、牌号比较和关系图 |
++| 数据筛查 | 可用 | 检查缺失值、可解释单位和宽范围异常；不输出“合格证” |
++| 公式引擎 | 可用 | 白名单数值语法；拒绝 `eval`、`new Function` 和任意属性访问 |
++| 本地计算沙箱 | 可用 | Carreau、WLF、Weibull 的透明确定性计算 |
++| AI API | 可选 | 用户填写 OpenAI-compatible Endpoint 和模型；不内置供应商 |
++| 远程数据库 | 仅前端适配器 | 本仓库不包含认证、授权或服务端数据库实现 |
++| 账户角色 | 演示模式 | Viewer、Editor、Admin 仅用于前端流程演示 |
++
++### 数据可信度分层
++
++ResinDB Pro 中的数据应按来源解释：
++
++1. **用户录入或导入值**：必须自行保留来源、单位、测试方法、温度、载荷和批次信息。
++2. **确定性演示估计值**：仅用于填充和展示界面流程，字段带有 `Deterministic synthetic demo estimate` 注释；不是测量值。
++3. **AI 假设**：只用于提出可检验的问题或草案，不是制造商规格、实验结果或认证结论。
++
++## 2. 本轮大规模治理
++
++第二轮代码审计继续清理了此前未覆盖的误导面和数据一致性问题：
++
++- 删除根目录生成式 `npm-audit.json`、`dependency-audit.json` 和一次性触发文件；
++- 删除未使用的静态“实验室宇宙”和“开放市场宇宙”JSON 数据；
++- 删除外部 DiceBear 头像、透明纹理和 Google Fonts 请求；
++- 删除密码字段与密码持久化，演示账户仅保存在当前 `sessionStorage`；
++- 头像只接受当前浏览器中的 PNG、JPEG、WebP 数据，不加载任意外部头像 URL；
++- 管理后台和系统健康页不再伪造服务器、区域、运行时间、数据库容量或 API 状态；
++- 反馈窗口不再声称已经把内容提交到不存在的后端；
++- QA PDF 改为“材料数据筛查报告”，取消虚拟印章、授权签字和合规证书表述；
++- 比较页面的百分比改为相对相似度，不再称为“合规分数”；
++- 演示物性改用基于记录 ID 的确定性生成，刷新页面不会随机漂移；
++- 数据清洗器不再自动伪造 ISO/ASTM 方法、MFR 温度或载荷；
++- 删除未被应用调用的 LAMMPS、QSPR 和“ASTM 通过”伪执行代码；
++- 批量导入保证 ID 唯一，并在写入前拒绝缺失牌号名称的整批数据；
++- XML 导出对元素文本和属性进行完整转义；
++- TypeScript 检查范围扩展到 `src`、`tests` 和 `vite.config.ts`；
++- 删除指向不存在测试目录的 npm 脚本；
++- 仓库中不保留产品截图、办公文档、Prompt 历史、IDE 记录或本地审计报告。
+ 
+ ## 3. 快速启动
+ 
+-### 3.1 环境
++### 环境
+ 
+ - Node.js 22 LTS
+ - npm 10 或更高版本
+-- Chrome、Edge、Firefox 或 Safari 的近期版本
+-
+-### 3.2 Windows PowerShell
++- 近期版本的 Chrome、Edge、Firefox 或 Safari
++
++### Windows PowerShell
+ 
+ ```powershell
+ git clone https://github.com/SUNHAOJUN22/ResinDB-Pro-by-SunHJ.git
+@@ -69,7 +85,7 @@
+ npm run dev
+ ```
+ 
+-### 3.3 macOS / Linux
++### macOS / Linux
+ 
+ ```bash
+ git clone https://github.com/SUNHAOJUN22/ResinDB-Pro-by-SunHJ.git
+@@ -79,100 +95,119 @@
+ npm run dev
+ ```
+ 
+-浏览器访问终端显示的本地地址，默认通常为：
+-
+-```text
+-http://localhost:5173
+-```
+-
+-不配置 AI 和远程 API 时，核心数据管理功能仍可正常运行。
+-
+-## 4. 实机操作演示
+-
+-以下流程与仓库 CI 使用同一套命令和代码路径。
+-
+-### 4.1 工程验证
++默认开发地址：
++
++```text
++http://127.0.0.1:3000
++```
++
++在容器或远程开发环境中需要监听所有接口时，显式执行：
++
++```bash
++npm run dev -- --host 0.0.0.0
++```
++
++不配置 AI 和远程 API 时，本地数据管理、筛选、比较、导入、导出和计算功能仍可使用。
++
++## 4. 实机工程验证
++
++本仓库永久 CI 与本地使用同一条验证命令：
+ 
+ ```bash
+ npm ci
+ npm run validate
+ ```
+ 
+-`validate` 顺序执行：
+-
+-```text
+-ESLint → TypeScript → Vitest → Vite production build → HTTP smoke test
+-```
+-
+-验证通过应满足：
+-
+-```text
+-lint       PASS (zero warnings)
+-typecheck  PASS
+-test       PASS
+-build      PASS
+-smoke      PASS (preview page contains #root)
+-```
+-
+-也可以逐项执行：
++实际执行链：
++
++```text
++ESLint --max-warnings=0
++  → TypeScript strict check
++  → Vitest
++  → Vite production build
++  → HTTP preview smoke test
++```
++
++2026-07-17 第二轮实机验证结果：
++
++```text
++npm ci       PASS · 527 packages · 0 vulnerabilities
++lint         PASS · 0 warnings
++ typecheck   PASS · src + tests + vite.config.ts
++ test        PASS · 6 files · 48 tests
++ build       PASS · Vite production bundle generated
++ smoke       PASS · production shell returned over HTTP
++```
++
++逐项执行：
+ 
+ ```bash
+ npm run lint
+ npm run typecheck
+ npm run test
++npm run test:unit
++npm run test:science
+ npm run build
+ npm run smoke
+ ```
+ 
+-### 4.2 首次进入
+-
+-1. 启动 `npm run dev`；
+-2. 在演示角色页选择 Viewer、Editor 或 Admin；
+-3. 进入 Dashboard；
+-4. 确认牌号数量、分类和数据完整度卡片正常显示；
+-5. 打开浏览器开发者工具，确认没有启动错误。
+-
+-角色页只控制前端演示权限。正式部署必须由服务端完成身份认证和授权。
+-
+-### 4.3 新增和编辑牌号
+-
+-1. 点击 **Add Product**；
+-2. 填写牌号、制造商和分类；
+-3. 为物性填写数值、单位、标准和温度条件；
+-4. 保存后在表格中搜索该牌号；
+-5. 打开详情抽屉复核字段；
+-6. 编辑后刷新页面，确认 IndexedDB 中的数据仍存在。
+-
+-建议把测试条件写完整，例如：
+-
+-```text
+-MFR = 2.3 g/10 min, ISO 1133, 230 °C / 2.16 kg
+-```
+-
+-不要把不同温度、载荷或试样状态的数据直接放在同一列比较。
+-
+-### 4.4 CSV 导入
+-
+-推荐表头：
++## 5. 实机操作演示
++
++### 5.1 首次进入与演示会话
++
++1. 执行 `npm run dev`。
++2. 打开 `http://127.0.0.1:3000`。
++3. 选择 Demo Viewer、Demo Editor 或 Demo Admin。
++4. 进入 Dashboard，核对当前记录数量和分类统计。
++5. 刷新页面，确认演示会话仅在当前浏览器会话中恢复。
++6. 关闭浏览器会话后重新进入，确认不存在持久化密码。
++
++这些角色不是正式身份系统。生产部署必须由服务端完成登录、权限检查、会话撤销和审计。
++
++### 5.2 新增并验证一条记录
++
++1. 点击 **Add Product**。
++2. 输入牌号、制造商和分类。
++3. 添加物性值、单位、测试方法与条件。
++4. 保存后搜索该牌号。
++5. 打开详情抽屉，核对字段。
++6. 刷新页面，确认 IndexedDB 持久化有效。
++7. 导出 CSV 或 JSON，抽样核对内容。
++
++推荐记录完整测试条件：
++
++```text
++MFR = 2.3 g/10 min
++Method = ISO 1133
++Temperature = 230 °C
++Load = 2.16 kg
++Specimen / batch = documented separately
++```
++
++不同温度、载荷、试样状态或预处理条件的数据不能直接比较。
++
++### 5.3 CSV 导入
++
++示例：
+ 
+ ```csv
+ Grade,Manufacturer,Category,Density,Density Unit,MFR,MFR Unit
+ Demo-PP-01,Example Lab,PP,0.905,g/cm3,3.2,g/10min
+ ```
+ 
+-操作步骤：
+-
+-1. 打开 **Import**；
+-2. 选择 CSV、JSON 或 TXT；
+-3. 检查编码、表头和预览行；
+-4. 将原始字段映射到 ResinDB 字段；
+-5. 核对数值和单位；
+-6. 执行导入；
+-7. 搜索新牌号并抽样复核。
+-
+-XLS/XLSX 不再由浏览器直接解析。请先使用可信办公软件转换为 CSV，并在导入预览中核对字段、单位与数值。
+-
+-### 4.5 搜索和筛选
++操作：
++
++1. 打开 **Import**。
++2. 选择 CSV、JSON 或 TXT。
++3. 检查编码、表头和预览行。
++4. 完成字段映射。
++5. 检查单位、测试条件和缺失值。
++6. 执行导入。
++7. 搜索导入记录并抽样复核。
++
++XLS/XLSX 不在浏览器中直接解析。请先用可信办公软件转换为 CSV，并在预览阶段检查精度、日期、科学计数法和单位。
++
++### 5.4 搜索与筛选
+ 
+ 普通搜索：
+ 
+@@ -182,7 +217,7 @@
+ 密度
+ ```
+ 
+-数值语法示例：
++数值表达式：
+ 
+ ```text
+ 密度:>0.90
+@@ -190,46 +225,59 @@
+ 弯曲模量:>=1200
+ ```
+ 
+-启用分类和高级筛选后，顶部 Active Filters 会显示当前条件。删除条件或点击清除即可恢复完整数据集。
+-
+-### 4.6 比较与分析
+-
+-1. 在 Data Grid 勾选多个牌号；
+-2. 打开 Comparison；
+-3. 核对属性单位和缺失值；
+-4. 切换 Analytics，选择 X/Y 属性和分组；
+-5. 对异常点返回详情页检查原始字段；
+-6. 导出筛选结果和分析记录。
+-
+-图表只反映当前数据。样本量不足、缺失值较多或测试条件不一致时，不应得出材料优劣结论。
+-
+-### 4.7 本地计算沙箱
+-
+-Sandbox 提供三个确定性模型：
++### 5.5 比较与数据筛查
++
++1. 在 Data Grid 勾选多个牌号。
++2. 打开 **Comparison**。
++3. 核对单位、方法、温度、载荷和缺失值。
++4. 将相对相似度仅视为当前字段的数值距离。
++5. 打开 **Materials data screening report**。
++6. 输入筛查阈值并导出 PDF。
++7. 确认报告明确显示“非证书、非质量放行、需人工复核”。
++
++“未发现明显范围异常”不等于符合标准。筛查器不会自动补写缺失的 ISO/ASTM 方法或实验条件。
++
++### 5.6 XML 导出安全检查
++
++可使用包含特殊字符的测试记录：
++
++```text
++Grade: A < B & C
++Manufacturer: Maker "One"
++```
++
++导出 XML 后应看到 `&lt;`、`&amp;`、`&quot;` 等转义内容，而不是破坏 XML 结构。
++
++### 5.7 本地计算沙箱
++
++Sandbox 提供：
+ 
+ - Carreau：剪切速率与黏度；
+ - WLF：温时等效位移因子；
+ - Weibull：给定时间下的生存概率。
+ 
+-界面会显示所用公式和输入。它不会连接设备、启动 WebSocket、执行 RDKit/LAMMPS，也不会生成“已完成实验”的虚假日志。
+-
+-## 5. AI API 配置
+-
+-AI 完全可选。项目不内置供应商、模型名称或专用 SDK。
+-
+-### 5.1 界面配置
+-
+-1. 点击右下角 AI 按钮；
+-2. 打开设置；
+-3. 填写完整 chat-completions Endpoint；
+-4. 填写模型标识符；
+-5. 填写受限开发 Key；
+-6. 点击 **Test**；
+-7. 成功后保存。
+-
+-Endpoint 和模型保存在 `localStorage`；API Key 仅保存在当前浏览器会话的 `sessionStorage`。关闭会话后需重新输入。
+-
+-### 5.2 环境变量
++页面显示公式、输入和结果。它不连接仪器、不建立外部 WebSocket、不执行 RDKit/LAMMPS，也不生成“实验已完成”的日志。
++
++## 6. AI API 配置
++
++AI 完全可选。项目不内置供应商、模型名称、专用 SDK 或 CLI。
++
++### 界面配置
++
++1. 打开 AI 面板设置。
++2. 输入完整的 OpenAI-compatible chat-completions Endpoint。
++3. 输入模型标识符。
++4. 输入受限开发 Key。
++5. 点击 **Test**。
++6. 保存设置。
++
++存储行为：
++
++- Endpoint、Model：`localStorage`；
++- API Key：当前会话的 `sessionStorage`；
++- 关闭会话后需重新输入 Key。
++
++### 环境变量
+ 
+ ```bash
+ VITE_AI_API_ENDPOINT=https://provider.example/v1/chat/completions
+@@ -237,25 +285,25 @@
+ VITE_AI_API_KEY=restricted-development-key
+ ```
+ 
+-所有 `VITE_*` 变量都会进入浏览器构建产物，生产密钥不得放在前端。推荐架构：
++所有 `VITE_*` 值都会进入浏览器构建产物。生产密钥必须放在认证的服务端网关中：
+ 
+ ```text
+ Browser → authenticated company gateway → selected AI provider
+ ```
+ 
+-客户端要求 HTTPS；只有 `localhost` 允许 HTTP 开发地址。
+-
+-## 6. 数据适配器
+-
+-### 6.1 IndexedDB
++客户端要求 HTTPS；仅 localhost 开发地址允许 HTTP。
++
++## 7. 数据适配器
++
++### IndexedDB
+ 
+ ```bash
+ VITE_DATABASE_ADAPTER_TYPE=indexeddb
+ ```
+ 
+-数据位于当前浏览器。清理站点数据、无痕模式限制或更换浏览器都会影响可用性，使用前请导出备份。
+-
+-### 6.2 Remote REST API
++数据位于当前浏览器。清理站点数据、使用无痕模式或更换浏览器都会影响数据可用性，重要记录应定期导出。
++
++### Remote REST API
+ 
+ ```bash
+ VITE_DATABASE_ADAPTER_TYPE=remote_api
+@@ -263,7 +311,7 @@
+ VITE_REMOTE_READ_FALLBACK=false
+ ```
+ 
+-前端期望至少提供：
++前端期望：
+ 
+ ```text
+ GET    /products
+@@ -276,9 +324,9 @@
+ POST   /products/restore-snapshot
+ ```
+ 
+-远程写入失败不会静默写入 IndexedDB，因为那会制造服务端与浏览器两套相互冲突的数据。
+-
+-## 7. 公式引擎
++远程写入失败不会静默写入 IndexedDB，以免生成相互冲突的服务端和浏览器数据集。
++
++## 8. 公式引擎
+ 
+ 允许：
+ 
+@@ -288,9 +336,9 @@
+ max(Props['MFR'], 0)
+ ```
+ 
+-支持数值、属性引用、括号、算术运算和文档化数学函数。未知标识符、任意属性访问、`eval` 和 `new Function` 均被拒绝。
+-
+-## 8. 项目结构
++支持数值、属性引用、括号、算术运算、常量和文档化数学函数。未知标识符、任意属性访问、`eval` 和 `new Function` 会被拒绝。
++
++## 9. 项目结构
+ 
+ ```text
+ .
+@@ -314,9 +362,15 @@
+ └── vite.config.ts
+ ```
+ 
+-仓库只保存源码、配置、测试和必要文档。截图、办公文档、Prompt 历史、IDE 记录、构建产物和本地报告不应提交。
+-
+-## 9. 生产构建
++仓库只保存源码、配置、测试和必要文档。以下内容不应提交：
++
++```text
++.env / credentials / private user data
++screenshots / office documents / prompt history
++IDE or agent state / build outputs / local audit reports
++```
++
++## 10. 生产部署
+ 
+ ```bash
+ npm ci
+@@ -324,22 +378,30 @@
+ npm run build
+ ```
+ 
+-输出位于 `dist/`。静态服务器需要把未知前端路由回退到 `index.html`，并配置 CSP、HTTPS、安全响应头和缓存策略。
+-
+-## 10. 已知限制
+-
+-- 内置身份角色是演示逻辑；
++输出位于 `dist/`。部署时应配置：
++
++- HTTPS；
++- Content Security Policy；
++- 安全响应头；
++- 静态资源缓存；
++- SPA 路由回退到 `index.html`；
++- 服务端身份认证与授权；
++- API 请求验证、限流和审计日志。
++
++## 11. 已知限制
++
++- Viewer、Editor、Admin 是浏览器端演示角色；
+ - 远程服务端不在本仓库中；
+ - AI 兼容层主要面向 OpenAI-compatible chat completions；
+-- 浏览器端无法安全保存高权限密钥；
+-- 分析模型未替代实验校准和不确定度评估；
+-- 当前没有单独 LICENSE 文件，因此不要推定额外授权条款。
+-
+-## 11. 开发规则
++- 浏览器不能安全保存高权限密钥；
++- 演示估计、筛查阈值和计算模型不能替代实验校准；
++- 当前没有单独的 LICENSE 文件，不应推定额外授权条款。
++
++## 12. 开发规则
+ 
+ - 最终维护分支为 `main`；
+ - 提交前运行 `npm run validate`；
+-- 不提交 `.env`、凭据、用户数据和大体积生成文件；
+-- 不在界面中伪造外部服务、实验、认证或实时设备连接；
++- 不提交凭据、用户数据、截图、生成式审计文件和大体积临时资产；
++- 不在 UI 中伪造服务器、实验、认证、标准通过或实时设备连接；
+ - 对科学计算写明公式、单位、假设和适用范围；
+-- 修改数据写入流程时必须测试成功、失败和部分失败路径。
++- 修改写入流程时覆盖成功、失败、部分失败、ID 冲突和导出转义测试。
+--- a/SECURITY.md
++++ b/SECURITY.md
+@@ -45,3 +45,12 @@
+ ## Data and AI limitations
+ 
+ AI-generated properties and formulation suggestions are hypotheses, not manufacturer specifications, certified test results, safety determinations, or regulatory approvals. Validate outputs against traceable source data and laboratory methods before use.
++
++
++## Browser session and local profile data
++
++The built-in Viewer, Editor and Admin identities are demonstration roles only. Their session is stored in `sessionStorage`; no password is collected or persisted. Local a
