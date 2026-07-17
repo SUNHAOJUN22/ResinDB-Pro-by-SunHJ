@@ -1,0 +1,34 @@
+name: One-time second-pass source snapshot
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/second-pass-snapshot.yml
+      - .github/second-pass-snapshot.trigger
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+      - name: Create tracked source snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files -z | tar --null -T - -czf resindb-second-pass-source.tar.gz
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: resindb-second-pass-source
+          path: resindb-second-pass-source.tar.gz
+          retention-days: 2
