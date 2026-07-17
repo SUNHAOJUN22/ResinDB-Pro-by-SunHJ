@@ -1,0 +1,25 @@
+name: Export source snapshot
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Remove Git metadata and generated directories
+        run: rm -rf .git node_modules dist coverage
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: resindb-source-snapshot
+          path: .
+          include-hidden-files: true
+          retention-days: 1
