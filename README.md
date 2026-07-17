@@ -72,7 +72,7 @@ ResinDB Pro v3.1.0 采用严格可移植的**三层体系架构模型**，使底
 
 ### 2. 📡 实验室级高频套接字遥测网联网关与传输介质仿真 (Lab Telemetry)
 *   **双通道握手**：支持 Physical WebSockets（真实硬件通道）与 Virtual Loopback（虚拟环回仿真）双模式热切换。
-*   **高保真网络噪声模型**：内置高精度抖动 (Jitter, 2ms-150ms)、丢包率 (Packet Loss)、信号漂移 (Calibration Gain/Offset) 的实时调节，模拟在复杂工业车间及弱网环境下的物化参数（密度、熔指、模量）数据传输抗扰性。
+*   **高保真网络噪声模型**：内置高精度抖动 (Jitter, 2ms-150ms), 丢包率 (Packet Loss), 信号漂移 (Calibration Gain/Offset) 的实时调节，模拟在复杂工业车间及弱网环境下的物化参数（密度、熔指、模量）数据传输抗扰性。
 
 ### 3. 🤖 Gemini Multimodal 驱动的分子与配方草图智能视觉解析
 *   **零样本物化提取**：搭载大模型多模态视觉 OCR 探针，支持一键解析分子红外光谱图线特征、催化流变图谱或手写物性分析草图。
@@ -97,24 +97,113 @@ ResinDB Pro v3.1.0 采用严格可移植的**三层体系架构模型**，使底
 
 ---
 
-## ⚛️ Web Worker 多线程多维高密度科学演算矩阵 (Multi-Threaded Workers)
+## ⚛️ 核心高分子理化模型算法理论与数学推导 (Mathematical Theory & Equations)
 
-为保证整个高保真原型在进行多物理参量扫频和拟合时不发生主帧率瞬间坠毁，本系统特建立了由 **24 组独立 Web Workers 驱动的高并发独立线程网格**。所有复杂的热化学、力学寿命及流变粘弹方程的求解，在后台线程独立调谐、实时交付：
+本系统的核心计算内核与 24 组独立 Web Workers 网格均基于严谨的物理高分子动力学与数理统计模型。以下为系统所集成的关键物理数学模型推导：
 
-| 独立线程名称 | 后台执行的材料学 / 物理、热力学算法方程 | 输入载荷与扫频因子 | 科学计算指标及作用 |
+### 1. Carreau-Yasuda 剪切流变本构模型 (Rheological Constitutive Model)
+在高剪切扫频拟合（`carreauWorker.ts`）中，系统用于重构高分子熔体表观黏度与剪切速率关系的本构方程为：
+$$\eta(\dot{\gamma}) = \eta_{\infty} + (\eta_0 - \eta_{\infty})\left[1 + (\lambda \dot{\gamma})^a\right]^\frac{n-1}{a}$$
+*   **$\eta(\dot{\gamma})$**：对应剪切速率 $\dot{\gamma}$ 下的表观黏度 ($\text{Pa·s}$)。
+*   **$\eta_0$**：零剪切黏度 ($\text{Pa·s}$)，表征高分子长链纠缠网在静态极限下的变形抗力。
+*   **$\eta_{\infty}$**：无穷剪切黏度 ($\text{Pa·s}$)，代表长链网络完全解纠缠取向后的极限溶剂化黏度，热塑性熔体计算中通常设为 0。
+*   **$\lambda$**：材料特征松弛时间 ($\text{s}$)，其倒数 $1/\lambda$ 表征了流体由牛顿区向幂律区过渡的临界剪切速率。
+*   **$a$**：Yasuda 无量纲参数，调控过渡区黏度下降的弯折曲率（系统在 standard Carreau 算子中取 $a=2$）。
+*   **$n$**：非牛顿指数（剪切稀释指数，当 $0 < n < 1$ 时呈拟塑性流体特征，其值越小表明剪切变稀敏感度越高）。
+
+### 2. William-Landel-Ferry (WLF) 温时等效平移方程 (TTS Viscoelasticity)
+在动态热力学阻尼松弛扫频中（`wlfWorker.ts`），利用自由体积理论描述非晶态高分子在玻璃化转变温度 $T_g$ 附近的松弛时间温时对等关系：
+$$\log_{10} a_T = \frac{-C_1(T - T_0)}{C_2 + (T - T_0)}$$
+*   **$a_T$**：水平位移因子，在流变测试中定义为温度 $T$ 与参考温度 $T_0$ 下的黏度及密度绝对比值：
+    $$a_T = \frac{\eta(T)\rho_0 T_0}{\eta(T_0)\rho T} \approx \frac{\eta(T)}{\eta(T_0)}$$
+*   **$C_1, C_2$**：系统特定参考温度 $T_0$ 下的半经验系数。若以玻璃化温度 $T_g$ 作为参考温度，多数非结晶高聚物符合普适常数：
+    $$C_1^g \approx 17.44, \quad C_2^g \approx 51.6 \text{ K}$$
+*   **参考温度平移换算公式**：当参考温度由 $T_g$ 平移切换至任意基准温度 $T_0$ 时，对应的系数 $C_1^0$ 与 $C_2^0$ 的严密转换公式为：
+    $$C_1^0 = \frac{C_1^g C_2^g}{C_2^g + (T_0 - T_g)}, \quad C_2^0 = C_2^g + (T_0 - T_g)$$
+
+### 3. Prony 剪切松弛模量麦克斯韦衰减谱模型 (Maxwell Relaxation)
+时域弹性蠕变与长效刚度评估（`pronyWorker.ts`）基于广义 Maxwell 粘弹性模型：
+$$G(t) = G_e + \sum_{i=1}^N G_i \exp\left(-\frac{t}{\tau_i}\right)$$
+*   **$G_e$**：平衡剪切模量（$t \to \infty$ 极限刚度，未交联线性树脂 $G_e = 0$）。
+*   **$G_i$**：第 $i$ 阶 Maxwell 单元的松弛弹性强度因子（模量贡献）。
+*   **$\tau_i = \eta_i / G_i$**：第 $i$ 阶子单元的特征松弛时间常数。
+*   **频域转换傅里叶积分对齐**：通过 Prony 谱系数，将正弦角频率 $\omega$ 扫频下的储能模量 $G'$ 和损耗模量 $G''$ 实时重构解出：
+    $$G'(\omega) = G_e + \sum_{i=1}^N \frac{G_i \omega^2 \tau_i^2}{1 + \omega^2 \tau_i^2}, \quad G''(\omega) = \sum_{i=1}^N \frac{G_i \omega \tau_i}{1 + \omega^2 \tau_i^2}$$
+
+### 4. Weibull 极限抗拉强度与力学疲劳破坏概率分布 (Mechanical Reliability)
+在材料抗疲劳长周期评估（`weibullWorker.ts`）中，采用双参数 Weibull 分布刻画高分子断裂失效几率：
+$$F(t) = 1 - R(t) = 1 - \exp\left[ -\left(\frac{t}{\eta}\right)^\beta \right]$$
+*   **$F(t)$**：失效累积概率（即在时间 $t$ 之前发生脆性/韧性力学疲劳断裂的概率）。
+*   **$R(t)$**：生存几率（可靠度函数）。
+*   **$\eta$**：尺度参数（特征寿命），即失效发生概率达到 $1 - e^{-1} \approx 63.2\%$ 时的持续受载时间。
+*   **$\beta$**：无量纲形状参数（Weibull 斜率）。其物理意义定义为：
+    *   $\beta < 1$：早期失效（浴盆曲线早期衰退期，通常源自熔接痕或大尺寸杂质）。
+    *   $\beta = 1$：偶然断裂失效（符合指数随机衰减，无疲劳累积）。
+    *   $\beta > 1$：疲劳磨损失效（随时间累积断裂几率激增，源于球晶界面微裂纹扩展）。
+
+### 5. Arrhenius 热氧化降解活化能模型 (Thermal Degradation Kinetics)
+用于聚合物热氧加速老化及加工防降解评估（`arrheniusWorker.ts`），其降解反应速率常数 $k(T)$ 遵循 Arrhenius 定律：
+$$k(T) = A \exp\left(-\frac{E_a}{R T}\right)$$
+*   **$A$**：指前因子（碰撞频率因子，$\text{s}^{-1}$）。
+*   **$E_a$**：氧化热解链键断裂活化能 ($\text{J/mol}$)，表征主链碳碳键热解的能量难易度。
+*   **$R$**：摩尔气体常数 ($8.314\text{ J/(mol·K)}$)。
+*   **$T$**：开氏绝对温度 ($\text{K}$)。
+*   **加速老化外推方程**：设服务温度下长周期破坏时间为 $t_f$ (对应温度 $T_s$)，加速试验下破坏时间为 $t_a$ (对应温度 $T_a$)，则寿命折算服从：
+    $$\ln\left(\frac{t_f}{t_a}\right) = \frac{E_a}{R}\left(\frac{1}{T_s} - \frac{1}{T_a}\right)$$
+
+### 6. Avrami 结晶动力学演变模型 (Isothermal Crystallization Kinetics)
+用于高分子冷却成型晶粒生长预测（`kineticsWorker.ts`），相对结晶度随时间演变的动力学规律符合：
+$$X(t) = 1 - \exp(-k t^n)$$
+*   **$X(t)$**：等温冷却时间 $t$ 下的相对结晶度（$0 \le X(t) \le 1$）。
+*   **$k$**：结晶速率常数 ($\text{s}^{-n}$)，由温度决定的成核率与晶体生长速率复合决定。
+*   **$n$**：Avrami 指数，表征空间晶体成核类型与生长几何维度的无量纲数（如 $n=3$ 表征偶发性成核的球晶三维生长）。
+*   **Avrami 双对数动力学线性变换**：
+    $$\ln\left[-\ln(1 - X(t))\right] = \ln k + n \ln t$$
+
+### 7. Sobol' 全局敏感性多因子方差贡献分解 (Sensitivity Decomposition)
+在多元配方助剂投料比波动分析中（`sobolWorker.ts`），将总物性响应方差 $V(Y)$ 投影分解为各配方单项及协同交互方差之和：
+$$V(Y) = \sum_{i=1}^p V_i + \sum_{i<j}^p V_{ij} + \dots + V_{12\dots p}$$
+*   **第一级主要敏感性指数 (First-Order Main Effect Index, $S_i$)**：表示单项变量 $X_i$ 对输出方差的直接贡献占比：
+    $$S_i = \frac{V_i}{V(Y)} = \frac{V_{X_i}\left( E_{X_{\sim i}}(Y \mid X_i) \right)}{V(Y)}$$
+*   **总敏感性指数 (Total Effect Index, $S_{Ti}$)**：包含该变量自身以及与其他配方成分间全部交互作用所产生的方差比例总和：
+    $$S_{Ti} = 1 - \frac{V_{X_{\sim i}}\left( E_{X_i}(Y \mid X_{\sim i}) \right)}{V(Y)}$$
+
+### 8. 强关联多维物性 Gaussian Copula 联合分布估计 (Joint Dependency)
+在多维性能雷达刚韧平衡度量中（`copulaWorker.ts`），根据 Sklar 定理，多元联合累积概率 CDF $F(x_1, x_2, \dots, x_p)$ 与其边缘分布 $F_i(x_i)$ 解耦为 Copula 函数 $C$：
+$$F(x_1, x_2, \dots, x_p) = C\left(F_1(x_1), F_2(x_2), \dots, F_p(x_p)\right) = C(u_1, u_2, \dots, u_p)$$
+*   **高斯 Copula 联合测定表达**：利用联合正态空间变换解构极限物性间的依赖：
+    $$C_{\mathbf{R}}(u_1, u_2, \dots, u_p) = \Phi_{\mathbf{R}}\left(\Phi^{-1}(u_1), \Phi^{-1}(u_2), \dots, \Phi^{-1}(u_p)\right)$$
+    其中 $\Phi^{-1}$ 为标准正态累积分布函数的逆函数（分位数函数），$\Phi_{\mathbf{R}}$ 为相关系数矩阵为 $\mathbf{R}$ 的多元标准正态累积分布函数。
+
+### 9. 基于 Wilson-Hilferty 变换的马氏距离多元异常检测 (Mahalanobis Outliers)
+在牌号物性偏离监控中（`mahalanobisWorker.ts`），计算高维牌号点向量 $x = [x_1, x_2, \dots, x_p]^T$ 到样本均值向量 $\mu$ 的协方差加权距离（马氏距离）：
+$$D_M^2(x) = (x - \mu)^T \mathbf{\Sigma}^{-1} (x - \mu)$$
+*   **显著性极限截断阈值**：假定数据服从多元正态分布，马氏平方距离 $D_M^2(x)$ 服从自由度为特征数 $p$ 的卡方分布：
+    $$D_M^2(x) \sim \chi^2(p)$$
+*   **Wilson-Hilferty 近似转换计算式**：利用正态分布分位数 $Z_{1-\alpha}$ 求解卡方截断阈值 $\chi^2_{1-\alpha}(p)$，确保在海量高维矩阵下计算不发生偏离：
+    $$\chi^2_{1-\alpha}(p) \approx p \left( 1 - \frac{2}{9p} + Z_{1-\alpha}\sqrt{\frac{2}{9p}} \right)^3$$
+    其中 $\alpha$ 为显著性水平（系统缺省取 $0.01$，对应 $Z_{0.99} \approx 2.32635$）。
+
+---
+
+## ⚛️ Web Worker 多线程高并发独立计算线程网格 (Workers Grid)
+
+系统为了避免耗时复杂的流变曲线积分拟合和卡方逆矩阵运算导致主线程渲染坠毁，建立了由 **24 组独立后台线程组成的计算网格**。典型计算线程配置如下：
+
+| 独立线程文件 | 后台执行的物理/统计方程式 | 主要输入参数载荷 | 科学计算作用 |
 | :--- | :--- | :--- | :--- |
-| `carreauWorker.ts` | **Carreau-Yasuda 剪切流变流动本构通用拟合方程**:<br>$$\eta(\dot{\gamma}) = \eta_{\infty} + (\eta_0 - \eta_{\infty})[1 + (\lambda \dot{\gamma})^2]^{\frac{n-1}{2}}$$ | 动态剪切速率变温扫频振幅向量 | 精确解算出材料宏观零剪切黏度 $\eta_0$、松弛时间常数 $\lambda$，定量判定产品挤出拉膜抗表面破裂和鲨鱼皮特性。 |
-| `wlfWorker.ts` | **William-Landel-Ferry (WLF) 时温等效动力本构相平移变换**:<br>$$\log a_T = \frac{-C_1(T - T_g)}{C_2 + (T - T_g)}$$ | 多重扫温频率 DMA（动态热力学分析仪）阻尼损失因子谱 | 依靠时域频域温度相互换算，将试验局限频率（如 $100\text{Hz}$）拓宽拟合出 $10^{10}\text{Hz}$ 的高阻尼降噪与力学松弛谱线。 |
-| `pronyWorker.ts` | **Prony Series 时域蠕变粘弹性离散麦克斯韦应力松弛模型**:<br>$$G(t) = G_e + \sum_{i=1}^N G_i \exp\left(-\frac{t}{\tau_i}\right)$$ | DMA 特征松弛扫频阶数系数阵列 | 估计高分子复合材料在连续长载荷形变（蠕变）下的结构应力松弛时间谱线，用于汽车/压力管道安全评测。 |
-| `weibullWorker.ts` | **Weibull 二参数极限极限应变力学疲劳寿命失效概率分布**:<br>$$F(t) = 1 - \exp\left(-\left(\frac{t}{\eta}\right)^\beta\right)$$ | 树脂高频率断裂强度测试及高温持久蠕变寿命序列 | 算出长效疲劳破坏概率，输出失效形状参数 $\beta$。辅助合成室迅速辨别由结晶球晶尺寸引起的力学退化。 |
-| `arrheniusWorker.ts` | **Arrhenius 电化学/热氧化链解聚能量活化能热老化模型**:<br>$$k = A \exp\left(-\frac{E_a}{R T}\right)$$ | TGA 热分解终点质量残余、各温度下热氧损耗速率 | 解构当前高聚物大分子链化学共价键断键难度，判定该牌号产品的长周期实验室加速热氧老化衰减。 |
-| `kineticsWorker.ts` | **Avrami 升/降结晶动力学方程**:<br>$$1 - X_t = \exp(-k t^n)$$ | 熔体差示扫描量热计 (DSC) 降温晶粒形核与生长扫频谱 | 描绘出聚合产品在大规模后加工工艺中，结晶速度与晶核形成参数 $n$，为模具温控开合时间提供最合理的设定区间。 |
-| `bayesWorker.ts` | **贝叶斯不确定性多点位高分子物化性状联合估计模型** | 进料质量偏差、单体共聚比例高频波动谱 | 在缺乏实测取样阶段，输出产品实时在线熔指（MFR）、微观密度指标的在产均值变位概率。 |
-| `sobolWorker.ts` | **Sobol’ Global Sensitivity 全局一阶/全阶多变量敏感性分解分析** | 回收再生料掺杂比率、多抗氧剂助剂微克配比向量 | 定量判定各种主辅配方的细微波动对材料最核心物理指标（如拉伸强度、气味等级）产生的直接作用占比。 |
-| `monteCarloWorker.ts`| **高维多级多通道 Monte Carlo 配方容差不确定性投料推导引擎** | 原料单体挥发分、压强周期波动波动统计方差 | 历经 10 万次混沌步长高频率拟合计算，预测该在产牌号大规模出厂的 Cp 与 Cpk 材料质量稳定性指数。 |
-| `copulaWorker.ts` | **Copula 联合极限偏态非线性物理参数应力关联分析器** | 拉伸强度与耐划伤强度边缘分布散点矩阵 | 脱开简陋的 Pearson 线性假设，发现物理极限特性在材料中的内在耦合规律。|
-| `similarityWorker.ts`| **基于 Mahalanobis 马氏和欧氏特征向量加权的关联材料对标器** | 16 个反映热/力/加工特性的高维物理极坐标数组 | 采用多特征加权矩阵，秒级搜索系统全部谱库，完成物理替代品推荐。 |
-| `kmeansWorker.ts` | **K-Means 高维特征空间无监督高分子牌号智能划分聚类** | 全球/全国同类树脂牌号力学和经济学特征离散阵列 | 完成自动智能归类排版，为销售和研究提供大材料层级的精细对标聚类分析。 |
+| `carreauWorker.ts` | Carreau-Yasuda 非线性黏度拟合 | 剪切速率序列与表观黏度序列 | 拟合零剪切黏度与流动曲线松弛时常数 |
+| `wlfWorker.ts` | WLF 时温等效平移方程拟合 | DMA 多重变频储能损耗因子谱 | 计算位移因子，建立主平移参考黏度曲线 |
+| `pronyWorker.ts` | Prony Series 离散 Maxwell 粘弹松弛谱 | 时域应力松弛扫频时间序列 | 重构时域应力松弛刚度响应曲线 |
+| `weibullWorker.ts` |  Weibull 双参数概率分布与参数回归 | 力学寿命破坏时间序列 | 回归 Weibull 形状参数 $\beta$ 与特征寿命 |
+| `arrheniusWorker.ts` | Arrhenius 热氧断键动力学模型 | 多段温度老化破坏时间 | 求解氧化热降解表观活化能 $E_a$ |
+| `kineticsWorker.ts` | Avrami 结晶动力学双对数线性回归 | DSC isothermal 结晶热流-时间序列 | 求解 Avrami 指数 $n$ 与结晶速率常数 $k$ |
+| `bayesWorker.ts` | 贝叶斯物性多点不确定性后验联合预测 | 在产熔指/密度高频测定点波动 | 输出产品质量波动的在产均值变位概率 |
+| `sobolWorker.ts` | Sobol' 敏感性分解与高维蒙特卡洛积分 | 多因子助剂掺杂比率与配比向量 | 求解一阶及总敏感性贡献度方差占比 |
+| `monteCarloWorker.ts`| 10 万次蒙特卡洛混沌投料分布模拟 | 进料挥发分与压强方差分布波动 | 预测出厂 Cp/Cpk 质量稳定性指标 |
+| `copulaWorker.ts` | 卡方 Gaussian Copula 多元依赖关联估计 | 刚韧物性边缘分布分位数序列 | 解耦材料韧性与强度参数的内在偶合几率 |
+| `similarityWorker.ts`| 基于马氏加权欧氏特征的向量对标搜索 | 16 项关键热/力/物理特性极坐标 | 全谱推荐性能匹配的物理替代牌号 |
+| `kmeansWorker.ts` | K-Means 高维特征空间无监督聚类 | 全球同品类牌号物性特征点云 | 自动划分出材料应用层级的聚类归属 |
 
 ---
 
@@ -143,7 +232,7 @@ const simulation = d3.forceSimulation(data.nodes)
      ```
 3. **级联 Trace 双向过滤与发光轨迹**:
    * 支持 **Upstream 溯源 (蓝色)**、**Both 双向关联 (紫色)**、**Downstream 流布 (绿色)**。
-   * 触发特异性节点分析时，无关联网络节点大幅度调减透明度至极具未来感的 `0.05`。特异相关的上下游连线上启动由 `flowingGradient` 与 `stroke-dasharray` 双重映射的匀速高分子流动粒子，生动体现合成化学供应链的能流、物流方向。
+   * 触发特异性节点分析时，无关联网络节点大幅度调减透明度至极具未来感的 `0.05`。特异相关的上下游连线上启动由 `flowingGradient` 与 `stroke-dasharray` 双重映射的匀速高分子流动粒子，生动体现合成化学供应链 the flow 方向。
 4. **智能固定机制 (Pinning) 与快捷维基/SciFinder 检索**:
    * 一键固定/解固。支持对特定牌号位置拖拽锁定 (`node.fx = node.x`)，不再跟随引力晃动。
    * 本地/云端双语路由检索链接，让物理特性与广阔的数字文献一键瞬间贯连。
@@ -162,7 +251,7 @@ const simulation = d3.forceSimulation(data.nodes)
 ├── index.html                 # 主 SPA 承载 HTML、高对比度骨架预加载标签
 ├── package.json               # 极简依赖库控制中心、带有精密的 lint/test/build 任务链
 ├── tsconfig.json              # 强类型 TypeScript 环境参数定义
-├── vite.config.ts             # 分模块分包惰性加载 (Lazy Loading)、Worker 组自动封装 vite 配置
+├── vite.config.ts             # 分模块分包惰性加载 (Lazy Loading)、Worker 组自动封装 vite配置
 ├── src/
 │   ├── main.tsx               # 启动、全局 UI 边界溢出和微应用引导中轴
 │   ├── index.css              # 导入 Tailwind v4 样式表，含有暗黑科技极暗配色、流动动画帧 keyframes
@@ -200,7 +289,6 @@ const simulation = d3.forceSimulation(data.nodes)
 │       │   └── TreeSidebar.tsx   # 按高分子细部大类（PP、HDPE、LDPE等）极密层级树观察栏
 │       │
 │       ├── ui/                # 极其纯净化、零耦合基础小元件
-│       │   ├── ErrorBoundary.tsx # UI 坠毁防护熔断墙
 │       │   └── ToastContainer.tsx# 精准轻微乐观通知栏，带有回滚(Undo)按钮
 │       │
 │       ├── modals/            # 带有 Framer-Motion 弹性缩放效果的专业模态框
