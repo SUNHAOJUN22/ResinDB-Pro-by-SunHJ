@@ -1,0 +1,96 @@
+2.4%
+-            </div>
+-            <p className="text-[10px] md:text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em] shrink-0 truncate">
+-              {subtitle}
+-            </p>
+-          </div>
++          <p className="mt-2 truncate text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 dark:text-slate-500 md:mt-3 md:text-xs">
++            {subtitle}
++          </p>
+         </div>
+         <motion.div
+           whileHover={{ rotate: 8, scale: 1.15 }}
+@@ -135,7 +129,6 @@
+     className="relative overflow-hidden bg-slate-950 border border-slate-800 px-6 md:px-8 py-6 md:py-7 text-white rounded-2xl md:rounded-3xl shadow-2xl shadow-slate-950/40 group"
+   >
+     <div className="absolute top-0 right-0 w-[500px] h-full bg-primary-600/5 rounded-full blur-[100px] -mr-32 -mt-32 mix-blend-screen pointer-events-none group-hover:bg-primary-600/10 transition-colors duration-1000" />
+-    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.05] pointer-events-none"></div>
+ 
+     <div className="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-6 md:gap-8">
+       <div className="space-y-4 md:space-y-5 max-w-2xl w-full">
+@@ -147,7 +140,7 @@
+           <div>
+             <div className="flex items-center gap-2 mb-0.5">
+               <span className="text-[8px] md:text-[10px] font-black text-primary-400 uppercase tracking-[0.3em]">
+-                Status: Nominal
++                Local workspace
+               </span>
+               <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+             </div>
+@@ -157,19 +150,12 @@
+               </span>
+             </h2>
+             <p className="text-slate-500 text-[8px] md:text-[10px] font-mono uppercase tracking-[0.2em] md:tracking-[0.4em] mt-1 truncate">
+-              Industrial Intelligence • Research Systems Ready
++              Browser-based materials data workspace
+             </p>
+           </div>
+         </div>
+-        <p className="text-slate-400 text-xs md:text-sm font-medium leading-relaxed max-w-xl">
+-          ResinDB core engine is operational.{" "}
+-          <span className="text-white font-black">12 new material grades</span>{" "}
+-          synchronized from the cloud registry. Global data completeness is
+-          holding at{" "}
+-          <span className="text-emerald-400 font-bold border-b border-emerald-400/30">
+-            94.8%
+-          </span>
+-          .
++        <p className="max-w-xl text-xs font-medium leading-relaxed text-slate-400 md:text-sm">
++          ResinDB is running in the current browser. Review live record counts, completeness indicators, and sync events before drawing conclusions from the workspace.
+         </p>
+         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 md:gap-4 pt-2 md:pt-3">
+           <motion.button
+@@ -181,16 +167,9 @@
+             INITIATE SESSION
+             <ChevronRight size={14} strokeWidth={3} />
+           </motion.button>
+-          <motion.button
+-            whileHover={{
+-              scale: 1.02,
+-              backgroundColor: "rgba(255,255,255,0.05)",
+-            }}
+-            whileTap={{ scale: 0.98 }}
+-            className="px-6 md:px-7 py-3 bg-slate-900/50 border border-slate-800 text-slate-400 hover:text-white rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-[0.2em] transition-all whitespace-nowrap text-center"
+-          >
+-            v3.1.0 LOGS
+-          </motion.button>
++          <span className="px-6 py-3 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
++            Demo workspace · verify source data
++          </span>
+         </div>
+       </div>
+       <div className="hidden xl:block relative shrink-0">
+@@ -308,28 +287,15 @@
+       </motion.div>
+       <div className="flex items-center gap-3 overflow-x-auto pb-1 md:pb-0 custom-scrollbar-horizontal">
+         <div className="flex -space-x-2 md:-space-x-3 shrink-0">
+-          {[1, 2, 3].map((i) => (
+-            <div
+-              key={i}
+-              className="w-10 h-10 border-2 border-white/80 dark:border-slate-800 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden shadow-md backdrop-blur-sm"
+-            >
+-              <img
+-                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=user${i}`}
+-                alt="User"
+-                referrerPolicy="no-referrer"
+-                className="w-full h-full object-cover"
+-              />
+-            </div>
++          {['Data', 'Lab', 'QA'].map((name) => (
++            <UserAvatar
++              key={name}
++              name={name}
++              className="h-10 w-10 rounded-xl border-2 border-white/80 text-[9px] shadow-md dark:border-slate-800"
++            />
+           ))}
+-          <div className="w-10 h-10 border-2 border-white/80 dark:border-slate-800 rounde
