@@ -1,12 +1,10 @@
 name: One-time second-pass source snapshot
 
 on:
-  push:
+  pull_request:
     branches:
       - main
-    paths:
-      - .github/workflows/second-pass-snapshot.yml
-      - .github/second-pass-snapshot.trigger
+  workflow_dispatch:
 
 permissions:
   contents: read
