@@ -5,7 +5,7 @@ on:
     branches:
       - agent/single-main-consolidation-v11
     paths:
-      - .github/single-main-v11/part-13
+      - .github/single-main-v11/part-03
 
 permissions:
   contents: write
