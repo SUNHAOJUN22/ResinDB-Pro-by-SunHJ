@@ -102,7 +102,3 @@ export function calculateTopsis<T extends { id: string }>(
 
   return scores;
 }
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

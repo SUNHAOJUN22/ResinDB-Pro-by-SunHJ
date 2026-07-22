@@ -185,6 +185,7 @@ const AppContent = memo(() => {
     removeFormula,
     history,
     restoreSnapshot,
+    syncEvents,
   } = useData();
 
   const {
@@ -208,7 +209,6 @@ const AppContent = memo(() => {
       return false;
     }
   });
-  const [lastSyncTime] = useState<string>(new Date().toLocaleTimeString());
   const [showAppMenu, setShowAppMenu] = useState(false);
 
   // Still use saved views hook but it can be refactored into context later
@@ -224,9 +224,13 @@ const AppContent = memo(() => {
     setSearchQuery,
     setAdvancedFilterGroup,
     setColumns,
-    () => {}, // Placeholder for addToast check if needed
+    addToast,
     t
   );
+
+  const lastSyncTime = syncEvents[0]
+    ? new Date(syncEvents[0].timestamp).toLocaleTimeString()
+    : t("notSynced", "Not synced");
 
   const applicationActions = {
     handleDelete,
@@ -595,15 +599,14 @@ const AppContent = memo(() => {
             updateUserProfile(data);
             closeModal("profile");
           }}
-          onAddToast={() => {}} // simplified
+          onAddToast={addToast}
         />
         <AdminModal isOpen={isModalOpen("admin")} onClose={() => closeModal("admin")} />
         <SystemHealthModal
           isOpen={isModalOpen("systemHealth")}
           onClose={() => closeModal("systemHealth")}
           status={systemStatus}
-          lastSync={lastSyncTime}
-          addToast={() => {}} // simplified
+          addToast={addToast}
         />
         <FeedbackModal
           isOpen={isModalOpen("feedback")}
@@ -637,7 +640,7 @@ const AppContent = memo(() => {
           onClose={closeDetail}
           onCategoryClick={(id) => setSelectedCategoryIds(new Set([id]))}
           onProductClick={setViewingProduct}
-          onAddToast={() => {}} // simplified
+          onAddToast={addToast}
         />
         <AddProductModal
           isOpen={isModalOpen("addProduct")}
@@ -793,7 +796,3 @@ const App: React.FC = () => (
 );
 
 export default App;
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

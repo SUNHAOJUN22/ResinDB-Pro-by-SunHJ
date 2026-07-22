@@ -296,7 +296,3 @@ function getCategoryNameById(id: string): string {
   if (id.includes('abs')) return 'ABS';
   return 'Resin';
 }
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

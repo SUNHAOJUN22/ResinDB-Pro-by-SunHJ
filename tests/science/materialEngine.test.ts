@@ -56,7 +56,3 @@ describe('Material Engine - Math safety guards', () => {
         expect(res.influentialPointsCount).toBe(0);
     });
 });
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

@@ -42,6 +42,18 @@ Production deployments should use an authenticated server-side gateway with:
 
 User-defined formulas are parsed by a white-listed numeric grammar. Dynamic JavaScript execution (`eval` and `new Function`) is not permitted. Supported constructs are numeric literals, `Props['property']` references, arithmetic operators, parentheses, constants, and documented mathematical functions.
 
+## Dependency response
+
+Use `npm ci` for reproducible installation and run `npm audit --omit=dev --audit-level=high` before release. A high or critical production advisory blocks release until the affected dependency is upgraded, removed, isolated from the production graph, or documented with a verified non-applicability rationale.
+
 ## Data and AI limitations
 
 AI-generated properties and formulation suggestions are hypotheses, not manufacturer specifications, certified test results, safety determinations, or regulatory approvals. Validate outputs against traceable source data and laboratory methods before use.
+
+## Browser session and local profile data
+
+The built-in Viewer, Editor and Admin identities are demonstration roles only. Their session is stored in `sessionStorage`; no password is collected or persisted. Local avatars are restricted to browser-generated PNG, JPEG or WebP data URLs and should not contain sensitive images. Production identity and profile data require an authenticated backend.
+
+## Data screening boundary
+
+Range checks and generated PDF reports are screening aids, not certificates, laboratory reports or standards-conformity decisions. The application must not infer missing test methods, temperatures, loads or provenance.

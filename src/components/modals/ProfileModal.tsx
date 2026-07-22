@@ -5,7 +5,6 @@ import {
   Save,
   User,
   Mail,
-  Lock,
   Camera,
   CheckCircle2,
   Loader2,
@@ -19,12 +18,13 @@ import { User as UserType } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme, ColorTheme } from "@/contexts/ThemeContext";
 import { useUI } from "@/contexts/UIContext";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   user: UserType | null;
-  onSave: (updatedUser: Partial<UserType> & { password?: string }) => void;
+  onSave: (updatedUser: Partial<UserType>) => void;
   onAddToast: (type: "success" | "error" | "info", message: string) => void;
 }
 
@@ -42,7 +42,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [avatar, setAvatar] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -52,28 +51,29 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setName(user.name);
       setEmail(user.email);
       setAvatar(user.avatar || "");
-      setPassword("");
       setShowSuccess(false);
     }
   }, [user]);
 
   const handleLocalUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        onAddToast("error", t("fileTooLarge"));
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatar(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      onAddToast("error", "Only PNG, JPEG and WebP avatars are supported.");
+      return;
     }
+    if (file.size > 2 * 1024 * 1024) {
+      onAddToast("error", t("fileTooLarge"));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => setAvatar(typeof reader.result === 'string' ? reader.result : '');
+    reader.readAsDataURL(file);
   };
 
   const resetToDefault = () => {
-    setAvatar(`https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`);
+    setAvatar("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -81,14 +81,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     setIsSaving(true);
 
     setTimeout(() => {
-      const updatedData: Partial<UserType> & { password?: string } = {
-        name,
-        email,
-        avatar,
-      };
-      if (password) updatedData.password = password;
-
-      onSave(updatedData);
+      onSave({ name: name.trim(), email: email.trim(), avatar: avatar || undefined });
       setIsSaving(false);
       setShowSuccess(true);
 
@@ -171,14 +164,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         className="w-28 h-28 overflow-hidden rounded-[2rem] border-2 border-slate-200 dark:border-slate-800 shadow-2xl relative group cursor-pointer"
                         onClick={() => fileInputRef.current?.click()}
                       >
-                        <img
-                          src={
-                            avatar ||
-                            `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`
-                          }
-                          alt="Preview"
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
+                        <UserAvatar
+                          name={name}
+                          avatar={avatar}
+                          alt="Profile avatar preview"
+                          className="h-full w-full rounded-none text-xl"
                         />
                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                           <Camera size={24} className="text-white" />
@@ -216,28 +206,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         type="file"
                         ref={fileInputRef}
                         className="hidden"
-                        accept="image/*"
+                        accept="image/png,image/jpeg,image/webp"
                         onChange={handleLocalUpload}
                       />
                     </div>
-                    <div className="w-full space-y-2">
-                      <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest ml-1">
-                        {t("avatarUrl")}
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={
-                            avatar.startsWith("data:")
-                              ? t("localImageAttached")
-                              : avatar
-                          }
-                          onChange={(e) => setAvatar(e.target.value)}
-                          className={`w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-[10px] font-mono font-bold outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/5 transition-all dark:text-slate-200 ${avatar.startsWith("data:") ? "italic text-emerald-600 dark:text-emerald-400" : ""}`}
-                          placeholder={t("avatarPlaceholder")}
-                        />
-                      </div>
-                    </div>
+                    <p className="max-w-sm text-center text-[10px] font-mono leading-5 text-slate-500 dark:text-slate-400">
+                      Avatar images stay in this browser session. Use PNG, JPEG or WebP files up to 2 MB.
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -284,29 +259,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                           className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono font-bold outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/5 transition-all dark:text-slate-200"
                         />
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                    <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest ml-1">
-                      {t("password")} ({t("keepEmpty")})
-                    </label>
-                    <div className="relative group">
-                      <Lock
-                        size={14}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors"
-                      />
-                      <motion.input
-                        whileFocus={{
-                          scale: 1.01,
-                          boxShadow: "0 0 0 4px rgba(79, 70, 229, 0.1)",
-                        }}
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder={t("keepEmpty")}
-                        className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono font-bold outline-none focus:border-primary-500 focus:ring-4 focus:ring-primary-500/5 transition-all dark:text-slate-200"
-                      />
                     </div>
                   </div>
 
@@ -440,7 +392,3 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     </AnimatePresence>
   );
 };
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

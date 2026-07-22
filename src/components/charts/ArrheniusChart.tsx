@@ -107,7 +107,3 @@ export const ArrheniusChart: React.FC<ArrheniusChartProps> = React.memo(({ point
 
   return <div ref={chartRef} className="w-full h-full" />;
 });
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

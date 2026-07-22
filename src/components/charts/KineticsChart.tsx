@@ -141,7 +141,3 @@ export const KineticsChart: React.FC<KineticsChartProps> = React.memo(({ points,
         <div ref={chartRef} className="w-full h-full min-h-[500px]"></div>
     );
 });
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

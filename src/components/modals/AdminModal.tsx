@@ -22,10 +22,23 @@ import { User as UserType } from '@/types/index';
 import api from '@/lib/adapters';
 import { PRODUCT_CATALOG } from '@/config/constants';
 import { safeStorage } from "@/lib/utils";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 interface AdminModalProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+function isDemoUser(value: unknown): value is UserType {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<UserType>;
+  return Boolean(
+    typeof candidate.id === 'string' &&
+    typeof candidate.name === 'string' &&
+    typeof candidate.email === 'string' &&
+    candidate.role &&
+    ['admin', 'editor', 'viewer'].includes(candidate.role),
+  );
 }
 
 export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClose }) => {
@@ -34,12 +47,10 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
     "users" | "projects" | "docs" | "system"
   >("users");
   const [users, setUsers] = useState<UserType[]>([]);
-  const [stats, setStats] = useState({
-    dbSize: "124 MB",
-    uptime: "12d 4h 22m",
-    apiStatus: "Healthy",
-    totalRecords: 0,
-  });
+  const stats = {
+    dbSize: "Browser managed",
+    uptime: "Current session",
+  };
   const [isSeeding, setIsSeeding] = useState(false);
   const [seedProgress, setSeedProgress] = useState(0);
 
@@ -76,51 +87,19 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Check if haojunsun exists, if not add them
-          const hasHaojun = parsed.some(p => p.id === 'admin-1' || p.name === 'haojunsun');
-          let finalUsers = parsed;
-          if (!hasHaojun) {
-             finalUsers = [{
-                id: "admin-1",
-                name: "haojunsun",
-                email: "haojun.sun@resindb.pri",
-                role: "admin" as const,
-                avatar: `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="8" fill="%234f46e5"/><ellipse cx="50" cy="50" rx="40" ry="12" stroke="%236366f1" stroke-width="2.5" transform="rotate(0 50 50)"/><ellipse cx="50" cy="50" rx="40" ry="12" stroke="%233b82f6" stroke-width="2.5" transform="rotate(60 50 50)"/><ellipse cx="50" cy="50" rx="40" ry="12" stroke="%238b5cf6" stroke-width="2.5" transform="rotate(120 50 50)"/><circle cx="90" cy="50" r="4" fill="%236366f1" /><circle cx="70" cy="84" r="4" fill="%233b82f6" /><circle cx="30" cy="16" r="4" fill="%238b5cf6" /></svg>`
-             }, ...parsed.filter(p => p.id !== 'user-001')];
-             safeStorage.local.setItem("resindb-users", JSON.stringify(finalUsers));
-          }
+          const finalUsers = parsed.filter(isDemoUser);
           setUsers(finalUsers);
-          setStats((prev) => ({ ...prev, totalRecords: finalUsers.length * 10 + 42 }));
           return;
         }
       }
       
-      const defaultUsers = [
-        {
-          id: "admin-1",
-          name: "haojunsun",
-          email: "haojun.sun@resindb.pri",
-          role: "admin" as const,
-          avatar: `data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="8" fill="%234f46e5"/><ellipse cx="50" cy="50" rx="40" ry="12" stroke="%236366f1" stroke-width="2.5" transform="rotate(0 50 50)"/><ellipse cx="50" cy="50" rx="40" ry="12" stroke="%233b82f6" stroke-width="2.5" transform="rotate(60 50 50)"/><ellipse cx="50" cy="50" rx="40" ry="12" stroke="%238b5cf6" stroke-width="2.5" transform="rotate(120 50 50)"/><circle cx="90" cy="50" r="4" fill="%236366f1" /><circle cx="70" cy="84" r="4" fill="%233b82f6" /><circle cx="30" cy="16" r="4" fill="%238b5cf6" /></svg>`
-        },
-        {
-          id: "editor-1",
-          name: "bot",
-          email: "editor.bot@resindb.pri",
-          role: "editor" as const,
-          avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=bot1"
-        },
-        {
-          id: "viewer-1",
-          name: "bot",
-          email: "viewer.bot@resindb.pri",
-          role: "viewer" as const,
-          avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=bot2"
-        }
+      const defaultUsers: UserType[] = [
+        { id: "demo-admin", name: "Demo Admin", email: "admin@example.invalid", role: "admin" },
+        { id: "demo-editor", name: "Demo Editor", email: "editor@example.invalid", role: "editor" },
+        { id: "demo-viewer", name: "Demo Viewer", email: "viewer@example.invalid", role: "viewer" },
       ];
       setUsers(defaultUsers);
       safeStorage.local.setItem("resindb-users", JSON.stringify(defaultUsers));
-      setStats((prev) => ({ ...prev, totalRecords: defaultUsers.length * 10 + 42 }));
     } catch (e) {
       logger.error("Failed to load users:", e);
     }
@@ -131,7 +110,7 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
   }, [loadUsers]);
 
   const handleDeleteUser = (id: string) => {
-    if (id === "admin-1") return;
+    if (id === "demo-admin") return;
     const updated = users.filter((u) => u.id !== id);
     setUsers(updated);
     try {
@@ -333,12 +312,7 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
                                 whileHover={{ scale: 1.1, rotate: 5 }}
                                 className="w-12 h-12 border border-slate-200 dark:border-slate-700 overflow-hidden rounded-2xl shadow-sm"
                               >
-                                <img
-                                  src={u.avatar}
-                                  alt=""
-                                  className="w-full h-full object-cover"
-                                  referrerPolicy="no-referrer"
-                                />
+                                <UserAvatar name={u.name} avatar={u.avatar} className="h-full w-full rounded-none text-xs" />
                               </motion.div>
                               <div>
                                 <p className="text-[13px] font-bold text-slate-800 dark:text-slate-100 tracking-tight leading-none mb-1.5">
@@ -563,12 +537,10 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
                             <span className="text-[8px] font-mono font-bold uppercase text-primary-500 tracking-widest px-2 py-0.5 rounded border border-primary-500/30 bg-primary-500/10">Developer</span>
                           </div>
                           <div className="flex items-center gap-3 mt-1">
-                            <div className="w-10 h-10 rounded-full border-2 border-primary-500 overflow-hidden shadow-sm flex items-center justify-center shrink-0">
-                               <img src={`data:image/svg+xml;utf8,<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="8" fill="%234f46e5"/><ellipse cx="50" cy="50" rx="40" ry="12" stroke="%236366f1" stroke-width="2.5" transform="rotate(0 50 50)"/><ellipse cx="50" cy="50" rx="40" ry="12" stroke="%233b82f6" stroke-width="2.5" transform="rotate(60 50 50)"/><ellipse cx="50" cy="50" rx="40" ry="12" stroke="%238b5cf6" stroke-width="2.5" transform="rotate(120 50 50)"/><circle cx="90" cy="50" r="4" fill="%236366f1" /><circle cx="70" cy="84" r="4" fill="%233b82f6" /><circle cx="30" cy="16" r="4" fill="%238b5cf6" /></svg>`} alt="Developer haojunsun" className="w-full h-full object-cover" />
-                            </div>
+                            <UserAvatar name="Repository" className="h-10 w-10 shrink-0 rounded-full border-2 border-primary-500 text-[9px] shadow-sm" />
                             <div>
-                              <p className="text-sm font-bold text-slate-900 dark:text-white tracking-tight leading-none mb-1">haojunsun</p>
-                              <p className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">Core Maintainer</p>
+                              <p className="text-sm font-bold text-slate-900 dark:text-white tracking-tight leading-none mb-1">Repository</p>
+                              <p className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">Local demo administration</p>
                             </div>
                           </div>
                         </motion.div>
@@ -651,7 +623,3 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
     </AnimatePresence>
   );
 });
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

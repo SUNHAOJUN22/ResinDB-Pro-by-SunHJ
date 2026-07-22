@@ -199,7 +199,3 @@ export const MarketTrendsSection: React.FC<MarketTrendsSectionProps> = ({ produc
     </div>
   );
 };
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

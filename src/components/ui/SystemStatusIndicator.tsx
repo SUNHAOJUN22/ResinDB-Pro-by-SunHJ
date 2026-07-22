@@ -50,7 +50,3 @@ export const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({
     </motion.div>
   );
 };
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

@@ -202,7 +202,3 @@ export class PolymerDataValidator {
       .filter((r): r is MaterialRecord => r !== null);
   }
 }
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

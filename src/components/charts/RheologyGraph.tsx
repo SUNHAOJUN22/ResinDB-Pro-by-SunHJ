@@ -20,8 +20,8 @@ const simulateRawPoints = (mfr: number, tempOffset: number) => {
    const data: [number, number][] = [];
    for (let i = -2; i <= 6; i += 0.5) {
        const rate = Math.pow(10, i);
-       // Add some noise to make it realistic for fitting
-       const noise = 1 + (Math.random() - 0.5) * 0.15; // 15% noise max
+       // Deterministic perturbation keeps the illustrative fit stable across renders.
+       const noise = 1 + Math.sin((i + mfr + tempOffset) * 12.9898) * 0.06
        const viscosity = eta0 * Math.pow(1 + Math.pow(lambda * rate, a), (n - 1) / a) * noise;
        data.push([rate, viscosity]);
    }
@@ -187,7 +187,3 @@ export const RheologyGraph: React.FC<RheologyGraphProps> = React.memo(({ product
     </div>
   );
 });
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

@@ -394,7 +394,6 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
             {/* Header */}
             <div className="relative h-32 md:h-48 shrink-0 overflow-hidden group">
               <div className="absolute inset-0 bg-slate-900 dark:bg-slate-950" />
-              <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]" />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent" />
 
               <div className="absolute top-4 md:top-6 left-4 md:left-6 right-4 md:right-6 flex justify-between items-start z-10">
@@ -1081,7 +1080,3 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
     </AnimatePresence>
   );
 });
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

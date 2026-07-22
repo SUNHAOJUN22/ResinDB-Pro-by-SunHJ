@@ -643,11 +643,11 @@ const DependencyMapD3: React.FC = () => {
 
   return (
     <div ref={containerRef} className={`w-full h-full flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden relative ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
-      <style dangerouslySetInnerHTML={{__html: `
+      <style>{`
         @keyframes flow {
           to { stroke-dashoffset: -12; }
         }
-      `}} />
+      `}</style>
       <div className="absolute top-6 left-6 z-10 flex flex-col gap-2 pointer-events-none">
         <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
           <ScanSearch className="w-5 h-5 text-indigo-500" />
@@ -1010,7 +1010,3 @@ const DependencyMapD3: React.FC = () => {
 };
 
 export default DependencyMapD3;
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

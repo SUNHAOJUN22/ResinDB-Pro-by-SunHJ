@@ -102,7 +102,3 @@ export const KdeTopologyChart: React.FC<KdeTopologyChartProps> = React.memo(({ g
 
   return <div ref={chartRef} className="w-full h-full" />;
 });
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

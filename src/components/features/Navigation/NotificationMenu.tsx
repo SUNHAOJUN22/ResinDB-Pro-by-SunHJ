@@ -153,7 +153,3 @@ export const NotificationMenu: React.FC<NotificationMenuProps> = ({ t }) => {
     </div>
   );
 };
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

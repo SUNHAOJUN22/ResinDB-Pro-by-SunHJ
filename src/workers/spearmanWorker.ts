@@ -101,7 +101,3 @@ self.onmessage = (e: MessageEvent<SpearmanMessage>) => {
     self.postMessage({ type: 'ERROR', payload: { message: error instanceof Error ? error.message : 'Unknown error' } } as SpearmanResponse);
   }
 };
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

@@ -102,7 +102,3 @@ export const SobolChart: React.FC<SobolChartProps> = React.memo(({ firstOrder, t
 
   return <div ref={chartRef} className="w-full h-full" />;
 });
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

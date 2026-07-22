@@ -4,6 +4,7 @@ import { Category, Product, ProductUpdates, PropertyValue } from '@/types/index'
 import { PRODUCT_CATALOG, CATEGORY_TREE } from '@/config/constants';
 import { IProductAdapter } from "@/lib/adapters/types";
 import { UniversalStorageBridge } from './UniversalStorageBridge';
+import { generateId } from '@/lib/utils';
 
 interface ResinDB extends DBSchema {
   products: {
@@ -78,8 +79,8 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     if (product.properties) {
       for (const [key, prop] of Object.entries(product.properties)) {
         if (prop && prop.value !== undefined && prop.value !== null) {
-          const numValue = typeof prop.value === 'number' ? prop.value : parseFloat(String(prop.value));
-          if (!isNaN(numValue)) {
+          const numValue = typeof prop.value === 'number' ? prop.value : Number(String(prop.value).trim());
+          if (Number.isFinite(numValue)) {
             if (!this.propertyIndex.has(key)) {
               this.propertyIndex.set(key, []);
             }
@@ -138,8 +139,9 @@ export class IndexedDBProductAdapter implements IProductAdapter {
   }
 
   private registerMutationDelete(ids: string[]): void {
+    const deletedIds = new Set(ids);
     if (this.cachedProducts) {
-      this.cachedProducts = this.cachedProducts.filter(p => !ids.includes(p.id));
+      this.cachedProducts = this.cachedProducts.filter(p => !deletedIds.has(p.id));
     }
     if (this.indicesRebuilt) {
       for (const id of ids) {
@@ -208,7 +210,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
 
   private async initDB(): Promise<IDBPDatabase<ResinDB>> {
     try {
-      // Renamed to resin-db-v3 to force a reset and ensure the new 300 products are loaded
+      // Versioned database name preserves compatibility with the current browser schema.
       const dbPromise = openDB<ResinDB>('resin-db-v3', 1, {
         upgrade(db) {
           if (!db.objectStoreNames.contains('products')) {
@@ -319,7 +321,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     }
 
     const newProduct: Product = {
-      id: product.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `p-${Math.random().toString(36).substr(2, 9)}`),
+      id: product.id || generateId(),
       gradeName: product.gradeName,
       manufacturer: product.manufacturer || "Unknown",
       manufacturerId: product.manufacturerId || "m-unknown",
@@ -348,7 +350,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
       logger.error("IndexedDB Create Failed:", e);
       // If ID collision, try one more time with a different ID
       if (e instanceof Error && e.name === 'ConstraintError') {
-        newProduct.id = `p-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+        newProduct.id = generateId();
         await db.add('products', newProduct);
         this.registerMutationCreate(newProduct);
         
@@ -453,7 +455,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
 
     for (const p of products) {
       const newProduct: Product = {
-        id: p.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `p-${Math.random().toString(36).substr(2, 9)}`),
+        id: p.id || generateId(),
         gradeName: p.gradeName || "New Product",
         manufacturer: p.manufacturer || "Unknown",
         manufacturerId: p.manufacturerId || "m-unknown",
