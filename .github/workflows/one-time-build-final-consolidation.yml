@@ -54,13 +54,46 @@ jobs:
           cache: npm
 
       - name: Install exact dependencies
-        run: npm ci
+        shell: bash
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tee /tmp/npm-ci.log
 
-      - name: Run full repository validation
-        run: npm run validate
+      - name: Lint
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee /tmp/lint.log
+
+      - name: Typecheck
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee /tmp/typecheck.log
+
+      - name: Test
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test 2>&1 | tee /tmp/test.log
+
+      - name: Build
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee /tmp/build.log
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run smoke 2>&1 | tee /tmp/smoke.log
 
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+        shell: bash
+        run: |
+          set -o pipefail
+          npm audit --omit=dev --audit-level=high 2>&1 | tee /tmp/npm-audit-production.log
 
       - name: Guard repository hygiene
         shell: bash
@@ -86,11 +119,21 @@ jobs:
             echo "base=$BASE_SHA"
             echo "candidate=$(git rev-parse HEAD)"
             echo "patch_sha256=e560f1966c05acbc9828d9aaaf9475f4dba25d327b691a68f3a1db379cc4fd15"
-            echo "validation=npm run validate"
+            echo "validation=lint,typecheck,test,build,smoke"
             echo "production_audit=npm audit --omit=dev --audit-level=high"
           } > /tmp/consolidation-candidate.txt
 
+      - name: Upload validation diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resindb-final-validation-diagnostics
+          path: /tmp/*.log
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Upload validation record
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: resindb-final-candidate-validation
