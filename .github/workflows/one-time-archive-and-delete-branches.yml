@@ -1,0 +1,103 @@
+name: One-time archive and delete non-main branches
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize]
+    paths:
+      - .github/branch-cleanup.trigger
+
+permissions:
+  contents: write
+
+jobs:
+  archive-delete-and-self-clean:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'automation/resindb-branch-cleanup'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Archive and delete every non-main branch
+        shell: bash
+        env:
+          EXPECTED_MAIN_SHA: ${{ github.event.pull_request.base.sha }}
+          CLEANUP_BRANCH: automation/resindb-branch-cleanup
+        run: |
+          set -euo pipefail
+          git config user.name 'ResinDB Branch Consolidation Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git fetch --force --prune origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN_SHA"
+
+          mkdir -p /tmp/resindb-branch-cleanup
+          git ls-remote --heads origin | sort -k2 > /tmp/resindb-branch-cleanup/before.txt
+
+          create_tag() {
+            local tag_name="$1"
+            local target_sha="$2"
+            local message="$3"
+            if git ls-remote --exit-code --tags origin "refs/tags/${tag_name}" >/dev/null 2>&1; then
+              echo "tag exists: ${tag_name}" >> /tmp/resindb-branch-cleanup/tags.txt
+            else
+              git tag -a "${tag_name}" "${target_sha}" -m "${message}"
+              git push origin "refs/tags/${tag_name}"
+              echo "created ${tag_name} -> ${target_sha}" >> /tmp/resindb-branch-cleanup/tags.txt
+            fi
+          }
+
+          create_tag 'pre-consolidation-20260722' '8e8eadbb52c9b657d9e83777c987882d3f09ba51' 'ResinDB Pro main before the 2026-07-22 validated consolidation'
+
+          mapfile -t branches < <(git ls-remote --heads origin | awk '{sub("refs/heads/", "", $2); print $1 " " $2}' | sort -k2)
+          : > /tmp/resindb-branch-cleanup/deleted.txt
+
+          for entry in "${branches[@]}"; do
+            sha="${entry%% *}"
+            branch="${entry#* }"
+            if [[ "$branch" == 'main' || "$branch" == "$CLEANUP_BRANCH" ]]; then
+              continue
+            fi
+            safe_name="${branch//\//-}"
+            create_tag "archive/${safe_name}-20260722" "$sha" "Archived before deleting branch ${branch} during single-main consolidation"
+            git push origin --delete "$branch"
+            echo "deleted ${branch} (${sha})" >> /tmp/resindb-branch-cleanup/deleted.txt
+          done
+
+          cleanup_sha=$(git ls-remote --heads origin "refs/heads/${CLEANUP_BRANCH}" | awk '{print $1}')
+          if [[ -n "$cleanup_sha" ]]; then
+            create_tag 'archive/automation-resindb-branch-cleanup-20260722' "$cleanup_sha" 'Archived temporary branch cleanup trigger'
+            git push origin --delete "$CLEANUP_BRANCH"
+            echo "deleted ${CLEANUP_BRANCH} (${cleanup_sha})" >> /tmp/resindb-branch-cleanup/deleted.txt
+          fi
+
+          git ls-remote --heads origin | sort -k2 > /tmp/resindb-branch-cleanup/after.txt
+          test "$(wc -l < /tmp/resindb-branch-cleanup/after.txt | tr -d ' ')" = '1'
+          grep -Eq "[[:space:]]refs/heads/main$" /tmp/resindb-branch-cleanup/after.txt
+
+      - name: Remove the one-time workflow from main
+        shell: bash
+        env:
+          EXPECTED_MAIN_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --force origin main
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN_SHA"
+          git switch --force-create cleanup-main origin/main
+          git rm .github/workflows/one-time-archive-and-delete-branches.yml
+          git commit -m 'chore: remove completed branch consolidation workflow'
+          git push origin HEAD:main
+          echo "final_main=$(git rev-parse HEAD)" > /tmp/resindb-branch-cleanup/final-main.txt
+
+      - name: Upload branch consolidation record
+        uses: actions/upload-artifact@v4
+        with:
+          name: resindb-branch-consolidation-record
+          path: /tmp/resindb-branch-cleanup
+          if-no-files-found: error
+          retention-days: 14
