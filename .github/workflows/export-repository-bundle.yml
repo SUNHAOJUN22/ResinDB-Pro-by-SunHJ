@@ -1,0 +1,44 @@
+name: Export full repository bundle
+
+on:
+  push:
+    branches:
+      - automation/resindb-consolidation-audit
+    paths:
+      - .github/consolidation/export-bundle.trigger
+
+permissions:
+  contents: read
+
+env:
+  REPOSITORY_NAME: ResinDB-Pro-by-SunHJ
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out audit branch
+        uses: actions/checkout@v4
+        with:
+          ref: automation/resindb-consolidation-audit
+          fetch-depth: 0
+
+      - name: Fetch every branch and tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --prune origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
+          mkdir -p /tmp/resindb-audit
+          git for-each-ref --sort=refname --format='%(refname) %(objectname) %(committerdate:iso8601-strict) %(subject)' refs/heads refs/remotes/origin refs/tags > /tmp/resindb-audit/refs.txt
+          git log --all --graph --decorate --oneline --date-order > /tmp/resindb-audit/history.txt
+          git bundle create /tmp/resindb-audit/${REPOSITORY_NAME}.bundle --all
+          sha256sum /tmp/resindb-audit/${REPOSITORY_NAME}.bundle > /tmp/resindb-audit/SHA256SUMS
+
+      - name: Upload auditable repository bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: resindb-complete-repository-bundle
+          path: /tmp/resindb-audit
+          if-no-files-found: error
+          retention-days: 2
