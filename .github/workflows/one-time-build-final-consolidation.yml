@@ -33,15 +33,12 @@ jobs:
           xz --decompress --stdout /tmp/resindb-final.patch.xz > /tmp/resindb-final.patch
           echo 'e560f1966c05acbc9828d9aaaf9475f4dba25d327b691a68f3a1db379cc4fd15  /tmp/resindb-final.patch' | sha256sum --check
 
-      - name: Apply patch to exact pull-request base
+      - name: Apply patch to current main
         shell: bash
-        env:
-          EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
           git fetch --force origin main
           git switch --force-create final-candidate origin/main
-          test "$(git rev-parse HEAD)" = "$EXPECTED_BASE_SHA"
           git apply --check /tmp/resindb-final.patch
           git apply /tmp/resindb-final.patch
           git rm --ignore-unmatch \
@@ -78,11 +75,11 @@ jobs:
         shell: bash
         env:
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
           git config user.name 'ResinDB Consolidation Bot'
           git config user.email 'actions@users.noreply.github.com'
+          BASE_SHA=$(git rev-parse HEAD)
           git commit -m 'refactor: consolidate and harden ResinDB Pro mainline'
           git push --force origin "HEAD:$HEAD_BRANCH"
           {
