@@ -1,0 +1,103 @@
+name: Materialize and validate single-main candidate v11
+
+on:
+  push:
+    branches:
+      - agent/single-main-consolidation-v11
+    paths:
+      - .github/single-main-v11/part-13
+
+permissions:
+  contents: write
+
+concurrency:
+  group: single-main-v11-materialization
+  cancel-in-progress: false
+
+jobs:
+  materialize-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --max-old-space-size=3072
+
+    steps:
+      - name: Check out candidate transport branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/single-main-consolidation-v11
+          fetch-depth: 0
+
+      - name: Reassemble and verify candidate archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/single-main-v11/part-* > /tmp/candidate.b64
+          printf '%s  %s\n' '86e29a96d9906b667181512a4c9e9dca3193e2c0026cd2da2b39b454b365672f' /tmp/candidate.b64 | sha256sum --check -
+          base64 --decode /tmp/candidate.b64 > /tmp/candidate.tar.xz
+          printf '%s  %s\n' '0a9ed77c4034947753c40eb4972532d7a80caac4fd283caf1fbabda7d4630cfc' /tmp/candidate.tar.xz | sha256sum --check -
+          mkdir -p /tmp/candidate
+          tar -xJf /tmp/candidate.tar.xz -C /tmp/candidate
+          test -f /tmp/candidate/package.json
+          test -f /tmp/candidate/package-lock.json
+          test -f /tmp/candidate/src/components/App.tsx
+          test -f /tmp/candidate/.github/workflows/ci.yml
+          ! find /tmp/candidate -type d \( -name .git -o -name node_modules -o -name dist -o -name coverage \) -print -quit | grep -q .
+          ! find /tmp/candidate -path '*/.github/*patch*' -o -path '*/.github/*snapshot*' | grep -q .
+
+      - name: Materialize ordinary source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'resindb-single-main-bot'
+          git config user.email 'actions@users.noreply.github.com'
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a /tmp/candidate/. .
+          git add -A
+          git diff --cached --check
+          git commit -m 'materialize comprehensive single-main candidate v3.1.1'
+          git push origin HEAD:agent/single-main-consolidation-v11
+
+      - name: Install exact dependencies
+        id: npm-ci
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci > /tmp/npm-ci.log 2>&1 || {
+            tail -n 160 /tmp/npm-ci.log
+            exit 1
+          }
+
+      - name: Static and functional validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run lint
+          npm run typecheck
+          npm run test
+          npm run test:coverage
+
+      - name: Production and performance validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build
+          npm run bundle:check
+          npm run smoke
+          npm run test:performance
+          npm audit --audit-level=high
+          git diff --check
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: single-main-v11-validation
+          path: |
+            /tmp/npm-ci.log
+            coverage/
+            artifacts/
+            dist/index.html
+          if-no-files-found: ignore
+          retention-days: 7
