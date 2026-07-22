@@ -5,7 +5,7 @@ on:
     branches:
       - agent/single-main-consolidation-v11
     paths:
-      - .github/single-main-v11/part-03
+      - .github/single-main-v11/candidate.patch.xz.b64
 
 permissions:
   contents: write
@@ -29,22 +29,17 @@ jobs:
           ref: agent/single-main-consolidation-v11
           fetch-depth: 0
 
-      - name: Reassemble and verify candidate archive
+      - name: Verify and decode candidate patch
         shell: bash
         run: |
           set -euo pipefail
-          cat .github/single-main-v11/part-* > /tmp/candidate.b64
-          printf '%s  %s\n' '86e29a96d9906b667181512a4c9e9dca3193e2c0026cd2da2b39b454b365672f' /tmp/candidate.b64 | sha256sum --check -
-          base64 --decode /tmp/candidate.b64 > /tmp/candidate.tar.xz
-          printf '%s  %s\n' '0a9ed77c4034947753c40eb4972532d7a80caac4fd283caf1fbabda7d4630cfc' /tmp/candidate.tar.xz | sha256sum --check -
-          mkdir -p /tmp/candidate
-          tar -xJf /tmp/candidate.tar.xz -C /tmp/candidate
-          test -f /tmp/candidate/package.json
-          test -f /tmp/candidate/package-lock.json
-          test -f /tmp/candidate/src/components/App.tsx
-          test -f /tmp/candidate/.github/workflows/ci.yml
-          ! find /tmp/candidate -type d \( -name .git -o -name node_modules -o -name dist -o -name coverage \) -print -quit | grep -q .
-          ! find /tmp/candidate -path '*/.github/*patch*' -o -path '*/.github/*snapshot*' | grep -q .
+          cp .github/single-main-v11/candidate.patch.xz.b64 /tmp/candidate.patch.xz.b64
+          printf '%s  %s\n' 'f597871ae789a73d20045a4d532b52e87aa316a8e735741161f5c2088d5e4f71' /tmp/candidate.patch.xz.b64 | sha256sum --check -
+          base64 --decode /tmp/candidate.patch.xz.b64 > /tmp/candidate.patch.xz
+          printf '%s  %s\n' '8648a711f112ec78a0b42e4b5afa18f50d11ffd3ae59ac839a717e42db63bffd' /tmp/candidate.patch.xz | sha256sum --check -
+          xz --decompress --stdout /tmp/candidate.patch.xz > /tmp/candidate.patch
+          printf '%s  %s\n' '58e9d6bee02a052a60b3a07182c81578a9bbac5999dfd1a45f85ff779e5a922a' /tmp/candidate.patch | sha256sum --check -
+          git apply --check --whitespace=nowarn /tmp/candidate.patch
 
       - name: Materialize ordinary source tree
         shell: bash
@@ -52,8 +47,24 @@ jobs:
           set -euo pipefail
           git config user.name 'resindb-single-main-bot'
           git config user.email 'actions@users.noreply.github.com'
-          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-          cp -a /tmp/candidate/. .
+          git rm -r --ignore-unmatch \
+            .dependency-hardening-trigger \
+            .github/agent-hardening-patch \
+            .github/hardening-patch \
+            .github/single-main-v11 \
+            .github/second-pass-pr.trigger \
+            .github/second-pass-snapshot.trigger \
+            .github/second-pass.patch.b64.00 \
+            .github/second-pass.patch.b64.01 \
+            .github/second-pass.patch.part.00 \
+            .github/second-pass.patch.part.01 \
+            .github/second-pass.patch.part.02a \
+            .github/second-pass.patch.part.02b \
+            .github/workflows/apply-agent-hardening-patch.yml \
+            .github/workflows/export-source.yml \
+            .github/workflows/materialize-single-main-v11.yml \
+            .github/workflows/second-pass-snapshot.yml || true
+          git apply --index --whitespace=nowarn /tmp/candidate.patch
           git add -A
           git diff --cached --check
           git commit -m 'materialize comprehensive single-main candidate v3.1.1'
