@@ -69,7 +69,3 @@ export function useFormulas() {
     removeFormula
   }), [formulas, addFormula, updateFormula, removeFormula]);
 }
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

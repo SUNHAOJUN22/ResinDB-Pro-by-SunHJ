@@ -101,7 +101,3 @@ self.onmessage = async (e: MessageEvent<HistoryWorkerMessage>) => {
     self.postMessage({ type: 'ERROR', payload: { message: err instanceof Error ? err.message : 'Unknown error' } } as HistoryWorkerResponse);
   }
 };
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

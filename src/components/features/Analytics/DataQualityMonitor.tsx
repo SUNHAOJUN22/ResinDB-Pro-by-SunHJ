@@ -482,7 +482,3 @@ export const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({ products
     </div>
   );
 };
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

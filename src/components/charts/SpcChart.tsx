@@ -105,7 +105,3 @@ export const SpcChart: React.FC<SpcChartProps> = React.memo(({ histogram, normal
 
   return <div ref={chartRef} className="w-full h-full" />;
 });
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

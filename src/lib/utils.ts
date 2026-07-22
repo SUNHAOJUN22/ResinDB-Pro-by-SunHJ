@@ -5,11 +5,19 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+let fallbackIdCounter = 0;
+
 export function generateId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
   }
-  return `p-${Math.random().toString(36).substring(2, 9)}`;
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const values = new Uint32Array(2);
+    crypto.getRandomValues(values);
+    return `p-${values[0].toString(36)}${values[1].toString(36)}`;
+  }
+  fallbackIdCounter += 1;
+  return `p-${Date.now().toString(36)}-${fallbackIdCounter.toString(36)}`;
 }
 
 export const safeStorage = {
@@ -74,7 +82,3 @@ export const safeStorage = {
     }
   }
 };
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

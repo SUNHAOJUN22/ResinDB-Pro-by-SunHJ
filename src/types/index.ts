@@ -186,7 +186,3 @@ export interface SyncEvent {
   status: 'success' | 'error';
   message: string;
 }
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

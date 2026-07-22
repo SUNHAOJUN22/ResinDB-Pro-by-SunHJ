@@ -33,7 +33,3 @@ export function useColumnResizing(defaultWidths: Record<string, number>) {
     handleResize
   };
 }
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

@@ -1614,7 +1614,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                              if(!isNaN(val) && val > 0) {
                                                  const match = k.match(/(\d+)\s*[℃C]/);
                                                  if(match) {
-                                                     newPts.push({ id: Date.now()+Math.random(), temp: Number(match[1]), time: val });
+                                                     newPts.push({ id: Date.now() + newPts.length, temp: Number(match[1]), time: val });
                                                  }
                                              }
                                         }
@@ -3666,7 +3666,3 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
     );
   },
 );
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

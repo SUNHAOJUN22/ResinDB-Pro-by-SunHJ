@@ -80,7 +80,3 @@ export function useShortcuts({
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, [setShowSidebar]);
 }
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

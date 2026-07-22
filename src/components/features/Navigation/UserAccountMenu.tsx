@@ -12,6 +12,7 @@ import { motion, AnimatePresence, Variants } from "motion/react";
 import { User } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme, ColorTheme } from "@/contexts/ThemeContext";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 interface UserAccountMenuProps {
   user: User | null;
@@ -77,13 +78,11 @@ export const UserAccountMenu: React.FC<UserAccountMenuProps> = ({
         onClick={() => setIsOpen(!isOpen)}
         className={`w-10 h-10 border overflow-hidden transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 rounded-lg shadow-sm ${isOpen ? "border-primary-500" : "border-slate-200/80 dark:border-slate-800/80 hover:border-primary-400"}`}
       >
-        <img
-          src={
-            user?.avatar ||
-            `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name}`
-          }
-          alt=""
-          className="w-full h-full object-cover transition-all"
+        <UserAvatar
+          name={user?.name}
+          avatar={user?.avatar}
+          className="h-full w-full rounded-none text-xs transition-all"
+          alt={user?.name || "User"}
         />
       </motion.button>
 
@@ -209,7 +208,3 @@ export const UserAccountMenu: React.FC<UserAccountMenuProps> = ({
     </div>
   );
 };
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

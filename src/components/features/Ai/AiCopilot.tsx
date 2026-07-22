@@ -17,6 +17,7 @@ import { Product, ProductUpdates } from '@/types/index';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { AiApiSettingsModal } from '@/components/modals/AiApiSettingsModal';
 import { getAiInsights, isAiConfigured } from '@/services/aiService';
+import { generateId } from '@/lib/utils';
 
 interface AiCopilotProps {
   data: Product[];
@@ -39,9 +40,7 @@ const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
 function createMessageId(): string {
-  return typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `msg-${generateId()}`;
 }
 
 async function readImage(file: File): Promise<{ data: string; mimeType: string }> {

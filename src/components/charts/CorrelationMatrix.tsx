@@ -106,7 +106,3 @@ export const CorrelationMatrix: React.FC<CorrelationMatrixProps> = ({ data, keys
     </div>
   );
 };
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

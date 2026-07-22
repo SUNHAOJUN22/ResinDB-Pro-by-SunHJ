@@ -166,7 +166,3 @@ export const getRheologyChartOption = (
     series: series as echarts.SeriesOption[],
   };
 };
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

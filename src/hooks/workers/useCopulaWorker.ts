@@ -51,8 +51,3 @@ export function useCopulaWorker() {
 
   return { isCalculating, copulaResult, error, calculateCopula, getJointFailureProb };
 }
-
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

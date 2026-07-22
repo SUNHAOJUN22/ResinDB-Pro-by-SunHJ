@@ -53,7 +53,3 @@ describe('useClickFeedback Hook', () => {
         expect(vibrateMock).toHaveBeenCalledWith(15);
     });
 });
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

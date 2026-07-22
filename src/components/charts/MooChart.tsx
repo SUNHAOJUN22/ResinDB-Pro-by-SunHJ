@@ -127,7 +127,3 @@ export const MooChart: React.FC<MooChartProps> = React.memo(({ evaluatedCandidat
         <div ref={chartRef} className="w-full h-full min-h-[400px]"></div>
     );
 });
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed

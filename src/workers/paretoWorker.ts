@@ -120,7 +120,3 @@ self.onmessage = (e: MessageEvent<ParetoMessage>) => {
     self.postMessage({ type: 'ERROR', payload: { message: error instanceof Error ? error.message : 'Unknown error' } } as ParetoResponse);
   }
 };
-
-// v3.1.0-sync
-
-// v3.1.0-sync-fixed
