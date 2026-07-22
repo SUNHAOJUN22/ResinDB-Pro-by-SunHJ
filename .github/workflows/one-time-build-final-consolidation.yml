@@ -1,23 +1,27 @@
 name: One-time validated final consolidation
 
 on:
-  push:
+  pull_request_target:
     branches: [main]
+    types: [opened, reopened, synchronize]
     paths:
-      - .github/consolidation/run-final-build.trigger
+      - .github/consolidation/final-patch/**
 
 permissions:
   contents: write
 
 jobs:
   validate-and-publish-candidate:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'automation/resindb-final-consolidation'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Check out patch transport branch with full history
+      - name: Check out controlled patch transport branch
         uses: actions/checkout@v4
         with:
-          ref: automation/resindb-final-consolidation
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Reconstruct and verify consolidation patch
@@ -29,13 +33,15 @@ jobs:
           xz --decompress --stdout /tmp/resindb-final.patch.xz > /tmp/resindb-final.patch
           echo 'e560f1966c05acbc9828d9aaaf9475f4dba25d327b691a68f3a1db379cc4fd15  /tmp/resindb-final.patch' | sha256sum --check
 
-      - name: Apply patch to triggering main commit
+      - name: Apply patch to exact pull-request base
         shell: bash
+        env:
+          EXPECTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
           git fetch --force origin main
-          git switch --force-create final-candidate "$GITHUB_SHA"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git switch --force-create final-candidate origin/main
+          test "$(git rev-parse HEAD)" = "$EXPECTED_BASE_SHA"
           git apply --check /tmp/resindb-final.patch
           git apply /tmp/resindb-final.patch
           git rm --ignore-unmatch \
@@ -68,16 +74,19 @@ jobs:
           test -z "$(git grep -nE 'api\.dicebear\.com|transparenttextures\.com|fonts\.googleapis\.com|fonts\.gstatic\.com' -- src index.html || true)"
           test -z "$(git grep -nE '(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})' -- . || true)"
 
-      - name: Commit validated candidate
+      - name: Commit and publish validated candidate
         shell: bash
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
           git config user.name 'ResinDB Consolidation Bot'
           git config user.email 'actions@users.noreply.github.com'
           git commit -m 'refactor: consolidate and harden ResinDB Pro mainline'
-          git push --force origin HEAD:automation/resindb-final-consolidation
+          git push --force origin "HEAD:$HEAD_BRANCH"
           {
-            echo "trigger_main=$GITHUB_SHA"
+            echo "base=$BASE_SHA"
             echo "candidate=$(git rev-parse HEAD)"
             echo "patch_sha256=e560f1966c05acbc9828d9aaaf9475f4dba25d327b691a68f3a1db379cc4fd15"
             echo "validation=npm run validate"
