@@ -42,10 +42,13 @@ Production deployments should use an authenticated server-side gateway with:
 
 User-defined formulas are parsed by a white-listed numeric grammar. Dynamic JavaScript execution (`eval` and `new Function`) is not permitted. Supported constructs are numeric literals, `Props['property']` references, arithmetic operators, parentheses, constants, and documented mathematical functions.
 
+## Dependency response
+
+Use `npm ci` for reproducible installation and run `npm audit --omit=dev --audit-level=high` before release. A high or critical production advisory blocks release until the affected dependency is upgraded, removed, isolated from the production graph, or documented with a verified non-applicability rationale.
+
 ## Data and AI limitations
 
 AI-generated properties and formulation suggestions are hypotheses, not manufacturer specifications, certified test results, safety determinations, or regulatory approvals. Validate outputs against traceable source data and laboratory methods before use.
-
 
 ## Browser session and local profile data
 
