@@ -5,7 +5,7 @@ on:
     branches:
       - agent/single-main-consolidation-v11
     paths:
-      - .github/single-main-v11/candidate.patch.xz.b64
+      - .github/single-main-v11/candidate.part-07
 
 permissions:
   contents: write
@@ -33,7 +33,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp .github/single-main-v11/candidate.patch.xz.b64 /tmp/candidate.patch.xz.b64
+          cat \
+            .github/single-main-v11/candidate.part-00 \
+            .github/single-main-v11/candidate.part-01 \
+            .github/single-main-v11/candidate.part-02 \
+            .github/single-main-v11/candidate.part-03 \
+            .github/single-main-v11/candidate.part-04 \
+            .github/single-main-v11/candidate.part-05 \
+            .github/single-main-v11/candidate.part-06 \
+            .github/single-main-v11/candidate.part-07 \
+            > /tmp/candidate.patch.xz.b64
           printf '%s  %s\n' 'f597871ae789a73d20045a4d532b52e87aa316a8e735741161f5c2088d5e4f71' /tmp/candidate.patch.xz.b64 | sha256sum --check -
           base64 --decode /tmp/candidate.patch.xz.b64 > /tmp/candidate.patch.xz
           printf '%s  %s\n' '8648a711f112ec78a0b42e4b5afa18f50d11ffd3ae59ac839a717e42db63bffd' /tmp/candidate.patch.xz | sha256sum --check -
