@@ -3,13 +3,17 @@ name: Direct main integration
 on:
   issues:
     types: [opened]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: write
 
 jobs:
   integrate-validate-publish:
-    if: github.event.issue.title == 'RUN_DIRECT_MAIN_INTEGRATION_20260723'
+    if: >-
+      github.event.issue.title == 'RUN_DIRECT_MAIN_INTEGRATION_20260723' &&
+      (github.event_name == 'issues' || github.event.comment.body == 'RUN_VALIDATED_DIRECT_MAIN_INTEGRATION')
     runs-on: ubuntu-latest
     timeout-minutes: 35
 
@@ -24,14 +28,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p integration-evidence
+          mkdir -p /tmp/integration-evidence
           base64 --decode .github/direct-main-integration.patch.xz.b64 > /tmp/integration.patch.xz
           echo '6b04c8c3582f1b7a8b89b7099cfa8bf37df3cce4c0943be08239ea82b36b935c  /tmp/integration.patch.xz' | sha256sum -c -
           xz --decompress --stdout /tmp/integration.patch.xz > /tmp/integration.patch
           git apply --check /tmp/integration.patch
           git apply /tmp/integration.patch
           git diff --check
-          cp /tmp/integration.patch integration-evidence/applied.patch
+          cp /tmp/integration.patch /tmp/integration-evidence/applied.patch
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -43,58 +47,58 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          npm ci 2>&1 | tee integration-evidence/npm-ci.log
+          npm ci 2>&1 | tee /tmp/integration-evidence/npm-ci.log
 
       - name: Lint
         shell: bash
         run: |
           set -o pipefail
-          npm run lint 2>&1 | tee integration-evidence/lint.log
+          npm run lint 2>&1 | tee /tmp/integration-evidence/lint.log
 
       - name: Typecheck
         shell: bash
         run: |
           set -o pipefail
-          npm run typecheck 2>&1 | tee integration-evidence/typecheck.log
+          npm run typecheck 2>&1 | tee /tmp/integration-evidence/typecheck.log
 
       - name: Run full tests
         shell: bash
         run: |
           set -o pipefail
-          npm run test 2>&1 | tee integration-evidence/test.log
+          npm run test 2>&1 | tee /tmp/integration-evidence/test.log
 
       - name: Run unit and science suites
         shell: bash
         run: |
           set -o pipefail
-          npm run test:unit 2>&1 | tee integration-evidence/test-unit.log
-          npm run test:science 2>&1 | tee integration-evidence/test-science.log
+          npm run test:unit 2>&1 | tee /tmp/integration-evidence/test-unit.log
+          npm run test:science 2>&1 | tee /tmp/integration-evidence/test-science.log
 
       - name: Generate coverage
         shell: bash
         run: |
           set -o pipefail
-          npm run test:coverage 2>&1 | tee integration-evidence/coverage.log
+          npm run test:coverage 2>&1 | tee /tmp/integration-evidence/coverage.log
 
       - name: Build production application
         shell: bash
         run: |
           set -o pipefail
-          npm run build 2>&1 | tee integration-evidence/build.log
+          npm run build 2>&1 | tee /tmp/integration-evidence/build.log
 
       - name: Run HTTP and browser UI smoke tests
         shell: bash
         run: |
           set -o pipefail
-          npm run smoke 2>&1 | tee integration-evidence/smoke.log
-          npm run test:ui 2>&1 | tee integration-evidence/ui-smoke.log
+          npm run smoke 2>&1 | tee /tmp/integration-evidence/smoke.log
+          npm run test:ui 2>&1 | tee /tmp/integration-evidence/ui-smoke.log
 
       - name: Audit production dependencies
         shell: bash
         run: |
           set -o pipefail
           for attempt in 1 2 3; do
-            if npm run audit:prod 2>&1 | tee integration-evidence/audit-production.log; then
+            if npm run audit:prod 2>&1 | tee /tmp/integration-evidence/audit-production.log; then
               exit 0
             fi
             if [ "$attempt" -lt 3 ]; then sleep $((attempt * 10)); fi
@@ -125,7 +129,7 @@ jobs:
           git diff --cached --check
           git commit -m 'feat: integrate validated platform capabilities and test evidence'
           git push origin HEAD:main
-          git rev-parse HEAD | tee integration-evidence/final-main-sha.txt
+          git rev-parse HEAD | tee /tmp/integration-evidence/final-main-sha.txt
 
       - name: Upload integration evidence
         if: always()
@@ -133,7 +137,7 @@ jobs:
         with:
           name: resindb-direct-main-integration-evidence
           path: |
-            integration-evidence
+            /tmp/integration-evidence
             coverage
             artifacts
           if-no-files-found: warn
