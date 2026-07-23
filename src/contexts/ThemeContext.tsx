@@ -126,6 +126,24 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       });
   }, [colorTheme]);
 
+
+  useEffect(() => {
+    const handleThemeChange = (event: Event) => {
+      const next = (event as CustomEvent<Theme>).detail;
+      if (next === 'light' || next === 'dark') setTheme(next);
+    };
+    const handleColorThemeChange = (event: Event) => {
+      const next = (event as CustomEvent<ColorTheme>).detail;
+      if (next in PALETTES) setColorTheme(next);
+    };
+    window.addEventListener('resindb-theme-change', handleThemeChange);
+    window.addEventListener('resindb-color-theme-change', handleColorThemeChange);
+    return () => {
+      window.removeEventListener('resindb-theme-change', handleThemeChange);
+      window.removeEventListener('resindb-color-theme-change', handleColorThemeChange);
+    };
+  }, []);
+
   const toggleTheme = React.useCallback(() => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   }, []);

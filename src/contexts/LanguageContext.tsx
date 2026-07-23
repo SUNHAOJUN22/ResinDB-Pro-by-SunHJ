@@ -25,6 +25,15 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
     safeStorage.local.setItem('resindb-language', language);
   }, [language]);
 
+  React.useEffect(() => {
+    const handleLanguageChange = (event: Event) => {
+      const next = (event as CustomEvent<Language>).detail;
+      if (next === 'zh' || next === 'en') setLanguage(next);
+    };
+    window.addEventListener('resindb-language-change', handleLanguageChange);
+    return () => window.removeEventListener('resindb-language-change', handleLanguageChange);
+  }, []);
+
   const t = React.useCallback((key: string, fallback?: string) => {
     const translationMap = translations[language];
     const val = translationMap[key as keyof typeof translationMap];
