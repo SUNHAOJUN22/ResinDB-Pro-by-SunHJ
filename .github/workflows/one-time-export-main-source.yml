@@ -1,0 +1,31 @@
+name: One-time export main source
+
+on:
+  push:
+    branches:
+      - automation/main-revalidation-snapshot
+    paths:
+      - .github/workflows/one-time-export-main-source.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: automation/main-revalidation-snapshot
+      - name: Remove generated and Git data
+        run: rm -rf .git node_modules dist coverage artifacts
+      - name: Upload complete source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: resindb-main-source-${{ github.sha }}
+          path: .
+          include-hidden-files: true
+          retention-days: 1
