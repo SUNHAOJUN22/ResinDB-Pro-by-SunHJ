@@ -48,24 +48,11 @@ describe('FormulaEngine scientific calculations and parser safety', () => {
   describe('topological ordering', () => {
     test('sorts formulas by dependency hierarchy', () => {
       const formulas: FormulaConfig[] = [
-        {
-          id: 'f1',
-          name: 'VolumeScore',
-          expression: "Props['Density'] * 10",
-          unit: '',
-        },
-        {
-          id: 'f2',
-          name: 'CompositeScore',
-          expression: "Props['VolumeScore'] + Props['Density']",
-          unit: '',
-        },
+        { id: 'f1', name: 'VolumeScore', expression: "Props['Density'] * 10", unit: '' },
+        { id: 'f2', name: 'CompositeScore', expression: "Props['VolumeScore'] + Props['Density']", unit: '' },
       ];
 
-      expect(engine.buildTopologicalOrder(formulas).map((formula) => formula.id)).toEqual([
-        'f1',
-        'f2',
-      ]);
+      expect(engine.buildTopologicalOrder(formulas).map((formula) => formula.id)).toEqual(['f1', 'f2']);
     });
 
     test('rejects cyclical references', () => {
@@ -73,9 +60,7 @@ describe('FormulaEngine scientific calculations and parser safety', () => {
         { id: 'f1', name: 'A', expression: "Props['B'] * 2", unit: '' },
         { id: 'f2', name: 'B', expression: "Props['A'] + 1", unit: '' },
       ];
-      expect(() => engine.buildTopologicalOrder(formulas)).toThrow(
-        'Cyclic dependency detected',
-      );
+      expect(() => engine.buildTopologicalOrder(formulas)).toThrow('Cyclic dependency detected');
     });
   });
 
@@ -108,18 +93,8 @@ describe('FormulaEngine scientific calculations and parser safety', () => {
   describe('compiled execution plan', () => {
     test('computes dependent formulas in sequence', () => {
       const formulas: FormulaConfig[] = [
-        {
-          id: 'f1',
-          name: 'DoubleDensity',
-          expression: "Props['密度'] * 2",
-          unit: '',
-        },
-        {
-          id: 'f2',
-          name: 'TripleDensity',
-          expression: "Props['DoubleDensity'] + Props['密度']",
-          unit: '',
-        },
+        { id: 'f1', name: 'DoubleDensity', expression: "Props['密度'] * 2", unit: '' },
+        { id: 'f2', name: 'TripleDensity', expression: "Props['DoubleDensity'] + Props['密度']", unit: '' },
       ];
 
       const results = engine.compileGraph(formulas)(
@@ -134,10 +109,51 @@ describe('FormulaEngine scientific calculations and parser safety', () => {
         { id: 'division', name: 'Division', expression: '1 / 0', unit: '' },
         { id: 'sqrt', name: 'Sqrt', expression: 'sqrt(-1)', unit: '' },
       ];
-      expect(engine.compileGraph(formulas)(createProduct({}))).toEqual({
-        division: 0,
-        sqrt: 0,
-      });
+      expect(engine.compileGraph(formulas)(createProduct({}))).toEqual({ division: 0, sqrt: 0 });
     });
+  });
+});
+
+describe('logical fallback operators and isolated formula failures', () => {
+  const logicalEngine = new FormulaEngine();
+
+  test('supports || and && with numeric short-circuit semantics', () => {
+    const executor = logicalEngine.compileGraph([
+      { id: 'or', name: 'Fallback', expression: "(props['A'] || props['B'] || 0) / 2", unit: '' },
+      { id: 'and', name: 'Guarded', expression: "props['A'] && props['B']", unit: '' },
+    ]);
+
+    const result = executor({
+      id: 'logical',
+      gradeName: 'Logical',
+      manufacturer: 'Test',
+      categoryIds: [],
+      properties: { A: { value: 0, unit: '' }, B: { value: 10, unit: '' } },
+      createdAt: '',
+      updatedAt: '',
+    });
+
+    expect(result.or).toBe(5);
+    expect(result.and).toBe(0);
+  });
+
+  test('isolates a malformed formula without blocking valid formulas', () => {
+    const executor = logicalEngine.compileGraph([
+      { id: 'bad', name: 'Malformed', expression: "props['A'] + )", unit: '' },
+      { id: 'good', name: 'Valid', expression: "props['A'] * 2", unit: '' },
+    ]);
+
+    const result = executor({
+      id: 'fault-tolerance',
+      gradeName: 'Fault tolerance',
+      manufacturer: 'Test',
+      categoryIds: [],
+      properties: { A: { value: 4, unit: '' } },
+      createdAt: '',
+      updatedAt: '',
+    });
+
+    expect(result.bad).toBe(0);
+    expect(result.good).toBe(8);
   });
 });

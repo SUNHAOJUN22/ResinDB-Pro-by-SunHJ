@@ -44,3 +44,6 @@ migrated_prompt_history/
 *.rar
 *.pptx
 *.docx
+
+# Generated browser-test screenshots
+artifacts/

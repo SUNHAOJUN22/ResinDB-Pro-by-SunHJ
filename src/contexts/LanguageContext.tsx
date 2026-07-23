@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { Language } from '@/types/index';
 import { translations, propertyMap } from '@/config/i18n';
+import { safeStorage } from '@/lib/utils';
 
 interface LanguageContextType {
   language: Language;
@@ -14,10 +15,14 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [language, setLanguage] = useState<Language>('zh');
+  const [language, setLanguage] = useState<Language>(() => {
+    const saved = safeStorage.local.getItem('resindb-language');
+    return saved === 'en' || saved === 'zh' ? saved : 'zh';
+  });
 
   React.useEffect(() => {
     document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
+    safeStorage.local.setItem('resindb-language', language);
   }, [language]);
 
   const t = React.useCallback((key: string, fallback?: string) => {

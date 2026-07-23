@@ -17,9 +17,9 @@ concurrency:
 
 jobs:
   validate:
-    name: Lint, typecheck, test and build
+    name: Validate, cover, render and audit
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Check out repository
@@ -37,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci > /tmp/npm-ci.log 2>&1 || {
-            tail -n 120 /tmp/npm-ci.log
+            tail -n 160 /tmp/npm-ci.log
             exit 1
           }
 
@@ -51,3 +51,34 @@ jobs:
 
       - name: Validate repository
         run: npm run validate
+
+      - name: Generate coverage report
+        run: npm run test:coverage
+
+      - name: Run authenticated browser smoke test
+        run: npm run test:ui
+
+      - name: Audit production dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if npm run audit:prod; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            sleep $((attempt * 10))
+          done
+
+      - name: Upload coverage and UI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-evidence-${{ github.sha }}
+          path: |
+            coverage/
+            artifacts/
+          if-no-files-found: warn
+          retention-days: 14
