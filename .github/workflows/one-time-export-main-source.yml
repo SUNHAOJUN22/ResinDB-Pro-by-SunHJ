@@ -6,6 +6,9 @@ on:
       - automation/main-revalidation-snapshot
     paths:
       - .github/workflows/one-time-export-main-source.yml
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
