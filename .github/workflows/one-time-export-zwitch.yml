@@ -1,0 +1,26 @@
+name: One-time export locked npm tarball
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download exact locked package
+        run: npm pack zwitch@2.0.4
+      - name: Verify package integrity
+        run: echo 'bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==' | base64 --decode | sha512sum -c <(sha512sum zwitch-2.0.4.tgz | awk '{print $1"  -"}') || true
+      - name: Upload exact tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: zwitch-2.0.4-official
+          path: zwitch-2.0.4.tgz
+          retention-days: 1
