@@ -1,0 +1,29 @@
+name: One-time export v3.1.1 patch base
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout audited base
+        uses: actions/checkout@v4
+        with:
+          ref: 8e8eadbb52c9b657d9e83777c987882d3f09ba51
+      - name: Remove Git and generated data
+        run: rm -rf .git node_modules dist coverage artifacts
+      - name: Upload audited base source
+        uses: actions/upload-artifact@v4
+        with:
+          name: resindb-v311-audited-base
+          path: .
+          include-hidden-files: true
+          retention-days: 1
