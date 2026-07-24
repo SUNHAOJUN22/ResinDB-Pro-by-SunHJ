@@ -1,0 +1,140 @@
+name: One-time full validation receipt
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/one-time-full-validation.trigger
+
+permissions:
+  contents: write
+
+concurrency:
+  group: resindb-one-time-full-validation
+  cancel-in-progress: false
+
+jobs:
+  validate-and-record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Run complete validation and record receipt
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p /tmp/resindb-validation reports
+          overall=0
+
+          run_check() {
+            local name="$1"
+            shift
+            echo "==> ${name}"
+            set +e
+            "$@" >"/tmp/resindb-validation/${name}.log" 2>&1
+            local code=$?
+            set -e
+            cat "/tmp/resindb-validation/${name}.log"
+            printf '%s' "$code" >"/tmp/resindb-validation/${name}.status"
+            if [ "$code" -ne 0 ]; then overall=1; fi
+          }
+
+          set -e
+          install_code=1
+          for attempt in 1 2 3; do
+            set +e
+            npm ci > /tmp/resindb-validation/npm-ci.log 2>&1
+            install_code=$?
+            set -e
+            if [ "$install_code" -eq 0 ]; then break; fi
+            tail -n 160 /tmp/resindb-validation/npm-ci.log
+            sleep $((attempt * 15))
+          done
+          cat /tmp/resindb-validation/npm-ci.log
+          printf '%s' "$install_code" > /tmp/resindb-validation/npm-ci.status
+          if [ "$install_code" -ne 0 ]; then
+            overall=1
+          else
+            run_check lint npm run lint
+            run_check typecheck npm run typecheck
+            run_check test npm run test
+            run_check test-unit npm run test:unit
+            run_check test-science npm run test:science
+            run_check test-coverage npm run test:coverage
+            run_check build npm run build
+            run_check smoke npm run smoke
+            run_check test-ui npm run test:ui
+
+            audit_code=1
+            for attempt in 1 2 3; do
+              set +e
+              npm run audit:prod > /tmp/resindb-validation/audit-prod.log 2>&1
+              audit_code=$?
+              set -e
+              if [ "$audit_code" -eq 0 ]; then break; fi
+              cat /tmp/resindb-validation/audit-prod.log
+              sleep $((attempt * 10))
+            done
+            cat /tmp/resindb-validation/audit-prod.log
+            printf '%s' "$audit_code" > /tmp/resindb-validation/audit-prod.status
+            if [ "$audit_code" -ne 0 ]; then overall=1; fi
+          fi
+
+          result=success
+          if [ "$overall" -ne 0 ]; then result=failure; fi
+          source_sha="${GITHUB_SHA}"
+          completed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          python - "$result" "$source_sha" "$completed_at" <<'PY'
+          import json, pathlib, sys
+          root = pathlib.Path('/tmp/resindb-validation')
+          result, source_sha, completed_at = sys.argv[1:]
+          statuses = {}
+          for path in sorted(root.glob('*.status')):
+              statuses[path.stem] = int(path.read_text().strip())
+          receipt = {
+              'schemaVersion': 1,
+              'result': result,
+              'sourceCommit': source_sha,
+              'completedAt': completed_at,
+              'runner': 'ubuntu-latest / Node.js 22',
+              'statuses': statuses,
+              'evidenceArtifact': f'resindb-full-validation-{source_sha}',
+          }
+          pathlib.Path('reports/ci-validation-latest.json').write_text(
+              json.dumps(receipt, ensure_ascii=False, indent=2) + '\n', encoding='utf-8'
+          )
+          PY
+
+          rm -rf dist coverage artifacts node_modules
+          git config user.name 'ResinDB Validation Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git rm .github/workflows/one-time-full-validation.yml .github/one-time-full-validation.trigger
+          git add reports/ci-validation-latest.json
+          git diff --cached --check
+          git commit -m "ci: record ${result} full validation [skip ci]"
+          git push origin HEAD:main
+
+          exit "$overall"
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resindb-full-validation-${{ github.sha }}
+          path: |
+            /tmp/resindb-validation
+            coverage/
+            artifacts/
+          if-no-files-found: warn
+          retention-days: 14
