@@ -27,6 +27,27 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Publish workflow run locator
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          cat > reports/source-export-started.json <<JSON
+          {
+            "schemaVersion": 1,
+            "repository": "${GITHUB_REPOSITORY}",
+            "sourceCommit": "${GITHUB_SHA}",
+            "workflowRunId": ${GITHUB_RUN_ID},
+            "workflowRunAttempt": ${GITHUB_RUN_ATTEMPT},
+            "generatedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          JSON
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/source-export-started.json
+          git commit -m "chore: publish source export run locator [skip ci]"
+          git push origin HEAD:main
+
       - name: Build source archive
         shell: bash
         run: |
@@ -78,7 +99,6 @@ jobs:
             exit 1
           fi
 
-          mkdir -p reports
           cat > reports/source-export.json <<JSON
           {
             "schemaVersion": 1,
@@ -91,8 +111,6 @@ jobs:
           }
           JSON
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add reports/source-export.json
           git commit -m "chore: publish source snapshot locator [skip ci]"
           git push origin HEAD:main
