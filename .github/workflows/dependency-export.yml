@@ -1,0 +1,127 @@
+name: Dependency Snapshot Export
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/dependency-export-trigger.txt
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: dependency-snapshot-export
+  cancel-in-progress: false
+
+jobs:
+  export:
+    name: Install and export exact dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out exact main commit
+        uses: actions/checkout@v4
+
+      - name: Publish workflow run locator
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports
+          cat > reports/dependency-export-started.json <<JSON
+          {
+            "schemaVersion": 1,
+            "repository": "${GITHUB_REPOSITORY}",
+            "sourceCommit": "${GITHUB_SHA}",
+            "workflowRunId": ${GITHUB_RUN_ID},
+            "workflowRunAttempt": ${GITHUB_RUN_ATTEMPT},
+            "generatedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          JSON
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/dependency-export-started.json
+          git commit -m "chore: publish dependency export run locator [skip ci]"
+          git push origin HEAD:main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if npm ci; then
+              exit 0
+            fi
+            [ "$attempt" -eq 3 ] && exit 1
+            sleep $((attempt * 15))
+          done
+
+      - name: Build dependency archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive_dir="${RUNNER_TEMP}/resindb-dependencies"
+          mkdir -p "${archive_dir}"
+          tar -czf "${archive_dir}/node_modules.tgz" node_modules
+          sha256sum "${archive_dir}/node_modules.tgz" > "${archive_dir}/node_modules.tgz.sha256"
+          echo "ARCHIVE_DIR=${archive_dir}" >> "${GITHUB_ENV}"
+
+      - name: Upload dependency snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: resindb-dependencies-${{ github.sha }}
+          path: |
+            ${{ env.ARCHIVE_DIR }}/node_modules.tgz
+            ${{ env.ARCHIVE_DIR }}/node_modules.tgz.sha256
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+
+      - name: Publish artifact locator
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_NAME: resindb-dependencies-${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_id=""
+          for attempt in $(seq 1 30); do
+            artifact_id="$(curl -fsSL \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100" \
+              | jq -r --arg name "${ARTIFACT_NAME}" '.artifacts[] | select(.name == $name) | .id' \
+              | head -n 1)"
+            if [ -n "${artifact_id}" ] && [ "${artifact_id}" != "null" ]; then
+              break
+            fi
+            sleep 3
+          done
+          if [ -z "${artifact_id}" ] || [ "${artifact_id}" = "null" ]; then
+            echo "Unable to resolve uploaded dependency artifact id" >&2
+            exit 1
+          fi
+
+          cat > reports/dependency-export.json <<JSON
+          {
+            "schemaVersion": 1,
+            "repository": "${GITHUB_REPOSITORY}",
+            "sourceCommit": "${GITHUB_SHA}",
+            "workflowRunId": ${GITHUB_RUN_ID},
+            "artifactId": ${artifact_id},
+            "artifactName": "${ARTIFACT_NAME}",
+            "generatedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          JSON
+          git add reports/dependency-export.json
+          git commit -m "chore: publish dependency snapshot locator [skip ci]"
+          git push origin HEAD:main
