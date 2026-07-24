@@ -1,188 +1,35 @@
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
-import { X, MessageSquare, Loader2, Send } from "lucide-react";
+import React, { useMemo, useState } from 'react';
+import { Download, MessageSquare, X } from 'lucide-react';
+import { safeStorage } from '@/lib/utils';
 
-interface FeedbackModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-export const FeedbackModal: React.FC<FeedbackModalProps> = ({
-  isOpen,
-  onClose,
-}) => {
-  const [type, setType] = useState<"bug" | "feature" | "other">("bug");
-  const [message, setMessage] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [isSubmitted, setIsSubmitted] = useState(false);
-
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setIsSubmitting(false);
-    setIsSubmitted(true);
-    setTimeout(() => {
-      onClose();
-      setTimeout(() => setIsSubmitted(false), 500);
-    }, 2000);
-  };
-
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          key="feedback-modal-root"
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-        >
-          <motion.div
-            key="feedback-modal-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm"
-            onClick={onClose}
-          ></motion.div>
-          <motion.div
-            key="feedback-modal-content"
-            initial={{ scale: 0.95, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.95, opacity: 0, y: 20 }}
-            transition={{ type: "spring", duration: 0.4, bounce: 0 }}
-            className="relative bg-white dark:bg-slate-950 w-full max-w-lg border border-slate-300 dark:border-slate-700 overflow-hidden rounded-[2.5rem] shadow-2xl min-h-[400px] flex flex-col"
-          >
-            <AnimatePresence mode="wait">
-              {!isSubmitted ? (
-                <motion.div
-                  key="form"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="flex flex-col h-full"
-                >
-                  <div className="px-6 py-4 border-b border-slate-300 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-900 relative overflow-hidden">
-                    <div className="flex items-center gap-4 relative z-10">
-                      <div className="p-2 bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-800 rounded-xl shadow-inner">
-                        <MessageSquare size={20} />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-serif font-bold text-slate-800 dark:text-white tracking-tight">
-                          发送反馈
-                        </h3>
-                        <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mt-0.5">
-                          Help us improve the platform
-                        </p>
-                      </div>
-                    </div>
-                    <motion.button
-                      whileHover={{
-                        scale: 1.1,
-                        backgroundColor: "rgba(225, 29, 72, 1)",
-                      }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={onClose}
-                      className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-500 shadow-sm transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-rose-500 z-10 rounded-xl"
-                    >
-                      <X size={16} />
-                    </motion.button>
-                  </div>
-                  <div className="p-6 space-y-6 bg-white dark:bg-slate-950 flex-1">
-                    <div className="flex gap-2">
-                      {(["bug", "feature", "other"] as const).map((t) => (
-                        <motion.button
-                          key={t}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => setType(t)}
-                          className={`flex-1 py-2 text-[10px] font-mono uppercase tracking-widest transition-all border rounded-xl shadow-sm ${type === t ? "bg-primary-600 text-white border-primary-600" : "bg-white dark:bg-slate-950 text-slate-500 border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600"}`}
-                        >
-                          {t === "bug"
-                            ? "缺陷报告"
-                            : t === "feature"
-                              ? "功能建议"
-                              : "其他反馈"}
-                        </motion.button>
-                      ))}
-                    </div>
-                    <div className="relative group">
-                      <motion.textarea
-                        whileFocus={{
-                          scale: 1.005,
-                          backgroundColor: "rgba(255, 255, 255, 1)",
-                        }}
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        placeholder="请描述您遇到的问题或建议..."
-                        className="w-full h-48 p-5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-800 dark:text-white focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 outline-none transition-all resize-none rounded-2xl group-hover:border-slate-300 dark:group-hover:border-slate-700 shadow-inner"
-                      />
-                      <div className="absolute bottom-3 right-4 text-[9px] font-mono text-slate-400 uppercase tracking-widest">
-                        {message.length} CHARS
-                      </div>
-                    </div>
-                  </div>
-                  <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-300 dark:border-slate-700 flex justify-end gap-3">
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={onClose}
-                      className="px-6 py-2 text-slate-500 font-mono text-[10px] uppercase tracking-widest hover:text-slate-800 dark:hover:text-slate-200 transition-all rounded-xl"
-                    >
-                      取消
-                    </motion.button>
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={handleSubmit}
-                      disabled={!message || isSubmitting}
-                      className="px-8 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 border border-transparent font-mono text-[10px] uppercase tracking-widest hover:bg-slate-800 dark:hover:bg-slate-100 transition-all disabled:opacity-50 flex items-center gap-2 rounded-xl shadow-lg shadow-black/5 dark:shadow-white/5"
-                    >
-                      {isSubmitting ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <Send size={14} />
-                      )}
-                      提交反馈
-                    </motion.button>
-                  </div>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="success"
-                  initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  className="flex flex-col items-center justify-center p-12 text-center h-full min-h-[400px]"
-                >
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{
-                      type: "spring",
-                      damping: 12,
-                      stiffness: 200,
-                      delay: 0.2,
-                    }}
-                    className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mb-6 border border-emerald-200 dark:border-emerald-800 shadow-xl"
-                  >
-                    <motion.div
-                      initial={{ pathLength: 0 }}
-                      animate={{ pathLength: 1 }}
-                      transition={{ duration: 0.5, delay: 0.5 }}
-                    >
-                      <Send size={40} />
-                    </motion.div>
-                  </motion.div>
-                  <h3 className="text-xl font-serif font-black text-slate-800 dark:text-white tracking-tight mb-2">
-                    感谢您的反馈!
-                  </h3>
-                  <p className="text-xs font-mono text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] max-w-[240px]">
-                    您的建议对我们非常重要，我们将尽快处理。
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
+interface FeedbackModalProps { isOpen: boolean; onClose: () => void }
+type FeedbackType='bug'|'feature'|'data'|'other';
+type Severity='low'|'medium'|'high'|'critical';
+const STORAGE_KEY='resindb-feedback-queue';
+export const redactFeedbackText=(value:string)=>value
+  .replace(/(api[_ -]?key|token|password|secret)\s*[:=]\s*[^\s,;]+/gi,'$1=[REDACTED]')
+  .replace(/\b(sk-[A-Za-z0-9_-]{8,})\b/g,'[REDACTED_KEY]');
+export interface FeedbackRecord { id:string; createdAt:string; type:FeedbackType; severity:Severity; module:string; title:string; description:string; steps:string; environment:{version:string;url:string;language:string;theme:string;userAgent:string}; privacy:string }
+export const buildFeedbackRecord=(input:Omit<FeedbackRecord,'id'|'createdAt'|'environment'|'privacy'>):FeedbackRecord=>({
+  ...input,title:redactFeedbackText(input.title.trim()),description:redactFeedbackText(input.description.trim()),steps:redactFeedbackText(input.steps.trim()),
+  id:`feedback-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,createdAt:new Date().toISOString(),
+  environment:{version:'3.0.0',url:location.pathname,language:document.documentElement.lang||'unknown',theme:document.documentElement.classList.contains('dark')?'dark':'light',userAgent:navigator.userAgent},
+  privacy:'No API keys, passwords or complete resin database records are intentionally collected.',
+});
+const readQueue=():FeedbackRecord[]=>{try{return JSON.parse(safeStorage.local.getItem(STORAGE_KEY)||'[]') as FeedbackRecord[];}catch{return[];}};
+export const FeedbackModal:React.FC<FeedbackModalProps>=({isOpen,onClose})=>{
+  const [type,setType]=useState<FeedbackType>('bug');const[severity,setSeverity]=useState<Severity>('medium');const[module,setModule]=useState('dashboard');
+  const[title,setTitle]=useState('');const[description,setDescription]=useState('');const[steps,setSteps]=useState('');const[status,setStatus]=useState('');
+  const valid=useMemo(()=>title.trim().length>=3&&description.trim().length>=10,[title,description]);
+  if(!isOpen)return null;
+  const save=(download:boolean)=>{if(!valid){setStatus('请填写标题和至少 10 个字符的描述。');return;}const record=buildFeedbackRecord({type,severity,module,title,description,steps});safeStorage.local.setItem(STORAGE_KEY,JSON.stringify([...readQueue(),record]));if(download){const blob=new Blob([JSON.stringify(record,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`resindb-feedback-${record.id}.json`;a.click();URL.revokeObjectURL(url);}setStatus(download?'反馈 JSON 已下载，并保存到本地待处理队列。':'反馈已保存到本地待处理队列。');};
+  return <div className="fixed inset-0 z-[230] flex items-center justify-center bg-slate-950/50 p-4" data-testid="feedback-modal"><div className="w-full max-w-xl rounded-2xl border bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-950">
+    <div className="mb-4 flex items-center justify-between"><div className="flex items-center gap-2"><MessageSquare size={18}/><h2 className="font-bold">反馈与诊断导出</h2></div><button type="button" onClick={onClose} aria-label="关闭反馈"><X size={18}/></button></div>
+    <p className="mb-4 text-xs text-slate-500">当前版本没有反馈服务器。记录会保存在本浏览器，并可导出 JSON 交给维护人员；疑似密钥和密码会被自动脱敏。</p>
+    <div className="grid gap-3 sm:grid-cols-3"><label className="text-xs">类型<select value={type} onChange={e=>setType(e.target.value as FeedbackType)} className="mt-1 w-full rounded-lg border p-2"><option value="bug">缺陷</option><option value="feature">建议</option><option value="data">数据问题</option><option value="other">其他</option></select></label><label className="text-xs">严重度<select value={severity} onChange={e=>setSeverity(e.target.value as Severity)} className="mt-1 w-full rounded-lg border p-2"><option value="low">低</option><option value="medium">中</option><option value="high">高</option><option value="critical">严重</option></select></label><label className="text-xs">模块<select value={module} onChange={e=>setModule(e.target.value)} className="mt-1 w-full rounded-lg border p-2"><option>dashboard</option><option>analytics</option><option>data-quality</option><option>dependency-map</option><option>pivot</option><option>beta-sandbox</option><option>import-export</option></select></label></div>
+    <label className="mt-3 block text-xs">标题<input data-testid="feedback-title" value={title} onChange={e=>setTitle(e.target.value)} maxLength={120} className="mt-1 w-full rounded-lg border p-2"/></label>
+    <label className="mt-3 block text-xs">描述<textarea data-testid="feedback-description" value={description} onChange={e=>setDescription(e.target.value)} maxLength={4000} className="mt-1 h-28 w-full rounded-lg border p-2"/></label>
+    <label className="mt-3 block text-xs">复现步骤<textarea value={steps} onChange={e=>setSteps(e.target.value)} maxLength={3000} className="mt-1 h-20 w-full rounded-lg border p-2"/></label>
+    <div aria-live="polite" className="mt-3 min-h-5 text-xs text-emerald-600">{status}</div><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={()=>save(false)} className="rounded-lg border px-4 py-2 text-xs">保存本地</button><button data-testid="feedback-export" type="button" onClick={()=>save(true)} className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs text-white"><Download size={14}/>导出 JSON</button></div>
+  </div></div>;
 };
