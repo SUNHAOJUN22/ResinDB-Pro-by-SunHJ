@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0.0",
+  "release": "3.1.0",
+  "generatedAt": "2026-07-25T00:00:00Z",
+  "scope": "pre-CI local release baseline",
+  "branchPolicy": {
+    "requiredBranches": ["main"],
+    "maximumBranchCount": 1
+  },
+  "dataArchitecture": {
+    "runtimeAssets": 10,
+    "resinDocuments": 9,
+    "totalExternalBytes": 53618,
+    "categories": 97,
+    "products": 11,
+    "networkNodes": 26,
+    "frontendSentinelMatches": 0
+  },
+  "tests": {
+    "total": 79,
+    "unit": 14,
+    "scientific": 65,
+    "failed": 0
+  },
+  "coveragePercent": {
+    "lines": 71.54,
+    "statements": 70.10,
+    "branches": 44.72,
+    "functions": 70.82
+  },
+  "build": {
+    "status": "passed",
+    "durationSeconds": 12.10,
+    "distFiles": 96,
+    "distBytesApprox": 4500000,
+    "mainChunkBytesApprox": 1458000,
+    "mainChunkGzipBytesApprox": 448000,
+    "modulePreloads": 0
+  },
+  "uiEvidenceExpected": 7,
+  "acceptance": "Final acceptance requires the matching GitHub Actions run and resindb/ci-evidence status to succeed."
+}
