@@ -52,6 +52,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          archive_dir="${RUNNER_TEMP}/resindb-source"
+          mkdir -p "${archive_dir}"
           tar \
             --exclude=.git \
             --exclude=node_modules \
@@ -59,16 +61,17 @@ jobs:
             --exclude=coverage \
             --exclude=artifacts \
             --exclude=reports/source-export.json \
-            -czf resindb-source.tgz .
-          sha256sum resindb-source.tgz > resindb-source.tgz.sha256
+            -czf "${archive_dir}/resindb-source.tgz" .
+          sha256sum "${archive_dir}/resindb-source.tgz" > "${archive_dir}/resindb-source.tgz.sha256"
+          echo "ARCHIVE_DIR=${archive_dir}" >> "${GITHUB_ENV}"
 
       - name: Upload source snapshot
         uses: actions/upload-artifact@v4
         with:
           name: resindb-source-${{ github.sha }}
           path: |
-            resindb-source.tgz
-            resindb-source.tgz.sha256
+            ${{ env.ARCHIVE_DIR }}/resindb-source.tgz
+            ${{ env.ARCHIVE_DIR }}/resindb-source.tgz.sha256
           if-no-files-found: error
           retention-days: 3
           compression-level: 0
