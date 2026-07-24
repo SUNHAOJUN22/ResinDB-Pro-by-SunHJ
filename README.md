@@ -17,21 +17,21 @@
 
 ## 树脂数据外置
 
-树脂数据不嵌入 React 组件，集中存放于 `src/data/`：
+分类、目录和关系数据不再嵌入 React 组件，集中存放于 `src/data/`：
 
 - `resin-taxonomy.json`：分类树；
 - `resin-category-aliases.json`：分类代码和别名；
 - `resin-property-groups.json`：物性字段分组；
-- `resin-manufacturers.json`、`resin-references.json`；
-- `polymerDatabase.json`、`myLabUniverse.json`、`openMarketUniverse.json`：版本化材料记录；
-- `resin-network.json`：原料—树脂关系网络；
+- `resin-manufacturers.json`、`resin-references.json`：厂家与参考来源目录；
+- `resin-network.json`：原料-树脂关系网络；
+- `polymerDatabase.json`、`myLabUniverse.json`、`openMarketUniverse.json`：独立材料记录数据集；
 - `resinData.ts`：统一 loader、结构校验和确定性 demo fallback。
 
-数据文档包含 `schemaVersion`、`dataKind`、`sourceType`、`recordStatus`、`updatedAt` 和 `data`。Loader 会拒绝不兼容版本、重复 ID、断裂父级、分类环路和损坏记录。演示数据不得冒充实测或制造商官方规格。
+新目录文档采用 `schemaVersion`、`dataKind`、`sourceType`、`recordStatus`、`updatedAt` 和 `data` 元数据封装。现有三套材料记录仍可保持独立数组格式；loader 同时接受旧数组和版本化文档，以便逐步迁移而无需修改 UI。Loader 会检查版本、结构、重复 ID、分类环路和损坏记录。演示数据不得冒充实测数据或制造商官方规格。
 
 ## 反馈
 
-反馈窗口记录模块、类型、严重程度、标题、描述、复现步骤和环境摘要；疑似 token、密码和 API Key 会被脱敏。当前仓库没有反馈服务端，因此反馈保存在浏览器本地并可导出 JSON，不显示虚假的“已发送到服务器”。
+反馈窗口记录模块、类型、严重程度、标题、描述、复现步骤和环境摘要。疑似 token、密码和 API Key 会被脱敏。当前仓库没有反馈服务端，因此反馈保存在浏览器本地待处理队列，并可导出 JSON；界面不会显示虚假的“已发送到服务器”。
 
 ## 安装与运行
 
@@ -60,7 +60,11 @@ npm run test:ui
 npm run audit:prod
 ```
 
-`test:ui` 启动真实生产预览并使用 Chromium 登录 Demo Admin，遍历主导航和科学图表，检查 SVG/Canvas、材料关系图、语言/主题/配色及反馈 JSON 导出，同时捕获 page error、console error 和失败请求。测试数量和覆盖率以最新 CI 为准，不作永久性能承诺。
+- `test` 覆盖通用、数据、反馈、数据库、公式和科学计算回归；
+- `test:science` 包含主要数理 Worker 的有限结果检查，禁止返回未处理 `ERROR`、`NaN` 或 `Infinity`；
+- `test:ui` 启动生产预览，通过 Chromium 登录 Demo Admin，验证 13 条演示记录、浏览器控制台无错误，以及语言、明暗模式和配色持久化，并保存真实界面截图；
+- 关系网络、反馈导出和数据 loader 另有组件/单元测试；
+- 测试数量与覆盖率以当前 CI 和其上传的证据为准，不作永久性能承诺。
 
 ## 安全与边界
 
