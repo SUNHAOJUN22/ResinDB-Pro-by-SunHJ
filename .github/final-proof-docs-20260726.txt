@@ -1,0 +1,1 @@
+Validate the final ResinDB Pro code and documentation tree, then self-clean the proof workflow.
