@@ -1,0 +1,54 @@
+name: Diagnose ResinDB v3.1.0 patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/apply-v310-patch.trigger
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Verify staged patch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAYLOAD_SHA256: ec61784122da0d984532c3b71e7d57a67d167cc17a8e4d70860797af4d771cd6
+        run: |
+          set -euo pipefail
+          post_status() {
+            local state="$1" context="$2" description="$3"
+            curl -fsSL -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+              -d "$(jq -nc --arg state "$state" --arg context "$context" --arg description "$description" --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
+          }
+          cat .github/.resindb-v310-patch/part* | base64 -d > /tmp/resindb-v310.patch.gz
+          if ! printf '%s  %s\n' "${PAYLOAD_SHA256}" /tmp/resindb-v310.patch.gz | sha256sum -c -; then
+            post_status failure resindb/apply-hash "v3.1.0 payload hash mismatch"
+            exit 1
+          fi
+          post_status success resindb/apply-hash "v3.1.0 payload hash verified"
+          gzip -dc /tmp/resindb-v310.patch.gz > /tmp/resindb-v310.patch
+          exclusions=(
+            --exclude=.github/source-export-trigger.txt
+            --exclude=.github/workflows/source-export.yml
+            --exclude=reports/release-baseline-v3.1.0.json
+          )
+          if ! git apply --check --binary "${exclusions[@]}" /tmp/resindb-v310.patch; then
+            post_status failure resindb/apply-check "git apply check failed"
+            exit 1
+          fi
+          post_status success resindb/apply-check "git apply check passed"
