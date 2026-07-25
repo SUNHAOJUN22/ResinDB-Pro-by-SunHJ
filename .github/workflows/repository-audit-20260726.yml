@@ -1,0 +1,226 @@
+name: Repository audit 2026-07-26
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/audit-trigger-20260726.txt
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: resindb-repository-audit-20260726
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Audit current main and publish evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+
+    steps:
+      - name: Check out triggering main commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Run evidence-preserving audit
+        id: audit
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+          out="reports/automated-audit-20260726"
+          logs="$out/logs"
+          rm -rf "$out"
+          mkdir -p "$logs"
+
+          printf '%s\n' "$GITHUB_SHA" > "$out/validated-commit.txt"
+          git ls-files | sort > "$out/file-inventory.txt"
+          git ls-remote --heads origin | awk '{print $2}' | sed 's#refs/heads/##' | sort > "$out/remote-branches.txt"
+          {
+            echo "node=$(node --version)"
+            echo "npm=$(npm --version)"
+            echo "runner=${RUNNER_OS:-unknown}"
+          } > "$out/runtime.txt"
+
+          overall=0
+          run_check() {
+            local name="$1"
+            shift
+            echo "==> $name"
+            set +e
+            timeout 25m "$@" > "$logs/$name.log" 2>&1
+            local code=$?
+            set -e
+            printf '%s\n' "$code" > "$out/$name.status"
+            if [ "$code" -ne 0 ]; then overall=1; fi
+            cat "$logs/$name.log"
+          }
+
+          install_code=1
+          for attempt in 1 2 3; do
+            set +e
+            timeout 15m npm ci > "$logs/npm-ci.log" 2>&1
+            install_code=$?
+            set -e
+            if [ "$install_code" -eq 0 ]; then break; fi
+            tail -n 120 "$logs/npm-ci.log"
+            sleep $((attempt * 10))
+          done
+          printf '%s\n' "$install_code" > "$out/npm-ci.status"
+          if [ "$install_code" -ne 0 ]; then
+            overall=1
+          else
+            run_check lint npm run lint
+            run_check typecheck npm run typecheck
+            run_check test npm run test
+            run_check test-unit npm run test:unit
+            run_check test-science npm run test:science
+            run_check test-coverage npm run test:coverage
+            run_check build npm run build
+            run_check smoke npm run smoke
+            run_check test-ui npm run test:ui
+            run_check audit-prod npm run audit:prod
+          fi
+
+          set +e
+          git diff --check > "$logs/git-diff-check.log" 2>&1
+          diff_code=$?
+          set -e
+          printf '%s\n' "$diff_code" > "$out/git-diff-check.status"
+          if [ "$diff_code" -ne 0 ]; then overall=1; fi
+
+          set +e
+          grep -RInE 'TODO|FIXME|HACK|@ts-ignore|@ts-nocheck|eslint-disable|eval\(|new Function|console\.(error|warn)' src tests scripts 2>/dev/null > "$out/static-risk-scan.txt"
+          scan_code=$?
+          set -e
+          if [ "$scan_code" -gt 1 ]; then overall=1; fi
+
+          git ls-files | grep -Ei '(^|/)(tmp|temp|backup|backups|debug|diagnostic|payload|trigger|copy)(/|\.|-|_)' > "$out/residue-candidates.txt" || true
+
+          if [ "$overall" -eq 0 ]; then
+            printf 'success\n' > "$out/result.txt"
+          else
+            printf 'failure\n' > "$out/result.txt"
+          fi
+
+          python3 - <<'PY'
+          from __future__ import annotations
+          import datetime as dt
+          import json
+          from pathlib import Path
+
+          root = Path('reports/automated-audit-20260726')
+          logs = root / 'logs'
+          statuses = {}
+          for path in sorted(root.glob('*.status')):
+              try:
+                  statuses[path.stem] = int(path.read_text(encoding='utf-8').strip())
+              except ValueError:
+                  statuses[path.stem] = 999
+
+          result = (root / 'result.txt').read_text(encoding='utf-8').strip()
+          commit = (root / 'validated-commit.txt').read_text(encoding='utf-8').strip()
+          branches = (root / 'remote-branches.txt').read_text(encoding='utf-8').splitlines()
+          inventory = (root / 'file-inventory.txt').read_text(encoding='utf-8').splitlines()
+          runtime = dict(
+              line.split('=', 1)
+              for line in (root / 'runtime.txt').read_text(encoding='utf-8').splitlines()
+              if '=' in line
+          )
+          summary = {
+              'schemaVersion': 1,
+              'result': result,
+              'repository': 'SUNHAOJUN22/ResinDB-Pro-by-SunHJ',
+              'validatedCommit': commit,
+              'completedAt': dt.datetime.now(dt.timezone.utc).isoformat(),
+              'runtime': runtime,
+              'remoteBranches': branches,
+              'trackedFileCount': len(inventory),
+              'statuses': statuses,
+          }
+          (root / 'summary.json').write_text(
+              json.dumps(summary, ensure_ascii=False, indent=2) + '\n',
+              encoding='utf-8',
+          )
+
+          lines = [
+              '# ResinDB Pro automated repository audit',
+              '',
+              f'- Result: **{result.upper()}**',
+              f'- Validated commit: `{commit}`',
+              f"- Runtime: `{runtime.get('node', 'unknown')}` / `{runtime.get('npm', 'unknown')}` / `{runtime.get('runner', 'unknown')}`",
+              f'- Remote branches: `{", ".join(branches) or "none"}`',
+              f'- Tracked files: **{len(inventory)}**',
+              '',
+              '## Command status',
+              '',
+              '| Check | Exit code |',
+              '|---|---:|',
+          ]
+          for name, code in statuses.items():
+              lines.append(f'| `{name}` | `{code}` |')
+
+          failed = [name for name, code in statuses.items() if code != 0]
+          if failed:
+              lines += ['', '## Failure evidence']
+              for name in failed:
+                  log = logs / f'{name}.log'
+                  if not log.exists():
+                      continue
+                  content = log.read_text(encoding='utf-8', errors='replace').splitlines()
+                  excerpt = content[:80]
+                  if len(content) > 240:
+                      excerpt += ['... log middle omitted ...'] + content[-160:]
+                  elif len(content) > 80:
+                      excerpt += content[80:]
+                  lines += ['', f'### {name}', '', '```text', *excerpt, '```']
+
+          risk = root / 'static-risk-scan.txt'
+          risk_lines = risk.read_text(encoding='utf-8', errors='replace').splitlines() if risk.exists() else []
+          lines += [
+              '',
+              '## Static risk scan',
+              '',
+              f'- Matches: **{len(risk_lines)}**',
+          ]
+          if risk_lines:
+              lines += ['', '```text', *risk_lines[:300], '```']
+
+          residue = root / 'residue-candidates.txt'
+          residue_lines = residue.read_text(encoding='utf-8', errors='replace').splitlines() if residue.exists() else []
+          lines += [
+              '',
+              '## Residue candidates',
+              '',
+              f'- Candidates: **{len(residue_lines)}**',
+          ]
+          if residue_lines:
+              lines += ['', '```text', *residue_lines[:300], '```']
+
+          (root / 'REPORT.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+
+      - name: Publish audit report to main
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ResinDB Audit Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -f reports/automated-audit-20260726
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "ci: publish automated repository audit [skip ci]"
+          git pull --rebase origin main
+          git push origin HEAD:main
