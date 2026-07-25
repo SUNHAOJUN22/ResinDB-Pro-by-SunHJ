@@ -74,16 +74,20 @@
 - `reports/automated-audit-20260726/`
 - `scripts/generate-release-evidence.py`
 
+## Evidence retention
+
+The committed durable evidence consists of this report, `summary.json`, and `reports/ci-validation-latest.json`. Raw `*.log` files, coverage output and Chromium PNG screenshots are generated artifacts and are excluded from the repository by `.gitignore`. GitHub Actions uploads those files for the workflow's configured retention period; they must not be described as permanently stored repository files.
+
 ## Interpretation
 
-This final proof re-ran the full deterministic gate after the README and validation contract were aligned. The proof workflow and trigger remove themselves before the evidence commit, leaving only the permanent CI workflow.
+This final proof re-ran the full deterministic gate after the README and validation contract were aligned. The proof workflow and trigger removed themselves before the evidence commit, leaving only the permanent CI workflow.
 
 ## Post-documentation proof
 
 - Result: **SUCCESS**
 - Validated input commit: `5325f7590fd540bfefbc9fff408fcb240511ff29`
 - Aggregate command: `npm run validate:ci`
-- The proof workflow and trigger remove themselves before the evidence commit.
+- The proof workflow and trigger removed themselves before the evidence commit.
 
 | Gate | Exit code |
 |---|---:|
