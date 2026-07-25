@@ -1,0 +1,172 @@
+name: Independent reaudit 2026-07-26
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/reaudit-20260726.trigger
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: resindb-independent-reaudit-20260726
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Run independent full validation
+        id: proof
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+          out=/tmp/resindb-reaudit-20260726
+          rm -rf "$out"
+          mkdir -p "$out"
+          overall=0
+
+          record() {
+            local name="$1"
+            shift
+            set +e
+            timeout 45m "$@" > "$out/$name.log" 2>&1
+            local code=$?
+            set -e
+            printf '%s\n' "$code" > "$out/$name.status"
+            cat "$out/$name.log"
+            if [ "$code" -ne 0 ]; then overall=1; fi
+          }
+
+          record npm-ci npm ci
+          if [ "$(cat "$out/npm-ci.status")" = "0" ]; then
+            record validate-ci npm run validate:ci
+          fi
+          record visual-regeneration python3 scripts/generate-readme-visuals.py
+
+          set +e
+          git diff --exit-code -- docs/assets > "$out/visual-diff.log" 2>&1
+          visual_code=$?
+          set -e
+          printf '%s\n' "$visual_code" > "$out/visual-diff.status"
+          if [ "$visual_code" -ne 0 ]; then overall=1; fi
+
+          set +e
+          git diff --check > "$out/git-diff-check.log" 2>&1
+          diff_code=$?
+          set -e
+          printf '%s\n' "$diff_code" > "$out/git-diff-check.status"
+          if [ "$diff_code" -ne 0 ]; then overall=1; fi
+
+          git ls-remote --heads origin | awk '{print $2}' | sed 's#refs/heads/##' | sort > "$out/branches.txt"
+          if [ "$(cat "$out/branches.txt")" = "main" ]; then
+            printf '0\n' > "$out/only-main.status"
+          else
+            printf '1\n' > "$out/only-main.status"
+            overall=1
+          fi
+
+          forbidden=(
+            .github/.resindb-main-update
+            .github/.resindb-v310-patch
+            .github/workflows/apply-resindb-main-update.yml
+            .github/workflows/apply-v310-patch.yml
+            .github/workflows/final-proof-docs-20260726.yml
+            docs/MIGRATION_v3.1.0.md
+            docs/RELEASE_NOTES_v3.1.0.md
+            reports/patch-diagnostic.json
+            reports/release-baseline-v3.1.0.json
+          )
+          residue=0
+          for path in "${forbidden[@]}"; do
+            if [ -e "$path" ]; then
+              echo "$path" >> "$out/residue.log"
+              residue=1
+            fi
+          done
+          printf '%s\n' "$residue" > "$out/residue-check.status"
+          if [ "$residue" -ne 0 ]; then overall=1; fi
+
+          result=success
+          if [ "$overall" -ne 0 ]; then result=failure; fi
+          printf '%s\n' "$result" > "$out/result.txt"
+
+          python3 - <<'PY'
+          from __future__ import annotations
+          import datetime as dt
+          import json
+          from pathlib import Path
+
+          root = Path('/tmp/resindb-reaudit-20260726')
+          summary_path = Path('reports/final-validation-20260726/summary.json')
+          summary = json.loads(summary_path.read_text())
+          statuses = {
+              p.stem: int(p.read_text().strip())
+              for p in sorted(root.glob('*.status'))
+          }
+          summary.update({
+              'result': root.joinpath('result.txt').read_text().strip(),
+              'independentReaudit': True,
+              'independentReauditInputCommit': '${{ github.sha }}',
+              'independentReauditCompletedAt': dt.datetime.now(dt.timezone.utc).isoformat(),
+              'independentReauditStatuses': statuses,
+          })
+          summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n')
+          Path('reports/ci-validation-latest.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n')
+
+          report = Path('reports/final-validation-20260726/REPORT.md')
+          text = report.read_text()
+          text += '\n## Independent re-audit after evidence-retention correction\n\n'
+          text += f"- Result: **{summary['result'].upper()}**\n"
+          text += f"- Input commit: `{summary['independentReauditInputCommit']}`\n"
+          text += '- Aggregate validation: `npm run validate:ci`\n\n'
+          text += '| Gate | Exit code |\n|---|---:|\n'
+          for name, code in statuses.items():
+              text += f'| `{name}` | `{code}` |\n'
+          report.write_text(text)
+          PY
+
+          if [ "$overall" -ne 0 ]; then exit 1; fi
+
+      - name: Upload raw reaudit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resindb-independent-reaudit-${{ github.sha }}
+          path: |
+            /tmp/resindb-reaudit-20260726/
+            coverage/
+            artifacts/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Publish self-cleaned durable evidence
+        if: steps.proof.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf node_modules dist coverage artifacts
+          rm -f .github/workflows/reaudit-20260726.yml .github/reaudit-20260726.trigger
+          git config user.name "ResinDB Reaudit Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "ci: publish independent final reaudit evidence"
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+      - name: Enforce result
+        if: always()
+        shell: bash
+        run: test "${{ steps.proof.outcome }}" = "success"
