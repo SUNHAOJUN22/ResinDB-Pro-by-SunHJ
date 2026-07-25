@@ -35,12 +35,18 @@ jobs:
               "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
               -d "$(jq -nc --arg state "$state" --arg context "$context" --arg description "$description" --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
           }
+          for file in .github/.resindb-v310-patch/part*; do
+            name="$(basename "$file")"
+            digest="$(sha256sum "$file" | cut -d' ' -f1)"
+            post_status success "resindb/${name}" "${digest}"
+          done
           cat .github/.resindb-v310-patch/part* | base64 -d > /tmp/resindb-v310.patch.gz
-          if ! printf '%s  %s\n' "${PAYLOAD_SHA256}" /tmp/resindb-v310.patch.gz | sha256sum -c -; then
-            post_status failure resindb/apply-hash "v3.1.0 payload hash mismatch"
+          actual="$(sha256sum /tmp/resindb-v310.patch.gz | cut -d' ' -f1)"
+          if [ "${actual}" != "${PAYLOAD_SHA256}" ]; then
+            post_status failure resindb/apply-hash "${actual}"
             exit 1
           fi
-          post_status success resindb/apply-hash "v3.1.0 payload hash verified"
+          post_status success resindb/apply-hash "${actual}"
           gzip -dc /tmp/resindb-v310.patch.gz > /tmp/resindb-v310.patch
           exclusions=(
             --exclude=.github/source-export-trigger.txt
