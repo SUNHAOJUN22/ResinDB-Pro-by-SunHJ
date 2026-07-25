@@ -2,7 +2,7 @@
 
 - Result: **SUCCESS**
 - Version: `3.0.0`
-- Validated input commit: `2ad01c7b38a5d4d9dac076025c217fa2d3413c8e`
+- Validated input commit: `678ea37a59cb67a01725047ff4d4ac4a12299ec5`
 - Runtime: `v22.23.1` / `10.9.8` / `Linux`
 - Remote branches: `main`
 - Tests passed: **79**
@@ -13,7 +13,6 @@
 |---|---:|
 | `audit-prod` | `0` |
 | `build` | `0` |
-| `document-drift` | `0` |
 | `git-diff-check` | `0` |
 | `lint` | `0` |
 | `npm-ci` | `0` |
@@ -31,8 +30,8 @@
 
 | Metric | Percent |
 |---|---:|
-| Statements | 70.04% |
-| Branches | 44.75% |
+| Statements | 70.02% |
+| Branches | 44.70% |
 | Functions | 70.75% |
 | Lines | 71.37% |
 
@@ -55,15 +54,17 @@
 - `.github/apply-resindb-main-update.trigger`
 - `.github/apply-v310-patch.trigger`
 - `.github/finalize-resindb-main-update.trigger`
+- `.github/finalize-repository-20260726.trigger`
+- `.github/finalize-repository-v2-20260726.txt`
+- `.github/audit-trigger-20260726.txt`
 - `.github/workflows/apply-resindb-main-update-retry.yml`
 - `.github/workflows/apply-resindb-main-update.yml`
 - `.github/workflows/apply-v310-patch.yml`
 - `.github/workflows/diagnose-v310-patch.yml`
 - `.github/workflows/finalize-resindb-main-update.yml`
 - `.github/workflows/repository-audit-20260726.yml`
-- `.github/audit-trigger-20260726.txt`
 - `.github/workflows/finalize-repository-20260726.yml`
-- `.github/finalize-repository-20260726.trigger`
+- `.github/workflows/finalize-repository-v2-20260726.yml`
 - `docs/MIGRATION_v3.1.0.md`
 - `docs/RELEASE_NOTES_v3.1.0.md`
 - `reports/patch-diagnostic.json`
@@ -73,4 +74,4 @@
 
 ## Interpretation
 
-This report records deterministic command results for the cleaned candidate tree before it was committed to `main`. README architecture claims were checked against version `3.0.0`; hand-authored SVG diagrams are explanatory assets, while Chromium PNG files remain the UI test evidence.
+This report records deterministic command results for the cleaned candidate tree before it was committed to `main`. The SVG files are explanatory assets; the Chromium PNG files generated during `test:ui` remain the real UI evidence.
