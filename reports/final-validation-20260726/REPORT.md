@@ -98,3 +98,19 @@ This final proof re-ran the full deterministic gate after the README and validat
 | `validate-ci` | `0` |
 | `visual-diff` | `0` |
 | `visual-regeneration` | `0` |
+
+## Independent re-audit after evidence-retention correction
+
+- Result: **SUCCESS**
+- Input commit: `d00789f6a39b7f2ca4507232cebb4149c48ff0f6`
+- Aggregate validation: `npm run validate:ci`
+
+| Gate | Exit code |
+|---|---:|
+| `git-diff-check` | `0` |
+| `npm-ci` | `0` |
+| `only-main` | `0` |
+| `residue-check` | `0` |
+| `validate-ci` | `0` |
+| `visual-diff` | `0` |
+| `visual-regeneration` | `0` |
