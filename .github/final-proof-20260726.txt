@@ -1,1 +1,0 @@
-Revalidate the fully cleaned and documented ResinDB Pro main tree.

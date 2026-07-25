@@ -2,7 +2,7 @@
 
 - Result: **SUCCESS**
 - Version: `3.0.0`
-- Validated input commit: `678ea37a59cb67a01725047ff4d4ac4a12299ec5`
+- Validated input commit: `7afdf44438d64be675f2291972ca934ecf87f6b8`
 - Runtime: `v22.23.1` / `10.9.8` / `Linux`
 - Remote branches: `main`
 - Tests passed: **79**
@@ -25,13 +25,15 @@
 | `test-unit` | `0` |
 | `test` | `0` |
 | `typecheck` | `0` |
+| `visual-diff` | `0` |
+| `visual-regeneration` | `0` |
 
 ## Coverage
 
 | Metric | Percent |
 |---|---:|
 | Statements | 70.02% |
-| Branches | 44.70% |
+| Branches | 44.75% |
 | Functions | 70.75% |
 | Lines | 71.37% |
 
@@ -74,4 +76,4 @@
 
 ## Interpretation
 
-This report records deterministic command results for the cleaned candidate tree before it was committed to `main`. The SVG files are explanatory assets; the Chromium PNG files generated during `test:ui` remain the real UI evidence.
+This final proof re-ran the full deterministic gate after the README and validation contract were aligned. The proof workflow and trigger remove themselves before the evidence commit, leaving only the permanent CI workflow.

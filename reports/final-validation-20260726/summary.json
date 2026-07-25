@@ -3,8 +3,8 @@
   "result": "success",
   "repository": "SUNHAOJUN22/ResinDB-Pro-by-SunHJ",
   "version": "3.0.0",
-  "validatedInputCommit": "678ea37a59cb67a01725047ff4d4ac4a12299ec5",
-  "completedAt": "2026-07-25T16:58:57.813447+00:00",
+  "validatedInputCommit": "7afdf44438d64be675f2291972ca934ecf87f6b8",
+  "completedAt": "2026-07-25T17:03:25.837315+00:00",
   "runtime": {
     "node": "v22.23.1",
     "npm": "10.9.8",
@@ -27,12 +27,14 @@
     "test-ui": 0,
     "test-unit": 0,
     "test": 0,
-    "typecheck": 0
+    "typecheck": 0,
+    "visual-diff": 0,
+    "visual-regeneration": 0
   },
   "testsPassed": 79,
   "coveragePercent": {
     "statements": 70.02,
-    "branches": 44.7,
+    "branches": 44.75,
     "functions": 70.75,
     "lines": 71.37
   },
@@ -70,5 +72,6 @@
     "reports/release-baseline-v3.1.0.json",
     "reports/automated-audit-20260726/",
     "scripts/generate-release-evidence.py"
-  ]
+  ],
+  "finalProof": true
 }
