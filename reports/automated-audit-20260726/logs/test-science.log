@@ -1,0 +1,88 @@
+
+> resindb-pro-by-sunhj@3.0.0 test:science
+> node scripts/run-test-files.mjs tests/science
+
+
+=== isolated Vitest: tests/science/formulaEngine.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.5 [39m[90m/home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ[39m
+
+[90mstdout[2m | tests/science/formulaEngine.test.ts[2m > [22m[2mlogical fallback operators and isolated formula failures[2m > [22m[2misolates a malformed formula without blocking valid formulas
+[22m[39m[ERROR] [2026-07-25T16:31:43.064Z] Formula parse failed for "Malformed": Error: Unexpected token ")" at position 13
+    at ArithmeticParser.parsePrimary [90m(/home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ/[39msrc/lib/formula/expressionParser.ts:316:11[90m)[39m
+    at ArithmeticParser.parseUnary [90m(/home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ/[39msrc/lib/formula/expressionParser.ts:256:17[90m)[39m
+    at ArithmeticParser.parsePower [90m(/home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ/[39msrc/lib/formula/expressionParser.ts:238:23[90m)[39m
+    at ArithmeticParser.parseMultiplicative [90m(/home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ/[39msrc/lib/formula/expressionParser.ts:215:21[90m)[39m
+    at ArithmeticParser.parseAdditive [90m(/home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ/[39msrc/lib/formula/expressionParser.ts:203:26[90m)[39m
+    at ArithmeticParser.parseLogicalAnd [90m(/home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ/[39msrc/lib/formula/expressionParser.ts:176:21[90m)[39m
+    at ArithmeticParser.parseLogicalOr [90m(/home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ/[39msrc/lib/formula/expressionParser.ts:156:21[90m)[39m
+    at ArithmeticParser.parse [90m(/home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ/[39msrc/lib/formula/expressionParser.ts:120:28[90m)[39m
+    at compileFormulaExpression [90m(/home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ/[39msrc/lib/formula/expressionParser.ts:321:43[90m)[39m
+    at [90m/home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ/[39msrc/lib/formulaParser.ts:191:20
+
+ [32m✓[39m tests/science/formulaEngine.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m20 passed[39m[22m[90m (20)[39m
+[2m   Start at [22m 16:31:42
+[2m   Duration [22m 736ms[2m (transform 96ms, setup 67ms, import 78ms, tests 14ms, environment 474ms)[22m
+
+
+=== isolated Vitest: tests/science/indexedDBProductAdapter.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.5 [39m[90m/home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ[39m
+
+ [32m✓[39m tests/science/indexedDBProductAdapter.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 968[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m   Start at [22m 16:31:43
+[2m   Duration [22m 1.79s[2m (transform 179ms, setup 63ms, import 176ms, tests 968ms, environment 478ms)[22m
+
+
+=== isolated Vitest: tests/science/materialEngine.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.5 [39m[90m/home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ[39m
+
+ [32m✓[39m tests/science/materialEngine.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m7 passed[39m[22m[90m (7)[39m
+[2m   Start at [22m 16:31:45
+[2m   Duration [22m 691ms[2m (transform 86ms, setup 58ms, import 69ms, tests 5ms, environment 460ms)[22m
+
+
+=== isolated Vitest: tests/science/polymerValidator.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.5 [39m[90m/home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ[39m
+
+[90mstderr[2m | tests/science/polymerValidator.test.ts[2m > [22m[2m🧪 PRO RIGOROUS POLYMER SCIENCE & MECHANICAL VALIDATION SUITE[2m > [22m[2m2. PolymerDataValidator - Standard Bounds & Physical Limit Rules[2m > [22m[2mShould reject physical impossibility: Density exceeding upper physical bound (3.0 g/cm³)
+[22m[39m[Polymer Validator Alert] Grade Impossible-PP density is 4.8 g/cm³, which exceeds international physical limits (0.8 - 3.0). Removed.
+
+[90mstderr[2m | tests/science/polymerValidator.test.ts[2m > [22m[2m🧪 PRO RIGOROUS POLYMER SCIENCE & MECHANICAL VALIDATION SUITE[2m > [22m[2m2. PolymerDataValidator - Standard Bounds & Physical Limit Rules[2m > [22m[2mShould reject structural anomalies exceeding mechanical limits (TensileStrength > 500 MPa)
+[22m[39m[Polymer Validator Alert] Tensile yield strength value 1200 MPa out of typical polymer limits, removed.
+
+[90mstderr[2m | tests/science/polymerValidator.test.ts[2m > [22m[2m🧪 PRO RIGOROUS POLYMER SCIENCE & MECHANICAL VALIDATION SUITE[2m > [22m[2m4. PolymerDataValidator - Hard Melt-down Line Constraint[2m > [22m[2mShould melt-down and drop record entirely if valid physical property count is < 2 (Zero-Tolerance for Shell Data)
+[22m[39m🔴 [Polymer Validator BLOCKED] Grade Fake-ABS has fewer than 2 valid core properties (current: 1). Meltdown line triggered; this incomplete record was automatically rejected.
+
+ [32m✓[39m tests/science/polymerValidator.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m9 passed[39m[22m[90m (9)[39m
+[2m   Start at [22m 16:31:46
+[2m   Duration [22m 795ms[2m (transform 145ms, setup 56ms, import 149ms, tests 7ms, environment 470ms)[22m
+
+
+=== isolated Vitest: tests/science/workerMatrix.test.ts ===
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.5 [39m[90m/home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ[39m
+
+ [32m✓[39m tests/science/workerMatrix.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 262[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m21 passed[39m[22m[90m (21)[39m
+[2m   Start at [22m 16:31:47
+[2m   Duration [22m 932ms[2m (transform 193ms, setup 66ms, import 38ms, tests 262ms, environment 465ms)[22m
+
+
+Isolated Vitest completed: 5 file(s).
