@@ -13,7 +13,7 @@ The contract covers the repository as it exists today:
 - optional OpenAI-compatible AI integration;
 - production build, HTTP smoke, Chromium UI smoke and dependency audit.
 
-It does **not** claim that data is served from a `public/data/resin/manifest.json` runtime manifest, because that architecture is not present in version `3.0.0`.
+It does **not** claim a separate public runtime manifest architecture, because version `3.0.0` imports and validates the maintained catalogs from `src/data/`.
 
 ## Required gates
 
