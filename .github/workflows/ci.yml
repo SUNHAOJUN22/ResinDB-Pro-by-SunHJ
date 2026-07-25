@@ -22,12 +22,12 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
@@ -36,7 +36,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git branch --show-current)" = "${GITHUB_HEAD_REF:-main}" || true
           git diff --check
           if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
             branches="$(git ls-remote --heads origin | awk '{print $2}' | sed 's#refs/heads/##' | sort)"
@@ -60,7 +59,7 @@ jobs:
 
       - name: Upload npm diagnostics
         if: failure() && steps.npm-ci.outcome == 'failure'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: npm-ci-diagnostics-${{ github.sha }}
           path: /tmp/npm-ci.log
@@ -107,7 +106,7 @@ jobs:
 
       - name: Upload coverage and UI evidence
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: validation-evidence-${{ github.sha }}
           path: |
