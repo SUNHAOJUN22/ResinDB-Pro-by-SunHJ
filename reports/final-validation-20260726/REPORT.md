@@ -77,3 +77,20 @@
 ## Interpretation
 
 This final proof re-ran the full deterministic gate after the README and validation contract were aligned. The proof workflow and trigger remove themselves before the evidence commit, leaving only the permanent CI workflow.
+
+## Post-documentation proof
+
+- Result: **SUCCESS**
+- Validated input commit: `5325f7590fd540bfefbc9fff408fcb240511ff29`
+- Aggregate command: `npm run validate:ci`
+- The proof workflow and trigger remove themselves before the evidence commit.
+
+| Gate | Exit code |
+|---|---:|
+| `git-diff-check` | `0` |
+| `npm-ci` | `0` |
+| `only-main` | `0` |
+| `residue-check` | `0` |
+| `validate-ci` | `0` |
+| `visual-diff` | `0` |
+| `visual-regeneration` | `0` |
