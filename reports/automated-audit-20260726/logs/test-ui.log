@@ -1,7 +1,0 @@
-
-> resindb-pro-by-sunhj@3.0.0 test:ui
-> node scripts/ui-smoke-test.mjs
-
-  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m4174[22m/[39m
-UI smoke test passed: authenticated dashboard rendered 13 records and persisted language/theme/palette controls.
-Screenshots: /home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ/artifacts/ui-smoke-dashboard-zh.png, /home/runner/work/ResinDB-Pro-by-SunHJ/ResinDB-Pro-by-SunHJ/artifacts/ui-smoke-dashboard-en-dark.png

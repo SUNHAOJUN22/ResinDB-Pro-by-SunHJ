@@ -1,0 +1,8 @@
+resindb-ai-platform-overview.svg
+resindb-ai-workflow.svg
+resindb-data-lifecycle.svg
+resindb-scientific-engine.svg
+resindb-knowledge-network.svg
+resindb-quality-gates.svg
+resindb-local-first-privacy.svg
+resindb-research-workflow.svg

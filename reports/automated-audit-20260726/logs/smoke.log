@@ -1,6 +1,0 @@
-
-> resindb-pro-by-sunhj@3.0.0 smoke
-> node scripts/smoke-test.mjs
-
-  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m4173[22m/[39m
-Smoke test passed: http://127.0.0.1:4173 returned the production application shell.
