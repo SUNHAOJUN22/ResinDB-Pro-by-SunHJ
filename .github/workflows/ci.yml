@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,17 +18,30 @@ jobs:
   validate:
     name: Validate, cover, render and audit
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
+
+      - name: Verify repository integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = "${GITHUB_HEAD_REF:-main}" || true
+          git diff --check
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            branches="$(git ls-remote --heads origin | awk '{print $2}' | sed 's#refs/heads/##' | sort)"
+            test "$branches" = "main"
+          fi
 
       - name: Install exact dependencies
         id: npm-ci
@@ -36,6 +50,7 @@ jobs:
           set -euo pipefail
           for attempt in 1 2 3; do
             if npm ci > /tmp/npm-ci.log 2>&1; then
+              cat /tmp/npm-ci.log
               exit 0
             fi
             tail -n 160 /tmp/npm-ci.log
@@ -45,14 +60,20 @@ jobs:
 
       - name: Upload npm diagnostics
         if: failure() && steps.npm-ci.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: npm-ci-diagnostics-${{ github.sha }}
           path: /tmp/npm-ci.log
           retention-days: 3
 
-      - name: Lint, typecheck, full tests, build and HTTP smoke
-        run: npm run validate
+      - name: ESLint
+        run: npm run lint
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: Complete regression suite
+        run: npm run test
 
       - name: Unit tests
         run: npm run test:unit
@@ -62,6 +83,12 @@ jobs:
 
       - name: Coverage
         run: npm run test:coverage
+
+      - name: Production build
+        run: npm run build
+
+      - name: HTTP smoke
+        run: npm run smoke
 
       - name: Chromium UI smoke
         run: npm run test:ui
@@ -80,7 +107,7 @@ jobs:
 
       - name: Upload coverage and UI evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: validation-evidence-${{ github.sha }}
           path: |
