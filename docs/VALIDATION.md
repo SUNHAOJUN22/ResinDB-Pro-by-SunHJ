@@ -64,14 +64,16 @@ The final cleaned-tree audit executed on Linux with Node.js `v22.23.1` and npm `
 | migration and diagnostic residue check | passed |
 | sole remote branch check | passed |
 
-The baseline contains **9 test files and 79 passing tests**. Coverage from the final run was:
+The baseline contains **9 test files and 79 passing tests**. Rounded coverage from the final proof was:
 
 | Metric | Coverage |
 |---|---:|
-| Statements | 70.02% |
-| Branches | 44.70% |
-| Functions | 70.75% |
-| Lines | 71.37% |
+| Statements | 70.0% |
+| Branches | 44.7% |
+| Functions | 70.8% |
+| Lines | 71.4% |
+
+The exact values from each run remain in the machine-readable validation report rather than being treated as permanent thresholds.
 
 The Chromium smoke test authenticated as Demo Admin, rendered **13 records**, confirmed that the browser console contained no errors, persisted language/theme/palette changes, and generated two application screenshots:
 
