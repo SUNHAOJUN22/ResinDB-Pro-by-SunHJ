@@ -1,0 +1,91 @@
+validated_commit=36fc8148686691b854ca32cbef6c571fba1b91c6
+npm_ci_exit=1
+
+--- npm ci ---
+npm error code ERESOLVE
+npm error ERESOLVE could not resolve
+npm error
+npm error While resolving: eslint-plugin-react-hooks@7.0.1
+npm error Found: eslint@10.8.0
+npm error node_modules/eslint
+npm error   dev eslint@"^10.8.0" from the root project
+npm error   peer eslint@"^6.0.0 || ^7.0.0 || >=8.0.0" from @eslint-community/eslint-utils@4.9.1
+npm error   node_modules/@eslint-community/eslint-utils
+npm error     @eslint-community/eslint-utils@"^4.9.1" from @typescript-eslint/utils@8.58.2
+npm error     node_modules/@typescript-eslint/utils
+npm error       @typescript-eslint/utils@"8.58.2" from @typescript-eslint/eslint-plugin@8.58.2
+npm error       node_modules/@typescript-eslint/eslint-plugin
+npm error         dev @typescript-eslint/eslint-plugin@"^8.58.2" from the root project
+npm error         2 more (eslint-plugin-unused-imports, typescript-eslint)
+npm error       2 more (@typescript-eslint/type-utils, typescript-eslint)
+npm error     @eslint-community/eslint-utils@"^4.8.0" from eslint@10.8.0
+npm error   7 more (@typescript-eslint/eslint-plugin, ...)
+npm error
+npm error Could not resolve dependency:
+npm error peer eslint@"^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0-0 || ^9.0.0" from eslint-plugin-react-hooks@7.0.1
+npm error node_modules/eslint-plugin-react-hooks
+npm error   dev eslint-plugin-react-hooks@"^7.0.1" from the root project
+npm error
+npm error Conflicting peer dependency: eslint@9.39.5
+npm error node_modules/eslint
+npm error   peer eslint@"^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0-0 || ^9.0.0" from eslint-plugin-react-hooks@7.0.1
+npm error   node_modules/eslint-plugin-react-hooks
+npm error     dev eslint-plugin-react-hooks@"^7.0.1" from the root project
+npm error
+npm error Fix the upstream dependency conflict, or retry
+npm error this command with --force or --legacy-peer-deps
+npm error to accept an incorrect (and potentially broken) dependency resolution.
+npm error
+npm error
+npm error For a full report see:
+npm error /home/runner/.npm/_logs/2026-07-26T17_15_41_068Z-eresolve-report.txt
+npm error A complete log of this run can be found in: /home/runner/.npm/_logs/2026-07-26T17_15_41_068Z-debug-0.log
+
+--- peer dependencies ---
+### @typescript-eslint/eslint-plugin@latest
+{
+  "version": "8.65.0",
+  "peerDependencies": {
+    "eslint": "^8.57.0 || ^9.0.0 || ^10.0.0",
+    "typescript": ">=4.8.4 <6.1.0",
+    "@typescript-eslint/parser": "^8.65.0"
+  }
+}
+### @typescript-eslint/parser@latest
+{
+  "version": "8.65.0",
+  "peerDependencies": {
+    "eslint": "^8.57.0 || ^9.0.0 || ^10.0.0",
+    "typescript": ">=4.8.4 <6.1.0"
+  }
+}
+### typescript-eslint@latest
+{
+  "version": "8.65.0",
+  "peerDependencies": {
+    "eslint": "^8.57.0 || ^9.0.0 || ^10.0.0",
+    "typescript": ">=4.8.4 <6.1.0"
+  }
+}
+### eslint-plugin-react-hooks@latest
+{
+  "version": "7.1.1",
+  "peerDependencies": {
+    "eslint": "^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0-0 || ^9.0.0 || ^10.0.0"
+  }
+}
+### eslint-plugin-react-refresh@latest
+{
+  "version": "0.5.3",
+  "peerDependencies": {
+    "eslint": "^9 || ^10"
+  }
+}
+### eslint-plugin-unused-imports@latest
+{
+  "version": "4.4.1",
+  "peerDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.0.0-0 || ^7.0.0 || ^6.0.0 || ^5.0.0",
+    "eslint": "^10.0.0 || ^9.0.0 || ^8.0.0"
+  }
+}
