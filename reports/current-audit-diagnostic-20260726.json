@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "validatedCommit": "512f3d8f1d5da5a77ba56861cf1d0f4a2fdb0129",
+  "exitCode": 1,
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 5,
+      "critical": 0,
+      "total": 5
+    },
+    "dependencies": {
+      "prod": 202,
+      "dev": 387,
+      "optional": 92,
+      "peer": 1,
+      "peerOptional": 0,
+      "total": 600
+    }
+  },
+  "vulnerabilities": [
+    {
+      "name": "@eslint/config-array",
+      "severity": "high",
+      "isDirect": false,
+      "range": "<=0.22.0",
+      "nodes": [
+        "node_modules/@eslint/config-array"
+      ],
+      "effects": [
+        "eslint"
+      ],
+      "viaDependencies": [
+        "minimatch"
+      ],
+      "advisories": [],
+      "fixAvailable": {
+        "name": "eslint",
+        "version": "10.8.0",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "name": "@eslint/eslintrc",
+      "severity": "high",
+      "isDirect": false,
+      "range": "0.0.1 || >=0.1.1",
+      "nodes": [
+        "node_modules/@eslint/eslintrc"
+      ],
+      "effects": [
+        "eslint"
+      ],
+      "viaDependencies": [
+        "minimatch"
+      ],
+      "advisories": [],
+      "fixAvailable": {
+        "name": "eslint",
+        "version": "10.8.0",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "name": "brace-expansion",
+      "severity": "high",
+      "isDirect": false,
+      "range": "<=5.0.7",
+      "nodes": [
+        "node_modules/@eslint/config-array/node_modules/brace-expansion",
+        "node_modules/@eslint/eslintrc/node_modules/brace-expansion",
+        "node_modules/eslint/node_modules/brace-expansion"
+      ],
+      "effects": [
+        "minimatch"
+      ],
+      "viaDependencies": [],
+      "advisories": [
+        {
+          "source": 1124334,
+          "name": "brace-expansion",
+          "dependency": "brace-expansion",
+          "title": "brace-expansion: DoS via unbounded expansion length causing an out-of-memory process crash",
+          "url": "https://github.com/advisories/GHSA-mh99-v99m-4gvg",
+          "severity": "high",
+          "range": "<=5.0.7",
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          }
+        }
+      ],
+      "fixAvailable": {
+        "name": "eslint",
+        "version": "10.8.0",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "name": "eslint",
+      "severity": "high",
+      "isDirect": true,
+      "range": "0.12.0 - 2.0.0-rc.1 || 4.1.0 - 10.0.0-rc.2",
+      "nodes": [
+        "node_modules/eslint"
+      ],
+      "effects": [],
+      "viaDependencies": [
+        "@eslint/config-array",
+        "@eslint/eslintrc",
+        "minimatch"
+      ],
+      "advisories": [],
+      "fixAvailable": {
+        "name": "eslint",
+        "version": "10.8.0",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "name": "minimatch",
+      "severity": "high",
+      "isDirect": false,
+      "range": "2.0.0 - 10.0.2",
+      "nodes": [
+        "node_modules/@eslint/config-array/node_modules/minimatch",
+        "node_modules/@eslint/eslintrc/node_modules/minimatch",
+        "node_modules/eslint/node_modules/minimatch"
+      ],
+      "effects": [
+        "@eslint/config-array",
+        "@eslint/eslintrc",
+        "eslint"
+      ],
+      "viaDependencies": [
+        "brace-expansion"
+      ],
+      "advisories": [],
+      "fixAvailable": {
+        "name": "eslint",
+        "version": "10.8.0",
+        "isSemVerMajor": true
+      }
+    }
+  ]
+}
