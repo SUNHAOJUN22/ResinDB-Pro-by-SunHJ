@@ -1,0 +1,46 @@
+name: Exact lockfile rebuild diagnostic 2026-07-26
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/lockfile-rebuild-diagnostic-20260726.trigger
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Capture exact lockfile rebuild error
+        shell: bash
+        run: |
+          set +e
+          npm install --package-lock-only --ignore-scripts --no-audit > /tmp/rebuild.log 2>&1
+          code=$?
+          set -e
+          {
+            echo "validated_commit=$GITHUB_SHA"
+            echo "rebuild_exit=$code"
+            echo
+            cat /tmp/rebuild.log
+          } > reports/lockfile-rebuild-diagnostic-20260726.txt
+      - name: Publish and self-clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/lockfile-rebuild-diagnostic-20260726.yml
+          rm -f .github/lockfile-rebuild-diagnostic-20260726.trigger
+          git config user.name "ResinDB Lockfile Diagnostic Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "ci: publish exact lockfile rebuild diagnostic"
+          git pull --rebase origin main
+          git push origin HEAD:main
