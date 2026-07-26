@@ -1,0 +1,145 @@
+name: Dependency audit diagnostic 2026-07-26
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/dependency-audit-diagnostic-20260726.trigger
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Capture exact audit results
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          set +e
+          npm audit --json > /tmp/audit-all.json 2>/tmp/audit-all.stderr
+          all_code=$?
+          npm audit --omit=dev --json > /tmp/audit-prod.json 2>/tmp/audit-prod.stderr
+          prod_code=$?
+          set -e
+          python3 - <<'PY'
+          from __future__ import annotations
+          import json
+          from pathlib import Path
+
+          def load(path: str) -> dict:
+              text = Path(path).read_text(encoding='utf-8', errors='replace').strip()
+              return json.loads(text) if text else {}
+
+          def normalize(data: dict, exit_code: int) -> dict:
+              vulnerabilities = data.get('vulnerabilities', {})
+              rows = []
+              for name, item in sorted(vulnerabilities.items()):
+                  via = item.get('via', [])
+                  via_names = []
+                  advisories = []
+                  for entry in via:
+                      if isinstance(entry, str):
+                          via_names.append(entry)
+                      elif isinstance(entry, dict):
+                          advisories.append({
+                              'source': entry.get('source'),
+                              'name': entry.get('name'),
+                              'dependency': entry.get('dependency'),
+                              'title': entry.get('title'),
+                              'url': entry.get('url'),
+                              'severity': entry.get('severity'),
+                              'range': entry.get('range'),
+                              'cvss': entry.get('cvss'),
+                          })
+                  rows.append({
+                      'name': name,
+                      'severity': item.get('severity'),
+                      'isDirect': item.get('isDirect'),
+                      'range': item.get('range'),
+                      'nodes': item.get('nodes', []),
+                      'effects': item.get('effects', []),
+                      'viaDependencies': via_names,
+                      'advisories': advisories,
+                      'fixAvailable': item.get('fixAvailable'),
+                  })
+              return {
+                  'exitCode': exit_code,
+                  'metadata': data.get('metadata', {}),
+                  'vulnerabilities': rows,
+              }
+
+          all_code = int(Path('/tmp/all-code').read_text())
+          prod_code = int(Path('/tmp/prod-code').read_text())
+          payload = {
+              'schemaVersion': 1,
+              'validatedCommit': Path('/tmp/validated-commit').read_text().strip(),
+              'node': Path('/tmp/node-version').read_text().strip(),
+              'npm': Path('/tmp/npm-version').read_text().strip(),
+              'allDependencies': normalize(load('/tmp/audit-all.json'), all_code),
+              'productionDependencies': normalize(load('/tmp/audit-prod.json'), prod_code),
+          }
+          out = Path('reports/dependency-audit-diagnostic-20260726.json')
+          out.parent.mkdir(parents=True, exist_ok=True)
+          out.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          lines = [
+              '# ResinDB Pro dependency audit diagnostic', '',
+              f"- Commit: `{payload['validatedCommit']}`",
+              f"- Runtime: `{payload['node']}` / `{payload['npm']}`", '',
+          ]
+          for title, key in (
+              ('All dependencies', 'allDependencies'),
+              ('Production dependencies', 'productionDependencies'),
+          ):
+              section = payload[key]
+              lines += [f'## {title}', '', f"- Exit code: `{section['exitCode']}`"]
+              counts = section.get('metadata', {}).get('vulnerabilities', {})
+              lines.append(f"- Counts: `{json.dumps(counts, sort_keys=True)}`")
+              lines.append('')
+              if not section['vulnerabilities']:
+                  lines.append('- No vulnerabilities reported.')
+              for item in section['vulnerabilities']:
+                  lines += [
+                      f"### `{item['name']}`",
+                      '',
+                      f"- Severity: `{item['severity']}`",
+                      f"- Direct: `{item['isDirect']}`",
+                      f"- Range: `{item['range']}`",
+                      f"- Fix available: `{json.dumps(item['fixAvailable'], sort_keys=True)}`",
+                      f"- Via dependencies: `{', '.join(item['viaDependencies']) or 'none'}`",
+                  ]
+                  for advisory in item['advisories']:
+                      lines.append(
+                          f"- Advisory: {advisory.get('title')} | {advisory.get('url')} | range `{advisory.get('range')}`"
+                      )
+                  lines.append('')
+          Path('reports/dependency-audit-diagnostic-20260726.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+        env:
+          CI: true
+
+      - name: Publish diagnostic and self-clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/dependency-audit-diagnostic-20260726.yml
+          rm -f .github/dependency-audit-diagnostic-20260726.trigger
+          git config user.name "ResinDB Dependency Audit Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "ci: publish exact dependency audit diagnostic"
+          git pull --rebase origin main
+          git push origin HEAD:main
