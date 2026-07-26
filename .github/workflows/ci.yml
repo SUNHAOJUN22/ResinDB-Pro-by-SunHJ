@@ -98,12 +98,12 @@ jobs:
       - name: Chromium UI smoke
         run: npm run test:ui
 
-      - name: Production dependency audit
+      - name: Full dependency audit
         shell: bash
         run: |
           set -euo pipefail
           for attempt in 1 2 3; do
-            if npm run audit:prod; then
+            if npm run audit:all; then
               exit 0
             fi
             [ "$attempt" -eq 3 ] && exit 1
