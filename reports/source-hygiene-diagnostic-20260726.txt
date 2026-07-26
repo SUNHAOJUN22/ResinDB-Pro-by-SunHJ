@@ -1,0 +1,5 @@
+validated_commit=f973a4339bd5204857cefe00ddf7d50561669ab7
+exit_code=1
+
+production source hygiene failed:
+src/components/ui/FloatingParticles.tsx:10: dynamic HTML injection: dangerouslySetInnerHTML={{
