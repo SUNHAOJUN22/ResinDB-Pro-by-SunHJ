@@ -33,6 +33,11 @@ jobs:
           npm audit --omit=dev --json > /tmp/audit-prod.json 2>/tmp/audit-prod.stderr
           prod_code=$?
           set -e
+          printf '%s\n' "$all_code" > /tmp/all-code
+          printf '%s\n' "$prod_code" > /tmp/prod-code
+          printf '%s\n' "$GITHUB_SHA" > /tmp/validated-commit
+          node --version > /tmp/node-version
+          npm --version > /tmp/npm-version
           python3 - <<'PY'
           from __future__ import annotations
           import json
@@ -46,10 +51,9 @@ jobs:
               vulnerabilities = data.get('vulnerabilities', {})
               rows = []
               for name, item in sorted(vulnerabilities.items()):
-                  via = item.get('via', [])
                   via_names = []
                   advisories = []
-                  for entry in via:
+                  for entry in item.get('via', []):
                       if isinstance(entry, str):
                           via_names.append(entry)
                       elif isinstance(entry, dict):
@@ -80,15 +84,13 @@ jobs:
                   'vulnerabilities': rows,
               }
 
-          all_code = int(Path('/tmp/all-code').read_text())
-          prod_code = int(Path('/tmp/prod-code').read_text())
           payload = {
               'schemaVersion': 1,
               'validatedCommit': Path('/tmp/validated-commit').read_text().strip(),
               'node': Path('/tmp/node-version').read_text().strip(),
               'npm': Path('/tmp/npm-version').read_text().strip(),
-              'allDependencies': normalize(load('/tmp/audit-all.json'), all_code),
-              'productionDependencies': normalize(load('/tmp/audit-prod.json'), prod_code),
+              'allDependencies': normalize(load('/tmp/audit-all.json'), int(Path('/tmp/all-code').read_text())),
+              'productionDependencies': normalize(load('/tmp/audit-prod.json'), int(Path('/tmp/prod-code').read_text())),
           }
           out = Path('reports/dependency-audit-diagnostic-20260726.json')
           out.parent.mkdir(parents=True, exist_ok=True)
@@ -104,22 +106,23 @@ jobs:
               ('Production dependencies', 'productionDependencies'),
           ):
               section = payload[key]
-              lines += [f'## {title}', '', f"- Exit code: `{section['exitCode']}`"]
-              counts = section.get('metadata', {}).get('vulnerabilities', {})
-              lines.append(f"- Counts: `{json.dumps(counts, sort_keys=True)}`")
-              lines.append('')
+              lines.extend([
+                  f'## {title}', '',
+                  f"- Exit code: `{section['exitCode']}`",
+                  f"- Counts: `{json.dumps(section.get('metadata', {}).get('vulnerabilities', {}), sort_keys=True)}`",
+                  '',
+              ])
               if not section['vulnerabilities']:
                   lines.append('- No vulnerabilities reported.')
               for item in section['vulnerabilities']:
-                  lines += [
-                      f"### `{item['name']}`",
-                      '',
+                  lines.extend([
+                      f"### `{item['name']}`", '',
                       f"- Severity: `{item['severity']}`",
                       f"- Direct: `{item['isDirect']}`",
                       f"- Range: `{item['range']}`",
                       f"- Fix available: `{json.dumps(item['fixAvailable'], sort_keys=True)}`",
                       f"- Via dependencies: `{', '.join(item['viaDependencies']) or 'none'}`",
-                  ]
+                  ])
                   for advisory in item['advisories']:
                       lines.append(
                           f"- Advisory: {advisory.get('title')} | {advisory.get('url')} | range `{advisory.get('range')}`"
@@ -127,8 +130,6 @@ jobs:
                   lines.append('')
           Path('reports/dependency-audit-diagnostic-20260726.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
           PY
-        env:
-          CI: true
 
       - name: Publish diagnostic and self-clean
         shell: bash
