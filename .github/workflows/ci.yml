@@ -68,6 +68,9 @@ jobs:
       - name: Documentation, visuals and repository hygiene
         run: npm run validate:docs
 
+      - name: Production source hygiene
+        run: npm run validate:source
+
       - name: ESLint
         run: npm run lint
 
