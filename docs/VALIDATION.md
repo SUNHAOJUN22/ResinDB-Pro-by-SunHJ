@@ -98,7 +98,7 @@ The recorded baseline contains **10 test files and 82 passing tests**. Rounded c
 | Metric | Coverage |
 |---|---:|
 | Statements | 70.2% |
-| Branches | 45.4% |
+| Branches | 45.3% |
 | Functions | 71.1% |
 | Lines | 71.5% |
 

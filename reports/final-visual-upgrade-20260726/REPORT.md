@@ -1,7 +1,7 @@
 # ResinDB Pro final visual and validation report
 
-- Result: **FAILURE**
-- Validated input commit: `0b97046d365bee1719e5c5edfa336d6310768892`
+- Result: **SUCCESS**
+- Validated input commit: `68cd6af7b8df8bdc6facebe32556ccd539247b56`
 - Runtime: `v22.23.1` / `10.9.8` / `Python 3.12.3` / `Linux`
 - Remote branches: `main`
 - Test files passed: **10**
@@ -21,7 +21,7 @@
 | `smoke` | `0` |
 | `test-coverage` | `0` |
 | `test-science` | `0` |
-| `test-ui` | `1` |
+| `test-ui` | `0` |
 | `test-unit` | `0` |
 | `test` | `0` |
 | `typecheck` | `0` |
@@ -33,7 +33,7 @@
 | Metric | Percent |
 |---|---:|
 | Statements | 70.17% |
-| Branches | 45.36% |
+| Branches | 45.31% |
 | Functions | 71.11% |
 | Lines | 71.53% |
 
@@ -61,9 +61,9 @@
 - Added three HelpModal regression tests; the suite now contains 82 passing tests.
 - Updated the deterministic quality-gate SVG to include production-source hygiene.
 - Added permanent semantic validation for the source-hygiene quality-gate visual.
-- Re-ran Chromium UI smoke after an isolated transient failure; the clean-tree run is authoritative.
+- Hardened Chromium launch for loaded runners with shared-memory compatibility, process-exit detection and page-target polling.
 
 ## Final documentation proof
 
-- Result: **FAILURE**
-- `validate-docs`: `1`
+- Result: **SUCCESS**
+- `validate-docs`: `0`

@@ -44,6 +44,9 @@ const chrome = spawn(
     '--headless=new',
     '--no-sandbox',
     '--disable-gpu',
+    '--disable-dev-shm-usage',
+    '--no-first-run',
+    '--no-default-browser-check',
     '--hide-scrollbars',
     '--remote-allow-origins=*',
     `--remote-debugging-port=${debugPort}`,
@@ -67,8 +70,14 @@ chrome.stderr.on('data', (chunk) => {
 
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-async function waitForHttp(url, attempts = 60) {
+async function waitForHttp(url, attempts = 120) {
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    if (url === appUrl && preview.exitCode !== null) {
+      throw new Error(`Preview exited before ${url} became ready (code ${preview.exitCode})`);
+    }
+    if (url.includes(`:${debugPort}/`) && chrome.exitCode !== null) {
+      throw new Error(`Chromium exited before the debug endpoint became ready (code ${chrome.exitCode})`);
+    }
     try {
       const response = await fetch(url, { signal: AbortSignal.timeout(1_000) });
       if (response.ok) return response;
@@ -133,7 +142,7 @@ async function evaluate(session, expression) {
 }
 
 async function waitForDashboard(session) {
-  for (let attempt = 1; attempt <= 80; attempt += 1) {
+  for (let attempt = 1; attempt <= 120; attempt += 1) {
     const state = await evaluate(
       session,
       `(() => ({
@@ -155,6 +164,25 @@ async function waitForDashboard(session) {
   throw new Error('Authenticated dashboard did not become ready');
 }
 
+async function waitForPageTarget(attempts = 120) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    if (chrome.exitCode !== null) {
+      throw new Error(`Chromium exited before exposing a page target (code ${chrome.exitCode})`);
+    }
+    try {
+      const pages = await fetch(`http://${host}:${debugPort}/json/list`, {
+        signal: AbortSignal.timeout(1_000),
+      }).then((response) => response.json());
+      const target = pages.find((page) => page.type === 'page');
+      if (target) return target;
+    } catch {
+      // The remote debugging target can lag behind the version endpoint.
+    }
+    await sleep(250);
+  }
+  throw new Error('Chromium did not expose a page target');
+}
+
 function stop(processHandle) {
   if (processHandle.exitCode === null) processHandle.kill('SIGTERM');
 }
@@ -162,9 +190,7 @@ function stop(processHandle) {
 try {
   await waitForHttp(appUrl);
   await waitForHttp(`http://${host}:${debugPort}/json/version`);
-  const pages = await fetch(`http://${host}:${debugPort}/json/list`).then((response) => response.json());
-  const target = pages.find((page) => page.type === 'page');
-  if (!target) throw new Error('Chromium did not expose a page target');
+  const target = await waitForPageTarget();
 
   const session = new CdpSession(target.webSocketDebuggerUrl);
   await session.open();
