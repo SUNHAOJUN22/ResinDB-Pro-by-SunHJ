@@ -1,7 +1,7 @@
 # ResinDB Pro final visual and validation report
 
 - Result: **FAILURE**
-- Validated input commit: `5ac6aa1043aaece4e3124be7de310f121add9962`
+- Validated input commit: `0b97046d365bee1719e5c5edfa336d6310768892`
 - Runtime: `v22.23.1` / `10.9.8` / `Python 3.12.3` / `Linux`
 - Remote branches: `main`
 - Test files passed: **10**
@@ -25,7 +25,6 @@
 | `test-unit` | `0` |
 | `test` | `0` |
 | `typecheck` | `0` |
-| `validate-docs-pre` | `0` |
 | `validate-source` | `0` |
 | `visuals-check` | `0` |
 
@@ -33,7 +32,7 @@
 
 | Metric | Percent |
 |---|---:|
-| Statements | 70.15% |
+| Statements | 70.17% |
 | Branches | 45.36% |
 | Functions | 71.11% |
 | Lines | 71.53% |
@@ -59,11 +58,12 @@
 
 - Corrected Help Center import, export and demo-role claims to match implemented capabilities.
 - Added bilingual dialog semantics, Escape handling, responsive layout and accessible close labels.
-- Added HelpModal regression tests for Chinese, English and keyboard dismissal.
+- Added three HelpModal regression tests; the suite now contains 82 passing tests.
 - Updated the deterministic quality-gate SVG to include production-source hygiene.
 - Added permanent semantic validation for the source-hygiene quality-gate visual.
+- Re-ran Chromium UI smoke after an isolated transient failure; the clean-tree run is authoritative.
 
 ## Final documentation proof
 
 - Result: **FAILURE**
-- `validate-docs-final`: `0`
+- `validate-docs`: `1`

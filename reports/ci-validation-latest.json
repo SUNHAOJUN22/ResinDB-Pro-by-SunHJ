@@ -3,8 +3,8 @@
   "result": "failure",
   "repository": "SUNHAOJUN22/ResinDB-Pro-by-SunHJ",
   "version": "3.0.0",
-  "validatedInputCommit": "5ac6aa1043aaece4e3124be7de310f121add9962",
-  "completedAt": "2026-07-26T09:11:12.418561+00:00",
+  "validatedInputCommit": "0b97046d365bee1719e5c5edfa336d6310768892",
+  "completedAt": "2026-07-26T09:19:31.671276+00:00",
   "runtime": {
     "node": "v22.23.1",
     "npm": "10.9.8",
@@ -28,15 +28,14 @@
     "test-unit": 0,
     "test": 0,
     "typecheck": 0,
-    "validate-docs-final": 1,
-    "validate-docs-pre": 0,
+    "validate-docs": 1,
     "validate-source": 0,
     "visuals-check": 0
   },
   "testFilesPassed": 10,
   "testsPassed": 82,
   "coveragePercent": {
-    "statements": 70.15,
+    "statements": 70.17,
     "branches": 45.36,
     "functions": 71.11,
     "lines": 71.53
@@ -58,11 +57,11 @@
     "resindb-security-deployment.svg",
     "resindb-worker-architecture.svg"
   ],
-  "rawEvidenceArtifact": "resindb-ultimate-readme-audit-5ac6aa1043aaece4e3124be7de310f121add9962",
+  "rawEvidenceArtifact": "resindb-final-clean-tree-0b97046d365bee1719e5c5edfa336d6310768892",
   "currentTreeVerification": {
     "result": "failure",
-    "validatedInputCommit": "5ac6aa1043aaece4e3124be7de310f121add9962",
-    "completedAt": "2026-07-26T09:11:12.418561+00:00",
+    "validatedInputCommit": "0b97046d365bee1719e5c5edfa336d6310768892",
+    "completedAt": "2026-07-26T09:19:31.671276+00:00",
     "runtime": {
       "node": "v22.23.1",
       "npm": "10.9.8",
@@ -86,12 +85,11 @@
       "test-unit": 0,
       "test": 0,
       "typecheck": 0,
-      "validate-docs-final": 1,
-      "validate-docs-pre": 0,
+      "validate-docs": 1,
       "validate-source": 0,
       "visuals-check": 0
     },
-    "scope": "truthful bilingual help, accessible dialog, production-source hygiene, deterministic quality-gate visual and complete application validation",
-    "rawEvidenceArtifact": "resindb-ultimate-readme-audit-5ac6aa1043aaece4e3124be7de310f121add9962"
+    "scope": "truthful bilingual Help Center, accessible dialog, production-source hygiene, deterministic quality-gate visual and complete application validation",
+    "rawEvidenceArtifact": "resindb-final-clean-tree-0b97046d365bee1719e5c5edfa336d6310768892"
   }
 }
