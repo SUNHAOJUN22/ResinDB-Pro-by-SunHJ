@@ -174,7 +174,7 @@ npm run test:ui
 npm run audit:prod
 ```
 
-当前已提交验证基线使用 Node.js 22 / npm 10 / Linux，记录 **9 个测试文件、79 个测试用例** 全部通过，并通过中文浅色和英文深色 Dashboard Chromium smoke。精确退出码与覆盖率见 [`reports/final-validation-20260726/REPORT.md`](reports/final-validation-20260726/REPORT.md) 和 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
+当前最新完整验证基线使用 Node.js 22 / npm 10 / Python 3.12 / Linux，记录 **9 个测试文件、79 个测试用例** 全部通过，验证 **14 张确定性功能图**，并通过中文浅色和英文深色 Dashboard Chromium smoke。精确退出码、覆盖率与图像清单见 [`reports/final-visual-upgrade-20260726/REPORT.md`](reports/final-visual-upgrade-20260726/REPORT.md)、[`reports/ci-validation-latest.json`](reports/ci-validation-latest.json) 和 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
 
 ## 典型科研工作流
 
@@ -249,7 +249,8 @@ npm run visuals:check
 - 图片是否与生成器输出逐字节一致；
 - README、`package.json` 与验证合同的版本是否一致；
 - 正式 CI 是否执行文档检查；
-- 仓库是否重新出现旧 patch、trigger、迁移或诊断残留。
+- 仓库是否重新出现旧 patch、trigger、迁移或诊断残留；
+- 最新机器摘要是否与固定报告目录一致，避免证据链接漂移。
 
 架构 SVG 是说明性图示，不是运行截图。真实 Chromium PNG、原始日志和 Coverage HTML 作为 GitHub Actions artifact 限时保存，不会被伪装成仓库静态证据。
 
