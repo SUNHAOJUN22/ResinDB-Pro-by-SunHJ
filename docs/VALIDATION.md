@@ -11,45 +11,75 @@ The contract covers the repository as it exists today:
 - React UI, data views, export flows and feedback diagnostics;
 - the whitelist formula engine and scientific Web Workers;
 - optional OpenAI-compatible AI integration;
+- deterministic README visuals and documentation integrity;
 - production build, HTTP smoke, Chromium UI smoke and dependency audit.
 
-It does **not** claim a separate public runtime manifest architecture, because version `3.0.0` imports and validates the maintained catalogs from `src/data/`.
+It does **not** claim a separate public runtime manifest architecture. Version `3.0.0` imports and validates the maintained catalogs from `src/data/`.
 
 ## Required gates
 
 A release candidate must satisfy every gate below without disabling assertions or lowering failure thresholds:
 
 1. `npm ci` succeeds using the committed lockfile on Node.js 22.
-2. `npm run lint` completes with zero ESLint warnings.
-3. `npm run typecheck` completes without TypeScript errors.
-4. `npm run test` passes the complete Vitest regression suite.
-5. `npm run test:unit` passes the isolated unit-test group.
-6. `npm run test:science` passes the isolated scientific/data/worker group.
-7. `npm run test:coverage` completes and emits a coverage report.
-8. `npm run build` produces the Vite production bundle.
-9. `npm run smoke` verifies the built application over HTTP.
-10. `npm run test:ui` renders the authenticated Dashboard in Chromium, detects browser-console errors, checks preference persistence and saves real screenshots.
-11. `npm run audit:prod` finds no high-severity production dependency vulnerability.
-12. `git diff --check` reports no whitespace errors.
-13. The remote branch inventory contains exactly `main` for a main-branch release.
+2. `npm run validate:docs` confirms all local README links, the exact 14-image inventory, SVG accessibility metadata, deterministic regeneration, version alignment, CI integration and repository hygiene.
+3. `npm run lint` completes with zero ESLint warnings.
+4. `npm run typecheck` completes without TypeScript errors.
+5. `npm run test` passes the complete Vitest regression suite.
+6. `npm run test:unit` passes the isolated unit-test group.
+7. `npm run test:science` passes the isolated scientific/data/worker group.
+8. `npm run test:coverage` completes and emits a coverage report.
+9. `npm run build` produces the Vite production bundle.
+10. `npm run smoke` verifies the built application over HTTP.
+11. `npm run test:ui` renders the authenticated Dashboard in Chromium, detects browser-console errors, checks preference persistence and saves real screenshots.
+12. `npm run audit:prod` finds no high-severity production dependency vulnerability.
+13. `git diff --check` reports no whitespace errors.
+14. The remote branch inventory contains exactly `main` for a main-branch release.
+
+## Documentation and visual contract
+
+`scripts/generate-readme-visuals.py` owns the complete `docs/assets/resindb-*.svg` inventory. The checked-in files must be byte-for-byte reproducible through:
+
+```bash
+npm run visuals:generate
+npm run visuals:check
+```
+
+Each SVG must contain:
+
+- a root `role="img"`;
+- an `aria-labelledby` reference;
+- one `<title>`;
+- one `<desc>`;
+- no dependency on an external image service.
+
+`scripts/validate-repository-docs.py` also rejects:
+
+- a missing or duplicated README reference to any expected visual;
+- a broken local README link;
+- a README/package/validation version mismatch;
+- a permanent CI workflow that omits `npm run validate:docs`;
+- reintroduced patch payloads, migration fragments, temporary workflows or diagnostic residue.
+
+The diagrams are explanatory architecture assets. They are not Chromium screenshots and must never be presented as runtime evidence.
 
 ## Permanent GitHub Actions gate
 
-`.github/workflows/ci.yml` runs on every push to `main`, every pull request targeting `main`, and manual dispatch. The current workflow pins the same action majors used by the successful repository audit:
+`.github/workflows/ci.yml` runs on every push to `main`, every pull request targeting `main`, and manual dispatch. It uses:
 
 - `actions/checkout@v4`;
 - `actions/setup-node@v4` with Node.js 22 and npm caching;
 - `actions/upload-artifact@v4` for install diagnostics, coverage and UI evidence.
 
-The workflow runs each validation stage separately so that a failing check remains attributable. Production audit and dependency installation include bounded retries for transient registry failures; test, type, build and UI failures are never retried into a false pass.
+The workflow runs documentation validation, static checks, regression groups, build, browser smoke and security audit as separately named steps so failures remain attributable. Dependency installation and production audit include bounded retries for transient registry failures; test, type, build, documentation and UI failures are never retried into a false pass.
 
 ## Current verified baseline
 
-The final cleaned-tree audit executed on Linux with Node.js `v22.23.1` and npm `10.9.8` and recorded zero exit codes for:
+The most recent committed full-tree audit executed on Linux with Node.js `v22.23.1` and npm `10.9.8` and recorded zero exit codes for:
 
 | Check | Result |
 |---|---|
 | npm clean install | passed |
+| documentation and visual regeneration | passed |
 | ESLint | passed |
 | TypeScript | passed |
 | complete regression suite | passed |
@@ -64,7 +94,7 @@ The final cleaned-tree audit executed on Linux with Node.js `v22.23.1` and npm `
 | migration and diagnostic residue check | passed |
 | sole remote branch check | passed |
 
-The baseline contains **9 test files and 79 passing tests**. Rounded coverage from the final proof was:
+The recorded baseline contains **9 test files and 79 passing tests**. Rounded coverage was:
 
 | Metric | Coverage |
 |---|---:|
@@ -73,42 +103,37 @@ The baseline contains **9 test files and 79 passing tests**. Rounded coverage fr
 | Functions | 70.8% |
 | Lines | 71.4% |
 
-The exact values from each run remain in the machine-readable validation report rather than being treated as permanent thresholds.
+Exact values from each run remain in the machine-readable validation report rather than being treated as permanent thresholds.
 
-The Chromium smoke test authenticated as Demo Admin, rendered **13 records**, confirmed that the browser console contained no errors, persisted language/theme/palette changes, and generated two application screenshots:
+The Chromium smoke test authenticated as Demo Admin, rendered **13 records**, confirmed that the browser console contained no errors, persisted language/theme/palette changes, and generated:
 
 - `ui-smoke-dashboard-zh.png`;
 - `ui-smoke-dashboard-en-dark.png`.
 
-These values describe the recorded final audit; they are not permanent promises for later commits.
-
 ## Evidence retention
 
-The repository commits durable, compact evidence only:
+The repository commits compact durable evidence:
 
-- `reports/final-validation-20260726/summary.json` contains machine-readable exit codes, runtime, branch proof, test count, coverage and visual-asset checks;
-- `reports/final-validation-20260726/REPORT.md` contains the human-readable acceptance record;
-- `reports/ci-validation-latest.json` mirrors the latest machine-readable proof.
+- `reports/final-validation-20260726/summary.json`;
+- `reports/final-validation-20260726/REPORT.md`;
+- `reports/ci-validation-latest.json`.
 
-Raw command logs, coverage HTML and Chromium PNG screenshots are intentionally **not committed** because `.gitignore` excludes generated logs, coverage and browser artifacts. They are uploaded by GitHub Actions as run artifacts and are available only for the configured retention period. The committed summary must therefore be treated as the durable record, while raw logs and screenshots are time-limited supporting evidence.
+Raw command logs, coverage HTML and Chromium PNG screenshots are generated artifacts excluded by `.gitignore`. GitHub Actions uploads them for the workflow's configured retention period. The committed summary is the durable acceptance record; raw logs and screenshots are time-limited supporting evidence.
 
 ## Scientific acceptance rules
 
-Scientific tests exercise the formula parser, material helpers, storage validation and the worker matrix. The release gate rejects unhandled exceptions and checks that valid worker results are finite rather than `NaN` or `Infinity`.
+Scientific tests exercise the formula parser, material helpers, storage validation and worker matrix. The release gate rejects unhandled exceptions and checks that valid results are finite rather than `NaN` or `Infinity`.
 
-Console output emitted by negative tests is expected when a test deliberately supplies malformed formulas or physically invalid records. A passing test must still assert that the malformed input is isolated or rejected and that valid neighboring calculations remain usable.
-
-## UI evidence rules
-
-UI screenshots are generated by the tested production preview in Chromium. Repository-owned SVG diagrams in `docs/assets/` explain architecture and workflow but are **not** UI test evidence. CI evidence is uploaded from `artifacts/` and `coverage/` for the commit that produced it and follows the workflow's artifact-retention setting.
+Console output from negative tests is expected when a test deliberately supplies malformed formulas or physically invalid records. The test must still prove that invalid input is isolated or rejected while valid neighboring calculations remain usable.
 
 ## Release rule
 
 A release is accepted only when:
 
-- all required gates pass on the exact candidate tree;
+- every required gate passes on the exact candidate tree;
+- `npm run visuals:check` confirms deterministic, current assets;
 - the repository contains no active migration payload, temporary trigger or self-modifying patch workflow;
-- `README.md`, `package.json`, this validation contract and the implemented data architecture agree;
+- `README.md`, `package.json`, this contract and the implemented data architecture agree;
 - the remote branch list contains only `main`.
 
 When a check cannot be executed, the release must be reported as unverified rather than inferred to be successful.
