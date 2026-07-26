@@ -1,11 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" role="img" aria-labelledby="network-title network-title-desc">
-<title id="network-title">ResinDB Pro knowledge network</title>
-<desc id="network-title-desc">A network view connecting resin grades to polymer families, manufacturers, processes, references, properties and comparable grades.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640"
+ viewBox="0 0 1200 640" role="img"
+ aria-labelledby="network-title network-title-desc">
+<title id="network-title">Resin knowledge network</title>
+<desc id="network-title-desc">Network connecting resin grades with polymer families, manufacturers, processes, references and comparable grades.</desc>
 
 <defs>
   <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
     <stop offset="0" stop-color="#06111f"/>
-    <stop offset="0.55" stop-color="#0b1830"/>
+    <stop offset=".56" stop-color="#0b1830"/>
     <stop offset="1" stop-color="#111b35"/>
   </linearGradient>
   <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
@@ -16,25 +18,17 @@
     <stop offset="0" stop-color="#34d399"/>
     <stop offset="1" stop-color="#059669"/>
   </linearGradient>
-  <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#c084fc"/>
-    <stop offset="1" stop-color="#7c3aed"/>
-  </linearGradient>
-  <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#fbbf24"/>
-    <stop offset="1" stop-color="#f97316"/>
-  </linearGradient>
-  <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+  <filter id="shadow" x="-25%" y="-25%" width="150%" height="170%">
+    <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#020617" flood-opacity=".46"/>
+  </filter>
+  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
     <feGaussianBlur stdDeviation="7" result="blur"/>
     <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
   </filter>
-  <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
-    <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#020617" flood-opacity=".45"/>
-  </filter>
   <pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse">
-    <path d="M36 0H0V36" fill="none" stroke="#94a3b8" stroke-opacity=".055" stroke-width="1"/>
+    <path d="M36 0H0V36" fill="none" stroke="#94a3b8" stroke-opacity=".055"/>
   </pattern>
-  <marker id="arrow-cyan" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+  <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
     <path d="M0 0L10 5L0 10Z" fill="#38bdf8"/>
   </marker>
   <marker id="arrow-muted" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
@@ -46,47 +40,11 @@
 <rect width="1200" height="640" rx="28" fill="url(#grid)"/>
 <circle cx="1040" cy="80" r="190" fill="#2563eb" fill-opacity=".07"/>
 <circle cx="110" cy="620" r="210" fill="#10b981" fill-opacity=".05"/>
-<text x="72" y="70" fill="#f8fafc" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="36" font-weight="800" text-anchor="start">Resin knowledge network</text><text x="72" y="104" fill="#94a3b8" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="500" text-anchor="start">Explore relationships between families, grades, properties, processes and evidence</text><path d="M72 126H1128" stroke="#334155" stroke-width="1"/>
-<g filter="url(#glow)">
-  <circle cx="600" cy="330" r="74" fill="#38bdf8" fill-opacity=".18" stroke="#38bdf8" stroke-width="2"/>
-  <circle cx="600" cy="330" r="28.12" fill="#38bdf8" fill-opacity=".9"/>
+<text x="72" y="70" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="36" font-weight="820" text-anchor="start">Resin knowledge network</text><text x="72" y="104" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="520" text-anchor="start">Explore relationships without confusing adjacency with causality</text><path d="M72 126H1128" stroke="#334155"/>
+<g transform="translate(600 334)" filter="url(#glow)">
+  <path d="M0-82L71-41V41L0 82L-71 41V-41Z" fill="#0b2b4f" stroke="#38bdf8" stroke-width="3"/>
+  <path d="M0-44L38-22V22L0 44L-38 22V-22Z" fill="url(#cyan)" fill-opacity=".28" stroke="#67e8f9"/>
+  <circle r="13" fill="#e0f2fe"/>
 </g>
-<text x="600" y="430" fill="#e2e8f0" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="650" text-anchor="middle">Resin grade</text>
-<path d="M600 330L280 206" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)"/>
-<g filter="url(#glow)">
-  <circle cx="280" cy="206" r="48" fill="#34d399" fill-opacity=".18" stroke="#34d399" stroke-width="2"/>
-  <circle cx="280" cy="206" r="18.240000000000002" fill="#34d399" fill-opacity=".9"/>
-</g>
-<text x="280" y="280" fill="#e2e8f0" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="650" text-anchor="middle">Polymer family</text>
-<path d="M600 330L920 206" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)"/>
-<g filter="url(#glow)">
-  <circle cx="920" cy="206" r="48" fill="#fbbf24" fill-opacity=".18" stroke="#fbbf24" stroke-width="2"/>
-  <circle cx="920" cy="206" r="18.240000000000002" fill="#fbbf24" fill-opacity=".9"/>
-</g>
-<text x="920" y="280" fill="#e2e8f0" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="650" text-anchor="middle">Manufacturer</text>
-<path d="M600 330L250 454" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)"/>
-<g filter="url(#glow)">
-  <circle cx="250" cy="454" r="48" fill="#a78bfa" fill-opacity=".18" stroke="#a78bfa" stroke-width="2"/>
-  <circle cx="250" cy="454" r="18.240000000000002" fill="#a78bfa" fill-opacity=".9"/>
-</g>
-<text x="250" y="528" fill="#e2e8f0" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="650" text-anchor="middle">Process route</text>
-<path d="M600 330L950 454" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)"/>
-<g filter="url(#glow)">
-  <circle cx="950" cy="454" r="48" fill="#fb7185" fill-opacity=".18" stroke="#fb7185" stroke-width="2"/>
-  <circle cx="950" cy="454" r="18.240000000000002" fill="#fb7185" fill-opacity=".9"/>
-</g>
-<text x="950" y="528" fill="#e2e8f0" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="650" text-anchor="middle">Reference</text>
-<path d="M600 330L600 164" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)"/>
-<g filter="url(#glow)">
-  <circle cx="600" cy="164" r="44" fill="#38bdf8" fill-opacity=".18" stroke="#38bdf8" stroke-width="2"/>
-  <circle cx="600" cy="164" r="16.72" fill="#38bdf8" fill-opacity=".9"/>
-</g>
-<text x="600" y="234" fill="#e2e8f0" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="650" text-anchor="middle">Property group</text>
-<path d="M600 330L600 520" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)"/>
-<g filter="url(#glow)">
-  <circle cx="600" cy="520" r="44" fill="#34d399" fill-opacity=".18" stroke="#34d399" stroke-width="2"/>
-  <circle cx="600" cy="520" r="16.72" fill="#34d399" fill-opacity=".9"/>
-</g>
-<text x="600" y="590" fill="#e2e8f0" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="650" text-anchor="middle">Comparable grade</text>
-<path d="M280 206Q600 330 600 164" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="7 8"/><path d="M600 164Q600 330 920 206" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="7 8"/><path d="M250 454Q600 330 600 520" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="7 8"/><path d="M600 520Q600 330 950 454" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="7 8"/><path d="M280 206Q600 330 250 454" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="7 8"/><path d="M920 206Q600 330 950 454" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="7 8"/>
+<path d="M600 334L230 205" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)" stroke-dasharray="8 8"/><circle cx="230" cy="205" r="52" fill="#38bdf8" fill-opacity=".16" stroke="#38bdf8" stroke-width="2"/><circle cx="230" cy="205" r="18" fill="#38bdf8" fill-opacity=".9"/><text x="230" y="285" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" text-anchor="middle">Polymer family</text><text x="230" y="306" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="520" text-anchor="middle">taxonomy</text><path d="M600 334L600 170" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)" stroke-dasharray="8 8"/><circle cx="600" cy="170" r="52" fill="#34d399" fill-opacity=".16" stroke="#34d399" stroke-width="2"/><circle cx="600" cy="170" r="18" fill="#34d399" fill-opacity=".9"/><text x="600" y="250" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" text-anchor="middle">Property group</text><text x="600" y="271" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="520" text-anchor="middle">semantic fields</text><path d="M600 334L970 205" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)" stroke-dasharray="8 8"/><circle cx="970" cy="205" r="52" fill="#a78bfa" fill-opacity=".16" stroke="#a78bfa" stroke-width="2"/><circle cx="970" cy="205" r="18" fill="#a78bfa" fill-opacity=".9"/><text x="970" y="285" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" text-anchor="middle">Manufacturer</text><text x="970" y="306" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="520" text-anchor="middle">catalog entry</text><path d="M600 334L230 455" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)" stroke-dasharray="8 8"/><circle cx="230" cy="455" r="52" fill="#fbbf24" fill-opacity=".16" stroke="#fbbf24" stroke-width="2"/><circle cx="230" cy="455" r="18" fill="#fbbf24" fill-opacity=".9"/><text x="230" y="535" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" text-anchor="middle">Process route</text><text x="230" y="556" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="520" text-anchor="middle">context</text><path d="M600 334L600 505" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)" stroke-dasharray="8 8"/><circle cx="600" cy="505" r="52" fill="#fb7185" fill-opacity=".16" stroke="#fb7185" stroke-width="2"/><circle cx="600" cy="505" r="18" fill="#fb7185" fill-opacity=".9"/><text x="600" y="585" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" text-anchor="middle">Comparable grade</text><text x="600" y="606" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="520" text-anchor="middle">similarity</text><path d="M600 334L970 455" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)" stroke-dasharray="8 8"/><circle cx="970" cy="455" r="52" fill="#22d3ee" fill-opacity=".16" stroke="#22d3ee" stroke-width="2"/><circle cx="970" cy="455" r="18" fill="#22d3ee" fill-opacity=".9"/><text x="970" y="535" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" text-anchor="middle">Reference</text><text x="970" y="556" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="520" text-anchor="middle">evidence source</text>
 </svg>

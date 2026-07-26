@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640"
  viewBox="0 0 1200 640" role="img"
- aria-labelledby="lifecycle-title lifecycle-title-desc">
-<title id="lifecycle-title">Resin data lifecycle</title>
-<desc id="lifecycle-title-desc">Lifecycle from file import through validation, normalization, persistence, analysis and portable export.</desc>
+ aria-labelledby="worker-title worker-title-desc">
+<title id="worker-title">Web Worker execution architecture</title>
+<desc id="worker-title-desc">Architecture of UI hooks, worker messages, numerical workers, finite-result checks and chart rendering.</desc>
 
 <defs>
   <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -40,65 +40,65 @@
 <rect width="1200" height="640" rx="28" fill="url(#grid)"/>
 <circle cx="1040" cy="80" r="190" fill="#2563eb" fill-opacity=".07"/>
 <circle cx="110" cy="620" r="210" fill="#10b981" fill-opacity=".05"/>
-<text x="72" y="70" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="36" font-weight="820" text-anchor="start">Resin data lifecycle</text><text x="72" y="104" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="520" text-anchor="start">Validate at every boundary • preserve provenance • export without lock-in</text><path d="M72 126H1128" stroke="#334155"/>
+<text x="72" y="70" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="36" font-weight="820" text-anchor="start">Web Worker execution architecture</text><text x="72" y="104" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="520" text-anchor="start">Heavy numerical work stays off the interactive React thread</text><path d="M72 126H1128" stroke="#334155"/>
 <g filter="url(#shadow)">
   <rect x="85.0" y="220" width="148.33333333333334" height="150" rx="24" fill="#0f213b" stroke="#334155"/>
   <rect x="85.0" y="220" width="7" height="150" rx="3.5" fill="#38bdf8"/>
-  <text x="111.0" y="262" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Import</text>
-  <text x="111.0" y="290" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">CSV • JSON • TXT</text>
+  <text x="111.0" y="262" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">React view</text>
+  <text x="111.0" y="290" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">user intent</text>
 </g>
 <circle cx="159.16666666666669" cy="332" r="22" fill="#38bdf8" fill-opacity=".18" stroke="#38bdf8"/><text x="159.16666666666669" y="339" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="800" text-anchor="middle">1</text><path d="M233.33333333333334 295L253.33333333333337 295" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
 <g filter="url(#shadow)">
   <rect x="261.33333333333337" y="220" width="148.33333333333334" height="150" rx="24" fill="#0f213b" stroke="#334155"/>
   <rect x="261.33333333333337" y="220" width="7" height="150" rx="3.5" fill="#34d399"/>
-  <text x="287.33333333333337" y="262" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Validate</text>
-  <text x="287.33333333333337" y="290" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">shape • IDs • ranges</text>
+  <text x="287.33333333333337" y="262" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Worker hook</text>
+  <text x="287.33333333333337" y="290" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">typed request</text>
 </g>
 <circle cx="335.50000000000006" cy="332" r="22" fill="#34d399" fill-opacity=".18" stroke="#34d399"/><text x="335.50000000000006" y="339" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="800" text-anchor="middle">2</text><path d="M409.66666666666674 295L429.66666666666674 295" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
 <g filter="url(#shadow)">
   <rect x="437.6666666666667" y="220" width="148.33333333333334" height="150" rx="24" fill="#0f213b" stroke="#334155"/>
   <rect x="437.6666666666667" y="220" width="7" height="150" rx="3.5" fill="#a78bfa"/>
-  <text x="463.6666666666667" y="262" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Normalize</text>
-  <text x="463.6666666666667" y="290" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">taxonomy • units</text>
+  <text x="463.6666666666667" y="262" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Worker manager</text>
+  <text x="463.6666666666667" y="290" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">lifecycle + timeout</text>
 </g>
 <circle cx="511.83333333333337" cy="332" r="22" fill="#a78bfa" fill-opacity=".18" stroke="#a78bfa"/><text x="511.83333333333337" y="339" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="800" text-anchor="middle">3</text><path d="M586.0 295L606.0 295" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
 <g filter="url(#shadow)">
   <rect x="614.0" y="220" width="148.33333333333334" height="150" rx="24" fill="#0f213b" stroke="#334155"/>
   <rect x="614.0" y="220" width="7" height="150" rx="3.5" fill="#fbbf24"/>
-  <text x="640.0" y="262" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Persist</text>
-  <text x="640.0" y="290" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">IndexedDB • snapshots</text>
+  <text x="640.0" y="262" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Scientific worker</text>
+  <text x="640.0" y="290" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">numerical compute</text>
 </g>
 <circle cx="688.1666666666666" cy="332" r="22" fill="#fbbf24" fill-opacity=".18" stroke="#fbbf24"/><text x="688.1666666666666" y="339" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="800" text-anchor="middle">4</text><path d="M762.3333333333334 295L782.3333333333334 295" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
 <g filter="url(#shadow)">
   <rect x="790.3333333333334" y="220" width="148.33333333333334" height="150" rx="24" fill="#0f213b" stroke="#334155"/>
   <rect x="790.3333333333334" y="220" width="7" height="150" rx="3.5" fill="#fb7185"/>
-  <text x="816.3333333333334" y="262" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Analyze</text>
-  <text x="816.3333333333334" y="290" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">charts • workers</text>
+  <text x="816.3333333333334" y="262" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Result guard</text>
+  <text x="816.3333333333334" y="290" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">finite + shaped</text>
 </g>
 <circle cx="864.5" cy="332" r="22" fill="#fb7185" fill-opacity=".18" stroke="#fb7185"/><text x="864.5" y="339" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="800" text-anchor="middle">5</text><path d="M938.6666666666667 295L958.6666666666667 295" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)"/>
 <g filter="url(#shadow)">
   <rect x="966.6666666666667" y="220" width="148.33333333333334" height="150" rx="24" fill="#0f213b" stroke="#334155"/>
   <rect x="966.6666666666667" y="220" width="7" height="150" rx="3.5" fill="#22d3ee"/>
-  <text x="992.6666666666667" y="262" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Export</text>
-  <text x="992.6666666666667" y="290" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">CSV • JSON • XML • PDF</text>
+  <text x="992.6666666666667" y="262" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Chart / report</text>
+  <text x="992.6666666666667" y="290" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">rendered evidence</text>
 </g>
 <circle cx="1040.8333333333335" cy="332" r="22" fill="#22d3ee" fill-opacity=".18" stroke="#22d3ee"/><text x="1040.8333333333335" y="339" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="800" text-anchor="middle">6</text>
 <g>
   <rect x="100" y="548" width="321.3333333333333" height="34" rx="17" fill="#38bdf8" fill-opacity=".13"
         stroke="#38bdf8" stroke-opacity=".55"/>
-  <text x="260.66666666666663" y="571" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">Deterministic fallback</text>
+  <text x="260.66666666666663" y="571" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">Failure isolation</text>
 </g>
 
 <g>
   <rect x="439.3333333333333" y="548" width="321.3333333333333" height="34" rx="17" fill="#34d399" fill-opacity=".13"
         stroke="#34d399" stroke-opacity=".55"/>
-  <text x="600.0" y="571" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">No silent remote write fallback</text>
+  <text x="600.0" y="571" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">Responsive UI</text>
 </g>
 
 <g>
   <rect x="778.6666666666666" y="548" width="321.3333333333333" height="34" rx="17" fill="#a78bfa" fill-opacity=".13"
         stroke="#a78bfa" stroke-opacity=".55"/>
-  <text x="939.3333333333333" y="571" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">Source review required</text>
+  <text x="939.3333333333333" y="571" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">Explicit cancellation</text>
 </g>
 
 </svg>

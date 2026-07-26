@@ -1,11 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640" role="img" aria-labelledby="hero-title hero-title-desc">
-<title id="hero-title">ResinDB Pro platform overview</title>
-<desc id="hero-title-desc">An overview of the local-first resin data platform, scientific analysis engine, visual analytics and optional AI copilot.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640"
+ viewBox="0 0 1200 640" role="img"
+ aria-labelledby="platform-title platform-title-desc">
+<title id="platform-title">ResinDB Pro</title>
+<desc id="platform-title-desc">Platform overview of resin data management, analytics, scientific computation, optional AI and evidence export.</desc>
 
 <defs>
   <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
     <stop offset="0" stop-color="#06111f"/>
-    <stop offset="0.55" stop-color="#0b1830"/>
+    <stop offset=".56" stop-color="#0b1830"/>
     <stop offset="1" stop-color="#111b35"/>
   </linearGradient>
   <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
@@ -16,25 +18,17 @@
     <stop offset="0" stop-color="#34d399"/>
     <stop offset="1" stop-color="#059669"/>
   </linearGradient>
-  <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#c084fc"/>
-    <stop offset="1" stop-color="#7c3aed"/>
-  </linearGradient>
-  <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#fbbf24"/>
-    <stop offset="1" stop-color="#f97316"/>
-  </linearGradient>
-  <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+  <filter id="shadow" x="-25%" y="-25%" width="150%" height="170%">
+    <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#020617" flood-opacity=".46"/>
+  </filter>
+  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
     <feGaussianBlur stdDeviation="7" result="blur"/>
     <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
   </filter>
-  <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
-    <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#020617" flood-opacity=".45"/>
-  </filter>
   <pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse">
-    <path d="M36 0H0V36" fill="none" stroke="#94a3b8" stroke-opacity=".055" stroke-width="1"/>
+    <path d="M36 0H0V36" fill="none" stroke="#94a3b8" stroke-opacity=".055"/>
   </pattern>
-  <marker id="arrow-cyan" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+  <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
     <path d="M0 0L10 5L0 10Z" fill="#38bdf8"/>
   </marker>
   <marker id="arrow-muted" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
@@ -46,58 +40,11 @@
 <rect width="1200" height="640" rx="28" fill="url(#grid)"/>
 <circle cx="1040" cy="80" r="190" fill="#2563eb" fill-opacity=".07"/>
 <circle cx="110" cy="620" r="210" fill="#10b981" fill-opacity=".05"/>
-<text x="72" y="70" fill="#f8fafc" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="36" font-weight="800" text-anchor="start">ResinDB Pro</text><text x="72" y="104" fill="#94a3b8" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="500" text-anchor="start">Local-first resin intelligence • scientific workers • auditable AI assistance</text><path d="M72 126H1128" stroke="#334155" stroke-width="1"/>
+<text x="72" y="70" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="36" font-weight="820" text-anchor="start">ResinDB Pro</text><text x="72" y="104" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="520" text-anchor="start">Local-first resin intelligence • scientific workers • auditable AI assistance</text><path d="M72 126H1128" stroke="#334155"/>
 <g transform="translate(600 334)" filter="url(#glow)">
-  <path d="M0-112L97-56V56L0 112L-97 56V-56Z" fill="#0b2b4f" stroke="#38bdf8" stroke-width="3"/>
-  <path d="M0-66L57-33V33L0 66L-57 33V-33Z" fill="url(#cyan)" fill-opacity=".26" stroke="#67e8f9" stroke-width="2"/>
-  <circle r="18" fill="#e0f2fe"/>
-  <circle cx="-38" cy="-23" r="9" fill="#34d399"/>
-  <circle cx="42" cy="-20" r="9" fill="#c084fc"/>
-  <circle cx="0" cy="47" r="9" fill="#fbbf24"/>
-  <path d="M-30-18L-8-5M34-16L9-4M0 37V17" stroke="#e0f2fe" stroke-width="4" stroke-linecap="round"/>
+  <path d="M0-82L71-41V41L0 82L-71 41V-41Z" fill="#0b2b4f" stroke="#38bdf8" stroke-width="3"/>
+  <path d="M0-44L38-22V22L0 44L-38 22V-22Z" fill="url(#cyan)" fill-opacity=".28" stroke="#67e8f9"/>
+  <circle r="13" fill="#e0f2fe"/>
 </g>
-
-<g filter="url(#shadow)">
-  <rect x="86" y="182" width="252" height="126" rx="24" fill="#0f213b" stroke="#334155"/>
-  <rect x="86" y="182" width="7" height="126" rx="3.5" fill="#38bdf8"/>
-  <text x="114" y="224" fill="#f8fafc" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="21" font-weight="750" text-anchor="start">Data workspace</text>
-  <text x="114" y="252" fill="#94a3b8" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="500" text-anchor="start">CRUD • import • snapshots</text>
-</g>
-
-<g filter="url(#shadow)">
-  <rect x="86" y="398" width="252" height="126" rx="24" fill="#0f213b" stroke="#334155"/>
-  <rect x="86" y="398" width="7" height="126" rx="3.5" fill="#a78bfa"/>
-  <text x="114" y="440" fill="#f8fafc" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="21" font-weight="750" text-anchor="start">Visual analytics</text>
-  <text x="114" y="468" fill="#94a3b8" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="500" text-anchor="start">dashboard • pivot • network</text>
-</g>
-
-<g filter="url(#shadow)">
-  <rect x="862" y="182" width="252" height="126" rx="24" fill="#0f213b" stroke="#334155"/>
-  <rect x="862" y="182" width="7" height="126" rx="3.5" fill="#34d399"/>
-  <text x="890" y="224" fill="#f8fafc" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="21" font-weight="750" text-anchor="start">Scientific engine</text>
-  <text x="890" y="252" fill="#94a3b8" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="500" text-anchor="start">rheology • kinetics • statistics</text>
-</g>
-
-<g filter="url(#shadow)">
-  <rect x="862" y="398" width="252" height="126" rx="24" fill="#0f213b" stroke="#334155"/>
-  <rect x="862" y="398" width="7" height="126" rx="3.5" fill="#fbbf24"/>
-  <text x="890" y="440" fill="#f8fafc" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="21" font-weight="750" text-anchor="start">AI copilot</text>
-  <text x="890" y="468" fill="#94a3b8" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="500" text-anchor="start">optional endpoint • human review</text>
-</g>
-<path d="M338 245L482 298" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-cyan)"/><path d="M338 462L482 374" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-cyan)"/><path d="M718 298L862 245" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-cyan)"/><path d="M718 374L862 462" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-cyan)"/>
-<g>
-  <rect x="431" y="517" width="122" height="34" rx="17" fill="#38bdf8" fill-opacity=".13" stroke="#38bdf8" stroke-opacity=".55"/>
-  <text x="492.0" y="540" fill="#e2e8f0" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">IndexedDB</text>
-</g>
-
-<g>
-  <rect x="568" y="517" width="138" height="34" rx="17" fill="#34d399" fill-opacity=".13" stroke="#34d399" stroke-opacity=".55"/>
-  <text x="637.0" y="540" fill="#e2e8f0" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">Web Workers</text>
-</g>
-
-<g>
-  <rect x="721" y="517" width="136" height="34" rx="17" fill="#a78bfa" fill-opacity=".13" stroke="#a78bfa" stroke-opacity=".55"/>
-  <text x="789.0" y="540" fill="#e2e8f0" fill-opacity="1.0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">Bilingual UI</text>
-</g>
-
+<path d="M600 334L230 205" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)" stroke-dasharray="8 8"/><circle cx="230" cy="205" r="52" fill="#38bdf8" fill-opacity=".16" stroke="#38bdf8" stroke-width="2"/><circle cx="230" cy="205" r="18" fill="#38bdf8" fill-opacity=".9"/><text x="230" y="285" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" text-anchor="middle">Data workspace</text><text x="230" y="306" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="520" text-anchor="middle">CRUD + snapshots</text><path d="M600 334L600 170" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)" stroke-dasharray="8 8"/><circle cx="600" cy="170" r="52" fill="#34d399" fill-opacity=".16" stroke="#34d399" stroke-width="2"/><circle cx="600" cy="170" r="18" fill="#34d399" fill-opacity=".9"/><text x="600" y="250" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" text-anchor="middle">Visual analytics</text><text x="600" y="271" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="520" text-anchor="middle">dashboard + pivot</text><path d="M600 334L970 205" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)" stroke-dasharray="8 8"/><circle cx="970" cy="205" r="52" fill="#a78bfa" fill-opacity=".16" stroke="#a78bfa" stroke-width="2"/><circle cx="970" cy="205" r="18" fill="#a78bfa" fill-opacity=".9"/><text x="970" y="285" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" text-anchor="middle">Scientific engine</text><text x="970" y="306" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="520" text-anchor="middle">models + statistics</text><path d="M600 334L230 455" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)" stroke-dasharray="8 8"/><circle cx="230" cy="455" r="52" fill="#fbbf24" fill-opacity=".16" stroke="#fbbf24" stroke-width="2"/><circle cx="230" cy="455" r="18" fill="#fbbf24" fill-opacity=".9"/><text x="230" y="535" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" text-anchor="middle">AI copilot</text><text x="230" y="556" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="520" text-anchor="middle">optional endpoint</text><path d="M600 334L600 505" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)" stroke-dasharray="8 8"/><circle cx="600" cy="505" r="52" fill="#fb7185" fill-opacity=".16" stroke="#fb7185" stroke-width="2"/><circle cx="600" cy="505" r="18" fill="#fb7185" fill-opacity=".9"/><text x="600" y="585" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" text-anchor="middle">Evidence export</text><text x="600" y="606" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="520" text-anchor="middle">portable reports</text><path d="M600 334L970 455" fill="none" stroke="#64748b" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow-muted)" stroke-dasharray="8 8"/><circle cx="970" cy="455" r="52" fill="#22d3ee" fill-opacity=".16" stroke="#22d3ee" stroke-width="2"/><circle cx="970" cy="455" r="18" fill="#22d3ee" fill-opacity=".9"/><text x="970" y="535" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700" text-anchor="middle">Quality gates</text><text x="970" y="556" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="520" text-anchor="middle">tests + audit</text>
 </svg>

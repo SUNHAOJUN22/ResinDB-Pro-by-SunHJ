@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640"
+ viewBox="0 0 1200 640" role="img"
+ aria-labelledby="deployment-title deployment-title-desc">
+<title id="deployment-title">Security and deployment boundary</title>
+<desc id="deployment-title-desc">Layered deployment boundary for browser UI, server gateway, identity controls, remote data and operational audit.</desc>
+
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#06111f"/>
+    <stop offset=".56" stop-color="#0b1830"/>
+    <stop offset="1" stop-color="#111b35"/>
+  </linearGradient>
+  <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#22d3ee"/>
+    <stop offset="1" stop-color="#2563eb"/>
+  </linearGradient>
+  <linearGradient id="emerald" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#34d399"/>
+    <stop offset="1" stop-color="#059669"/>
+  </linearGradient>
+  <filter id="shadow" x="-25%" y="-25%" width="150%" height="170%">
+    <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#020617" flood-opacity=".46"/>
+  </filter>
+  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+    <feGaussianBlur stdDeviation="7" result="blur"/>
+    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse">
+    <path d="M36 0H0V36" fill="none" stroke="#94a3b8" stroke-opacity=".055"/>
+  </pattern>
+  <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+    <path d="M0 0L10 5L0 10Z" fill="#38bdf8"/>
+  </marker>
+  <marker id="arrow-muted" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+    <path d="M0 0L10 5L0 10Z" fill="#64748b"/>
+  </marker>
+</defs>
+
+<rect width="1200" height="640" rx="28" fill="url(#bg)"/>
+<rect width="1200" height="640" rx="28" fill="url(#grid)"/>
+<circle cx="1040" cy="80" r="190" fill="#2563eb" fill-opacity=".07"/>
+<circle cx="110" cy="620" r="210" fill="#10b981" fill-opacity=".05"/>
+<text x="72" y="70" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="36" font-weight="820" text-anchor="start">Security and deployment boundary</text><text x="72" y="104" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="520" text-anchor="start">The browser demo is not an authentication or quality-release system</text><path d="M72 126H1128" stroke="#334155"/><rect x="120" y="172" width="960" height="70" rx="22" fill="#38bdf8" fill-opacity=".12" stroke="#38bdf8" stroke-opacity=".7"/><text x="148" y="203" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="740" text-anchor="start">Browser application</text><text x="148" y="227" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">demo roles • CSP • no privileged secrets</text><rect x="158" y="254" width="884" height="70" rx="22" fill="#34d399" fill-opacity=".12" stroke="#34d399" stroke-opacity=".7"/><text x="186" y="285" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="740" text-anchor="start">Server gateway</text><text x="186" y="309" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">authentication • authorization • validation • rate limiting</text><rect x="196" y="336" width="808" height="70" rx="22" fill="#a78bfa" fill-opacity=".12" stroke="#a78bfa" stroke-opacity=".7"/><text x="224" y="367" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="740" text-anchor="start">Data services</text><text x="224" y="391" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">remote database • backup • retention • audit</text><rect x="234" y="418" width="732" height="70" rx="22" fill="#fbbf24" fill-opacity=".12" stroke="#fbbf24" stroke-opacity=".7"/><text x="262" y="449" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" font-weight="740" text-anchor="start">Operational governance</text><text x="262" y="473" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">HTTPS • monitoring • incident response • professional review</text>
+<g>
+  <rect x="100" y="558" width="321.3333333333333" height="34" rx="17" fill="#38bdf8" fill-opacity=".13"
+        stroke="#38bdf8" stroke-opacity=".55"/>
+  <text x="260.66666666666663" y="581" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">Demo roles ≠ auth</text>
+</g>
+
+<g>
+  <rect x="439.3333333333333" y="558" width="321.3333333333333" height="34" rx="17" fill="#34d399" fill-opacity=".13"
+        stroke="#34d399" stroke-opacity=".55"/>
+  <text x="600.0" y="581" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">AI output ≠ release</text>
+</g>
+
+<g>
+  <rect x="778.6666666666666" y="558" width="321.3333333333333" height="34" rx="17" fill="#a78bfa" fill-opacity=".13"
+        stroke="#a78bfa" stroke-opacity=".55"/>
+  <text x="939.3333333333333" y="581" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">Operator owns compliance</text>
+</g>
+
+</svg>
