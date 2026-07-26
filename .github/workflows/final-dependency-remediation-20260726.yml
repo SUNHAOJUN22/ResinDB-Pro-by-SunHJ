@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: resindb-final-dependency-remediation-20260726
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   remediate:
@@ -22,23 +22,31 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Remediate lockfile and validate final tree
+      - name: Prepare, remediate and validate
         id: validation
         continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           out=/tmp/resindb-final-dependency-remediation-20260726
           logs="$out/logs"
-          report=reports/final-dependency-remediation-20260726
-          rm -rf "$out" "$report"
-          mkdir -p "$logs" "$report"
+          rm -rf "$out"
+          mkdir -p "$logs"
           overall=0
+          printf 'failure\n' > "$out/result.txt"
+          printf '%s\n' "$GITHUB_SHA" > "$out/validated-input-commit.txt"
+          {
+            echo "node=$(node --version)"
+            echo "npm=$(npm --version)"
+            echo "python=$(python3 --version 2>&1)"
+            echo "runner=${RUNNER_OS:-unknown}"
+          } > "$out/runtime.txt"
 
           record() {
             local name="$1"
@@ -52,136 +60,28 @@ jobs:
             if [ "$code" -ne 0 ]; then overall=1; fi
           }
 
-          cat > /tmp/patch-repository.py <<'PY'
-          from __future__ import annotations
-          from pathlib import Path
+          record prepare python3 scripts/finalize-dependency-candidate.py
+          cp package.json /tmp/package-before.json
+          cp reports/dependency-audit-diagnostic-20260726.json /tmp/dependency-audit-before.json
 
-          root = Path('.')
-
-          readme_path = root / 'README.md'
-          readme = readme_path.read_text(encoding='utf-8')
-          readme = readme.replace('生产依赖审计组成的质量门', '完整依赖审计组成的质量门')
-          readme = readme.replace('\nnpm run audit:prod\n', '\nnpm run audit:all\n')
-          source_note = ('`validate:source` 只扫描 `src/` 下的生产 TypeScript/JavaScript，拒绝 TypeScript/ESLint 抑制、'
-                         '任意代码执行、危险 HTML 注入和未完成标记。用于证明公式引擎拒绝恶意表达式的负向安全样本'
-                         '保留在 `tests/`，不会再被错误当成生产风险。')
-          audit_note = ('\n\n`audit:all` 审计生产依赖与开发工具链的 high/critical 漏洞；`audit:prod` 可单独核验生产依赖。'
-                        '本次已通过非强制 lockfile 修复关闭 `brace-expansion` 开发依赖链漏洞，不改变应用依赖声明。')
-          if audit_note.strip() not in readme:
-              if source_note not in readme:
-                  raise SystemExit('README source-hygiene paragraph anchor is missing')
-              readme = readme.replace(source_note, source_note + audit_note, 1)
-          readme_path.write_text(readme, encoding='utf-8')
-
-          validation_path = root / 'docs' / 'VALIDATION.md'
-          validation = validation_path.read_text(encoding='utf-8')
-          validation = validation.replace(
-              'production build, HTTP smoke, Chromium UI smoke and dependency audit.',
-              'production build, HTTP smoke, Chromium UI smoke and full production/development dependency audit.',
-          )
-          validation = validation.replace(
-              '13. `npm run audit:prod` finds no high-severity production dependency vulnerability.',
-              '13. `npm run audit:all` finds no high- or critical-severity vulnerability across production and development dependencies; `npm run audit:prod` separately confirms the production subset.',
-          )
-          validation = validation.replace(
-              'Chromium UI smoke and the production dependency audit as separate attributable stages.',
-              'Chromium UI smoke and the full dependency audit as separate attributable stages.',
-          )
-          validation = validation.replace(
-              'Dependency installation and production audit include bounded retries for transient registry failures;',
-              'Dependency installation and full dependency audit include bounded retries for transient registry failures;',
-          )
-          if '## Dependency audit contract' not in validation:
-              anchor = '## Current verified baseline\n'
-              section = '''## Dependency audit contract
-
-`npm run audit:all` is the release gate and covers production plus development dependencies at `high` severity or above. `npm run audit:prod` remains available as an explicit production-only subset check. Lockfile remediation must not silently alter `package.json`; any required direct-dependency upgrade must be reviewed as a separate source change.
-
-'''
-              if anchor not in validation:
-                  raise SystemExit('Validation baseline anchor is missing')
-              validation = validation.replace(anchor, section + anchor, 1)
-          validation_path.write_text(validation, encoding='utf-8')
-
-          generator_path = root / 'scripts' / 'generate-readme-visuals.py'
-          generator = generator_path.read_text(encoding='utf-8')
-          generator = generator.replace('("Security", "production dependency audit")', '("Security", "all dependencies • high gate")')
-          generator = generator.replace(
-              'runtime smoke and dependency audit.',
-              'runtime smoke and full dependency audit.',
-          )
-          generator_path.write_text(generator, encoding='utf-8')
-
-          validator_path = root / 'scripts' / 'validate-repository-docs.py'
-          validator = validator_path.read_text(encoding='utf-8')
-          forbidden_anchor = '    "docs/MIGRATION_v3.1.0.md",\n'
-          forbidden_entries = (
-              '    ".github/final-dependency-remediation-20260726.trigger",\n'
-              '    ".github/workflows/final-dependency-remediation-20260726.yml",\n'
-              '    ".github/dependency-audit-diagnostic-20260726.trigger",\n'
-              '    ".github/workflows/dependency-audit-diagnostic-20260726.yml",\n'
-              '    "reports/dependency-audit-diagnostic-20260726.json",\n'
-              '    "reports/dependency-audit-diagnostic-20260726.md",\n'
-          )
-          if '"reports/dependency-audit-diagnostic-20260726.json"' not in validator:
-              if forbidden_anchor not in validator:
-                  raise SystemExit('Validator forbidden-path anchor is missing')
-              validator = validator.replace(forbidden_anchor, forbidden_entries + forbidden_anchor, 1)
-          scripts_anchor = '        "validate:source": "python3 scripts/validate-source-hygiene.py",\n'
-          scripts_insert = (
-              scripts_anchor
-              + '        "audit:all": "npm audit --audit-level=high",\n'
-              + '        "audit:prod": "npm audit --omit=dev --audit-level=high",\n'
-          )
-          if '"audit:all": "npm audit --audit-level=high"' not in validator:
-              if scripts_anchor not in validator:
-                  raise SystemExit('Validator required-scripts anchor is missing')
-              validator = validator.replace(scripts_anchor, scripts_insert, 1)
-          validate_anchor = '    if "npm run validate:source" not in validate_script:\n        fail("package.json validate must include npm run validate:source")\n'
-          validate_insert = (
-              validate_anchor
-              + '    if "npm run audit:all" not in scripts.get("validate:ci", ""):\n'
-              + '        fail("package.json validate:ci must include npm run audit:all")\n'
-          )
-          if 'package.json validate:ci must include npm run audit:all' not in validator:
-              if validate_anchor not in validator:
-                  raise SystemExit('Validator validate-chain anchor is missing')
-              validator = validator.replace(validate_anchor, validate_insert, 1)
-          ci_anchor = '    if "npm run validate:source" not in ci:\n        fail("permanent CI must execute npm run validate:source")\n'
-          ci_insert = (
-              ci_anchor
-              + '    if "npm run audit:all" not in ci:\n'
-              + '        fail("permanent CI must execute npm run audit:all")\n'
-              + '    if "contents: write" in ci or "EMBEDDED DEPENDENCY REMEDIATION" in ci:\n'
-              + '        fail("permanent CI must remain read-only and non-self-modifying")\n'
-          )
-          if 'permanent CI must execute npm run audit:all' not in validator:
-              if ci_anchor not in validator:
-                  raise SystemExit('Validator CI anchor is missing')
-              validator = validator.replace(ci_anchor, ci_insert, 1)
-          validator_path.write_text(validator, encoding='utf-8')
-          PY
-
-          record patch-repository python3 /tmp/patch-repository.py
-
-          if [ "$(cat "$out/patch-repository.status")" = "0" ]; then
-            cp package.json /tmp/package-before.json
-            if [ -f reports/dependency-audit-diagnostic-20260726.json ]; then
-              cp reports/dependency-audit-diagnostic-20260726.json /tmp/dependency-audit-before.json
-            fi
+          if [ "$(cat "$out/prepare.status")" = "0" ]; then
             record lockfile-remediation bash -c 'npm audit fix --package-lock-only --ignore-scripts && cmp -s package.json /tmp/package-before.json'
+          else
+            printf '1\n' > "$out/lockfile-remediation.status"
+            overall=1
           fi
 
           rm -f .github/workflows/final-dependency-remediation-20260726.yml
           rm -f .github/final-dependency-remediation-20260726.trigger
           rm -f .github/workflows/dependency-audit-diagnostic-20260726.yml
           rm -f .github/dependency-audit-diagnostic-20260726.trigger
+          rm -f scripts/finalize-dependency-candidate.py
           rm -f reports/dependency-audit-diagnostic-20260726.json
           rm -f reports/dependency-audit-diagnostic-20260726.md
 
           record visuals-generate npm run visuals:generate
 
-          if [ -f "$out/lockfile-remediation.status" ] && [ "$(cat "$out/lockfile-remediation.status")" = "0" ]; then
+          if [ "$(cat "$out/lockfile-remediation.status")" = "0" ]; then
             record npm-ci npm ci
           else
             printf '1\n' > "$out/npm-ci.status"
@@ -223,19 +123,11 @@ jobs:
           printf '%s\n' "$diff_code" > "$out/git-diff-check.status"
           if [ "$diff_code" -ne 0 ]; then overall=1; fi
 
-          printf '%s\n' "$GITHUB_SHA" > "$out/validated-input-commit.txt"
-          {
-            echo "node=$(node --version)"
-            echo "npm=$(npm --version)"
-            echo "python=$(python3 --version 2>&1)"
-            echo "runner=${RUNNER_OS:-unknown}"
-          } > "$out/runtime.txt"
+          if [ "$overall" -eq 0 ]; then
+            printf 'success\n' > "$out/result.txt"
+          fi
 
-          result=success
-          if [ "$overall" -ne 0 ]; then result=failure; fi
-          printf '%s\n' "$result" > "$out/result.txt"
-
-          cat > /tmp/write-evidence.py <<'PY'
+          python3 - <<'PY'
           from __future__ import annotations
           import datetime as dt
           import json
@@ -244,8 +136,6 @@ jobs:
 
           root = Path('/tmp/resindb-final-dependency-remediation-20260726')
           logs = root / 'logs'
-          report_dir = Path('reports/final-dependency-remediation-20260726')
-          report_dir.mkdir(parents=True, exist_ok=True)
 
           def load_json(path: Path) -> dict:
               if not path.exists():
@@ -253,16 +143,23 @@ jobs:
               text = path.read_text(encoding='utf-8', errors='replace').strip()
               return json.loads(text) if text else {}
 
-          def counts(data: dict) -> dict:
+          def vulnerability_counts(data: dict) -> dict:
               return data.get('metadata', {}).get('vulnerabilities', {})
 
           statuses = {p.stem: int(p.read_text().strip()) for p in sorted(root.glob('*.status'))}
-          runtime = dict(line.split('=', 1) for line in (root / 'runtime.txt').read_text().splitlines() if '=' in line)
-          coverage_log = logs / 'test-coverage.log'
-          clean = re.sub(r'\x1b\[[0-9;]*m', '', coverage_log.read_text(errors='replace') if coverage_log.exists() else '')
-          tests_match = re.search(r'Tests\s+(\d+) passed', clean)
-          files_match = re.search(r'Test Files\s+(\d+) passed', clean)
-          coverage_match = re.search(r'All files\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)', clean)
+          runtime = dict(
+              line.split('=', 1)
+              for line in (root / 'runtime.txt').read_text().splitlines()
+              if '=' in line
+          )
+          coverage_text = (logs / 'test-coverage.log').read_text(errors='replace') if (logs / 'test-coverage.log').exists() else ''
+          coverage_text = re.sub(r'\x1b\[[0-9;]*m', '', coverage_text)
+          tests_match = re.search(r'Tests\s+(\d+) passed', coverage_text)
+          files_match = re.search(r'Test Files\s+(\d+) passed', coverage_text)
+          coverage_match = re.search(
+              r'All files\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)',
+              coverage_text,
+          )
           coverage = {}
           if coverage_match:
               coverage = {
@@ -271,16 +168,18 @@ jobs:
                   'functions': float(coverage_match.group(3)),
                   'lines': float(coverage_match.group(4)),
               }
-          visuals = sorted(p.name for p in Path('docs/assets').glob('resindb-*.svg'))
+
           before = load_json(Path('/tmp/dependency-audit-before.json'))
           after_all = load_json(Path('/tmp/audit-all-after.json'))
           after_prod = load_json(Path('/tmp/audit-prod-after.json'))
-          result = 'success' if all(code == 0 for code in statuses.values()) else 'failure'
+          visuals = sorted(p.name for p in Path('docs/assets').glob('resindb-*.svg'))
+          result = 'success' if statuses and all(code == 0 for code in statuses.values()) else 'failure'
           validated_commit = (root / 'validated-input-commit.txt').read_text().strip()
+          completed = dt.datetime.now(dt.timezone.utc).isoformat()
           proof = {
               'result': result,
               'validatedInputCommit': validated_commit,
-              'completedAt': dt.datetime.now(dt.timezone.utc).isoformat(),
+              'completedAt': completed,
               'runtime': runtime,
               'remoteBranches': (root / 'remote-branches.txt').read_text().splitlines(),
               'statuses': statuses,
@@ -293,7 +192,7 @@ jobs:
               'repository': 'SUNHAOJUN22/ResinDB-Pro-by-SunHJ',
               'version': '3.0.0',
               'validatedInputCommit': validated_commit,
-              'completedAt': proof['completedAt'],
+              'completedAt': completed,
               'runtime': runtime,
               'remoteBranches': proof['remoteBranches'],
               'statuses': statuses,
@@ -307,17 +206,22 @@ jobs:
                   'packageJsonUnchanged': statuses.get('lockfile-remediation') == 0,
                   'beforeAll': before.get('allDependencies', {}).get('metadata', {}).get('vulnerabilities', {}),
                   'beforeProduction': before.get('productionDependencies', {}).get('metadata', {}).get('vulnerabilities', {}),
-                  'afterAll': counts(after_all),
-                  'afterProduction': counts(after_prod),
+                  'afterAll': vulnerability_counts(after_all),
+                  'afterProduction': vulnerability_counts(after_prod),
                   'resolvedPackage': 'brace-expansion',
               },
               'rawEvidenceArtifact': proof['rawEvidenceArtifact'],
               'currentTreeVerification': proof,
           }
           payload = json.dumps(summary, ensure_ascii=False, indent=2) + '\n'
-          Path('reports/final-visual-upgrade-20260726/summary.json').write_text(payload, encoding='utf-8')
-          Path('reports/ci-validation-latest.json').write_text(payload, encoding='utf-8')
-          report_dir.joinpath('summary.json').write_text(payload, encoding='utf-8')
+          report_dir = Path('reports/final-dependency-remediation-20260726')
+          report_dir.mkdir(parents=True, exist_ok=True)
+          for path in (
+              Path('reports/final-visual-upgrade-20260726/summary.json'),
+              Path('reports/ci-validation-latest.json'),
+              report_dir / 'summary.json',
+          ):
+              path.write_text(payload, encoding='utf-8')
 
           lines = [
               '# ResinDB Pro final dependency remediation report', '',
@@ -350,16 +254,45 @@ jobs:
           lines.extend(['', '## Generated visual inventory', ''])
           lines.extend(f'- `{name}`' for name in visuals)
           report_text = '\n'.join(lines) + '\n'
-          report_dir.joinpath('REPORT.md').write_text(report_text, encoding='utf-8')
+          (report_dir / 'REPORT.md').write_text(report_text, encoding='utf-8')
           Path('reports/final-visual-upgrade-20260726/REPORT.md').write_text(report_text, encoding='utf-8')
+          Path('/tmp/resindb-final-dependency-remediation-20260726/result.txt').write_text(result + '\n')
           PY
 
-          python3 /tmp/write-evidence.py
           record validate-docs npm run validate:docs
-          python3 /tmp/write-evidence.py
-          final_result="$(python3 -c 'import json; print(json.load(open("reports/ci-validation-latest.json"))["result"])')"
-          printf '%s\n' "$final_result" > "$out/result.txt"
-          if [ "$final_result" != "success" ]; then exit 1; fi
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('/tmp/resindb-final-dependency-remediation-20260726')
+          statuses = {p.stem: int(p.read_text().strip()) for p in sorted(root.glob('*.status'))}
+          result = 'success' if statuses and all(code == 0 for code in statuses.values()) else 'failure'
+          paths = (
+              Path('reports/final-visual-upgrade-20260726/summary.json'),
+              Path('reports/ci-validation-latest.json'),
+              Path('reports/final-dependency-remediation-20260726/summary.json'),
+          )
+          summary = json.loads(paths[0].read_text(encoding='utf-8'))
+          summary['result'] = result
+          summary['statuses'] = statuses
+          summary['currentTreeVerification']['result'] = result
+          summary['currentTreeVerification']['statuses'] = statuses
+          payload = json.dumps(summary, ensure_ascii=False, indent=2) + '\n'
+          for path in paths:
+              path.write_text(payload, encoding='utf-8')
+
+          report_path = Path('reports/final-dependency-remediation-20260726/REPORT.md')
+          text = report_path.read_text(encoding='utf-8')
+          text += '\n## Final documentation proof\n\n'
+          text += f'- Result: **{result.upper()}**\n'
+          text += f"- `validate-docs`: `{statuses.get('validate-docs')}`\n"
+          report_path.write_text(text, encoding='utf-8')
+          Path('reports/final-visual-upgrade-20260726/REPORT.md').write_text(text, encoding='utf-8')
+          (root / 'result.txt').write_text(result + '\n')
+          PY
+
+          test "$(cat "$out/result.txt")" = success
 
       - name: Upload raw evidence
         if: always()
@@ -374,7 +307,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Publish remediated final tree
+      - name: Publish remediated tree
         if: always()
         shell: bash
         run: |
