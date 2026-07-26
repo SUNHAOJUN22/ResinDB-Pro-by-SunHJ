@@ -1,1 +1,1 @@
-Re-run the now-registered lockfile-only dependency remediation, documentation/visual update and complete verification gate; publish durable evidence and self-clean.
+Run the syntax-validated dependency candidate preparer, lockfile-only security fix and complete final quality gate; publish evidence and self-clean.
