@@ -1,0 +1,47 @@
+name: Source hygiene diagnostic 2026-07-26
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/source-hygiene-diagnostic-20260726.trigger
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Capture exact source-hygiene findings
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/validate-source-hygiene.py > /tmp/source-hygiene.log 2>&1
+          code=$?
+          set -e
+          {
+            echo "validated_commit=$GITHUB_SHA"
+            echo "exit_code=$code"
+            echo
+            cat /tmp/source-hygiene.log
+          } > reports/source-hygiene-diagnostic-20260726.txt
+
+      - name: Publish diagnostic and self-clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/source-hygiene-diagnostic-20260726.yml
+          rm -f .github/source-hygiene-diagnostic-20260726.trigger
+          git config user.name "ResinDB Diagnostic Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "ci: publish source hygiene diagnostic"
+          git pull --rebase origin main
+          git push origin HEAD:main
