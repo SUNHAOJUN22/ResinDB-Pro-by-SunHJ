@@ -21,7 +21,7 @@ It does **not** claim a separate public runtime manifest architecture. Version `
 A release candidate must satisfy every gate below without disabling assertions or lowering failure thresholds:
 
 1. `npm ci` succeeds using the committed lockfile on Node.js 22.
-2. `npm run validate:docs` confirms all local README links, the exact 14-image inventory, SVG accessibility metadata, deterministic regeneration, version alignment, CI integration and repository hygiene.
+2. `npm run validate:docs` confirms all local README links, the exact 14-image inventory, SVG accessibility metadata, deterministic regeneration, version alignment, CI integration, durable-evidence alignment and repository hygiene.
 3. `npm run lint` completes with zero ESLint warnings.
 4. `npm run typecheck` completes without TypeScript errors.
 5. `npm run test` passes the complete Vitest regression suite.
@@ -58,6 +58,7 @@ Each SVG must contain:
 - a broken local README link;
 - a README/package/validation version mismatch;
 - a permanent CI workflow that omits `npm run validate:docs`;
+- stale validation-report links or drift between the fixed summary and `ci-validation-latest.json`;
 - reintroduced patch payloads, migration fragments, temporary workflows or diagnostic residue.
 
 The diagrams are explanatory architecture assets. They are not Chromium screenshots and must never be presented as runtime evidence.
@@ -74,7 +75,7 @@ The workflow runs documentation validation, static checks, regression groups, bu
 
 ## Current verified baseline
 
-The most recent committed full-tree audit executed on Linux with Node.js `v22.23.1` and npm `10.9.8` and recorded zero exit codes for:
+The current committed full-tree audit executed on Linux with Node.js `v22.23.1`, npm `10.9.8` and Python `3.12.3`, verified 14 deterministic README visuals, and recorded zero exit codes for:
 
 | Check | Result |
 |---|---|
@@ -91,7 +92,7 @@ The most recent committed full-tree audit executed on Linux with Node.js `v22.23
 | Chromium UI smoke | passed |
 | production dependency audit | passed |
 | whitespace check | passed |
-| migration and diagnostic residue check | passed |
+| static-risk scan | passed |
 | sole remote branch check | passed |
 
 The recorded baseline contains **9 test files and 79 passing tests**. Rounded coverage was:
@@ -114,9 +115,11 @@ The Chromium smoke test authenticated as Demo Admin, rendered **13 records**, co
 
 The repository commits compact durable evidence:
 
-- `reports/final-validation-20260726/summary.json`;
-- `reports/final-validation-20260726/REPORT.md`;
+- `reports/final-visual-upgrade-20260726/summary.json`;
+- `reports/final-visual-upgrade-20260726/REPORT.md`;
 - `reports/ci-validation-latest.json`.
+
+The fixed summary and latest alias must agree on result, repository, version, runtime, remote branches, statuses, test counts, coverage and visual inventory. The result must be `success`, every recorded status must be zero, and the remote branch proof must contain only `main`.
 
 Raw command logs, coverage HTML and Chromium PNG screenshots are generated artifacts excluded by `.gitignore`. GitHub Actions uploads them for the workflow's configured retention period. The committed summary is the durable acceptance record; raw logs and screenshots are time-limited supporting evidence.
 
@@ -132,6 +135,7 @@ A release is accepted only when:
 
 - every required gate passes on the exact candidate tree;
 - `npm run visuals:check` confirms deterministic, current assets;
+- the durable summary and latest alias remain synchronized;
 - the repository contains no active migration payload, temporary trigger or self-modifying patch workflow;
 - `README.md`, `package.json`, this contract and the implemented data architecture agree;
 - the remote branch list contains only `main`.
