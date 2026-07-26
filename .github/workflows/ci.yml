@@ -123,7 +123,7 @@ jobs:
 
   # BEGIN EMBEDDED DEPENDENCY REMEDIATION
   remediate_dependency_audit:
-    if: github.event_name == 'push' && github.event.head_commit.message == 'ci: trigger embedded dependency remediation'
+    if: github.event_name == 'push'
     name: Remediate full dependency audit
     runs-on: ubuntu-latest
     timeout-minutes: 25
