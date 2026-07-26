@@ -1,0 +1,47 @@
+name: Remediate lockfile 2026-07-26
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/remediate-lockfile-20260726.trigger
+
+permissions:
+  contents: write
+
+jobs:
+  remediate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Apply non-forced audit remediation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp package.json /tmp/package-before.json
+          npm audit fix --package-lock-only --ignore-scripts
+          cmp -s package.json /tmp/package-before.json
+          npm ci
+          npm audit --audit-level=high
+          npm audit --omit=dev --audit-level=high
+      - name: Publish remediated lockfile and self-clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/remediate-lockfile-20260726.yml
+          rm -f .github/remediate-lockfile-20260726.trigger
+          rm -f reports/dependency-audit-diagnostic-20260726.txt
+          git config user.name "ResinDB Lockfile Remediation Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix: remediate full dependency audit"
+          git pull --rebase origin main
+          git push origin HEAD:main
