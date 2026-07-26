@@ -7,6 +7,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "smoke": "node scripts/smoke-test.mjs",
+    "visuals:generate": "python3 scripts/generate-readme-visuals.py",
+    "visuals:check": "python3 scripts/generate-readme-visuals.py --check",
+    "validate:docs": "python3 scripts/validate-repository-docs.py",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --pool=forks --maxWorkers=1",
@@ -14,7 +17,7 @@
     "test:unit": "node scripts/run-test-files.mjs tests/unit",
     "test:science": "node scripts/run-test-files.mjs tests/science",
     "test:coverage": "vitest run --coverage --pool=forks --maxWorkers=1",
-    "validate": "npm run lint && npm run typecheck && npm run test && npm run build && npm run smoke",
+    "validate": "npm run validate:docs && npm run lint && npm run typecheck && npm run test && npm run build && npm run smoke",
     "test:ui": "node scripts/ui-smoke-test.mjs",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "validate:ci": "npm run validate && npm run test:unit && npm run test:science && npm run test:coverage && npm run test:ui && npm run audit:prod"
