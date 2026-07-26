@@ -143,6 +143,31 @@ body {
   100% { transform: translateX(200%) scaleX(0.2); }
 }
 
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(5%, 5%) scale(1.05); }
+}
+
+@keyframes float-delayed {
+  0%, 100% { transform: translate(0, 0) scale(1.05); }
+  50% { transform: translate(-5%, -5%) scale(1); }
+}
+
+.animate-float {
+  animation: float 15s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float-delayed 18s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-float-delayed {
+    animation: none;
+  }
+}
+
 @media print {
   body {
     -webkit-print-color-adjust: exact !important;
@@ -217,7 +242,3 @@ button[style*="transform"] {
 button[style*="transform"]:hover, button[style*="transform"]:active {
   transform: none;
 }
-
-
-
-
