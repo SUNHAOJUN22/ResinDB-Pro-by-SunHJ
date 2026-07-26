@@ -56,8 +56,8 @@
 - `resindb-worker-architecture.svg`
 ## Current evidence-aligned tree verification
 
-- Result: **FAILURE**
-- Validated input commit: `aab6d0cb567002d1faca834a7de66ffbdd06e942`
+- Result: **SUCCESS**
+- Validated input commit: `a378f53e8d67ea78470ede3bb773b5327718b5dd`
 - Scope: production-source hygiene plus complete application, scientific, browser and dependency validation
 - Runtime: `v22.23.1` / `10.9.8` / `Python 3.12.3` / `Linux`
 - Remote branches: `main`
@@ -77,6 +77,6 @@
 | `test-unit` | `0` |
 | `test` | `0` |
 | `typecheck` | `0` |
-| `validate-docs` | `1` |
-| `validate-source` | `1` |
+| `validate-docs` | `0` |
+| `validate-source` | `0` |
 | `visuals-check` | `0` |

@@ -59,9 +59,9 @@
   ],
   "rawEvidenceArtifact": "resindb-final-visual-upgrade-fb257cfcad6850e387ecc808dee4f18ab049a09f",
   "currentTreeVerification": {
-    "result": "failure",
-    "validatedInputCommit": "aab6d0cb567002d1faca834a7de66ffbdd06e942",
-    "completedAt": "2026-07-26T08:42:38.019516+00:00",
+    "result": "success",
+    "validatedInputCommit": "a378f53e8d67ea78470ede3bb773b5327718b5dd",
+    "completedAt": "2026-07-26T08:50:42.697479+00:00",
     "runtime": {
       "node": "v22.23.1",
       "npm": "10.9.8",
@@ -85,11 +85,11 @@
       "test-unit": 0,
       "test": 0,
       "typecheck": 0,
-      "validate-docs": 1,
-      "validate-source": 1,
+      "validate-docs": 0,
+      "validate-source": 0,
       "visuals-check": 0
     },
     "scope": "production-source hygiene plus complete application, scientific, browser and dependency validation",
-    "rawEvidenceArtifact": "resindb-final-source-verification-aab6d0cb567002d1faca834a7de66ffbdd06e942"
+    "rawEvidenceArtifact": "resindb-final-verified-tree-a378f53e8d67ea78470ede3bb773b5327718b5dd"
   }
 }
