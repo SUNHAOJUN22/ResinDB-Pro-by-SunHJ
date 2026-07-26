@@ -54,3 +54,19 @@
 - `resindb-scientific-engine.svg`
 - `resindb-security-deployment.svg`
 - `resindb-worker-architecture.svg`
+## Current evidence-aligned tree verification
+
+- Result: **FAILURE**
+- Validated input commit: `73f4ef403d10a303614db6d62ee261cdb913f97b`
+- Runtime: `v22.23.1` / `10.9.8` / `Python 3.12.3` / `Linux`
+- Remote branches: `main`
+
+| Gate | Exit code |
+|---|---:|
+| `git-diff-check` | `0` |
+| `npm-ci` | `0` |
+| `only-main` | `0` |
+| `static-risk` | `1` |
+| `validate-ci` | `0` |
+| `validate-docs-after-proof` | `0` |
+| `visuals-check` | `0` |
