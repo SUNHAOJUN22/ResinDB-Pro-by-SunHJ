@@ -1,0 +1,53 @@
+name: Lint stack install diagnostic 2026-07-26
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/lint-stack-install-diagnostic-20260726.trigger
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Capture exact synchronized install failure
+        shell: bash
+        run: |
+          set +e
+          npm install --save-dev --package-lock-only --ignore-scripts \
+            eslint@10.8.0 \
+            @typescript-eslint/eslint-plugin@8.65.0 \
+            @typescript-eslint/parser@8.65.0 \
+            typescript-eslint@8.65.0 \
+            eslint-plugin-react-hooks@7.1.1 \
+            eslint-plugin-react-refresh@0.5.3 \
+            > /tmp/install.log 2>&1
+          code=$?
+          set -e
+          {
+            echo "validated_commit=$GITHUB_SHA"
+            echo "install_exit=$code"
+            echo
+            cat /tmp/install.log
+          } > reports/lint-stack-install-diagnostic-20260726.txt
+      - name: Publish and self-clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/lint-stack-install-diagnostic-20260726.yml
+          rm -f .github/lint-stack-install-diagnostic-20260726.trigger
+          git config user.name "ResinDB Lint Stack Diagnostic Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "ci: publish lint stack install diagnostic"
+          git pull --rebase origin main
+          git push origin HEAD:main
