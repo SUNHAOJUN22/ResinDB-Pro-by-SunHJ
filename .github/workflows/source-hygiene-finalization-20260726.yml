@@ -1,0 +1,370 @@
+name: Source hygiene finalization 2026-07-26
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/source-hygiene-finalization-20260726.trigger
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: resindb-source-hygiene-finalization-20260726
+  cancel-in-progress: true
+
+jobs:
+  finalize:
+    name: Separate production hygiene from negative security tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out exact main commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Apply permanent source-hygiene gate and verify
+        id: validation
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -uo pipefail
+          out=/tmp/resindb-source-hygiene-finalization-20260726
+          logs="$out/logs"
+          rm -rf "$out"
+          mkdir -p "$logs"
+          overall=0
+
+          cat > scripts/validate-source-hygiene.py <<'PY'
+          #!/usr/bin/env python3
+          """Reject unsafe production-source constructs without flagging negative test fixtures."""
+
+          from __future__ import annotations
+
+          import re
+          from pathlib import Path
+
+          ROOT = Path(__file__).resolve().parents[1]
+          SOURCE_ROOT = ROOT / "src"
+          SOURCE_SUFFIXES = {".ts", ".tsx", ".js", ".jsx", ".mjs"}
+          RULES = (
+              ("TypeScript suppression", re.compile(r"@ts-(?:ignore|nocheck)")),
+              ("ESLint suppression", re.compile(r"eslint-disable")),
+              ("dynamic HTML injection", re.compile(r"dangerouslySetInnerHTML")),
+              ("eval execution", re.compile(r"(?<![A-Za-z0-9_$])eval\s*\(")),
+              ("Function constructor execution", re.compile(r"\bnew\s+Function\s*\(")),
+              ("unfinished marker", re.compile(r"\b(?:TODO|FIXME|HACK)\b")),
+          )
+
+          findings: list[str] = []
+          for path in sorted(SOURCE_ROOT.rglob("*")):
+              if not path.is_file() or path.suffix not in SOURCE_SUFFIXES:
+                  continue
+              text = path.read_text(encoding="utf-8", errors="replace")
+              for line_number, line in enumerate(text.splitlines(), start=1):
+                  for name, pattern in RULES:
+                      if pattern.search(line):
+                          findings.append(
+                              f"{path.relative_to(ROOT)}:{line_number}: {name}: {line.strip()}"
+                          )
+
+          if findings:
+              raise SystemExit(
+                  "production source hygiene failed:\n" + "\n".join(findings)
+              )
+
+          print("validated production source hygiene; negative security fixtures remain test-scoped")
+          PY
+
+          python3 - <<'PY'
+          from __future__ import annotations
+          import json
+          from pathlib import Path
+
+          root = Path('.')
+
+          package_path = root / 'package.json'
+          package = json.loads(package_path.read_text(encoding='utf-8'))
+          scripts = package.setdefault('scripts', {})
+          scripts['validate:source'] = 'python3 scripts/validate-source-hygiene.py'
+          validate_parts = [part.strip() for part in scripts['validate'].split('&&')]
+          source_command = 'npm run validate:source'
+          if source_command not in validate_parts:
+              try:
+                  docs_index = validate_parts.index('npm run validate:docs')
+              except ValueError as error:
+                  raise SystemExit('validate script is missing npm run validate:docs') from error
+              validate_parts.insert(docs_index + 1, source_command)
+          scripts['validate'] = ' && '.join(validate_parts)
+          package_path.write_text(json.dumps(package, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          ci_path = root / '.github' / 'workflows' / 'ci.yml'
+          ci = ci_path.read_text(encoding='utf-8')
+          if 'run: npm run validate:source' not in ci:
+              anchor = '      - name: ESLint\n        run: npm run lint\n'
+              replacement = ('      - name: Production source hygiene\n'
+                             '        run: npm run validate:source\n\n' + anchor)
+              if anchor not in ci:
+                  raise SystemExit('CI ESLint anchor is missing')
+              ci = ci.replace(anchor, replacement, 1)
+          ci_path.write_text(ci, encoding='utf-8')
+
+          validator_path = root / 'scripts' / 'validate-repository-docs.py'
+          validator = validator_path.read_text(encoding='utf-8')
+          script_anchor = '        "validate:docs": "python3 scripts/validate-repository-docs.py",\n'
+          script_insert = (script_anchor +
+                           '        "validate:source": "python3 scripts/validate-source-hygiene.py",\n')
+          if '"validate:source": "python3 scripts/validate-source-hygiene.py"' not in validator:
+              if script_anchor not in validator:
+                  raise SystemExit('validator required-script anchor is missing')
+              validator = validator.replace(script_anchor, script_insert, 1)
+          validate_anchor = '    if "npm run validate:docs" not in scripts.get("validate", ""):\n        fail("package.json validate must include npm run validate:docs")\n'
+          validate_insert = (validate_anchor +
+                             '    if "npm run validate:source" not in scripts.get("validate", ""):\n'
+                             '        fail("package.json validate must include npm run validate:source")\n')
+          if 'package.json validate must include npm run validate:source' not in validator:
+              if validate_anchor not in validator:
+                  raise SystemExit('validator validate-chain anchor is missing')
+              validator = validator.replace(validate_anchor, validate_insert, 1)
+          ci_anchor = '    if "npm run validate:docs" not in ci:\n        fail("permanent CI must execute npm run validate:docs")\n'
+          ci_insert = (ci_anchor +
+                       '    if "npm run validate:source" not in ci:\n'
+                       '        fail("permanent CI must execute npm run validate:source")\n')
+          if 'permanent CI must execute npm run validate:source' not in validator:
+              if ci_anchor not in validator:
+                  raise SystemExit('validator CI anchor is missing')
+              validator = validator.replace(ci_anchor, ci_insert, 1)
+          validator_path.write_text(validator, encoding='utf-8')
+
+          readme_path = root / 'README.md'
+          readme = readme_path.read_text(encoding='utf-8')
+          if 'npm run validate:source' not in readme:
+              command_anchor = 'npm run validate:docs\nnpm run lint\n'
+              if command_anchor not in readme:
+                  raise SystemExit('README validation command anchor is missing')
+              readme = readme.replace(
+                  command_anchor,
+                  'npm run validate:docs\nnpm run validate:source\nnpm run lint\n',
+                  1,
+              )
+              sentence_anchor = ('`validate:docs` 会进一步阻止图片断链、版本漂移、生成器输出漂移、'
+                                 '旧迁移残留与证据摘要漂移重新进入仓库。')
+              sentence_replacement = (sentence_anchor +
+                                      ' `validate:source` 只扫描生产源码，拒绝 TypeScript/ESLint 抑制、'
+                                      '任意代码执行、危险 HTML 注入和未完成标记；负向安全测试样本保留在 `tests/`。')
+              if sentence_anchor not in readme:
+                  raise SystemExit('README validation description anchor is missing')
+              readme = readme.replace(sentence_anchor, sentence_replacement, 1)
+          readme_path.write_text(readme, encoding='utf-8')
+
+          validation_path = root / 'docs' / 'VALIDATION.md'
+          validation = validation_path.read_text(encoding='utf-8')
+          if '`npm run validate:source`' not in validation:
+              gate_anchor = ('2. `npm run validate:docs` confirms all local README links, the exact 14-image inventory, '
+                             'SVG accessibility metadata, deterministic regeneration, version alignment, CI integration, '
+                             'durable-evidence alignment and repository hygiene.\n')
+              gate_insert = (gate_anchor +
+                             '3. `npm run validate:source` scans production files under `src/` for suppression directives, '
+                             'dynamic JavaScript execution, dangerous HTML injection and unfinished markers; negative security '
+                             'fixtures remain under `tests/`.\n')
+              if gate_anchor not in validation:
+                  raise SystemExit('validation contract gate anchor is missing')
+              validation = validation.replace(gate_anchor, gate_insert, 1)
+              for number in range(13, 2, -1):
+                  validation = validation.replace(f'\n{number}. `', f'\n{number + 1}. `', 1)
+              workflow_anchor = ('The workflow runs documentation validation, static checks, regression groups, build, '
+                                 'HTTP smoke, Chromium UI smoke and the production dependency audit as separate attributable stages.')
+              workflow_replacement = ('The workflow runs documentation validation, production-source hygiene, static checks, '
+                                      'regression groups, build, HTTP smoke, Chromium UI smoke and the production dependency '
+                                      'audit as separate attributable stages.')
+              if workflow_anchor not in validation:
+                  raise SystemExit('validation workflow description anchor is missing')
+              validation = validation.replace(workflow_anchor, workflow_replacement, 1)
+          validation_path.write_text(validation, encoding='utf-8')
+          PY
+
+          # The permanent repository-hygiene gate should see the candidate without this temporary workflow.
+          rm -f .github/workflows/source-hygiene-finalization-20260726.yml .github/source-hygiene-finalization-20260726.trigger
+
+          record() {
+            local name="$1"
+            shift
+            echo "==> $name"
+            set +e
+            timeout 40m "$@" > "$logs/$name.log" 2>&1
+            local code=$?
+            set -e
+            printf '%s\n' "$code" > "$out/$name.status"
+            cat "$logs/$name.log"
+            if [ "$code" -ne 0 ]; then overall=1; fi
+          }
+
+          printf '%s\n' "$GITHUB_SHA" > "$out/validated-input-commit.txt"
+          {
+            echo "node=$(node --version)"
+            echo "npm=$(npm --version)"
+            echo "python=$(python3 --version 2>&1)"
+            echo "runner=${RUNNER_OS:-unknown}"
+          } > "$out/runtime.txt"
+
+          install_code=1
+          for attempt in 1 2 3; do
+            set +e
+            timeout 15m npm ci > "$logs/npm-ci.log" 2>&1
+            install_code=$?
+            set -e
+            if [ "$install_code" -eq 0 ]; then break; fi
+            tail -n 160 "$logs/npm-ci.log"
+            sleep $((attempt * 10))
+          done
+          printf '%s\n' "$install_code" > "$out/npm-ci.status"
+          cat "$logs/npm-ci.log"
+          if [ "$install_code" -ne 0 ]; then
+            overall=1
+          else
+            record validate-source npm run validate:source
+            record validate-ci npm run validate:ci
+            record visuals-check npm run visuals:check
+          fi
+
+          git ls-remote --heads origin | awk '{print $2}' | sed 's#refs/heads/##' | sort > "$out/remote-branches.txt"
+          if [ "$(cat "$out/remote-branches.txt")" = "main" ]; then
+            printf '0\n' > "$out/only-main.status"
+          else
+            printf '1\n' > "$out/only-main.status"
+            overall=1
+          fi
+
+          set +e
+          git diff --check > "$logs/git-diff-check.log" 2>&1
+          diff_code=$?
+          set -e
+          printf '%s\n' "$diff_code" > "$out/git-diff-check.status"
+          if [ "$diff_code" -ne 0 ]; then overall=1; fi
+
+          result=success
+          if [ "$overall" -ne 0 ]; then result=failure; fi
+          printf '%s\n' "$result" > "$out/result.txt"
+
+          python3 - <<'PY'
+          from __future__ import annotations
+          import datetime as dt
+          import json
+          from pathlib import Path
+
+          root = Path('/tmp/resindb-source-hygiene-finalization-20260726')
+          fixed = Path('reports/final-visual-upgrade-20260726/summary.json')
+          alias = Path('reports/ci-validation-latest.json')
+          report = Path('reports/final-visual-upgrade-20260726/REPORT.md')
+          summary = json.loads(fixed.read_text(encoding='utf-8'))
+          statuses = {p.stem: int(p.read_text().strip()) for p in sorted(root.glob('*.status'))}
+          runtime = dict(line.split('=', 1) for line in (root / 'runtime.txt').read_text().splitlines() if '=' in line)
+          proof = {
+              'result': (root / 'result.txt').read_text().strip(),
+              'validatedInputCommit': (root / 'validated-input-commit.txt').read_text().strip(),
+              'completedAt': dt.datetime.now(dt.timezone.utc).isoformat(),
+              'runtime': runtime,
+              'remoteBranches': (root / 'remote-branches.txt').read_text().splitlines(),
+              'statuses': statuses,
+              'scope': 'production source hygiene and complete validate:ci; negative security fixtures remain test-scoped',
+              'rawEvidenceArtifact': f"resindb-source-hygiene-finalization-{(root / 'validated-input-commit.txt').read_text().strip()}",
+          }
+          summary['currentTreeVerification'] = proof
+          payload = json.dumps(summary, ensure_ascii=False, indent=2) + '\n'
+          fixed.write_text(payload, encoding='utf-8')
+          alias.write_text(payload, encoding='utf-8')
+
+          text = report.read_text(encoding='utf-8')
+          marker = '\n## Current evidence-aligned tree verification\n'
+          if marker in text:
+              text = text.split(marker, 1)[0].rstrip() + '\n'
+          text += marker + '\n'
+          text += f"- Result: **{proof['result'].upper()}**\n"
+          text += f"- Validated input commit: `{proof['validatedInputCommit']}`\n"
+          text += f"- Scope: {proof['scope']}\n"
+          text += f"- Runtime: `{runtime.get('node')}` / `{runtime.get('npm')}` / `{runtime.get('python')}` / `{runtime.get('runner')}`\n"
+          text += f"- Remote branches: `{', '.join(proof['remoteBranches'])}`\n\n"
+          text += '| Gate | Exit code |\n|---|---:|\n'
+          for name, code in statuses.items():
+              text += f'| `{name}` | `{code}` |\n'
+          report.write_text(text, encoding='utf-8')
+          PY
+
+          record validate-docs-after-proof npm run validate:docs
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('/tmp/resindb-source-hygiene-finalization-20260726')
+          fixed = Path('reports/final-visual-upgrade-20260726/summary.json')
+          alias = Path('reports/ci-validation-latest.json')
+          report = Path('reports/final-visual-upgrade-20260726/REPORT.md')
+          summary = json.loads(fixed.read_text(encoding='utf-8'))
+          proof = summary['currentTreeVerification']
+          proof['statuses'] = {p.stem: int(p.read_text().strip()) for p in sorted(root.glob('*.status'))}
+          proof['result'] = 'success' if all(code == 0 for code in proof['statuses'].values()) else 'failure'
+          payload = json.dumps(summary, ensure_ascii=False, indent=2) + '\n'
+          fixed.write_text(payload, encoding='utf-8')
+          alias.write_text(payload, encoding='utf-8')
+          text = report.read_text(encoding='utf-8')
+          marker = '\n## Current evidence-aligned tree verification\n'
+          text = text.split(marker, 1)[0].rstrip() + marker + '\n'
+          text += f"- Result: **{proof['result'].upper()}**\n"
+          text += f"- Validated input commit: `{proof['validatedInputCommit']}`\n"
+          text += f"- Scope: {proof['scope']}\n"
+          text += f"- Runtime: `{proof['runtime'].get('node')}` / `{proof['runtime'].get('npm')}` / `{proof['runtime'].get('python')}` / `{proof['runtime'].get('runner')}`\n"
+          text += f"- Remote branches: `{', '.join(proof['remoteBranches'])}`\n\n"
+          text += '| Gate | Exit code |\n|---|---:|\n'
+          for name, code in proof['statuses'].items():
+              text += f'| `{name}` | `{code}` |\n'
+          report.write_text(text, encoding='utf-8')
+          Path('/tmp/resindb-source-hygiene-finalization-20260726/result.txt').write_text(proof['result'] + '\n')
+          PY
+
+          if [ "$(cat "$out/result.txt")" != "success" ]; then exit 1; fi
+
+      - name: Upload final validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resindb-source-hygiene-finalization-${{ github.sha }}
+          path: |
+            /tmp/resindb-source-hygiene-finalization-20260726/
+            coverage/
+            artifacts/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Publish final verified tree and self-clean
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          result="$(cat /tmp/resindb-source-hygiene-finalization-20260726/result.txt)"
+          rm -rf node_modules dist coverage artifacts
+          git config user.name "ResinDB Source Hygiene Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          if git diff --cached --quiet; then exit 0; fi
+          if [ "$result" = "success" ]; then
+            git commit -m "final: separate production hygiene from security fixtures"
+          else
+            git commit -m "ci: publish source hygiene finalization failure evidence"
+          fi
+          git pull --rebase origin main
+          git push origin HEAD:main
+
+      - name: Enforce validation result
+        if: always()
+        shell: bash
+        run: test "${{ steps.validation.outcome }}" = "success"
