@@ -1,7 +1,7 @@
 # ResinDB Pro final dependency remediation report
 
 - Result: **FAILURE**
-- Validated input commit: `8c25a62542a404f4a649ad0143b79113f7dac836`
+- Validated input commit: `cd960cc6597c730b7cd499305b8804c97694c08c`
 - Runtime: `v22.23.1` / `10.9.8` / `Python 3.12.3` / `Linux`
 - Remote branches: `main`
 - Test files passed: **None**
@@ -10,8 +10,10 @@
 
 ## Dependency remediation
 
-- Direct development dependency: `eslint`.
-- Upgrade: `9.39.4` → `10.8.0`.
+- ESLint: `9.39.4` → `10.8.0`.
+- typescript-eslint family: `8.58.2` → `8.65.0`.
+- eslint-plugin-react-hooks: `7.0.1` → `7.1.1`.
+- eslint-plugin-react-refresh: `0.5.2` → `0.5.3`.
 - Resolved vulnerable chain: `eslint` → `minimatch` → `brace-expansion`.
 - Application runtime dependencies were unchanged.
 - Before, all dependencies: `{"critical": 0, "high": 5, "info": 0, "low": 0, "moderate": 0, "total": 5}`
@@ -22,8 +24,8 @@
 
 | Gate | Exit code |
 |---|---:|
-| `eslint-upgrade` | `0` |
 | `git-diff-check` | `0` |
+| `lint-stack-upgrade` | `1` |
 | `npm-ci` | `1` |
 | `only-main` | `0` |
 | `validate-docs` | `1` |

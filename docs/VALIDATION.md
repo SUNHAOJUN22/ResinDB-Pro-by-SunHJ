@@ -91,7 +91,7 @@ The workflow runs documentation validation, production-source hygiene, ESLint, T
 
 ## Dependency audit contract
 
-`npm run audit:all` is the release gate and covers production plus development dependencies at `high` severity or above. `npm run audit:prod` remains available as an explicit production-only subset check. The reviewed remediation upgraded the direct development tool ESLint from `9.39.4` to `10.8.0`; application runtime dependencies were unchanged, and the complete lint/type/test/build/browser gates were rerun.
+`npm run audit:all` is the release gate and covers production plus development dependencies at `high` severity or above. `npm run audit:prod` remains available as an explicit production-only subset check. The reviewed remediation upgraded ESLint from `9.39.4` to `10.8.0` and synchronized `typescript-eslint` to `8.65.0`, `eslint-plugin-react-hooks` to `7.1.1`, and `eslint-plugin-react-refresh` to `0.5.3`. Application runtime dependencies were unchanged, and the complete lint/type/test/build/browser gates were rerun.
 
 ## Current verified baseline
 

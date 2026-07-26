@@ -3,8 +3,8 @@
   "result": "failure",
   "repository": "SUNHAOJUN22/ResinDB-Pro-by-SunHJ",
   "version": "3.0.0",
-  "validatedInputCommit": "8c25a62542a404f4a649ad0143b79113f7dac836",
-  "completedAt": "2026-07-26T17:13:53.533792+00:00",
+  "validatedInputCommit": "cd960cc6597c730b7cd499305b8804c97694c08c",
+  "completedAt": "2026-07-26T17:20:20.757920+00:00",
   "runtime": {
     "node": "v22.23.1",
     "npm": "10.9.8",
@@ -15,8 +15,8 @@
     "main"
   ],
   "statuses": {
-    "eslint-upgrade": 0,
     "git-diff-check": 0,
+    "lint-stack-upgrade": 1,
     "npm-ci": 1,
     "only-main": 0,
     "validate-docs": 1
@@ -42,9 +42,14 @@
     "resindb-worker-architecture.svg"
   ],
   "dependencyRemediation": {
-    "directDevelopmentDependency": "eslint",
-    "fromVersion": "9.39.4",
-    "toVersion": "10.8.0",
+    "developmentToolchain": {
+      "eslint": "10.8.0",
+      "typescript-eslint": "8.65.0",
+      "@typescript-eslint/eslint-plugin": "8.65.0",
+      "@typescript-eslint/parser": "8.65.0",
+      "eslint-plugin-react-hooks": "7.1.1",
+      "eslint-plugin-react-refresh": "0.5.3"
+    },
     "resolvedPackages": [
       "minimatch",
       "brace-expansion"
@@ -69,11 +74,11 @@
     "afterProduction": {},
     "runtimeDependenciesChanged": false
   },
-  "rawEvidenceArtifact": "resindb-final-eslint-remediation-8c25a62542a404f4a649ad0143b79113f7dac836",
+  "rawEvidenceArtifact": "resindb-final-compatible-lint-stack-cd960cc6597c730b7cd499305b8804c97694c08c",
   "currentTreeVerification": {
     "result": "failure",
-    "validatedInputCommit": "8c25a62542a404f4a649ad0143b79113f7dac836",
-    "completedAt": "2026-07-26T17:13:53.533792+00:00",
+    "validatedInputCommit": "cd960cc6597c730b7cd499305b8804c97694c08c",
+    "completedAt": "2026-07-26T17:20:20.757920+00:00",
     "runtime": {
       "node": "v22.23.1",
       "npm": "10.9.8",
@@ -84,13 +89,13 @@
       "main"
     ],
     "statuses": {
-      "eslint-upgrade": 0,
       "git-diff-check": 0,
+      "lint-stack-upgrade": 1,
       "npm-ci": 1,
       "only-main": 0,
       "validate-docs": 1
     },
-    "scope": "ESLint 10 remediation plus documentation, source, application, scientific, browser, visual and full dependency validation",
-    "rawEvidenceArtifact": "resindb-final-eslint-remediation-8c25a62542a404f4a649ad0143b79113f7dac836"
+    "scope": "compatible ESLint 10 toolchain plus documentation, source, application, scientific, browser, visual and full dependency validation",
+    "rawEvidenceArtifact": "resindb-final-compatible-lint-stack-cd960cc6597c730b7cd499305b8804c97694c08c"
   }
 }

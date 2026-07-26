@@ -178,7 +178,7 @@ npm run audit:all
 
 `validate:source` 只扫描 `src/` 下的生产 TypeScript/JavaScript，拒绝 TypeScript/ESLint 抑制、任意代码执行、危险 HTML 注入和未完成标记。用于证明公式引擎拒绝恶意表达式的负向安全样本保留在 `tests/`，不会再被错误当成生产风险。
 
-`audit:all` 审计生产依赖与开发工具链中的 high/critical 漏洞；`audit:prod` 可单独核验生产依赖。本次将开发工具 ESLint 从 9.39.4 升级到 10.8.0，由新版 `minimatch`/`brace-expansion` 关闭传递依赖漏洞；应用运行时依赖保持不变。
+`audit:all` 审计生产依赖与开发工具链中的 high/critical 漏洞；`audit:prod` 可单独核验生产依赖。本次将 ESLint 升级至 10.8.0，并同步升级 `typescript-eslint` 8.65.0、`eslint-plugin-react-hooks` 7.1.1 与 `eslint-plugin-react-refresh` 0.5.3，关闭 `minimatch`/`brace-expansion` 传递依赖漏洞；应用运行时依赖保持不变。
 
 当前最新完整验证基线使用 Node.js 22 / npm 10 / Python 3.12 / Linux，记录 **10 个测试文件、82 个测试用例** 全部通过，验证 **14 张确定性功能图**，并通过中文浅色和英文深色 Dashboard Chromium smoke。精确退出码、覆盖率与图像清单见 [`reports/final-visual-upgrade-20260726/REPORT.md`](reports/final-visual-upgrade-20260726/REPORT.md)、[`reports/ci-validation-latest.json`](reports/ci-validation-latest.json) 和 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
 
