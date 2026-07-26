@@ -135,7 +135,7 @@ AI 能力默认关闭，平台不内置或强制选择任何供应商。推荐�
 ## 自动测试与质量门
 
 <p align="center">
-  <img src="docs/assets/resindb-quality-gates.svg" alt="文档、静态检查、回归测试、构建、浏览器 UI 和生产依赖审计组成的质量门" width="100%" />
+  <img src="docs/assets/resindb-quality-gates.svg" alt="文档、生产源码卫生、静态检查、回归测试、构建、浏览器 UI 和生产依赖审计组成的质量门" width="100%" />
 </p>
 
 提交前执行：
@@ -150,10 +150,11 @@ npm run validate
 npm run validate:ci
 ```
 
-文档与视觉资产可以单独检查：
+文档、视觉资产和生产源码可以单独检查：
 
 ```bash
 npm run validate:docs
+npm run validate:source
 npm run visuals:check
 ```
 
@@ -162,6 +163,7 @@ npm run visuals:check
 ```bash
 npm ci
 npm run validate:docs
+npm run validate:source
 npm run lint
 npm run typecheck
 npm run test
@@ -173,6 +175,8 @@ npm run smoke
 npm run test:ui
 npm run audit:prod
 ```
+
+`validate:source` 只扫描 `src/` 下的生产 TypeScript/JavaScript，拒绝 TypeScript/ESLint 抑制、任意代码执行、危险 HTML 注入和未完成标记。用于证明公式引擎拒绝恶意表达式的负向安全样本保留在 `tests/`，不会再被错误当成生产风险。
 
 当前最新完整验证基线使用 Node.js 22 / npm 10 / Python 3.12 / Linux，记录 **9 个测试文件、79 个测试用例** 全部通过，验证 **14 张确定性功能图**，并通过中文浅色和英文深色 Dashboard Chromium smoke。精确退出码、覆盖率与图像清单见 [`reports/final-visual-upgrade-20260726/REPORT.md`](reports/final-visual-upgrade-20260726/REPORT.md)、[`reports/ci-validation-latest.json`](reports/ci-validation-latest.json) 和 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
 
@@ -248,9 +252,10 @@ npm run visuals:check
 - README 是否引用全部 14 张图且不存在断链；
 - 图片是否与生成器输出逐字节一致；
 - README、`package.json` 与验证合同的版本是否一致；
-- 正式 CI 是否执行文档检查；
+- 正式 CI 是否执行文档与生产源码卫生检查；
 - 仓库是否重新出现旧 patch、trigger、迁移或诊断残留；
-- 最新机器摘要是否与固定报告目录一致，避免证据链接漂移。
+- 最新机器摘要是否与固定报告目录一致，避免证据链接漂移；
+- 当前树验证不得保留失败状态或非零退出码。
 
 架构 SVG 是说明性图示，不是运行截图。真实 Chromium PNG、原始日志和 Coverage HTML 作为 GitHub Actions artifact 限时保存，不会被伪装成仓库静态证据。
 
@@ -265,6 +270,7 @@ npm run visuals:check
 ├── scripts/
 │   ├── generate-readme-visuals.py
 │   ├── validate-repository-docs.py
+│   ├── validate-source-hygiene.py
 │   ├── run-test-files.mjs
 │   ├── smoke-test.mjs
 │   └── ui-smoke-test.mjs
