@@ -71,6 +71,12 @@ FORBIDDEN_PATHS = (
     ".github/npm-ci-peer-diagnostic-20260726.trigger",
     ".github/workflows/npm-ci-peer-diagnostic-20260726.yml",
     "reports/npm-ci-peer-diagnostic-20260726.txt",
+    ".github/final-lockfile-rebuild-20260726.trigger",
+    ".github/workflows/final-lockfile-rebuild-20260726.yml",
+    ".github/lint-stack-install-diagnostic-20260726.trigger",
+    ".github/workflows/lint-stack-install-diagnostic-20260726.yml",
+    "scripts/finalize-lockfile-rebuild.sh",
+    "reports/lint-stack-install-diagnostic-20260726.txt",
     "docs/MIGRATION_v3.1.0.md",
     "docs/RELEASE_NOTES_v3.1.0.md",
     "reports/patch-diagnostic.json",
@@ -163,6 +169,18 @@ def validate_version_and_scripts(readme_text: str, validation_text: str) -> None
         fail(f"README version badge is not aligned with package version {version}")
     if f"`{version}`" not in validation_text:
         fail(f"docs/VALIDATION.md does not identify package version {version}")
+    expected_dev_dependencies = {
+        "eslint": "^10.8.0",
+        "@typescript-eslint/eslint-plugin": "^8.65.0",
+        "@typescript-eslint/parser": "^8.65.0",
+        "typescript-eslint": "^8.65.0",
+        "eslint-plugin-react-hooks": "^7.1.1",
+        "eslint-plugin-react-refresh": "^0.5.3",
+    }
+    dev_dependencies = package.get("devDependencies", {})
+    for name, expected in expected_dev_dependencies.items():
+        if dev_dependencies.get(name) != expected:
+            fail(f"development toolchain drift: {name} must equal {expected}")
     if "十四张" not in readme_text and "14 张" not in readme_text:
         fail("README must state that the visual system contains 14 diagrams")
 

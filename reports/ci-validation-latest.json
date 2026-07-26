@@ -3,8 +3,8 @@
   "result": "failure",
   "repository": "SUNHAOJUN22/ResinDB-Pro-by-SunHJ",
   "version": "3.0.0",
-  "validatedInputCommit": "cd960cc6597c730b7cd499305b8804c97694c08c",
-  "completedAt": "2026-07-26T17:20:20.757920+00:00",
+  "validatedInputCommit": "8cebbc2957422bad6fb4933f8038280c4f219bed",
+  "completedAt": "2026-07-26T17:37:10.501713+00:00",
   "runtime": {
     "node": "v22.23.1",
     "npm": "10.9.8",
@@ -16,7 +16,7 @@
   ],
   "statuses": {
     "git-diff-check": 0,
-    "lint-stack-upgrade": 1,
+    "lockfile-rebuild": 1,
     "npm-ci": 1,
     "only-main": 0,
     "validate-docs": 1
@@ -72,13 +72,14 @@
     },
     "afterAll": {},
     "afterProduction": {},
-    "runtimeDependenciesChanged": false
+    "runtimeDependenciesChanged": false,
+    "lockfileRebuiltFromConsistentManifest": false
   },
-  "rawEvidenceArtifact": "resindb-final-compatible-lint-stack-cd960cc6597c730b7cd499305b8804c97694c08c",
+  "rawEvidenceArtifact": "resindb-final-lockfile-rebuild-8cebbc2957422bad6fb4933f8038280c4f219bed",
   "currentTreeVerification": {
     "result": "failure",
-    "validatedInputCommit": "cd960cc6597c730b7cd499305b8804c97694c08c",
-    "completedAt": "2026-07-26T17:20:20.757920+00:00",
+    "validatedInputCommit": "8cebbc2957422bad6fb4933f8038280c4f219bed",
+    "completedAt": "2026-07-26T17:37:10.501713+00:00",
     "runtime": {
       "node": "v22.23.1",
       "npm": "10.9.8",
@@ -90,12 +91,12 @@
     ],
     "statuses": {
       "git-diff-check": 0,
-      "lint-stack-upgrade": 1,
+      "lockfile-rebuild": 1,
       "npm-ci": 1,
       "only-main": 0,
       "validate-docs": 1
     },
-    "scope": "compatible ESLint 10 toolchain plus documentation, source, application, scientific, browser, visual and full dependency validation",
-    "rawEvidenceArtifact": "resindb-final-compatible-lint-stack-cd960cc6597c730b7cd499305b8804c97694c08c"
+    "scope": "consistent ESLint 10 toolchain, rebuilt lockfile and complete documentation, source, application, scientific, browser, visual and dependency validation",
+    "rawEvidenceArtifact": "resindb-final-lockfile-rebuild-8cebbc2957422bad6fb4933f8038280c4f219bed"
   }
 }
