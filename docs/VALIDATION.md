@@ -93,14 +93,14 @@ The workflow runs documentation validation, production-source hygiene, ESLint, T
 
 The committed full-tree audit executed on Linux with Node.js `v22.23.1`, npm `10.9.8` and Python `3.12.3`, verified 14 deterministic README visuals, and recorded zero exit codes for the complete application gate. A later broad text scan incorrectly included negative security fixtures from `tests/`; the permanent production-source gate now scopes that check to `src/` and requires a separate successful current-tree verification.
 
-The recorded baseline contains **9 test files and 79 passing tests**. Rounded coverage was:
+The recorded baseline contains **10 test files and 82 passing tests**. Rounded coverage was:
 
 | Metric | Coverage |
 |---|---:|
-| Statements | 70.0% |
-| Branches | 44.7% |
-| Functions | 70.8% |
-| Lines | 71.4% |
+| Statements | 70.2% |
+| Branches | 45.4% |
+| Functions | 71.1% |
+| Lines | 71.5% |
 
 Exact values from each run remain in the machine-readable validation report rather than being treated as permanent thresholds.
 

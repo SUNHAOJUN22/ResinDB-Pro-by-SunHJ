@@ -178,7 +178,9 @@ npm run audit:prod
 
 `validate:source` 只扫描 `src/` 下的生产 TypeScript/JavaScript，拒绝 TypeScript/ESLint 抑制、任意代码执行、危险 HTML 注入和未完成标记。用于证明公式引擎拒绝恶意表达式的负向安全样本保留在 `tests/`，不会再被错误当成生产风险。
 
-当前最新完整验证基线使用 Node.js 22 / npm 10 / Python 3.12 / Linux，记录 **9 个测试文件、79 个测试用例** 全部通过，验证 **14 张确定性功能图**，并通过中文浅色和英文深色 Dashboard Chromium smoke。精确退出码、覆盖率与图像清单见 [`reports/final-visual-upgrade-20260726/REPORT.md`](reports/final-visual-upgrade-20260726/REPORT.md)、[`reports/ci-validation-latest.json`](reports/ci-validation-latest.json) 和 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
+当前最新完整验证基线使用 Node.js 22 / npm 10 / Python 3.12 / Linux，记录 **10 个测试文件、82 个测试用例** 全部通过，验证 **14 张确定性功能图**，并通过中文浅色和英文深色 Dashboard Chromium smoke。精确退出码、覆盖率与图像清单见 [`reports/final-visual-upgrade-20260726/REPORT.md`](reports/final-visual-upgrade-20260726/REPORT.md)、[`reports/ci-validation-latest.json`](reports/ci-validation-latest.json) 和 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
+
+应用内帮助中心与本 README 使用同一能力边界：CSV/JSON/TXT 导入，CSV/JSON/XML/PDF 导出；Admin、Editor、Viewer 仅为界面演示角色，不构成真实认证或 RBAC 安全边界。
 
 ## 典型科研工作流
 

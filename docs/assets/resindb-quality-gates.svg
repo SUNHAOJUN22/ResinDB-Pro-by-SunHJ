@@ -2,7 +2,7 @@
  viewBox="0 0 1200 640" role="img"
  aria-labelledby="quality-title quality-title-desc">
 <title id="quality-title">Quality and validation gates</title>
-<desc id="quality-title-desc">Permanent quality gates for documentation, static analysis, regression tests, build, browser smoke and dependency audit.</desc>
+<desc id="quality-title-desc">Permanent gates for documentation, production-source hygiene, static analysis, regression, runtime smoke and dependency audit.</desc>
 
 <defs>
   <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -45,35 +45,35 @@
   <rect x="80" y="174" width="320" height="154" rx="24" fill="#0f213b" stroke="#334155"/>
   <rect x="80" y="174" width="7" height="154" rx="3.5" fill="#38bdf8"/>
   <text x="106" y="216" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Documentation</text>
-  <text x="106" y="244" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">links • SVGs • versions</text>
+  <text x="106" y="244" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">links • SVGs • evidence</text>
 </g>
 <path d="M112 286C168 252,224 316,280 277S350 254,368 290" fill="none" stroke="#38bdf8" stroke-width="3"/>
 <g filter="url(#shadow)">
   <rect x="440" y="174" width="320" height="154" rx="24" fill="#0f213b" stroke="#334155"/>
   <rect x="440" y="174" width="7" height="154" rx="3.5" fill="#34d399"/>
-  <text x="466" y="216" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Static</text>
-  <text x="466" y="244" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">ESLint • TypeScript</text>
+  <text x="466" y="216" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Source hygiene</text>
+  <text x="466" y="244" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">production code • no injection</text>
 </g>
 <path d="M472 286C528 252,584 316,640 277S710 254,728 290" fill="none" stroke="#34d399" stroke-width="3"/>
 <g filter="url(#shadow)">
   <rect x="800" y="174" width="320" height="154" rx="24" fill="#0f213b" stroke="#334155"/>
   <rect x="800" y="174" width="7" height="154" rx="3.5" fill="#a78bfa"/>
-  <text x="826" y="216" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Regression</text>
-  <text x="826" y="244" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">unit • science • workers</text>
+  <text x="826" y="216" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Static</text>
+  <text x="826" y="244" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">ESLint • TypeScript</text>
 </g>
 <path d="M832 286C888 252,944 316,1000 277S1070 254,1088 290" fill="none" stroke="#a78bfa" stroke-width="3"/>
 <g filter="url(#shadow)">
   <rect x="80" y="370" width="320" height="154" rx="24" fill="#0f213b" stroke="#334155"/>
   <rect x="80" y="370" width="7" height="154" rx="3.5" fill="#fbbf24"/>
-  <text x="106" y="412" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Build</text>
-  <text x="106" y="440" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">Vite • HTTP smoke</text>
+  <text x="106" y="412" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Regression</text>
+  <text x="106" y="440" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">unit • science • workers</text>
 </g>
 <path d="M112 482C168 448,224 512,280 473S350 450,368 486" fill="none" stroke="#fbbf24" stroke-width="3"/>
 <g filter="url(#shadow)">
   <rect x="440" y="370" width="320" height="154" rx="24" fill="#0f213b" stroke="#334155"/>
   <rect x="440" y="370" width="7" height="154" rx="3.5" fill="#fb7185"/>
-  <text x="466" y="412" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Browser</text>
-  <text x="466" y="440" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">Chromium UI smoke</text>
+  <text x="466" y="412" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Runtime</text>
+  <text x="466" y="440" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">Vite • HTTP • Chromium</text>
 </g>
 <path d="M472 482C528 448,584 512,640 473S710 450,728 486" fill="none" stroke="#fb7185" stroke-width="3"/>
 <g filter="url(#shadow)">

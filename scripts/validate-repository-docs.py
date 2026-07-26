@@ -52,6 +52,8 @@ FORBIDDEN_PATHS = (
     ".github/workflows/reaudit-20260726.yml",
     ".github/workflows/final-reaudit-20260726.yml",
     ".github/workflows/source-hygiene-finalization-20260726.yml",
+    ".github/workflows/ultimate-readme-audit-20260726.yml",
+    ".github/ultimate-readme-audit-20260726.trigger",
     "docs/MIGRATION_v3.1.0.md",
     "docs/RELEASE_NOTES_v3.1.0.md",
     "reports/patch-diagnostic.json",
@@ -111,6 +113,11 @@ def validate_visual_inventory(readme_text: str) -> None:
             fail(f"{filename}: missing role=img or aria-labelledby")
         if not root.findall(f"{namespace}title") or not root.findall(f"{namespace}desc"):
             fail(f"{filename}: missing title or desc")
+        if filename == "resindb-quality-gates.svg":
+            svg_text = (ASSETS / filename).read_text(encoding="utf-8")
+            for phrase in ("Source hygiene", "production code • no injection"):
+                if phrase not in svg_text:
+                    fail(f"{filename}: quality-gate semantics are missing {phrase!r}")
 
 
 def validate_version_and_scripts(readme_text: str, validation_text: str) -> None:

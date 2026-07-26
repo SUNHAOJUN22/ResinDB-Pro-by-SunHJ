@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "result": "success",
+  "result": "failure",
   "repository": "SUNHAOJUN22/ResinDB-Pro-by-SunHJ",
   "version": "3.0.0",
-  "validatedInputCommit": "fb257cfcad6850e387ecc808dee4f18ab049a09f",
-  "completedAt": "2026-07-26T04:16:15.540483+00:00",
+  "validatedInputCommit": "5ac6aa1043aaece4e3124be7de310f121add9962",
+  "completedAt": "2026-07-26T09:11:12.418561+00:00",
   "runtime": {
     "node": "v22.23.1",
     "npm": "10.9.8",
@@ -22,23 +22,24 @@
     "npm-ci": 0,
     "only-main": 0,
     "smoke": 0,
-    "static-risk": 0,
     "test-coverage": 0,
     "test-science": 0,
-    "test-ui": 0,
+    "test-ui": 1,
     "test-unit": 0,
     "test": 0,
     "typecheck": 0,
-    "validate-docs": 0,
-    "visuals-generate": 0
+    "validate-docs-final": 1,
+    "validate-docs-pre": 0,
+    "validate-source": 0,
+    "visuals-check": 0
   },
-  "testFilesPassed": 9,
-  "testsPassed": 79,
+  "testFilesPassed": 10,
+  "testsPassed": 82,
   "coveragePercent": {
-    "statements": 70.02,
-    "branches": 44.75,
-    "functions": 70.75,
-    "lines": 71.37
+    "statements": 70.15,
+    "branches": 45.36,
+    "functions": 71.11,
+    "lines": 71.53
   },
   "visualCount": 14,
   "generatedVisuals": [
@@ -57,11 +58,11 @@
     "resindb-security-deployment.svg",
     "resindb-worker-architecture.svg"
   ],
-  "rawEvidenceArtifact": "resindb-final-visual-upgrade-fb257cfcad6850e387ecc808dee4f18ab049a09f",
+  "rawEvidenceArtifact": "resindb-ultimate-readme-audit-5ac6aa1043aaece4e3124be7de310f121add9962",
   "currentTreeVerification": {
-    "result": "success",
-    "validatedInputCommit": "a378f53e8d67ea78470ede3bb773b5327718b5dd",
-    "completedAt": "2026-07-26T08:50:42.697479+00:00",
+    "result": "failure",
+    "validatedInputCommit": "5ac6aa1043aaece4e3124be7de310f121add9962",
+    "completedAt": "2026-07-26T09:11:12.418561+00:00",
     "runtime": {
       "node": "v22.23.1",
       "npm": "10.9.8",
@@ -81,15 +82,16 @@
       "smoke": 0,
       "test-coverage": 0,
       "test-science": 0,
-      "test-ui": 0,
+      "test-ui": 1,
       "test-unit": 0,
       "test": 0,
       "typecheck": 0,
-      "validate-docs": 0,
+      "validate-docs-final": 1,
+      "validate-docs-pre": 0,
       "validate-source": 0,
       "visuals-check": 0
     },
-    "scope": "production-source hygiene plus complete application, scientific, browser and dependency validation",
-    "rawEvidenceArtifact": "resindb-final-verified-tree-a378f53e8d67ea78470ede3bb773b5327718b5dd"
+    "scope": "truthful bilingual help, accessible dialog, production-source hygiene, deterministic quality-gate visual and complete application validation",
+    "rawEvidenceArtifact": "resindb-ultimate-readme-audit-5ac6aa1043aaece4e3124be7de310f121add9962"
   }
 }
