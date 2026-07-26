@@ -13,7 +13,7 @@ The contract covers the repository as it exists today:
 - optional OpenAI-compatible AI integration;
 - deterministic README visuals and documentation integrity;
 - production-source hygiene;
-- production build, HTTP smoke, Chromium UI smoke and dependency audit.
+- production build, HTTP smoke, Chromium UI smoke and full production/development dependency audit.
 
 It does **not** claim a separate public runtime manifest architecture. Version `3.0.0` imports and validates the maintained catalogs from `src/data/`.
 
@@ -33,7 +33,7 @@ A release candidate must satisfy every gate below without disabling assertions o
 10. `npm run build` produces the Vite production bundle.
 11. `npm run smoke` verifies the built application over HTTP.
 12. `npm run test:ui` renders the authenticated Dashboard in Chromium, detects browser-console errors, checks preference persistence and saves real screenshots.
-13. `npm run audit:prod` finds no high-severity production dependency vulnerability.
+13. `npm run audit:all` finds no high- or critical-severity vulnerability across production and development dependencies; `npm run audit:prod` separately confirms the production subset.
 14. `git diff --check` reports no whitespace errors.
 15. The remote branch inventory contains exactly `main` for a main-branch release.
 
@@ -87,7 +87,11 @@ Negative tests may contain malicious-looking strings when they prove that the wh
 - `actions/setup-node@v4` with Node.js 22 and npm caching;
 - `actions/upload-artifact@v4` for install diagnostics, coverage and UI evidence.
 
-The workflow runs documentation validation, production-source hygiene, ESLint, TypeScript, regression groups, build, HTTP smoke, Chromium UI smoke and the production dependency audit as separate attributable stages. Dependency installation and production audit include bounded retries for transient registry failures; test, type, build, documentation, source-hygiene and UI failures are never retried into a false pass.
+The workflow runs documentation validation, production-source hygiene, ESLint, TypeScript, regression groups, build, HTTP smoke, Chromium UI smoke and the full dependency audit as separate attributable stages. Dependency installation and full dependency audit include bounded retries for transient registry failures; test, type, build, documentation, source-hygiene and UI failures are never retried into a false pass.
+
+## Dependency audit contract
+
+`npm run audit:all` is the release gate and covers production plus development dependencies at `high` severity or above. `npm run audit:prod` remains available as an explicit production-only subset check. Lockfile remediation must not silently alter `package.json`; any required direct-dependency upgrade must be reviewed as a separate source change.
 
 ## Current verified baseline
 

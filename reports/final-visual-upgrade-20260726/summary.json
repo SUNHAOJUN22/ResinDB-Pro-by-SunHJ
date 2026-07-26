@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "result": "success",
+  "result": "failure",
   "repository": "SUNHAOJUN22/ResinDB-Pro-by-SunHJ",
   "version": "3.0.0",
-  "validatedInputCommit": "68cd6af7b8df8bdc6facebe32556ccd539247b56",
-  "completedAt": "2026-07-26T09:29:01.839921+00:00",
+  "validatedInputCommit": "9f588d27f99070bc087aefd9f1991f6275eaa182",
+  "completedAt": "2026-07-26T16:59:47.868899+00:00",
   "runtime": {
     "node": "v22.23.1",
     "npm": "10.9.8",
@@ -15,31 +15,17 @@
     "main"
   ],
   "statuses": {
-    "audit-prod": 0,
-    "build": 0,
     "git-diff-check": 0,
-    "lint": 0,
-    "npm-ci": 0,
+    "lockfile-remediation": 1,
+    "npm-ci": 1,
     "only-main": 0,
-    "smoke": 0,
-    "test-coverage": 0,
-    "test-science": 0,
-    "test-ui": 0,
-    "test-unit": 0,
-    "test": 0,
-    "typecheck": 0,
-    "validate-docs": 0,
-    "validate-source": 0,
-    "visuals-check": 0
+    "prepare": 0,
+    "validate-docs": 1,
+    "visuals-generate": 0
   },
-  "testFilesPassed": 10,
-  "testsPassed": 82,
-  "coveragePercent": {
-    "statements": 70.17,
-    "branches": 45.31,
-    "functions": 71.11,
-    "lines": 71.53
-  },
+  "testFilesPassed": null,
+  "testsPassed": null,
+  "coveragePercent": {},
   "visualCount": 14,
   "generatedVisuals": [
     "resindb-ai-platform-overview.svg",
@@ -57,11 +43,34 @@
     "resindb-security-deployment.svg",
     "resindb-worker-architecture.svg"
   ],
-  "rawEvidenceArtifact": "resindb-harden-ui-smoke-68cd6af7b8df8bdc6facebe32556ccd539247b56",
+  "dependencyRemediation": {
+    "command": "npm audit fix --package-lock-only --ignore-scripts",
+    "packageJsonUnchanged": false,
+    "beforeAll": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 1,
+      "critical": 0,
+      "total": 1
+    },
+    "beforeProduction": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "afterAll": {},
+    "afterProduction": {},
+    "resolvedPackage": "brace-expansion"
+  },
+  "rawEvidenceArtifact": "resindb-final-dependency-remediation-9f588d27f99070bc087aefd9f1991f6275eaa182",
   "currentTreeVerification": {
-    "result": "success",
-    "validatedInputCommit": "68cd6af7b8df8bdc6facebe32556ccd539247b56",
-    "completedAt": "2026-07-26T09:29:01.839921+00:00",
+    "result": "failure",
+    "validatedInputCommit": "9f588d27f99070bc087aefd9f1991f6275eaa182",
+    "completedAt": "2026-07-26T16:59:47.868899+00:00",
     "runtime": {
       "node": "v22.23.1",
       "npm": "10.9.8",
@@ -72,24 +81,15 @@
       "main"
     ],
     "statuses": {
-      "audit-prod": 0,
-      "build": 0,
       "git-diff-check": 0,
-      "lint": 0,
-      "npm-ci": 0,
+      "lockfile-remediation": 1,
+      "npm-ci": 1,
       "only-main": 0,
-      "smoke": 0,
-      "test-coverage": 0,
-      "test-science": 0,
-      "test-ui": 0,
-      "test-unit": 0,
-      "test": 0,
-      "typecheck": 0,
-      "validate-docs": 0,
-      "validate-source": 0,
-      "visuals-check": 0
+      "prepare": 0,
+      "validate-docs": 1,
+      "visuals-generate": 0
     },
-    "scope": "hardened Chromium readiness, truthful bilingual Help Center, deterministic quality-gate visual and complete application validation",
-    "rawEvidenceArtifact": "resindb-harden-ui-smoke-68cd6af7b8df8bdc6facebe32556ccd539247b56"
+    "scope": "lockfile-only dependency remediation plus documentation, source, application, scientific, browser, visual and full dependency validation",
+    "rawEvidenceArtifact": "resindb-final-dependency-remediation-9f588d27f99070bc087aefd9f1991f6275eaa182"
   }
 }

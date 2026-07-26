@@ -135,7 +135,7 @@ AI 能力默认关闭，平台不内置或强制选择任何供应商。推荐�
 ## 自动测试与质量门
 
 <p align="center">
-  <img src="docs/assets/resindb-quality-gates.svg" alt="文档、生产源码卫生、静态检查、回归测试、构建、浏览器 UI 和生产依赖审计组成的质量门" width="100%" />
+  <img src="docs/assets/resindb-quality-gates.svg" alt="文档、生产源码卫生、静态检查、回归测试、构建、浏览器 UI 和完整依赖审计组成的质量门" width="100%" />
 </p>
 
 提交前执行：
@@ -173,10 +173,12 @@ npm run test:coverage
 npm run build
 npm run smoke
 npm run test:ui
-npm run audit:prod
+npm run audit:all
 ```
 
 `validate:source` 只扫描 `src/` 下的生产 TypeScript/JavaScript，拒绝 TypeScript/ESLint 抑制、任意代码执行、危险 HTML 注入和未完成标记。用于证明公式引擎拒绝恶意表达式的负向安全样本保留在 `tests/`，不会再被错误当成生产风险。
+
+`audit:all` 审计生产依赖与开发工具链中的 high/critical 漏洞；`audit:prod` 可单独核验生产依赖。本次通过非强制 lockfile 修复关闭 `brace-expansion` 开发依赖链漏洞，`package.json` 的应用依赖声明保持不变。
 
 当前最新完整验证基线使用 Node.js 22 / npm 10 / Python 3.12 / Linux，记录 **10 个测试文件、82 个测试用例** 全部通过，验证 **14 张确定性功能图**，并通过中文浅色和英文深色 Dashboard Chromium smoke。精确退出码、覆盖率与图像清单见 [`reports/final-visual-upgrade-20260726/REPORT.md`](reports/final-visual-upgrade-20260726/REPORT.md)、[`reports/ci-validation-latest.json`](reports/ci-validation-latest.json) 和 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
 

@@ -2,7 +2,7 @@
  viewBox="0 0 1200 640" role="img"
  aria-labelledby="quality-title quality-title-desc">
 <title id="quality-title">Quality and validation gates</title>
-<desc id="quality-title-desc">Permanent gates for documentation, production-source hygiene, static analysis, regression, runtime smoke and dependency audit.</desc>
+<desc id="quality-title-desc">Permanent gates for documentation, production-source hygiene, static analysis, regression, runtime smoke and full dependency audit.</desc>
 
 <defs>
   <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
@@ -80,7 +80,7 @@
   <rect x="800" y="370" width="320" height="154" rx="24" fill="#0f213b" stroke="#334155"/>
   <rect x="800" y="370" width="7" height="154" rx="3.5" fill="#22d3ee"/>
   <text x="826" y="412" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Security</text>
-  <text x="826" y="440" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">production dependency audit</text>
+  <text x="826" y="440" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">all dependencies • high gate</text>
 </g>
 <path d="M832 482C888 448,944 512,1000 473S1070 450,1088 486" fill="none" stroke="#22d3ee" stroke-width="3"/>
 <g>

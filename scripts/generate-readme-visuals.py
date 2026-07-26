@@ -399,7 +399,7 @@ VISUALS = (
     Visual(
         "resindb-quality-gates.svg", "quality-title",
         "Quality and validation gates", "A release is accepted only after every deterministic gate is green",
-        "Permanent gates for documentation, production-source hygiene, static analysis, regression, runtime smoke and dependency audit.",
+        "Permanent gates for documentation, production-source hygiene, static analysis, regression, runtime smoke and full dependency audit.",
         "grid",
         (
             ("Documentation", "links • SVGs • evidence"),
@@ -407,7 +407,7 @@ VISUALS = (
             ("Static", "ESLint • TypeScript"),
             ("Regression", "unit • science • workers"),
             ("Runtime", "Vite • HTTP • Chromium"),
-            ("Security", "production dependency audit"),
+            ("Security", "all dependencies • high gate"),
         ),
         ("Sole main branch", "No migration residue", "Artifacts retained temporarily"),
     ),

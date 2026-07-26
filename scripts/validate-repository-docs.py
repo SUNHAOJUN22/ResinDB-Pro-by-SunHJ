@@ -54,6 +54,13 @@ FORBIDDEN_PATHS = (
     ".github/workflows/source-hygiene-finalization-20260726.yml",
     ".github/workflows/ultimate-readme-audit-20260726.yml",
     ".github/ultimate-readme-audit-20260726.trigger",
+    ".github/final-dependency-remediation-20260726.trigger",
+    ".github/workflows/final-dependency-remediation-20260726.yml",
+    ".github/dependency-audit-diagnostic-20260726.trigger",
+    ".github/workflows/dependency-audit-diagnostic-20260726.yml",
+    "scripts/finalize-dependency-candidate.py",
+    "reports/dependency-audit-diagnostic-20260726.json",
+    "reports/dependency-audit-diagnostic-20260726.md",
     "docs/MIGRATION_v3.1.0.md",
     "docs/RELEASE_NOTES_v3.1.0.md",
     "reports/patch-diagnostic.json",
@@ -129,6 +136,8 @@ def validate_version_and_scripts(readme_text: str, validation_text: str) -> None
         "visuals:check": "python3 scripts/generate-readme-visuals.py --check",
         "validate:docs": "python3 scripts/validate-repository-docs.py",
         "validate:source": "python3 scripts/validate-source-hygiene.py",
+        "audit:all": "npm audit --audit-level=high",
+        "audit:prod": "npm audit --omit=dev --audit-level=high",
     }
     for name, command in required_scripts.items():
         if scripts.get(name) != command:
@@ -138,6 +147,8 @@ def validate_version_and_scripts(readme_text: str, validation_text: str) -> None
         fail("package.json validate must include npm run validate:docs")
     if "npm run validate:source" not in validate_script:
         fail("package.json validate must include npm run validate:source")
+    if "npm run audit:all" not in scripts.get("validate:ci", ""):
+        fail("package.json validate:ci must include npm run audit:all")
     if f"version-{version}-" not in readme_text:
         fail(f"README version badge is not aligned with package version {version}")
     if f"`{version}`" not in validation_text:
@@ -201,6 +212,10 @@ def validate_ci() -> None:
         fail("permanent CI must execute npm run validate:docs")
     if "npm run validate:source" not in ci:
         fail("permanent CI must execute npm run validate:source")
+    if "npm run audit:all" not in ci:
+        fail("permanent CI must execute npm run audit:all")
+    if "contents: write" in ci or "EMBEDDED DEPENDENCY REMEDIATION" in ci:
+        fail("permanent CI must remain read-only and non-self-modifying")
     if "branches: [main]" not in ci:
         fail("permanent CI is not restricted to main")
     if "contents: read" not in ci:
