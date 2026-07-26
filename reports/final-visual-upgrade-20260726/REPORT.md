@@ -57,17 +57,26 @@
 ## Current evidence-aligned tree verification
 
 - Result: **FAILURE**
-- Validated input commit: `624b660318a36f8dd728e934d8aa3a7f0a2bf54c`
-- Scope: production source hygiene and complete validate:ci; negative security fixtures remain test-scoped
+- Validated input commit: `aab6d0cb567002d1faca834a7de66ffbdd06e942`
+- Scope: production-source hygiene plus complete application, scientific, browser and dependency validation
 - Runtime: `v22.23.1` / `10.9.8` / `Python 3.12.3` / `Linux`
 - Remote branches: `main`
 
 | Gate | Exit code |
 |---|---:|
+| `audit-prod` | `0` |
+| `build` | `0` |
 | `git-diff-check` | `0` |
+| `lint` | `0` |
 | `npm-ci` | `0` |
 | `only-main` | `0` |
-| `validate-ci` | `1` |
-| `validate-docs-after-proof` | `1` |
+| `smoke` | `0` |
+| `test-coverage` | `0` |
+| `test-science` | `0` |
+| `test-ui` | `0` |
+| `test-unit` | `0` |
+| `test` | `0` |
+| `typecheck` | `0` |
+| `validate-docs` | `1` |
 | `validate-source` | `1` |
 | `visuals-check` | `0` |
