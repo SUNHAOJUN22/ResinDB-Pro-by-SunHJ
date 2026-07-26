@@ -1,1 +1,1 @@
-Rebuild the lockfile from the atomically aligned ESLint 10-compatible manifest, run all quality and dependency gates, publish durable success evidence, and self-clean.
+Execute the registered consistent-manifest lockfile rebuild and every final quality gate; publish durable evidence and self-clean.
