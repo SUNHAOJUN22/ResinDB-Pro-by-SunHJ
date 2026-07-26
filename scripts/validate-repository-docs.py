@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate README links, visual assets, version claims and repository hygiene."""
+"""Validate README links, visual assets, evidence, version claims and repository hygiene."""
 
 from __future__ import annotations
 
@@ -14,6 +14,9 @@ README = ROOT / "README.md"
 PACKAGE = ROOT / "package.json"
 VALIDATION = ROOT / "docs" / "VALIDATION.md"
 ASSETS = ROOT / "docs" / "assets"
+LATEST_REPORT = ROOT / "reports" / "final-visual-upgrade-20260726" / "REPORT.md"
+LATEST_SUMMARY = ROOT / "reports" / "final-visual-upgrade-20260726" / "summary.json"
+LATEST_ALIAS = ROOT / "reports" / "ci-validation-latest.json"
 
 EXPECTED_VISUALS = (
     "resindb-ai-platform-overview.svg",
@@ -35,6 +38,7 @@ EXPECTED_VISUALS = (
 FORBIDDEN_PATHS = (
     ".github/.resindb-main-update",
     ".github/.resindb-v310-patch",
+    ".github/final-reaudit-20260726.trigger",
     ".github/workflows/apply-resindb-main-update.yml",
     ".github/workflows/apply-v310-patch.yml",
     ".github/workflows/diagnose-v310-patch.yml",
@@ -45,11 +49,13 @@ FORBIDDEN_PATHS = (
     ".github/workflows/final-proof-20260726.yml",
     ".github/workflows/final-proof-docs-20260726.yml",
     ".github/workflows/reaudit-20260726.yml",
+    ".github/workflows/final-reaudit-20260726.yml",
     "docs/MIGRATION_v3.1.0.md",
     "docs/RELEASE_NOTES_v3.1.0.md",
     "reports/patch-diagnostic.json",
     "reports/release-baseline-v3.1.0.json",
     "reports/automated-audit-20260726",
+    "reports/final-reaudit-20260726",
 )
 
 LOCAL_LINK_PATTERNS = (
@@ -127,6 +133,58 @@ def validate_version_and_scripts(readme_text: str, validation_text: str) -> None
         fail("README must state that the visual system contains 14 diagrams")
 
 
+def validate_latest_evidence(readme_text: str, validation_text: str) -> None:
+    expected_paths = (
+        "reports/final-visual-upgrade-20260726/REPORT.md",
+        "reports/final-visual-upgrade-20260726/summary.json",
+        "reports/ci-validation-latest.json",
+    )
+    for relative in expected_paths:
+        if not (ROOT / relative).is_file():
+            fail(f"latest durable validation evidence is missing: {relative}")
+    if expected_paths[0] not in readme_text or expected_paths[2] not in readme_text:
+        fail("README must link the current report and machine-readable alias")
+    for relative in expected_paths:
+        if relative not in validation_text:
+            fail(f"docs/VALIDATION.md must identify current evidence: {relative}")
+    for stale_prefix in (
+        "reports/final-validation-20260726/",
+        "reports/final-reaudit-20260726/",
+    ):
+        if stale_prefix in readme_text or stale_prefix in validation_text:
+            fail(f"README or validation contract still points at superseded evidence: {stale_prefix}")
+
+    summary = json.loads(LATEST_SUMMARY.read_text(encoding="utf-8"))
+    alias = json.loads(LATEST_ALIAS.read_text(encoding="utf-8"))
+    compared_fields = (
+        "result",
+        "repository",
+        "version",
+        "runtime",
+        "remoteBranches",
+        "statuses",
+        "testFilesPassed",
+        "testsPassed",
+        "coveragePercent",
+        "visualCount",
+        "generatedVisuals",
+        "rawEvidenceArtifact",
+    )
+    for field in compared_fields:
+        if summary.get(field) != alias.get(field):
+            fail(f"latest evidence alias drift for field: {field}")
+    if summary.get("result") != "success":
+        fail("latest durable validation result is not success")
+    if summary.get("remoteBranches") != ["main"]:
+        fail("latest durable evidence does not prove main is the sole remote branch")
+    if any(code != 0 for code in summary.get("statuses", {}).values()):
+        fail("latest durable evidence contains a non-zero validation status")
+    if summary.get("visualCount") != len(EXPECTED_VISUALS):
+        fail("latest durable validation evidence does not cover all visuals")
+    if sorted(summary.get("generatedVisuals", [])) != sorted(EXPECTED_VISUALS):
+        fail("latest durable validation evidence visual inventory is incomplete")
+
+
 def validate_ci() -> None:
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     if "npm run validate:docs" not in ci:
@@ -149,6 +207,7 @@ def main() -> None:
     validate_local_links(readme_text)
     validate_visual_inventory(readme_text)
     validate_version_and_scripts(readme_text, validation_text)
+    validate_latest_evidence(readme_text, validation_text)
     validate_ci()
     validate_hygiene()
     subprocess.run(
@@ -158,7 +217,7 @@ def main() -> None:
     )
     print(
         f"validated README, {len(EXPECTED_VISUALS)} deterministic visuals, "
-        "version/scripts, CI contract and repository hygiene"
+        "version/scripts, durable evidence, CI contract and repository hygiene"
     )
 
 
