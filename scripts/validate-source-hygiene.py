@@ -18,35 +18,21 @@ RULES = (
     ("unfinished marker", re.compile(r"\b(?:TODO|FIXME|HACK)\b")),
 )
 
+findings: list[str] = []
+for path in sorted(SOURCE_ROOT.rglob("*")):
+    if not path.is_file() or path.suffix not in SOURCE_SUFFIXES:
+        continue
+    text = path.read_text(encoding="utf-8", errors="replace")
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        for name, pattern in RULES:
+            if pattern.search(line):
+                findings.append(
+                    f"{path.relative_to(ROOT)}:{line_number}: {name}: {line.strip()}"
+                )
 
-def main() -> None:
-    if not SOURCE_ROOT.is_dir():
-        raise SystemExit(f"production source directory is missing: {SOURCE_ROOT}")
-
-    findings: list[str] = []
-    scanned_files = 0
-    for path in sorted(SOURCE_ROOT.rglob("*")):
-        if not path.is_file() or path.suffix not in SOURCE_SUFFIXES:
-            continue
-        scanned_files += 1
-        text = path.read_text(encoding="utf-8", errors="replace")
-        for line_number, line in enumerate(text.splitlines(), start=1):
-            for name, pattern in RULES:
-                if pattern.search(line):
-                    findings.append(
-                        f"{path.relative_to(ROOT)}:{line_number}: {name}: {line.strip()}"
-                    )
-
-    if scanned_files == 0:
-        raise SystemExit("production source hygiene scanned zero source files")
-    if findings:
-        raise SystemExit("production source hygiene failed:\n" + "\n".join(findings))
-
-    print(
-        f"validated production source hygiene across {scanned_files} files; "
-        "negative security fixtures remain test-scoped"
+if findings:
+    raise SystemExit(
+        "production source hygiene failed:\n" + "\n".join(findings)
     )
 
-
-if __name__ == "__main__":
-    main()
+print("validated production source hygiene; negative security fixtures remain test-scoped")

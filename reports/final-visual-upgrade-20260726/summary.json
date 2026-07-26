@@ -60,8 +60,8 @@
   "rawEvidenceArtifact": "resindb-final-visual-upgrade-fb257cfcad6850e387ecc808dee4f18ab049a09f",
   "currentTreeVerification": {
     "result": "failure",
-    "validatedInputCommit": "73f4ef403d10a303614db6d62ee261cdb913f97b",
-    "completedAt": "2026-07-26T07:49:00.381082+00:00",
+    "validatedInputCommit": "624b660318a36f8dd728e934d8aa3a7f0a2bf54c",
+    "completedAt": "2026-07-26T08:39:14.179865+00:00",
     "runtime": {
       "node": "v22.23.1",
       "npm": "10.9.8",
@@ -75,11 +75,12 @@
       "git-diff-check": 0,
       "npm-ci": 0,
       "only-main": 0,
-      "static-risk": 1,
-      "validate-ci": 0,
-      "validate-docs-after-proof": 0,
+      "validate-ci": 1,
+      "validate-docs-after-proof": 1,
+      "validate-source": 1,
       "visuals-check": 0
     },
-    "rawEvidenceArtifact": "resindb-current-tree-verification-73f4ef403d10a303614db6d62ee261cdb913f97b"
+    "scope": "production source hygiene and complete validate:ci; negative security fixtures remain test-scoped",
+    "rawEvidenceArtifact": "resindb-source-hygiene-finalization-624b660318a36f8dd728e934d8aa3a7f0a2bf54c"
   }
 }
