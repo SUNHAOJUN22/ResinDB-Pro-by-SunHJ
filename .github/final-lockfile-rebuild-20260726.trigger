@@ -1,1 +1,1 @@
-Execute the registered consistent-manifest lockfile rebuild and every final quality gate; publish durable evidence and self-clean.
+Run the bash-syntax-validated lockfile rebuild script against the atomically aligned ESLint 10 manifest, then execute all final gates, publish evidence, and self-clean.
