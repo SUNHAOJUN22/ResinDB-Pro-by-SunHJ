@@ -65,6 +65,9 @@ jobs:
           path: /tmp/npm-ci.log
           retention-days: 3
 
+      - name: Documentation, visuals and repository hygiene
+        run: npm run validate:docs
+
       - name: ESLint
         run: npm run lint
 
