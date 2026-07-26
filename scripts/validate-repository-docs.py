@@ -39,6 +39,7 @@ FORBIDDEN_PATHS = (
     ".github/.resindb-main-update",
     ".github/.resindb-v310-patch",
     ".github/final-reaudit-20260726.trigger",
+    ".github/source-hygiene-finalization-20260726.trigger",
     ".github/workflows/apply-resindb-main-update.yml",
     ".github/workflows/apply-v310-patch.yml",
     ".github/workflows/diagnose-v310-patch.yml",
@@ -50,6 +51,7 @@ FORBIDDEN_PATHS = (
     ".github/workflows/final-proof-docs-20260726.yml",
     ".github/workflows/reaudit-20260726.yml",
     ".github/workflows/final-reaudit-20260726.yml",
+    ".github/workflows/source-hygiene-finalization-20260726.yml",
     "docs/MIGRATION_v3.1.0.md",
     "docs/RELEASE_NOTES_v3.1.0.md",
     "reports/patch-diagnostic.json",
@@ -119,18 +121,36 @@ def validate_version_and_scripts(readme_text: str, validation_text: str) -> None
         "visuals:generate": "python3 scripts/generate-readme-visuals.py",
         "visuals:check": "python3 scripts/generate-readme-visuals.py --check",
         "validate:docs": "python3 scripts/validate-repository-docs.py",
+        "validate:source": "python3 scripts/validate-source-hygiene.py",
     }
     for name, command in required_scripts.items():
         if scripts.get(name) != command:
             fail(f"package.json script {name!r} must equal {command!r}")
-    if "npm run validate:docs" not in scripts.get("validate", ""):
+    validate_script = scripts.get("validate", "")
+    if "npm run validate:docs" not in validate_script:
         fail("package.json validate must include npm run validate:docs")
+    if "npm run validate:source" not in validate_script:
+        fail("package.json validate must include npm run validate:source")
     if f"version-{version}-" not in readme_text:
         fail(f"README version badge is not aligned with package version {version}")
     if f"`{version}`" not in validation_text:
         fail(f"docs/VALIDATION.md does not identify package version {version}")
     if "十四张" not in readme_text and "14 张" not in readme_text:
         fail("README must state that the visual system contains 14 diagrams")
+
+
+def validate_status_block(name: str, proof: object) -> None:
+    if not isinstance(proof, dict):
+        fail(f"{name} evidence is missing or malformed")
+    if proof.get("result") != "success":
+        fail(f"{name} result is not success")
+    if proof.get("remoteBranches") != ["main"]:
+        fail(f"{name} does not prove main is the sole remote branch")
+    statuses = proof.get("statuses")
+    if not isinstance(statuses, dict) or not statuses:
+        fail(f"{name} contains no validation statuses")
+    if any(not isinstance(code, int) or code != 0 for code in statuses.values()):
+        fail(f"{name} contains a non-zero validation status")
 
 
 def validate_latest_evidence(readme_text: str, validation_text: str) -> None:
@@ -156,29 +176,12 @@ def validate_latest_evidence(readme_text: str, validation_text: str) -> None:
 
     summary = json.loads(LATEST_SUMMARY.read_text(encoding="utf-8"))
     alias = json.loads(LATEST_ALIAS.read_text(encoding="utf-8"))
-    compared_fields = (
-        "result",
-        "repository",
-        "version",
-        "runtime",
-        "remoteBranches",
-        "statuses",
-        "testFilesPassed",
-        "testsPassed",
-        "coveragePercent",
-        "visualCount",
-        "generatedVisuals",
-        "rawEvidenceArtifact",
-    )
-    for field in compared_fields:
-        if summary.get(field) != alias.get(field):
-            fail(f"latest evidence alias drift for field: {field}")
-    if summary.get("result") != "success":
-        fail("latest durable validation result is not success")
-    if summary.get("remoteBranches") != ["main"]:
-        fail("latest durable evidence does not prove main is the sole remote branch")
-    if any(code != 0 for code in summary.get("statuses", {}).values()):
-        fail("latest durable evidence contains a non-zero validation status")
+    if summary != alias:
+        fail("latest evidence alias differs from the fixed durable summary")
+    validate_status_block("baseline", summary)
+    current_tree = summary.get("currentTreeVerification")
+    if current_tree is not None:
+        validate_status_block("currentTreeVerification", current_tree)
     if summary.get("visualCount") != len(EXPECTED_VISUALS):
         fail("latest durable validation evidence does not cover all visuals")
     if sorted(summary.get("generatedVisuals", [])) != sorted(EXPECTED_VISUALS):
@@ -189,6 +192,8 @@ def validate_ci() -> None:
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     if "npm run validate:docs" not in ci:
         fail("permanent CI must execute npm run validate:docs")
+    if "npm run validate:source" not in ci:
+        fail("permanent CI must execute npm run validate:source")
     if "branches: [main]" not in ci:
         fail("permanent CI is not restricted to main")
     if "contents: read" not in ci:
@@ -217,7 +222,7 @@ def main() -> None:
     )
     print(
         f"validated README, {len(EXPECTED_VISUALS)} deterministic visuals, "
-        "version/scripts, durable evidence, CI contract and repository hygiene"
+        "version/scripts, source hygiene contract, durable evidence, CI contract and repository hygiene"
     )
 
 
