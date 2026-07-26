@@ -1,0 +1,68 @@
+name: UI smoke diagnostic 2026-07-26
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/ui-smoke-diagnostic-20260726.trigger
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Run build and UI smoke with full diagnostics
+        shell: bash
+        run: |
+          set +e
+          npm ci > /tmp/npm-ci.log 2>&1
+          install=$?
+          if [ "$install" -eq 0 ]; then
+            npm run build > /tmp/build.log 2>&1
+            build=$?
+          else
+            build=99
+          fi
+          if [ "$install" -eq 0 ] && [ "$build" -eq 0 ]; then
+            npm run test:ui > /tmp/ui-smoke.log 2>&1
+            ui=$?
+          else
+            ui=99
+          fi
+          set -e
+          {
+            echo "validated_commit=$GITHUB_SHA"
+            echo "npm_ci=$install"
+            echo "build=$build"
+            echo "test_ui=$ui"
+            echo
+            echo "## npm ci tail"
+            tail -n 80 /tmp/npm-ci.log || true
+            echo
+            echo "## build tail"
+            tail -n 120 /tmp/build.log 2>/dev/null || true
+            echo
+            echo "## UI smoke output"
+            cat /tmp/ui-smoke.log 2>/dev/null || true
+          } > reports/ui-smoke-diagnostic-20260726.txt
+      - name: Publish diagnostic and self-clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/ui-smoke-diagnostic-20260726.yml
+          rm -f .github/ui-smoke-diagnostic-20260726.trigger
+          git config user.name "ResinDB UI Diagnostic Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "ci: publish UI smoke diagnostic"
+          git pull --rebase origin main
+          git push origin HEAD:main
