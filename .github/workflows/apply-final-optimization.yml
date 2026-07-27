@@ -60,16 +60,26 @@ jobs:
           }
 
           blob_shas=(
-            7dd53c13901d139f683324aa5993cbaa4ff667b7
-            067abf7677984e3536613bb50aed8ed89e07f79a
+            dae49aaf98090379e4247d0396aa2db4e21ffb01
+            05d267937af6f0c6bcf8a841ff409919d5ada8af
+            38f7613b88cad25d9316333a4950ebfb97f67429
+            6f8b0c5c4509b640173b2f0be00a211e2f8f0222
+            810a0ed408a0ab3972c84899cd8d4ced700283c3
+            a37e3963af31a7d74576943e383909229b153869
+            b561b956fa5d7e72e3d073106c3f4af848bd1502
             f334ad66b29321ba95f1f7362a9873222a671501
             7252d8c9e4e3b444c6e3daedbe8d1132adb1c2e2
             9a84e49fcf701ed06e6d82a5c74f72acb3b151cf
             dfa57ae7ba893d8bc986a7c4cbacb6cb0413fa34
           )
           chunk_hashes=(
-            21e5e40be35fb00c4cf6a4747e682a221c66fbde68479436d50e640cd5e8d349
-            4bb28b8a16af5ca9c0e70c81adea48cac7bf86f998ec8bdacfa02f49a087defb
+            28ca72a8c3dcbec697966c7605d35651383c115aba2d77a5d413753b262052b6
+            06ac39797b3f0822e4f3ac099040e9b07e88947aaa341fe92246899e0ed1bdfd
+            767a809cf1d0d5a386db0964a9f57f253d2165d51c8cb5cdc9ad64a223ba665a
+            300b3e513ec8a1f63984c258fc994774415304657d82b4b11f896a3d589101de
+            570cb9926f19a4e416c29fc5ba1c4d829217041486e490e3fe7f13bc05722775
+            c7ed88c0cab810cd803110d6b62571df58a0114e569b758e6222b2112f4c9216
+            6034586882db5f6ee3986cabac8bb5a60b3568e7957c3924e48cd93bc4c359eb
             eda1d4881d00c13011f6b1477432cd2f45f316a37e39f7b82ca22335474b7c6d
             8d460f0c6f34eaf442c90e1a8f998cda474ed2b6c7391f7fef9ceec7eaed3af2
             953856f3d6b0dbb2d87afb79abd97ee5eda38bbcc60a3f0d2816350f527b530e
@@ -85,7 +95,11 @@ jobs:
               "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/blobs/${blob_shas[$index]}" \
               | jq -r '.content' | tr -d '\n' | base64 -d > "$output"
             actual="$(sha256sum "$output" | awk '{print $1}')"
-            test "$actual" = "${chunk_hashes[$index]}"
+            if [ "$actual" != "${chunk_hashes[$index]}" ]; then
+              post_status failure "resindb/chunk-$(printf '%02d' "$index")" "Chunk digest mismatch: ${actual}"
+              exit 1
+            fi
+            post_status success "resindb/chunk-$(printf '%02d' "$index")" "Chunk digest verified"
           done
 
           cat /tmp/resindb-chunk-* > /tmp/resindb-final.patch.gz.b64
