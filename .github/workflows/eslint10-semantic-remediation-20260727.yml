@@ -16,7 +16,7 @@ concurrency:
 jobs:
   remediate:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,48 +25,22 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Patch and validate
+      - name: Apply patch and run core gates
         id: validation
         continue-on-error: true
         shell: bash
         run: |
-          set +e
-          out=/tmp/resindb-eslint10-remediation
-          rm -rf "$out"
-          mkdir -p "$out"
-          run_gate() {
-            name="$1"; shift
-            "$@" > "$out/$name.txt" 2>&1
-            code=$?
-            printf '%s\n' "$code" > "$out/$name.exit"
-            cat "$out/$name.txt"
-            return "$code"
-          }
-          overall=0
-          run_gate npm-ci npm ci || overall=1
-          run_gate patch python3 scripts/fix-eslint10-findings.py || overall=1
-          if [ "$overall" -eq 0 ]; then
-            run_gate lint npm run lint || overall=1
-            run_gate typecheck npm run typecheck || overall=1
-            run_gate test npm run test || overall=1
-            run_gate build npm run build || overall=1
-          fi
+          set -o pipefail
           mkdir -p reports/performance-audit-20260727
           {
             echo "validated_commit=$GITHUB_SHA"
-            for status in "$out"/*.exit; do
-              [ -e "$status" ] || continue
-              echo "$(basename "$status" .exit)_exit=$(cat "$status")"
-            done
-            echo
-            for log in "$out"/*.txt; do
-              [ -e "$log" ] || continue
-              echo "--- $(basename "$log" .txt) ---"
-              cat "$log"
-              echo
-            done
-          } > reports/performance-audit-20260727/eslint10-remediation.txt
-          exit "$overall"
+            npm ci
+            python3 scripts/fix-eslint10-findings.py
+            npm run lint
+            npm run typecheck
+            npm run test
+            npm run build
+          } 2>&1 | tee reports/performance-audit-20260727/eslint10-remediation.txt
       - name: Publish candidate and self-clean
         if: always()
         shell: bash
