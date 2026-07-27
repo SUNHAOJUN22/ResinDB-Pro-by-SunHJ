@@ -61,6 +61,27 @@ if [ "$diff_code" -ne 0 ]; then overall=1; fi
 python3 /tmp/write-uiux-visual-evidence.py "$out"
 record validate-docs npm run validate:docs
 python3 /tmp/write-uiux-visual-evidence.py "$out"
-if [ "$(cat "$out/result.txt")" != "success" ]; then
+result="$(cat "$out/result.txt")"
+if [ "$result" = "success" ]; then
+  rm -rf reports/uiux-visual-final-proof-20260727
+else
+  diagnosis=reports/uiux-visual-final-proof-20260727
+  mkdir -p "$diagnosis"
+  {
+    echo "validated_commit=${GITHUB_SHA:-unknown}"
+    echo "result=$result"
+    echo
+    for status in "$out"/*.status; do
+      [ -e "$status" ] || continue
+      name="$(basename "$status" .status)"
+      code="$(cat "$status")"
+      echo "${name}_exit=${code}"
+      if [ "$code" != "0" ] && [ -f "$logs/$name.txt" ]; then
+        echo "--- $name ---"
+        tail -n 240 "$logs/$name.txt"
+        echo
+      fi
+    done
+  } > "$diagnosis/FAILURE.txt"
   exit 1
 fi
