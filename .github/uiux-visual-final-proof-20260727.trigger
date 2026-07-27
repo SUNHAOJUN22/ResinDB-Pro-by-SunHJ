@@ -1,0 +1,1 @@
+Refine narrow flow layouts, regenerate all fourteen diagrams, run the complete documentation, source, application, scientific, browser and dependency validation, publish durable evidence, and self-clean.
