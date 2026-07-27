@@ -1,1 +1,1 @@
-Execute the registered semantic remediation now; preserve exact lint, type, test and build evidence and self-clean.
+Execute the simplified registered patch and core validation gate; always publish the exact result and self-clean.
