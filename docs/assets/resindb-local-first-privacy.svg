@@ -1,119 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640"
  viewBox="0 0 1200 640" role="img"
- aria-labelledby="privacy-title privacy-title-desc">
+ aria-labelledby="privacy-title privacy-title-desc"
+ data-design-system="resindb-uiux-pro-max-v1" shape-rendering="geometricPrecision">
 <title id="privacy-title">Local-first privacy architecture</title>
-<desc id="privacy-title-desc">Privacy boundary between browser-resident data and optional governed AI and remote REST gateways.</desc>
+<desc id="privacy-title-desc">The design separates browser-owned deterministic state from optional governed AI and remote REST boundaries.</desc>
+<metadata>ResinDB UI UX Pro Max design system: Swiss modernism, Bento structure, WCAG-aware semantic colors, vector-only icons, 8-point spacing.</metadata>
 
 <defs>
-  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#06111f"/>
-    <stop offset=".56" stop-color="#0b1830"/>
-    <stop offset="1" stop-color="#111b35"/>
-  </linearGradient>
-  <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#22d3ee"/>
-    <stop offset="1" stop-color="#2563eb"/>
-  </linearGradient>
-  <linearGradient id="emerald" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#34d399"/>
-    <stop offset="1" stop-color="#059669"/>
-  </linearGradient>
-  <filter id="shadow" x="-25%" y="-25%" width="150%" height="170%">
-    <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#020617" flood-opacity=".46"/>
+  <filter id="shadow-sm" x="-15%" y="-20%" width="130%" height="150%">
+    <feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#0F172A" flood-opacity=".08"/>
   </filter>
-  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-    <feGaussianBlur stdDeviation="7" result="blur"/>
-    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-  </filter>
-  <pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse">
-    <path d="M36 0H0V36" fill="none" stroke="#94a3b8" stroke-opacity=".055"/>
+  <pattern id="dot-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+    <circle cx="1" cy="1" r="1" fill="#CBD5E1" fill-opacity=".38"/>
   </pattern>
-  <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
-    <path d="M0 0L10 5L0 10Z" fill="#38bdf8"/>
+  <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+    <path d="M0 0L9 4.5L0 9Z" fill="#2563EB"/>
   </marker>
-  <marker id="arrow-muted" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
-    <path d="M0 0L10 5L0 10Z" fill="#64748b"/>
+  <marker id="arrow-muted" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+    <path d="M0 0L9 4.5L0 9Z" fill="#64748B"/>
   </marker>
 </defs>
 
-<rect width="1200" height="640" rx="28" fill="url(#bg)"/>
-<rect width="1200" height="640" rx="28" fill="url(#grid)"/>
-<circle cx="1040" cy="80" r="190" fill="#2563eb" fill-opacity=".07"/>
-<circle cx="110" cy="620" r="210" fill="#10b981" fill-opacity=".05"/>
-<text x="72" y="70" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="36" font-weight="820" text-anchor="start">Local-first privacy architecture</text><text x="72" y="104" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="520" text-anchor="start">Browser storage by default; remote services are explicit and bounded</text><path d="M72 126H1128" stroke="#334155"/>
-<g filter="url(#shadow)">
-  <rect x="80" y="180" width="430" height="330" rx="24" fill="#0f213b" stroke="#334155"/>
-  <rect x="80" y="180" width="7" height="330" rx="3.5" fill="#38bdf8"/>
-  <text x="106" y="222" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Local / deterministic</text>
-  <text x="106" y="250" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">Browser-owned execution boundary</text>
-</g>
-
-<g filter="url(#shadow)">
-  <rect x="690" y="180" width="430" height="330" rx="24" fill="#0f213b" stroke="#334155"/>
-  <rect x="690" y="180" width="7" height="330" rx="3.5" fill="#fbbf24"/>
-  <text x="716" y="222" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="760" text-anchor="start">Optional / governed</text>
-  <text x="716" y="250" fill="#94a3b8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="520" text-anchor="start">Explicit service boundary</text>
-</g>
-
-<g>
-  <rect x="120" y="270" width="350" height="34" rx="17" fill="#38bdf8" fill-opacity=".13"
-        stroke="#38bdf8" stroke-opacity=".55"/>
-  <text x="295.0" y="293" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">IndexedDB — records</text>
-</g>
-
-<g>
-  <rect x="120" y="334" width="350" height="34" rx="17" fill="#34d399" fill-opacity=".13"
-        stroke="#34d399" stroke-opacity=".55"/>
-  <text x="295.0" y="357" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">Preferences — theme + language</text>
-</g>
-
-<g>
-  <rect x="120" y="398" width="350" height="34" rx="17" fill="#a78bfa" fill-opacity=".13"
-        stroke="#a78bfa" stroke-opacity=".55"/>
-  <text x="295.0" y="421" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">Feedback queue — local export</text>
-</g>
-
-<g>
-  <rect x="730" y="270" width="350" height="34" rx="17" fill="#fbbf24" fill-opacity=".13"
-        stroke="#fbbf24" stroke-opacity=".55"/>
-  <text x="905.0" y="293" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">AI gateway — optional</text>
-</g>
-
-<g>
-  <rect x="730" y="334" width="350" height="34" rx="17" fill="#fb7185" fill-opacity=".13"
-        stroke="#fb7185" stroke-opacity=".55"/>
-  <text x="905.0" y="357" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">Remote REST — explicit adapter</text>
-</g>
-
-<g>
-  <rect x="730" y="398" width="350" height="34" rx="17" fill="#22d3ee" fill-opacity=".13"
-        stroke="#22d3ee" stroke-opacity=".55"/>
-  <text x="905.0" y="421" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">Server controls — auth + rate limits</text>
-</g>
-
-<g transform="translate(600 350)">
-  <path d="M0-65L58-42V2C58 47 27 77 0 91C-27 77-58 47-58 2V-42Z"
-        fill="url(#emerald)" fill-opacity=".17" stroke="#34d399" stroke-width="2"/>
-  <path d="M-22 6l16 16 31-40" fill="none" stroke="#a7f3d0" stroke-width="6"
-        stroke-linecap="round" stroke-linejoin="round"/>
-</g>
-
-<g>
-  <rect x="100" y="558" width="321.3333333333333" height="34" rx="17" fill="#38bdf8" fill-opacity=".13"
-        stroke="#38bdf8" stroke-opacity=".55"/>
-  <text x="260.66666666666663" y="581" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">VITE_* is public</text>
-</g>
-
-<g>
-  <rect x="439.3333333333333" y="558" width="321.3333333333333" height="34" rx="17" fill="#34d399" fill-opacity=".13"
-        stroke="#34d399" stroke-opacity=".55"/>
-  <text x="600.0" y="581" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">No privileged client secret</text>
-</g>
-
-<g>
-  <rect x="778.6666666666666" y="558" width="321.3333333333333" height="34" rx="17" fill="#a78bfa" fill-opacity=".13"
-        stroke="#a78bfa" stroke-opacity=".55"/>
-  <text x="939.3333333333333" y="581" fill="#e2e8f0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="13" font-weight="650" text-anchor="middle">Export backups</text>
-</g>
-
+<rect width="1200" height="640" rx="24" fill="#F8FAFC"/>
+<rect x="0" y="142" width="1200" height="498" fill="url(#dot-grid)"/>
+<rect x="0" y="0" width="1200" height="142" fill="#0F172A"/><text x="64" y="38" fill="#93C5FD" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="750" text-anchor="start" letter-spacing="1.6">RESINDB PRO</text><text x="64" y="82" fill="#FFFFFF" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="32" font-weight="760" text-anchor="start">Local-first privacy architecture</text><text x="64" y="112" fill="#CBD5E1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="450" text-anchor="start">Browser storage by default; remote services are explicit</text><text x="1136" y="38" fill="#94A3B8" font-family="JetBrains Mono,SFMono-Regular,Consolas,monospace" font-size="11" font-weight="650" text-anchor="end" letter-spacing="1.0">ARCHITECTURE / PRIVACY BOUNDARY</text><rect x="64" y="132" width="90" height="4" rx="2" fill="#2563EB"/><rect x="64" y="176" width="508" height="360" rx="22" fill="#FFFFFF" stroke="#E2E8F0"/><rect x="628" y="176" width="508" height="360" rx="22" fill="#FFFFFF" stroke="#E2E8F0"/><text x="90" y="213" fill="#2563EB" font-family="JetBrains Mono,SFMono-Regular,Consolas,monospace" font-size="12" font-weight="750" text-anchor="start" letter-spacing="1.0">LOCAL / DETERMINISTIC</text><text x="654" y="213" fill="#B45309" font-family="JetBrains Mono,SFMono-Regular,Consolas,monospace" font-size="12" font-weight="750" text-anchor="start" letter-spacing="1.0">OPTIONAL / GOVERNED</text><path d="M600 190L600 524" fill="none" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round" stroke-dasharray="6 6"/><g filter="url(#shadow-sm)"><rect x="88" y="235" width="460" height="76" rx="18" fill="#FFFFFF" stroke="#E2E8F0"/><rect x="88" y="235" width="6" height="76" rx="3" fill="#2563EB"/></g><rect x="112" y="257" width="46" height="46" rx="14" fill="#2563EB" fill-opacity=".10" stroke="#2563EB" stroke-opacity=".28"/><g fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="135.0" cy="271.0" rx="12" ry="5"/><path d="M123.0 271.0v18c0 3 5 5 12 5s12-2 12-5v-18"/><path d="M123.0 280.0c0 3 5 5 12 5s12-2 12-5"/></g><text x="172" y="278" fill="#0F172A" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="720" text-anchor="start">IndexedDB</text><text x="172" y="301" fill="#64748B" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="500" text-anchor="start">records • snapshots</text><g filter="url(#shadow-sm)"><rect x="88" y="327" width="460" height="76" rx="18" fill="#FFFFFF" stroke="#E2E8F0"/><rect x="88" y="327" width="6" height="76" rx="3" fill="#0F766E"/></g><rect x="112" y="349" width="46" height="46" rx="14" fill="#0F766E" fill-opacity=".10" stroke="#0F766E" stroke-opacity=".28"/><g fill="none" stroke="#0F766E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M121.0 362.0h14l14 14-10 10-14-14v-14z"/><circle cx="128.0" cy="368.0" r="2"/></g><text x="172" y="370" fill="#0F172A" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="720" text-anchor="start">Preferences</text><text x="172" y="393" fill="#64748B" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="500" text-anchor="start">theme • language</text><g filter="url(#shadow-sm)"><rect x="88" y="419" width="460" height="76" rx="18" fill="#FFFFFF" stroke="#E2E8F0"/><rect x="88" y="419" width="6" height="76" rx="3" fill="#6D28D9"/></g><rect x="112" y="441" width="46" height="46" rx="14" fill="#6D28D9" fill-opacity=".10" stroke="#6D28D9" stroke-opacity=".28"/><g fill="none" stroke="#6D28D9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M125.0 449.0h13l8 8v22h-21z"/><path d="M138.0 449.0v8h8M130.0 465.0h11M130.0 471.0h8"/></g><text x="172" y="462" fill="#0F172A" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="720" text-anchor="start">Feedback queue</text><text x="172" y="485" fill="#64748B" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="500" text-anchor="start">local export</text><g filter="url(#shadow-sm)"><rect x="652" y="235" width="460" height="76" rx="18" fill="#FFFFFF" stroke="#E2E8F0"/><rect x="652" y="235" width="6" height="76" rx="3" fill="#B45309"/></g><rect x="676" y="257" width="46" height="46" rx="14" fill="#B45309" fill-opacity=".10" stroke="#B45309" stroke-opacity=".28"/><g fill="none" stroke="#B45309" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M699.0 264.0l3 9 9 3-9 3-3 9-3-9-9-3 9-3z"/><path d="M710.0 285.0l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/></g><text x="736" y="278" fill="#0F172A" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="720" text-anchor="start">AI gateway</text><text x="736" y="301" fill="#64748B" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="500" text-anchor="start">optional endpoint</text><g filter="url(#shadow-sm)"><rect x="652" y="327" width="460" height="76" rx="18" fill="#FFFFFF" stroke="#E2E8F0"/><rect x="652" y="327" width="6" height="76" rx="3" fill="#BE123C"/></g><rect x="676" y="349" width="46" height="46" rx="14" fill="#BE123C" fill-opacity=".10" stroke="#BE123C" stroke-opacity=".28"/><g fill="none" stroke="#BE123C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="684.0" y="358.0" width="30" height="11" rx="3"/><rect x="684.0" y="375.0" width="30" height="11" rx="3"/><circle cx="690.0" cy="363.5" r="1.5" fill="#BE123C" stroke="none"/><circle cx="690.0" cy="380.5" r="1.5" fill="#BE123C" stroke="none"/></g><text x="736" y="370" fill="#0F172A" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="720" text-anchor="start">Remote REST</text><text x="736" y="393" fill="#64748B" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="500" text-anchor="start">explicit adapter</text><g filter="url(#shadow-sm)"><rect x="652" y="419" width="460" height="76" rx="18" fill="#FFFFFF" stroke="#E2E8F0"/><rect x="652" y="419" width="6" height="76" rx="3" fill="#0E7490"/></g><rect x="676" y="441" width="46" height="46" rx="14" fill="#0E7490" fill-opacity=".10" stroke="#0E7490" stroke-opacity=".28"/><g fill="none" stroke="#0E7490" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M699.0 448.0l14 5v10c0 10-6 16-14 20-8-4-14-10-14-20v-10z"/><path d="M692.0 465.0l5 5 10-11"/></g><text x="736" y="462" fill="#0F172A" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17" font-weight="720" text-anchor="start">Server controls</text><text x="736" y="485" fill="#64748B" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="500" text-anchor="start">auth • rate limit • audit</text><text x="600" y="552" fill="#64748B" font-family="JetBrains Mono,SFMono-Regular,Consolas,monospace" font-size="11" font-weight="650" text-anchor="middle">explicit boundary</text><rect x="64" y="580" width="150" height="32" rx="16" fill="#FFFFFF" stroke="#CBD5E1"/><circle cx="80" cy="596" r="4" fill="#2563EB"/><text x="92" y="601" fill="#334155" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="600" text-anchor="start">VITE_* is public</text><rect x="226" y="580" width="225.1" height="32" rx="16" fill="#FFFFFF" stroke="#CBD5E1"/><circle cx="242" cy="596" r="4" fill="#0F766E"/><text x="254" y="601" fill="#334155" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="600" text-anchor="start">No privileged client secret</text><rect x="463.1" y="580" width="150" height="32" rx="16" fill="#FFFFFF" stroke="#CBD5E1"/><circle cx="479.1" cy="596" r="4" fill="#6D28D9"/><text x="491.1" y="601" fill="#334155" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="600" text-anchor="start">Portable backups</text>
 </svg>

@@ -242,24 +242,36 @@ cp .env.example .env.local
 
 远程写入失败不会静默回退到 IndexedDB，以免浏览器和服务器形成分叉数据库。
 
-## 十四张可复现功能图
+## 十四张 UI/UX Pro Max 可复现功能图
 
-本 README 的**十四张**功能图由 AI 辅助设计，并通过仓库脚本确定性生成；不依赖外部图片链接：
+本 README 的**十四张**功能图按照 [UI/UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 与其[中文指南](https://github.com/bbylw/ui-ux-pro-max-skill-cn)的设计工作流重新构建，并通过仓库脚本确定性生成。
+
+ResinDB 被归类为高密度科研材料信息学 Dashboard，采用：
+
+- **Swiss Modernism 2.0 + Bento Grid + Accessible & Ethical + Dimensional Layering**；
+- 密度 `8/10`、动效 `2/10`；
+- 8pt 间距节奏、语义色、统一 2 px 线性 SVG 图标；
+- 明确的标题层级、编号步骤和文字标签，避免仅依赖颜色表达含义；
+- 高对比浅色数据产品风格，不使用装饰性霓虹光晕、随机渐变或 emoji 图标。
+
+完整设计令牌、布局规则、无障碍合同和反模式清单见 [`docs/README_VISUAL_DESIGN_SYSTEM.md`](docs/README_VISUAL_DESIGN_SYSTEM.md)。
 
 ```bash
 npm run visuals:generate
 npm run visuals:check
 ```
 
-生成器使用 Python 标准库，自动检查 SVG XML、`<title>`、`<desc>`、`role="img"` 和 `aria-labelledby`。`validate:docs` 还会检查：
+生成器使用 Python 标准库，并自动检查：
 
-- README 是否引用全部 14 张图且不存在断链；
-- 图片是否与生成器输出逐字节一致；
-- README、`package.json` 与验证合同的版本是否一致；
-- 正式 CI 是否执行文档与生产源码卫生检查；
-- 仓库是否重新出现旧 patch、trigger、迁移或诊断残留；
-- 最新机器摘要是否与固定报告目录一致，避免证据链接漂移；
-- 当前树验证不得保留失败状态或非零退出码。
+- SVG XML 是否有效；
+- `<title>`、`<desc>`、`<metadata>` 是否完整；
+- `role="img"` 与 `aria-labelledby`；
+- `data-design-system="resindb-uiux-pro-max-v1"`；
+- README 是否只引用每张图一次且不存在断链；
+- 图片是否与干净环境中的重新生成结果逐字节一致；
+- README、`package.json`、视觉设计系统与验证合同是否一致；
+- 正式 CI 是否执行文档、视觉资产与生产源码卫生检查；
+- 仓库是否重新出现 patch、trigger、迁移或诊断残留。
 
 架构 SVG 是说明性图示，不是运行截图。真实 Chromium PNG、原始日志和 Coverage HTML 作为 GitHub Actions artifact 限时保存，不会被伪装成仓库静态证据。
 
@@ -270,6 +282,7 @@ npm run visuals:check
 ├── .github/workflows/ci.yml       # main 分支永久质量门
 ├── docs/
 │   ├── VALIDATION.md              # 验证合同与证据保留规则
+│   ├── README_VISUAL_DESIGN_SYSTEM.md # UI/UX Pro Max 视觉系统
 │   └── assets/                    # 14 张确定性 SVG
 ├── scripts/
 │   ├── generate-readme-visuals.py

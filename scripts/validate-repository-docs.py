@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 README = ROOT / "README.md"
 PACKAGE = ROOT / "package.json"
 VALIDATION = ROOT / "docs" / "VALIDATION.md"
+VISUAL_DESIGN_SYSTEM = ROOT / "docs" / "README_VISUAL_DESIGN_SYSTEM.md"
 ASSETS = ROOT / "docs" / "assets"
 LATEST_REPORT = ROOT / "reports" / "final-visual-upgrade-20260726" / "REPORT.md"
 LATEST_SUMMARY = ROOT / "reports" / "final-visual-upgrade-20260726" / "summary.json"
@@ -86,6 +87,11 @@ FORBIDDEN_PATHS = (
     ".github/workflows/lockfile-rebuild-diagnostic-20260726.yml",
     "reports/lockfile-rebuild-diagnostic-20260726.txt",
     "reports/fresh-lockfile-rebuild-failure-20260726.md",
+    ".github/uiux-design-system-research-20260727.trigger",
+    ".github/workflows/uiux-design-system-research-20260727.yml",
+    ".github/uiux-readme-visual-redesign-20260727.trigger",
+    ".github/workflows/uiux-readme-visual-redesign-20260727.yml",
+    "scripts/apply-uiux-readme-visual-system.py",
     "docs/MIGRATION_v3.1.0.md",
     "docs/RELEASE_NOTES_v3.1.0.md",
     "reports/patch-diagnostic.json",
@@ -145,11 +151,34 @@ def validate_visual_inventory(readme_text: str) -> None:
             fail(f"{filename}: missing role=img or aria-labelledby")
         if not root.findall(f"{namespace}title") or not root.findall(f"{namespace}desc"):
             fail(f"{filename}: missing title or desc")
+        if not root.findall(f"{namespace}metadata"):
+            fail(f"{filename}: missing design-system metadata")
+        if root.attrib.get("data-design-system") != "resindb-uiux-pro-max-v1":
+            fail(f"{filename}: missing ResinDB UI/UX Pro Max design-system marker")
         if filename == "resindb-quality-gates.svg":
             svg_text = (ASSETS / filename).read_text(encoding="utf-8")
             for phrase in ("Source hygiene", "production code • no injection"):
                 if phrase not in svg_text:
                     fail(f"{filename}: quality-gate semantics are missing {phrase!r}")
+
+
+def validate_visual_design_system(readme_text: str) -> None:
+    if not VISUAL_DESIGN_SYSTEM.is_file():
+        fail("README visual design-system document is missing")
+    if "docs/README_VISUAL_DESIGN_SYSTEM.md" not in readme_text:
+        fail("README must link the visual design-system document")
+    design_text = VISUAL_DESIGN_SYSTEM.read_text(encoding="utf-8")
+    required = (
+        "UI/UX Pro Max",
+        "Swiss Modernism 2.0",
+        "Bento Grid",
+        "Accessible & Ethical",
+        "8-point",
+        "data-design-system=\"resindb-uiux-pro-max-v1\"",
+    )
+    missing = [value for value in required if value not in design_text]
+    if missing:
+        fail(f"README visual design system is incomplete: {missing}")
 
 
 def validate_version_and_scripts(readme_text: str, validation_text: str) -> None:
@@ -270,6 +299,7 @@ def main() -> None:
     validation_text = VALIDATION.read_text(encoding="utf-8")
     validate_local_links(readme_text)
     validate_visual_inventory(readme_text)
+    validate_visual_design_system(readme_text)
     validate_version_and_scripts(readme_text, validation_text)
     validate_latest_evidence(readme_text, validation_text)
     validate_ci()
@@ -281,7 +311,7 @@ def main() -> None:
     )
     print(
         f"validated README, {len(EXPECTED_VISUALS)} deterministic visuals, "
-        "version/scripts, source hygiene contract, durable evidence, CI contract and repository hygiene"
+        "version/scripts, UI/UX Pro Max visual system, source hygiene contract, durable evidence, CI contract and repository hygiene"
     )
 
 
