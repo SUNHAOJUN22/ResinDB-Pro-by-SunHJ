@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "9f4f8c79fce08809d1b02b2efbd0126c43d9dcbc",
+  "archiveBytes": 606340,
+  "archiveSha256": "41227133e1de25ef979a977fdda44c3cdc3d18c7d25b4b6d905c70b6cfa30a87",
+  "encoding": "base64-concatenated",
+  "parts": [
+    {
+      "path": "reports/_final_source_export/part-000",
+      "bytes": 240000,
+      "sha256": "8482950a58fbd96b63ee0e27eb2cc65d1a8932ce0b7a78adfb8d80cec46297fe"
+    },
+    {
+      "path": "reports/_final_source_export/part-001",
+      "bytes": 240000,
+      "sha256": "854122060adb7dd7faade79653e0376413ae54d78c763f93917b4a08e81677ea"
+    },
+    {
+      "path": "reports/_final_source_export/part-002",
+      "bytes": 240000,
+      "sha256": "4fe36910bb294d2d5c0afe32942a77a4642a173b82857a690c3e919692f7d9ba"
+    },
+    {
+      "path": "reports/_final_source_export/part-003",
+      "bytes": 88456,
+      "sha256": "8f125bc7dd210345cbe906a8429d4e2ef1ea4e1179197ff805572b17e0d2ed42"
+    }
+  ]
+}
