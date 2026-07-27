@@ -5,8 +5,7 @@ import re
 root = Path.cwd()
 generator = root / 'scripts/generate-readme-visuals.py'
 text = generator.read_text(encoding='utf-8')
-if 'height="204" rx="18"' not in text:
-    flow = '''def render_flow(visual: Visual) -> str:
+flow = '''def render_flow(visual: Visual) -> str:
     body = header(visual)
     count = len(visual.items)
     gap = 22
@@ -41,9 +40,15 @@ if 'height="204" rx="18"' not in text:
     )
     return body + footer(visual)
 '''
-    text, count = re.subn(r'def render_flow\(visual: Visual\) -> str:\n.*?\n\ndef render_grid', flow + '\n\ndef render_grid', text, count=1, flags=re.S)
-    if count != 1:
-        raise SystemExit('render_flow replacement failed')
+text, count = re.subn(
+    r'def render_flow\(visual: Visual\) -> str:\n.*?\n\ndef render_grid',
+    flow + '\n\ndef render_grid',
+    text,
+    count=1,
+    flags=re.S,
+)
+if count != 1:
+    raise SystemExit('render_flow replacement failed')
 text = text.replace(
     '''        if width > 400:\n            body += text(x + 26, y + height - 27, visual.description, 12, TOKENS["muted"], 500)\n''',
     '',
@@ -65,4 +70,4 @@ if '"scripts/refine-uiux-visual-layout.py"' not in vtext:
         raise SystemExit('validator forbidden-path anchor missing')
     vtext = vtext.replace(anchor, entries + anchor, 1)
 validator.write_text(vtext, encoding='utf-8')
-print('refined narrow flow layout and final-proof hygiene contract')
+print('rebuilt narrow flow layout and final-proof hygiene contract')
