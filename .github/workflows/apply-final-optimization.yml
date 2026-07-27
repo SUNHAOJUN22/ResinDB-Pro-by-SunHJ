@@ -17,7 +17,8 @@ concurrency:
 jobs:
   validate-and-apply:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 70
+
     steps:
       - name: Publish pending status
         shell: bash
@@ -25,9 +26,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          curl -fsSL -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" -H "X-GitHub-Api-Version: 2022-11-28" \
+          curl -fsSL -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "$(jq -nc --arg state pending --arg context resindb/apply-candidate --arg description 'Fail-closed candidate validation is running' --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
+            -d "$(jq -nc --arg state pending --arg context resindb/apply-candidate --arg description 'Complete candidate verification is running' --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
 
       - name: Check out current main
         uses: actions/checkout@v4
@@ -35,82 +39,103 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Restore and verify chunked signed patch
+      - name: Restore and verify complete signed candidate
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          PATCH_SHA256: f06205db69ab3cc42cb3f15036d6d8a3866d0a4b8693d55d0f957e5feac038cd
+          TEXT_SHA256: 25fb284c8915ab4a61ce58a765290ffb9ea61336f8728a002c8b5d89f39e3e39
+          GZIP_SHA256: a50a4208cf4be9f5c06c4dadaeba7f2b2e43f57416fb1a53290f11f0dad4e8be
+          PATCH_SHA256: 2a33dc4222249f6c7f19ef9571945e7ac18d6f2e2ea0e88489efb088bc4fd694
         run: |
           set -euo pipefail
+
           post_status() {
             local state="$1" context="$2" description="$3"
-            curl -fsSL -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" -H "X-GitHub-Api-Version: 2022-11-28" \
+            curl -fsSL -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
               "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
               -d "$(jq -nc --arg state "$state" --arg context "$context" --arg description "${description:0:130}" --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
           }
+
           blob_shas=(
-            a37e6f99650801e11f3f1788193027fffccc41b6
-            1a22a06261b183e706ef4a9f329a12d51b493d90
-            eeea702c6d22a233f9615a9db70566a7ca7b2bda
-            39ef8cdfd996bcf4eefcd49edf2aa82590580250
-            135602ff120c54bd824a9650cad7ab8888900d92
-            a06e60f172902b02a0d1e884a910d2246069fe64
-            7370bf7e058a95c0ced3d178b634b6466fd3a5a8
-            cb049e1c1212929840799b90b3b8017cd11bf319
-            96af58e8bdc8748aef4e95bef757bb1834ba74d0
+            7dd53c13901d139f683324aa5993cbaa4ff667b7
+            067abf7677984e3536613bb50aed8ed89e07f79a
+            f334ad66b29321ba95f1f7362a9873222a671501
+            7252d8c9e4e3b444c6e3daedbe8d1132adb1c2e2
+            9a84e49fcf701ed06e6d82a5c74f72acb3b151cf
+            dfa57ae7ba893d8bc986a7c4cbacb6cb0413fa34
           )
           chunk_hashes=(
-            94531ebe12bd4756d692dc3f2479d177abd607c4a618c0a937cdb065dc058fea
-            6847d4ea56d1dfd6bf77381c16524866ba1510d578da46dc5c0f1a8339f7cfb7
-            bdece57215719eb5c8ab3ee4fb5f771634f814ae26dc0d7e52bb95d4c903f192
-            68ac47366a8fb5f21c5d61b8ba585c7543de060c1ac56692577e877c26ef0ad7
-            b659f35dd28bbebdf02ce54b36843f6bd4facb2a7ba47e884e71e3c7d4e9730e
-            0d282e2f8dba95c4822e66164100128cf43844f16c104c6a7ecc68421791c749
-            51b3e417cd6d187f26740102a087529b642e5aef79e0a3adec7f2941760a4c8c
-            bc0605a1963df8f3d711e731455e0559631603b63b4917ebaa2fbbc9bdf8d2a6
-            61cab3fe957a3b2c432a689e4ceffe8ffb560c635e46bab4e8839d587dd611c8
+            21e5e40be35fb00c4cf6a4747e682a221c66fbde68479436d50e640cd5e8d349
+            4bb28b8a16af5ca9c0e70c81adea48cac7bf86f998ec8bdacfa02f49a087defb
+            eda1d4881d00c13011f6b1477432cd2f45f316a37e39f7b82ca22335474b7c6d
+            8d460f0c6f34eaf442c90e1a8f998cda474ed2b6c7391f7fef9ceec7eaed3af2
+            953856f3d6b0dbb2d87afb79abd97ee5eda38bbcc60a3f0d2816350f527b530e
+            886529979947658498e10eddb0e29be57621c7bfd5548183b83039901e333d70
           )
-          : > /tmp/resindb-final.patch.gz
+
           for index in "${!blob_shas[@]}"; do
-            curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" -H "X-GitHub-Api-Version: 2022-11-28" \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/blobs/${blob_shas[$index]}" > "/tmp/blob-${index}.json"
-            jq -r '.content' "/tmp/blob-${index}.json" | tr -d '\n' | base64 -d > "/tmp/chunk-${index}"
-            actual_chunk="$(sha256sum "/tmp/chunk-${index}" | awk '{print $1}')"
-            test "$actual_chunk" = "${chunk_hashes[$index]}"
-            cat "/tmp/chunk-${index}" >> /tmp/resindb-final.patch.gz
+            output="/tmp/resindb-chunk-$(printf '%02d' "$index")"
+            curl -fsSL \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/blobs/${blob_shas[$index]}" \
+              | jq -r '.content' | tr -d '\n' | base64 -d > "$output"
+            actual="$(sha256sum "$output" | awk '{print $1}')"
+            test "$actual" = "${chunk_hashes[$index]}"
           done
-          actual="$(sha256sum /tmp/resindb-final.patch.gz | awk '{print $1}')"
-          if [ "$actual" != "$PATCH_SHA256" ]; then
-            post_status failure resindb/apply-download "Patch digest mismatch: ${actual}"
+
+          cat /tmp/resindb-chunk-* > /tmp/resindb-final.patch.gz.b64
+          actual_text="$(sha256sum /tmp/resindb-final.patch.gz.b64 | awk '{print $1}')"
+          if [ "$actual_text" != "$TEXT_SHA256" ]; then
+            post_status failure resindb/transport-text "Text digest mismatch: ${actual_text}"
+            exit 1
+          fi
+
+          base64 -d /tmp/resindb-final.patch.gz.b64 > /tmp/resindb-final.patch.gz
+          actual_gzip="$(sha256sum /tmp/resindb-final.patch.gz | awk '{print $1}')"
+          if [ "$actual_gzip" != "$GZIP_SHA256" ]; then
+            post_status failure resindb/transport-gzip "Gzip digest mismatch: ${actual_gzip}"
             exit 1
           fi
           gzip -t /tmp/resindb-final.patch.gz
-          post_status success resindb/apply-download "Patch digest verified: ${actual}"
+
           gzip -dc /tmp/resindb-final.patch.gz > /tmp/resindb-final.patch
-          exclusions=(
-            --exclude=.github/workflows/final-source-export.yml
-            --exclude=.github/workflows/remediate-lockfile-20260726.yml
-          )
-          if ! git apply --check --binary "${exclusions[@]}" /tmp/resindb-final.patch 2>/tmp/git-apply-check.log; then
-            message="$(tr '\n' ' ' < /tmp/git-apply-check.log | cut -c1-130)"
-            post_status failure resindb/apply-check "$message"
-            cat /tmp/git-apply-check.log
+          actual_patch="$(sha256sum /tmp/resindb-final.patch | awk '{print $1}')"
+          if [ "$actual_patch" != "$PATCH_SHA256" ]; then
+            post_status failure resindb/transport-patch "Patch digest mismatch: ${actual_patch}"
             exit 1
           fi
-          post_status success resindb/apply-check "git apply --check passed"
-          git apply --binary "${exclusions[@]}" /tmp/resindb-final.patch
+
+          git apply --check --binary /tmp/resindb-final.patch
+          git apply --binary /tmp/resindb-final.patch
+          post_status success resindb/transport "All transport digests and git apply checks passed"
 
       - name: Remove one-time transport and historical diagnostics
         shell: bash
         run: |
           set -euo pipefail
           rm -rf reports/_final_source_export
+          rm -rf .github/.resindb-v310-patch .github/.resindb-main-update .github/.resindb-v310
           rm -f .github/apply-final-optimization.trigger
           rm -f .github/workflows/apply-final-optimization.yml
           rm -f .github/final-source-export.trigger
           rm -f .github/workflows/final-source-export.yml
           rm -f .github/remediate-lockfile-20260726.trigger
           rm -f .github/workflows/remediate-lockfile-20260726.yml
+          rm -f .github/source-export-trigger.txt .github/dependency-export-trigger.txt
+          rm -f .github/apply-resindb-main-update.trigger .github/apply-resindb-main-update-retry.trigger
+          rm -f .github/workflows/source-export.yml .github/workflows/source-snapshot-export.yml
+          rm -f .github/workflows/dependency-snapshot-export.yml
+          rm -f .github/workflows/apply-resindb-main-update.yml .github/workflows/apply-resindb-main-update-retry.yml
+          rm -f reports/patch-diagnostic.json
+          rm -f reports/source-export.json reports/source-export-run.json reports/source-export-started.json
+          rm -f reports/dependency-export.json reports/dependency-export-run.json reports/dependency-export-started.json
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          find . -type f -name '*.pyc' -delete
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -119,17 +144,32 @@ jobs:
           cache: npm
 
       - name: Install exact dependencies
+        id: npm-ci
         shell: bash
         run: |
           set -euo pipefail
           for attempt in 1 2 3; do
-            if npm ci; then exit 0; fi
+            if npm ci > /tmp/npm-ci.log 2>&1; then
+              cat /tmp/npm-ci.log
+              exit 0
+            fi
+            tail -n 180 /tmp/npm-ci.log
             [ "$attempt" -eq 3 ] && exit 1
             sleep $((attempt * 15))
           done
 
       - name: Run complete pre-commit validation
         run: npm run validate:ci
+
+      - name: Generate and render final validation reports
+        run: |
+          npm run report:validation
+          npm run report:pdf
+          pdf="artifacts/ResinDB-Pro-3.2.0-Final-Validation-Report.pdf"
+          test -s "$pdf"
+          pdfinfo "$pdf"
+          pdftoppm -png -f 1 -singlefile -r 120 "$pdf" artifacts/pdf-render-page-1
+          test "$(stat -c%s artifacts/pdf-render-page-1.png)" -gt 10000
 
       - name: Commit validated tree directly to main
         shell: bash
@@ -149,9 +189,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           curl -fsSL -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "$(jq -nc --arg state success --arg context resindb/apply-candidate --arg description 'Candidate validated and committed to main' --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
+            -d "$(jq -nc --arg state success --arg context resindb/apply-candidate --arg description 'Candidate validated and committed directly to main' --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
 
       - name: Publish failed status
         if: failure()
@@ -159,6 +200,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           curl -fsSL -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "$(jq -nc --arg state failure --arg context resindb/apply-candidate --arg description 'Fail-closed candidate validation failed' --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
+            -d "$(jq -nc --arg state failure --arg context resindb/apply-candidate --arg description 'Candidate transport or validation failed' --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
