@@ -1,9 +1,0 @@
-validated_commit=2b874ef657a8652c8fbb45d0d96cca8a89082fc2
-apply_exit=1
-
-stage=formula-cache
-stage=category-index
-stage=shared-indexes
-stage=import-index
-stage=batch-cache-index
-IndexedDBProductAdapter batch method regex matched 0 times
