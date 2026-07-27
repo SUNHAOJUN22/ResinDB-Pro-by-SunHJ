@@ -1,0 +1,85 @@
+name: Performance source optimization v2 2026-07-27
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/performance-source-v2-20260727.trigger
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: resindb-performance-source-v2-20260727
+  cancel-in-progress: true
+
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Measure, patch and validate source
+        id: source
+        continue-on-error: true
+        run: bash scripts/run-performance-source-v2.sh
+      - name: Upload raw source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resindb-performance-source-v2-${{ github.sha }}
+          path: reports/performance-audit-20260727/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Publish verified source or rollback
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          result="$(cat reports/performance-audit-20260727/source-result.txt 2>/dev/null || echo failure)"
+          if [ "$result" != success ]; then
+            rm -rf /tmp/source-failure
+            mkdir -p /tmp/source-failure
+            cp reports/performance-audit-20260727/SOURCE_PHASE.* /tmp/source-failure/ 2>/dev/null || true
+            git reset --hard HEAD
+            rm -f .github/workflows/performance-source-v2-20260727.yml
+            rm -f .github/performance-source-v2-20260727.trigger
+            rm -f scripts/apply-performance-source-v2.py
+            rm -f scripts/run-performance-source-v2.sh
+            rm -rf reports/performance-audit-20260727
+            mkdir -p reports/performance-audit-20260727
+            cp -R /tmp/source-failure/. reports/performance-audit-20260727/ 2>/dev/null || true
+          else
+            rm -rf reports/performance-audit-20260727/source-logs
+            rm -f reports/performance-audit-20260727/source-*.status
+            rm -f reports/performance-audit-20260727/source-input-commit.txt
+            rm -f reports/performance-audit-20260727/source-result.txt
+            rm -f reports/performance-audit-20260727/FAILURE.md
+          fi
+          rm -f .github/workflows/performance-source-v2-20260727.yml
+          rm -f .github/performance-source-v2-20260727.trigger
+          rm -f scripts/apply-performance-source-v2.py
+          rm -f scripts/run-performance-source-v2.sh
+          rm -rf node_modules dist coverage artifacts
+          git config user.name "ResinDB Performance Source Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          if git diff --cached --quiet; then exit 0; fi
+          if [ "$result" = success ]; then
+            git commit -m "perf: cache formulas and index repeated lookups"
+          else
+            git commit -m "perf: publish staged source optimization failure"
+          fi
+          git pull --rebase origin main
+          git push origin HEAD:main
+      - name: Enforce result
+        if: always()
+        run: test "${{ steps.source.outcome }}" = success
