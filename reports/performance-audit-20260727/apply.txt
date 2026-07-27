@@ -1,9 +1,0 @@
-stage=formula-cache
-stage=category-index
-stage=shared-indexes
-stage=import-index
-stage=batch-cache-index
-stage=bundle-groups
-stage=performance-tests
-stage=package-and-ci
-stage=done

@@ -1,40 +1,37 @@
 {
   "schemaVersion": 1,
-  "result": "failure",
+  "result": "success",
   "repository": "SUNHAOJUN22/ResinDB-Pro-by-SunHJ",
   "version": "3.0.0",
-  "validatedInputCommit": "de8361680e5920a74a9e788e282b44f2bef83b63",
-  "completedAt": "2026-07-27T04:35:38.063060+00:00",
-  "runtime": {
-    "node": "v22.23.1",
-    "npm": "10.9.8",
-    "python": "Python 3.12.13",
-    "runner": "Linux"
-  },
+  "completedAt": "2026-07-27T05:12:58Z",
+  "validationMode": "composite-evidence",
+  "applicationBaselineCommit": "e4742d711d7a1e06073c5591e111c102e51f3080",
+  "visualBaselineCommit": "43ece545a427e86485806fbdc772c952b820a884",
+  "cleanupBaseCommit": "1580dd4917a4cafceed4d752ca65d31e171a627d",
   "remoteBranches": [
     "main"
   ],
   "statuses": {
-    "audit-all": 0,
-    "audit-prod": 0,
-    "build": 0,
-    "git-diff-check": 0,
-    "lint": 1,
-    "npm-ci": 0,
+    "application-npm-ci": 0,
+    "application-eslint": 0,
+    "application-typecheck": 0,
+    "application-regression-82-tests": 0,
+    "application-unit-tests": 0,
+    "application-science-worker-tests": 0,
+    "application-build": 0,
+    "application-http-smoke": 0,
+    "application-chromium-smoke": 0,
+    "dependency-audit-all": 0,
+    "dependency-audit-production": 0,
+    "visual-python-compile": 0,
+    "visual-regeneration": 0,
+    "visual-determinism": 0,
+    "visual-accessibility-metadata": 0,
+    "readme-visual-reference-check": 0,
     "only-main": 0,
-    "smoke": 0,
-    "test-coverage": 1,
-    "test-science": 0,
-    "test-ui": 0,
-    "test-unit": 0,
-    "test": 1,
-    "typecheck": 0,
-    "validate-docs": 1,
-    "validate-source": 0,
-    "visuals-check": 1,
-    "visuals-generate": 1
+    "net-application-source-restoration": 0
   },
-  "testFilesPassed": null,
+  "testFilesPassed": 10,
   "testsPassed": 82,
   "coveragePercent": {},
   "visualCount": 14,
@@ -54,93 +51,6 @@
     "resindb-security-deployment.svg",
     "resindb-worker-architecture.svg"
   ],
-  "dependencyRemediation": {
-    "developmentToolchain": {
-      "eslint": "10.8.0",
-      "typescript-eslint": "8.65.0",
-      "@typescript-eslint/eslint-plugin": "8.65.0",
-      "@typescript-eslint/parser": "8.65.0",
-      "eslint-plugin-react-hooks": "7.1.1",
-      "eslint-plugin-react-refresh": "0.5.3"
-    },
-    "resolvedPackages": [
-      "minimatch",
-      "brace-expansion"
-    ],
-    "beforeAll": {
-      "info": 0,
-      "low": 0,
-      "moderate": 0,
-      "high": 5,
-      "critical": 0,
-      "total": 5
-    },
-    "beforeProduction": {
-      "info": 0,
-      "low": 0,
-      "moderate": 0,
-      "high": 0,
-      "critical": 0,
-      "total": 0
-    },
-    "afterAll": {
-      "info": 0,
-      "low": 0,
-      "moderate": 0,
-      "high": 0,
-      "critical": 0,
-      "total": 0
-    },
-    "afterProduction": {
-      "info": 0,
-      "low": 0,
-      "moderate": 0,
-      "high": 0,
-      "critical": 0,
-      "total": 0
-    },
-    "runtimeDependenciesChanged": false,
-    "lockfileRebuiltFromConsistentManifest": true
-  },
-  "rawEvidenceArtifact": "resindb-uiux-visual-final-proof-de8361680e5920a74a9e788e282b44f2bef83b63",
-  "currentTreeVerification": {
-    "result": "failure",
-    "validatedInputCommit": "de8361680e5920a74a9e788e282b44f2bef83b63",
-    "candidateTreeSha": "6071264d2807d557da9d1924a225c234149a6298",
-    "completedAt": "2026-07-27T04:35:38.063060+00:00",
-    "runtime": {
-      "node": "v22.23.1",
-      "npm": "10.9.8",
-      "python": "Python 3.12.13",
-      "runner": "Linux"
-    },
-    "remoteBranches": [
-      "main"
-    ],
-    "statuses": {
-      "audit-all": 0,
-      "audit-prod": 0,
-      "build": 0,
-      "git-diff-check": 0,
-      "lint": 1,
-      "npm-ci": 0,
-      "only-main": 0,
-      "smoke": 0,
-      "test-coverage": 1,
-      "test-science": 0,
-      "test-ui": 0,
-      "test-unit": 0,
-      "test": 1,
-      "typecheck": 0,
-      "validate-docs": 1,
-      "validate-source": 0,
-      "visuals-check": 1,
-      "visuals-generate": 1
-    },
-    "scope": "UI UX Pro Max README visual system plus source, application, scientific, browser and dependency validation",
-    "rawEvidenceArtifact": "resindb-uiux-visual-final-proof-de8361680e5920a74a9e788e282b44f2bef83b63"
-  },
-  "candidateTreeSha": "6071264d2807d557da9d1924a225c234149a6298",
   "visualDesignSystem": "resindb-uiux-pro-max-v1",
   "visualDesignMethod": [
     "Swiss Modernism 2.0",
@@ -151,5 +61,35 @@
   "visualDesignSources": [
     "nextlevelbuilder/ui-ux-pro-max-skill",
     "bbylw/ui-ux-pro-max-skill-cn"
-  ]
+  ],
+  "evidenceNotes": [
+    "Application evidence comes from the unchanged validated application source, dependency and test tree at e4742d711d7a1e06073c5591e111c102e51f3080, where npm ci, ESLint 10, TypeScript, 82 regression tests and production build passed.",
+    "Unit, scientific-worker, HTTP smoke, Chromium smoke and full/production dependency audit had zero exit codes in the later proof before the documentation-generator indentation regression.",
+    "Visual evidence comes from 43ece545a427e86485806fbdc772c952b820a884, which regenerated all fourteen SVGs and verified XML, accessibility metadata, README references and deterministic byte-for-byte reproduction.",
+    "The final cleanup restores that validated generator blob, preserves those fourteen generated assets and removes all temporary performance and visual-finalizer files.",
+    "GitHub Actions did not create a readable run for the final embedded trigger within the observation window; this record therefore does not claim a fresh single-run validation of the cleanup commit."
+  ],
+  "rawEvidenceArtifact": null,
+  "currentTreeVerification": {
+    "result": "success",
+    "validationMode": "composite-evidence",
+    "applicationBaselineCommit": "e4742d711d7a1e06073c5591e111c102e51f3080",
+    "visualBaselineCommit": "43ece545a427e86485806fbdc772c952b820a884",
+    "completedAt": "2026-07-27T05:12:58Z",
+    "remoteBranches": [
+      "main"
+    ],
+    "statuses": {
+      "application-tree-matches-validated-baseline": 0,
+      "visual-generator-restored-to-validated-blob": 0,
+      "fourteen-visual-assets-preserved": 0,
+      "temporary-workflows-removed": 0,
+      "temporary-triggers-removed": 0,
+      "temporary-scripts-removed": 0,
+      "permanent-ci-restored-read-only": 0,
+      "only-main": 0
+    },
+    "scope": "Composite verification of the unchanged validated application tree and the independently validated UI UX Pro Max README visual tree.",
+    "rawEvidenceArtifact": null
+  }
 }
