@@ -1,1 +1,1 @@
-Execute the registered ESLint repair, dependency inventory, source scan, build baseline and formula/category microbenchmarks; publish evidence and self-clean.
+Run the evidence-preserving phase-zero baseline now; always publish exact logs and self-clean.
