@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Generate accessible, deterministic SVG diagrams for the ResinDB Pro README."""
+"""Generate accessible, deterministic ResinDB Pro README diagrams.
+
+The visual language follows the UI/UX Pro Max workflow for a dense scientific
+analytics dashboard: Swiss modernism, Bento structure, accessible semantic
+colors, a strict 8-point spacing rhythm, vector-only icons and low visual noise.
+"""
 
 from __future__ import annotations
 
@@ -16,426 +21,519 @@ DEFAULT_OUTPUT = ROOT / "docs" / "assets"
 WIDTH = 1200
 HEIGHT = 640
 FONT = "Inter,Segoe UI,Arial,sans-serif"
-COLORS = ("#38bdf8", "#34d399", "#a78bfa", "#fbbf24", "#fb7185", "#22d3ee")
+MONO = "JetBrains Mono,SFMono-Regular,Consolas,monospace"
 
-DEFS = """
+TOKENS = {
+    "canvas": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "surface_alt": "#F1F5F9",
+    "ink": "#0F172A",
+    "body": "#334155",
+    "muted": "#64748B",
+    "border": "#CBD5E1",
+    "border_soft": "#E2E8F0",
+    "primary": "#2563EB",
+    "cyan": "#0E7490",
+    "teal": "#0F766E",
+    "violet": "#6D28D9",
+    "amber": "#B45309",
+    "rose": "#BE123C",
+    "green": "#15803D",
+    "navy": "#0F172A",
+}
+ACCENTS = (
+    TOKENS["primary"], TOKENS["teal"], TOKENS["violet"],
+    TOKENS["amber"], TOKENS["rose"], TOKENS["cyan"],
+)
+
+DEFS = f"""
 <defs>
-  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#06111f"/>
-    <stop offset=".56" stop-color="#0b1830"/>
-    <stop offset="1" stop-color="#111b35"/>
-  </linearGradient>
-  <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#22d3ee"/>
-    <stop offset="1" stop-color="#2563eb"/>
-  </linearGradient>
-  <linearGradient id="emerald" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#34d399"/>
-    <stop offset="1" stop-color="#059669"/>
-  </linearGradient>
-  <filter id="shadow" x="-25%" y="-25%" width="150%" height="170%">
-    <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#020617" flood-opacity=".46"/>
+  <filter id="shadow-sm" x="-15%" y="-20%" width="130%" height="150%">
+    <feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#0F172A" flood-opacity=".08"/>
   </filter>
-  <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-    <feGaussianBlur stdDeviation="7" result="blur"/>
-    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-  </filter>
-  <pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse">
-    <path d="M36 0H0V36" fill="none" stroke="#94a3b8" stroke-opacity=".055"/>
+  <pattern id="dot-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+    <circle cx="1" cy="1" r="1" fill="#CBD5E1" fill-opacity=".38"/>
   </pattern>
-  <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
-    <path d="M0 0L10 5L0 10Z" fill="#38bdf8"/>
+  <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+    <path d="M0 0L9 4.5L0 9Z" fill="{TOKENS['primary']}"/>
   </marker>
-  <marker id="arrow-muted" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
-    <path d="M0 0L10 5L0 10Z" fill="#64748b"/>
+  <marker id="arrow-muted" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+    <path d="M0 0L9 4.5L0 9Z" fill="{TOKENS['muted']}"/>
   </marker>
 </defs>
 """
 
 
 @dataclass(frozen=True)
+class Item:
+    icon: str
+    title: str
+    subtitle: str
+
+
+@dataclass(frozen=True)
 class Visual:
     filename: str
     title_id: str
+    eyebrow: str
     title: str
     subtitle: str
     description: str
     layout: str
-    items: tuple[tuple[str, str], ...]
+    items: tuple[Item, ...]
     footer: tuple[str, ...] = ()
 
 
-def text(x: float, y: float, value: str, size: int = 20, color: str = "#e2e8f0",
-         weight: int = 500, anchor: str = "start") -> str:
+def text(x: float, y: float, value: str, size: int = 16, color: str | None = None,
+         weight: int = 500, anchor: str = "start", family: str = FONT,
+         letter_spacing: float | None = None) -> str:
+    color = color or TOKENS["body"]
+    tracking = f' letter-spacing="{letter_spacing}"' if letter_spacing is not None else ""
     return (
-        f'<text x="{x}" y="{y}" fill="{color}" font-family="{FONT}" '
-        f'font-size="{size}" font-weight="{weight}" text-anchor="{anchor}">'
+        f'<text x="{x}" y="{y}" fill="{color}" font-family="{family}" '
+        f'font-size="{size}" font-weight="{weight}" text-anchor="{anchor}"{tracking}>'
         f'{escape(value)}</text>'
     )
 
 
-def panel(x: float, y: float, width: float, height: float, title: str, subtitle: str,
-          accent: str) -> str:
-    return f"""
-<g filter="url(#shadow)">
-  <rect x="{x}" y="{y}" width="{width}" height="{height}" rx="24" fill="#0f213b" stroke="#334155"/>
-  <rect x="{x}" y="{y}" width="7" height="{height}" rx="3.5" fill="{accent}"/>
-  {text(x + 26, y + 42, title, 20, "#f8fafc", 760)}
-  {text(x + 26, y + 70, subtitle, 13, "#94a3b8", 520)}
-</g>
-"""
-
-
-def chip(x: float, y: float, label: str, accent: str, width: float) -> str:
-    return f"""
-<g>
-  <rect x="{x}" y="{y}" width="{width}" height="34" rx="17" fill="{accent}" fill-opacity=".13"
-        stroke="{accent}" stroke-opacity=".55"/>
-  {text(x + width / 2, y + 23, label, 13, "#e2e8f0", 650, "middle")}
-</g>
-"""
-
-
-def arrow(x1: float, y1: float, x2: float, y2: float, muted: bool = False,
-          dashed: bool = False) -> str:
-    color = "#64748b" if muted else "#38bdf8"
-    marker = "arrow-muted" if muted else "arrow"
-    dash = ' stroke-dasharray="8 8"' if dashed else ""
+def line(x1: float, y1: float, x2: float, y2: float, color: str | None = None,
+         width: float = 2, dashed: bool = False, marker: str | None = None) -> str:
+    color = color or TOKENS["border"]
+    dash = ' stroke-dasharray="6 6"' if dashed else ""
+    marker_attr = f' marker-end="url(#{marker})"' if marker else ""
     return (
         f'<path d="M{x1} {y1}L{x2} {y2}" fill="none" stroke="{color}" '
-        f'stroke-width="3" stroke-linecap="round" marker-end="url(#{marker})"{dash}/>'
+        f'stroke-width="{width}" stroke-linecap="round"{dash}{marker_attr}/>'
+    )
+
+
+def icon_path(name: str, cx: float, cy: float, color: str) -> str:
+    """Small Lucide-like outline icons with a consistent 2px stroke."""
+    s = f'fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'
+    if name == "database":
+        return f'<g {s}><ellipse cx="{cx}" cy="{cy-9}" rx="12" ry="5"/><path d="M{cx-12} {cy-9}v18c0 3 5 5 12 5s12-2 12-5v-18"/><path d="M{cx-12} {cy}c0 3 5 5 12 5s12-2 12-5"/></g>'
+    if name == "chart":
+        return f'<g {s}><path d="M{cx-14} {cy+13}V{cy-13}M{cx-14} {cy+13}H{cx+15}"/><path d="M{cx-9} {cy+7}l7-8 6 4 9-12"/><circle cx="{cx-2}" cy="{cy-1}" r="2" fill="{color}" stroke="none"/><circle cx="{cx+4}" cy="{cy+3}" r="2" fill="{color}" stroke="none"/></g>'
+    if name == "science":
+        return f'<g {s}><ellipse cx="{cx}" cy="{cy}" rx="16" ry="6"/><ellipse cx="{cx}" cy="{cy}" rx="16" ry="6" transform="rotate(60 {cx} {cy})"/><ellipse cx="{cx}" cy="{cy}" rx="16" ry="6" transform="rotate(120 {cx} {cy})"/><circle cx="{cx}" cy="{cy}" r="3" fill="{color}" stroke="none"/></g>'
+    if name == "spark":
+        return f'<g {s}><path d="M{cx} {cy-16}l3 9 9 3-9 3-3 9-3-9-9-3 9-3z"/><path d="M{cx+11} {cy+5}l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/></g>'
+    if name == "file":
+        return f'<g {s}><path d="M{cx-10} {cy-15}h13l8 8v22h-21z"/><path d="M{cx+3} {cy-15}v8h8M{cx-5} {cy+1}h11M{cx-5} {cy+7}h8"/></g>'
+    if name == "shield":
+        return f'<g {s}><path d="M{cx} {cy-16}l14 5v10c0 10-6 16-14 20-8-4-14-10-14-20v-10z"/><path d="M{cx-7} {cy+1}l5 5 10-11"/></g>'
+    if name == "worker":
+        return f'<g {s}><rect x="{cx-13}" y="{cy-13}" width="26" height="26" rx="5"/><path d="M{cx-5} {cy-5}h10v10h-10zM{cx-18} {cy-7}h5M{cx-18} {cy}h5M{cx-18} {cy+7}h5M{cx+13} {cy-7}h5M{cx+13} {cy}h5M{cx+13} {cy+7}h5"/></g>'
+    if name == "formula":
+        return f'<g {s}>{text(cx, cy+7, "fx", 22, color, 750, "middle", MONO)}</g>'
+    if name == "network":
+        return f'<g {s}><path d="M{cx-10} {cy-8}L{cx+9} {cy-12}L{cx+13} {cy+9}L{cx-7} {cy+13}Z"/><circle cx="{cx-10}" cy="{cy-8}" r="4" fill="{TOKENS["surface"]}"/><circle cx="{cx+9}" cy="{cy-12}" r="4" fill="{TOKENS["surface"]}"/><circle cx="{cx+13}" cy="{cy+9}" r="4" fill="{TOKENS["surface"]}"/><circle cx="{cx-7}" cy="{cy+13}" r="4" fill="{TOKENS["surface"]}"/></g>'
+    if name == "compare":
+        return f'<g {s}><path d="M{cx} {cy-14}v28M{cx-13} {cy-9}h26"/><path d="M{cx-13} {cy-9}l-7 13h14zM{cx+13} {cy-9}l-7 13h14z"/></g>'
+    if name == "lock":
+        return f'<g {s}><rect x="{cx-12}" y="{cy-2}" width="24" height="18" rx="4"/><path d="M{cx-7} {cy-2}v-5a7 7 0 0114 0v5"/><circle cx="{cx}" cy="{cy+7}" r="2" fill="{color}" stroke="none"/></g>'
+    if name == "import":
+        return f'<g {s}><path d="M{cx-12} {cy-14}h14l9 9v19h-23zM{cx+2} {cy-14}v9h9"/><path d="M{cx} {cy-1}v13M{cx-6} {cy+6}l6 6 6-6"/></g>'
+    if name == "check":
+        return f'<g {s}><circle cx="{cx}" cy="{cy}" r="15"/><path d="M{cx-8} {cy}l6 6 11-13"/></g>'
+    if name == "flask":
+        return f'<g {s}><path d="M{cx-6} {cy-16}h12M{cx-4} {cy-16}v10l-10 18a5 5 0 004 7h20a5 5 0 004-7l-10-18v-10"/><path d="M{cx-10} {cy+7}h20"/></g>'
+    if name == "server":
+        return f'<g {s}><rect x="{cx-15}" y="{cy-14}" width="30" height="11" rx="3"/><rect x="{cx-15}" y="{cy+3}" width="30" height="11" rx="3"/><circle cx="{cx-9}" cy="{cy-8.5}" r="1.5" fill="{color}" stroke="none"/><circle cx="{cx-9}" cy="{cy+8.5}" r="1.5" fill="{color}" stroke="none"/></g>'
+    if name == "tag":
+        return f'<g {s}><path d="M{cx-14} {cy-10}h14l14 14-10 10-14-14v-14z"/><circle cx="{cx-7}" cy="{cy-4}" r="2"/></g>'
+    if name == "filter":
+        return f'<g {s}><path d="M{cx-15} {cy-12}h30l-11 12v12l-8 4v-16z"/></g>'
+    if name == "layers":
+        return f'<g {s}><path d="M{cx} {cy-15}l16 8-16 8-16-8zM{cx-16} {cy}l16 8 16-8M{cx-16} {cy+8}l16 8 16-8"/></g>'
+    return f'<g {s}><circle cx="{cx}" cy="{cy}" r="14"/><path d="M{cx-6} {cy}h12M{cx} {cy-6}v12"/></g>'
+
+
+def icon_badge(x: float, y: float, icon: str, accent: str, size: float = 48) -> str:
+    cx, cy = x + size / 2, y + size / 2
+    return (
+        f'<rect x="{x}" y="{y}" width="{size}" height="{size}" rx="14" '
+        f'fill="{accent}" fill-opacity=".10" stroke="{accent}" stroke-opacity=".28"/>'
+        + icon_path(icon, cx, cy, accent)
     )
 
 
 def header(visual: Visual) -> str:
     return (
-        text(72, 70, visual.title, 36, "#f8fafc", 820)
-        + text(72, 104, visual.subtitle, 16, "#94a3b8", 520)
-        + '<path d="M72 126H1128" stroke="#334155"/>'
+        f'<rect x="0" y="0" width="{WIDTH}" height="142" fill="{TOKENS["navy"]}"/>'
+        + text(64, 38, "RESINDB PRO", 12, "#93C5FD", 750, letter_spacing=1.6)
+        + text(64, 82, visual.title, 32, "#FFFFFF", 760)
+        + text(64, 112, visual.subtitle, 15, "#CBD5E1", 450)
+        + text(1136, 38, visual.eyebrow.upper(), 11, "#94A3B8", 650, "end", MONO, 1.0)
+        + f'<rect x="64" y="132" width="90" height="4" rx="2" fill="{TOKENS["primary"]}"/>'
     )
 
 
-def footer_chips(labels: tuple[str, ...], y: float = 548) -> str:
-    if not labels:
+def footer(visual: Visual) -> str:
+    if not visual.footer:
         return ""
-    total = 1000
-    gap = 18
-    width = (total - gap * (len(labels) - 1)) / len(labels)
-    x = 100
+    x = 64
     result = ""
-    for index, label in enumerate(labels):
-        result += chip(x, y, label, COLORS[index % len(COLORS)], width)
-        x += width + gap
+    for index, label in enumerate(visual.footer):
+        width = max(150, 28 + len(label) * 7.3)
+        accent = ACCENTS[index % len(ACCENTS)]
+        result += (
+            f'<rect x="{x}" y="580" width="{width}" height="32" rx="16" '
+            f'fill="{TOKENS["surface"]}" stroke="{TOKENS["border"]}"/>'
+            f'<circle cx="{x+16}" cy="596" r="4" fill="{accent}"/>'
+            + text(x + 28, 601, label, 12, TOKENS["body"], 600)
+        )
+        x += width + 12
     return result
 
 
+def card(x: float, y: float, width: float, height: float, item: Item, accent: str,
+         number: int | None = None) -> str:
+    number_markup = ""
+    if number is not None:
+        number_markup = (
+            f'<rect x="{x+width-52}" y="{y+18}" width="32" height="24" rx="12" fill="{TOKENS["surface_alt"]}"/>'
+            + text(x + width - 36, y + 35, f"{number:02d}", 11, TOKENS["muted"], 700, "middle", MONO)
+        )
+    return (
+        f'<g filter="url(#shadow-sm)">'
+        f'<rect x="{x}" y="{y}" width="{width}" height="{height}" rx="18" fill="{TOKENS["surface"]}" stroke="{TOKENS["border_soft"]}"/>'
+        f'<rect x="{x}" y="{y}" width="6" height="{height}" rx="3" fill="{accent}"/>'
+        f'</g>'
+        + icon_badge(x + 24, y + 22, item.icon, accent, 46)
+        + text(x + 84, y + 43, item.title, 17, TOKENS["ink"], 720)
+        + text(x + 84, y + 66, item.subtitle, 12, TOKENS["muted"], 500)
+        + number_markup
+    )
+
+
 def render_flow(visual: Visual) -> str:
-    count = len(visual.items)
-    gap = 28
-    width = (1030 - gap * (count - 1)) / count
-    x0 = 85
-    y = 220
     body = header(visual)
-    for index, (title, subtitle) in enumerate(visual.items):
-        x = x0 + index * (width + gap)
-        color = COLORS[index % len(COLORS)]
-        body += panel(x, y, width, 150, title, subtitle, color)
-        body += f'<circle cx="{x + width / 2}" cy="{y + 112}" r="22" fill="{color}" fill-opacity=".18" stroke="{color}"/>'
-        body += text(x + width / 2, y + 119, str(index + 1), 16, "#f8fafc", 800, "middle")
+    count = len(visual.items)
+    gap = 22
+    width = (1072 - gap * (count - 1)) / count
+    y = 222
+    for index, item in enumerate(visual.items):
+        x = 64 + index * (width + gap)
+        accent = ACCENTS[index % len(ACCENTS)]
+        body += card(x, y, width, 178, item, accent, index + 1)
         if index < count - 1:
-            body += arrow(x + width, y + 75, x + width + gap - 8, y + 75)
-    body += footer_chips(visual.footer)
-    return body
+            body += line(x + width + 4, y + 89, x + width + gap - 5, y + 89,
+                         TOKENS["primary"], 2, False, "arrow")
+    body += (
+        f'<rect x="64" y="442" width="1072" height="92" rx="18" fill="{TOKENS["surface_alt"]}" stroke="{TOKENS["border_soft"]}"/>'
+        + text(88, 473, "DESIGN INTENT", 11, TOKENS["primary"], 750, family=MONO, letter_spacing=1.0)
+        + text(88, 503, visual.description, 14, TOKENS["body"], 500)
+    )
+    return body + footer(visual)
 
 
 def render_grid(visual: Visual) -> str:
-    columns = 3
-    x0, y0 = 80, 174
-    width, height = 320, 154
-    xgap, ygap = 40, 42
     body = header(visual)
-    for index, (title, subtitle) in enumerate(visual.items):
-        row, col = divmod(index, columns)
-        x = x0 + col * (width + xgap)
-        y = y0 + row * (height + ygap)
-        color = COLORS[index % len(COLORS)]
-        body += panel(x, y, width, height, title, subtitle, color)
-        body += (
-            f'<path d="M{x + 32} {y + 112}C{x + 88} {y + 78},'
-            f'{x + 144} {y + 142},{x + 200} {y + 103}S{x + 270} {y + 80},'
-            f'{x + 288} {y + 116}" fill="none" stroke="{color}" stroke-width="3"/>'
-        )
-    body += footer_chips(visual.footer, 558)
-    return body
+    width, height = 334, 154
+    x_positions = (64, 433, 802)
+    y_positions = (176, 354)
+    for index, item in enumerate(visual.items):
+        row, col = divmod(index, 3)
+        x, y = x_positions[col], y_positions[row]
+        accent = ACCENTS[index % len(ACCENTS)]
+        body += card(x, y, width, height, item, accent)
+        # Non-color-only mini metric glyph.
+        body += line(x + 26, y + 118, x + 306, y + 118, TOKENS["border_soft"], 1)
+        points = [(x + 32, y + 124), (x + 94, y + 107), (x + 152, y + 116), (x + 220, y + 91), (x + 296, y + 102)]
+        path = "M" + "L".join(f"{px} {py}" for px, py in points)
+        body += f'<path d="{path}" fill="none" stroke="{accent}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        for px, py in points:
+            body += f'<circle cx="{px}" cy="{py}" r="3" fill="{TOKENS["surface"]}" stroke="{accent}" stroke-width="2"/>'
+    return body + footer(visual)
+
+
+def render_bento(visual: Visual) -> str:
+    body = header(visual)
+    positions = (
+        (64, 176, 500, 174), (586, 176, 260, 174), (868, 176, 268, 174),
+        (64, 372, 268, 164), (354, 372, 492, 164), (868, 372, 268, 164),
+    )
+    for index, (item, (x, y, width, height)) in enumerate(zip(visual.items, positions)):
+        accent = ACCENTS[index % len(ACCENTS)]
+        body += card(x, y, width, height, item, accent, index + 1)
+        if width > 400:
+            body += text(x + 26, y + height - 27, visual.description, 12, TOKENS["muted"], 500)
+    return body + footer(visual)
 
 
 def render_hub(visual: Visual) -> str:
     body = header(visual)
-    center_x, center_y = 600, 334
-    body += """
-<g transform="translate(600 334)" filter="url(#glow)">
-  <path d="M0-82L71-41V41L0 82L-71 41V-41Z" fill="#0b2b4f" stroke="#38bdf8" stroke-width="3"/>
-  <path d="M0-44L38-22V22L0 44L-38 22V-22Z" fill="url(#cyan)" fill-opacity=".28" stroke="#67e8f9"/>
-  <circle r="13" fill="#e0f2fe"/>
-</g>
-"""
-    positions = ((230, 205), (600, 170), (970, 205), (230, 455), (600, 505), (970, 455))
-    for index, ((title, subtitle), (x, y)) in enumerate(zip(visual.items, positions)):
-        color = COLORS[index % len(COLORS)]
-        body += arrow(center_x, center_y, x, y, muted=True, dashed=True)
-        body += f'<circle cx="{x}" cy="{y}" r="52" fill="{color}" fill-opacity=".16" stroke="{color}" stroke-width="2"/>'
-        body += f'<circle cx="{x}" cy="{y}" r="18" fill="{color}" fill-opacity=".9"/>'
-        body += text(x, y + 80, title, 15, "#f8fafc", 700, "middle")
-        body += text(x, y + 101, subtitle, 12, "#94a3b8", 520, "middle")
-    return body
+    center_x, center_y = 600, 355
+    body += (
+        f'<rect x="480" y="272" width="240" height="166" rx="24" fill="{TOKENS["navy"]}"/>'
+        + icon_badge(576, 294, "database", "#93C5FD", 48)
+        + text(center_x, 374, "Resin knowledge graph", 18, "#FFFFFF", 720, "middle")
+        + text(center_x, 399, "relations stay reviewable", 12, "#CBD5E1", 500, "middle")
+    )
+    positions = ((90, 190), (450, 172), (880, 190), (90, 438), (450, 474), (880, 438))
+    for index, (item, (x, y)) in enumerate(zip(visual.items, positions)):
+        width, height = 230, 104
+        accent = ACCENTS[index % len(ACCENTS)]
+        target_x = x + width / 2
+        target_y = y + height / 2
+        body += line(center_x, center_y, target_x, target_y, TOKENS["muted"], 1.5, True, "arrow-muted")
+        body += card(x, y, width, height, item, accent)
+    return body + footer(visual)
 
 
 def render_split(visual: Visual) -> str:
     body = header(visual)
-    left = visual.items[: len(visual.items) // 2]
-    right = visual.items[len(visual.items) // 2 :]
-    body += panel(80, 180, 430, 330, "Local / deterministic", "Browser-owned execution boundary", "#38bdf8")
-    body += panel(690, 180, 430, 330, "Optional / governed", "Explicit service boundary", "#fbbf24")
-    for index, (title, subtitle) in enumerate(left):
-        body += chip(120, 270 + index * 64, f"{title} — {subtitle}", COLORS[index % len(COLORS)], 350)
-    for index, (title, subtitle) in enumerate(right):
-        body += chip(730, 270 + index * 64, f"{title} — {subtitle}", COLORS[(index + 3) % len(COLORS)], 350)
-    body += """
-<g transform="translate(600 350)">
-  <path d="M0-65L58-42V2C58 47 27 77 0 91C-27 77-58 47-58 2V-42Z"
-        fill="url(#emerald)" fill-opacity=".17" stroke="#34d399" stroke-width="2"/>
-  <path d="M-22 6l16 16 31-40" fill="none" stroke="#a7f3d0" stroke-width="6"
-        stroke-linecap="round" stroke-linejoin="round"/>
-</g>
-"""
-    body += footer_chips(visual.footer, 558)
-    return body
+    left = visual.items[:3]
+    right = visual.items[3:]
+    body += (
+        f'<rect x="64" y="176" width="508" height="360" rx="22" fill="{TOKENS["surface"]}" stroke="{TOKENS["border_soft"]}"/>'
+        f'<rect x="628" y="176" width="508" height="360" rx="22" fill="{TOKENS["surface"]}" stroke="{TOKENS["border_soft"]}"/>'
+        + text(90, 213, "LOCAL / DETERMINISTIC", 12, TOKENS["primary"], 750, family=MONO, letter_spacing=1.0)
+        + text(654, 213, "OPTIONAL / GOVERNED", 12, TOKENS["amber"], 750, family=MONO, letter_spacing=1.0)
+        + line(600, 190, 600, 524, TOKENS["border"], 2, True)
+    )
+    for side, items in enumerate((left, right)):
+        x = 88 if side == 0 else 652
+        for index, item in enumerate(items):
+            y = 235 + index * 92
+            accent = ACCENTS[(index + side * 3) % len(ACCENTS)]
+            body += card(x, y, 460, 76, item, accent)
+    body += text(600, 552, "explicit boundary", 11, TOKENS["muted"], 650, "middle", MONO)
+    return body + footer(visual)
 
 
 def render_layers(visual: Visual) -> str:
     body = header(visual)
-    y = 172
-    for index, (title, subtitle) in enumerate(visual.items):
-        x = 120 + index * 38
-        width = 960 - index * 76
-        color = COLORS[index % len(COLORS)]
-        body += f'<rect x="{x}" y="{y}" width="{width}" height="70" rx="22" fill="{color}" fill-opacity=".12" stroke="{color}" stroke-opacity=".7"/>'
-        body += text(x + 28, y + 31, title, 18, "#f8fafc", 740)
-        body += text(x + 28, y + 55, subtitle, 13, "#94a3b8", 520)
-        y += 82
-    body += footer_chips(visual.footer, 558)
-    return body
+    y = 176
+    for index, item in enumerate(visual.items):
+        x = 64 + index * 34
+        width = 1072 - index * 68
+        height = 78
+        accent = ACCENTS[index % len(ACCENTS)]
+        body += card(x, y, width, height, item, accent, index + 1)
+        y += 92
+    return body + footer(visual)
 
 
 RENDERERS = {
     "flow": render_flow,
     "grid": render_grid,
+    "bento": render_bento,
     "hub": render_hub,
     "split": render_split,
     "layers": render_layers,
 }
 
+
+def I(icon: str, title: str, subtitle: str) -> Item:
+    return Item(icon, title, subtitle)
+
+
 VISUALS = (
     Visual(
-        "resindb-ai-platform-overview.svg", "platform-title",
-        "ResinDB Pro", "Local-first resin intelligence • scientific workers • auditable AI assistance",
-        "Platform overview of resin data management, analytics, scientific computation, optional AI and evidence export.",
-        "hub",
+        "resindb-ai-platform-overview.svg", "platform-title", "Platform / Bento overview",
+        "ResinDB Pro", "Scientific resin intelligence with explicit evidence boundaries",
+        "A local-first research workspace connecting governed data, deterministic computation, visual analytics, optional AI and export evidence.",
+        "bento",
         (
-            ("Data workspace", "CRUD + snapshots"),
-            ("Visual analytics", "dashboard + pivot"),
-            ("Scientific engine", "models + statistics"),
-            ("AI copilot", "optional endpoint"),
-            ("Evidence export", "portable reports"),
-            ("Quality gates", "tests + audit"),
+            I("database", "Data workspace", "records • taxonomy • snapshots"),
+            I("chart", "Visual analytics", "dashboard • pivot • charts"),
+            I("science", "Scientific engine", "models • statistics • workers"),
+            I("spark", "AI copilot", "optional • bounded • reviewable"),
+            I("file", "Evidence export", "CSV • JSON • XML • PDF"),
+            I("shield", "Quality gates", "tests • audit • provenance"),
         ),
+        ("Local-first", "Deterministic compute", "Human approval"),
     ),
     Visual(
-        "resindb-data-lifecycle.svg", "lifecycle-title",
-        "Resin data lifecycle", "Validate at every boundary • preserve provenance • export without lock-in",
-        "Lifecycle from file import through validation, normalization, persistence, analysis and portable export.",
+        "resindb-data-lifecycle.svg", "lifecycle-title", "Data / Lifecycle",
+        "Resin data lifecycle", "Validate each boundary and preserve provenance",
+        "The lifecycle keeps source, schema, validation, persistence, analysis and portable export visible as separate stages.",
         "flow",
         (
-            ("Import", "CSV • JSON • TXT"),
-            ("Validate", "shape • IDs • ranges"),
-            ("Normalize", "taxonomy • units"),
-            ("Persist", "IndexedDB • snapshots"),
-            ("Analyze", "charts • workers"),
-            ("Export", "CSV • JSON • XML • PDF"),
+            I("import", "Import", "CSV • JSON • TXT"),
+            I("check", "Validate", "shape • IDs • ranges"),
+            I("tag", "Normalize", "taxonomy • aliases • units"),
+            I("database", "Persist", "IndexedDB • snapshots"),
+            I("chart", "Analyze", "filters • charts • workers"),
+            I("file", "Export", "portable evidence package"),
         ),
-        ("Deterministic fallback", "No silent remote write fallback", "Source review required"),
+        ("No silent fallback", "Stable IDs", "Explicit parse errors"),
     ),
     Visual(
-        "resindb-data-governance.svg", "governance-title",
-        "Data governance and provenance", "Catalog separation makes source, status and ownership reviewable",
-        "Governance view for taxonomies, aliases, property groups, manufacturers, references and record universes.",
+        "resindb-data-governance.svg", "governance-title", "Data / Governance",
+        "Data governance and provenance", "Separate records, references, semantics and validation metadata",
+        "Governance layers keep demo, measured, imported and reference data distinguishable and reviewable.",
         "layers",
         (
-            ("Record universes", "polymer database • laboratory • open-market records"),
-            ("Reference catalogs", "manufacturers • sources • relationship network"),
-            ("Semantic dictionaries", "taxonomy • aliases • property groups"),
-            ("Validation envelope", "schemaVersion • sourceType • recordStatus • updatedAt"),
+            I("database", "Record universes", "catalog • laboratory • open market"),
+            I("file", "Reference catalogs", "manufacturers • sources • network"),
+            I("tag", "Semantic dictionaries", "taxonomy • aliases • property groups"),
+            I("shield", "Validation envelope", "schemaVersion • sourceType • status • date"),
         ),
-        ("Demo ≠ measured", "Stable IDs", "Cycle + duplicate checks"),
+        ("Demo ≠ measured", "Duplicate checks", "Cycle checks"),
     ),
     Visual(
-        "resindb-scientific-engine.svg", "science-title",
-        "Scientific computation engine", "Dedicated modules cover rheology, kinetics, reliability and uncertainty",
-        "Scientific engine capabilities grouped by physical model and statistical purpose.",
+        "resindb-scientific-engine.svg", "science-title", "Compute / Scientific engine",
+        "Scientific computation engine", "Models are grouped by physical and statistical purpose",
+        "Dedicated workers and finite-result guards isolate numerical tasks from the interactive application thread.",
         "grid",
         (
-            ("Rheology & relaxation", "Carreau • WLF • Prony"),
-            ("Kinetics & reliability", "Arrhenius • Kissinger • Avrami • Weibull"),
-            ("Uncertainty", "Monte Carlo • Sobol • Copula • KDE"),
-            ("Similarity", "Mahalanobis • Spearman • K-Means • PCA"),
-            ("Optimization", "Pareto • MOO • RSM • SPC"),
-            ("Safeguards", "finite outputs • isolated errors • reproducible inputs"),
+            I("science", "Rheology & relaxation", "Carreau • WLF • Prony"),
+            I("chart", "Kinetics & reliability", "Arrhenius • Avrami • Weibull"),
+            I("formula", "Uncertainty", "Monte Carlo • Sobol • KDE"),
+            I("compare", "Similarity", "Mahalanobis • PCA • K-Means"),
+            I("filter", "Optimization", "Pareto • MOO • RSM • SPC"),
+            I("shield", "Safeguards", "finite output • isolated failure"),
         ),
+        ("Numerical parity", "Worker isolation", "Reproducible inputs"),
     ),
     Visual(
-        "resindb-worker-architecture.svg", "worker-title",
-        "Web Worker execution architecture", "Heavy numerical work stays off the interactive React thread",
-        "Architecture of UI hooks, worker messages, numerical workers, finite-result checks and chart rendering.",
+        "resindb-worker-architecture.svg", "worker-title", "Compute / Worker architecture",
+        "Web Worker execution architecture", "Heavy computation stays outside the React interaction budget",
+        "Typed requests, lifecycle control, finite-result validation and explicit errors form the worker execution contract.",
         "flow",
         (
-            ("React view", "user intent"),
-            ("Worker hook", "typed request"),
-            ("Worker manager", "lifecycle + timeout"),
-            ("Scientific worker", "numerical compute"),
-            ("Result guard", "finite + shaped"),
-            ("Chart / report", "rendered evidence"),
+            I("chart", "React view", "intent • controls"),
+            I("worker", "Worker hook", "typed request"),
+            I("layers", "Manager", "lifecycle • timeout"),
+            I("science", "Scientific worker", "numerical compute"),
+            I("shield", "Result guard", "shape • finite values"),
+            I("file", "Chart / report", "reviewable output"),
         ),
-        ("Failure isolation", "Responsive UI", "Explicit cancellation"),
+        ("Responsive UI", "Failure isolation", "Explicit cancellation"),
     ),
     Visual(
-        "resindb-formula-engine.svg", "formula-title",
+        "resindb-formula-engine.svg", "formula-title", "Compute / Formula safety",
         "Whitelist formula engine", "Parse approved syntax; never execute arbitrary JavaScript",
-        "Formula engine stages from tokenization through parsing, variable binding, evaluation and isolated error reporting.",
+        "Tokenization, parsing, binding, evaluation, short-circuiting and error isolation remain explicit stages.",
         "flow",
         (
-            ("Tokenize", "numbers • names • operators"),
-            ("Parse", "precedence • grouping"),
-            ("Bind", "approved variables"),
-            ("Evaluate", "arithmetic • comparison"),
-            ("Short-circuit", "&& • ||"),
-            ("Isolate", "one bad formula only"),
+            I("filter", "Tokenize", "numbers • names • operators"),
+            I("layers", "Parse", "precedence • grouping"),
+            I("tag", "Bind", "approved properties"),
+            I("formula", "Evaluate", "arithmetic • comparison"),
+            I("compare", "Short-circuit", "logical && • ||"),
+            I("shield", "Isolate", "one bad formula only"),
         ),
         ("No eval", "No new Function", "Finite-result checks"),
     ),
     Visual(
-        "resindb-knowledge-network.svg", "network-title",
-        "Resin knowledge network", "Explore relationships without confusing adjacency with causality",
-        "Network connecting resin grades with polymer families, manufacturers, processes, references and comparable grades.",
+        "resindb-knowledge-network.svg", "network-title", "Explore / Knowledge graph",
+        "Resin knowledge network", "Explore adjacency without claiming causality",
+        "Relations connect grades to families, property groups, manufacturers, routes, comparable grades and references.",
         "hub",
         (
-            ("Polymer family", "taxonomy"),
-            ("Property group", "semantic fields"),
-            ("Manufacturer", "catalog entry"),
-            ("Process route", "context"),
-            ("Comparable grade", "similarity"),
-            ("Reference", "evidence source"),
+            I("layers", "Polymer family", "taxonomy"),
+            I("tag", "Property group", "semantic fields"),
+            I("database", "Manufacturer", "catalog entry"),
+            I("science", "Process route", "context"),
+            I("compare", "Comparable grade", "similarity"),
+            I("file", "Reference", "evidence source"),
         ),
+        ("Adjacency ≠ causality", "Source review", "Stable identifiers"),
     ),
     Visual(
-        "resindb-comparison-decision.svg", "comparison-title",
-        "Grade comparison and decision support", "Combine normalized properties, uncertainty and reviewable rankings",
-        "Decision-support flow from comparable candidates to normalized metrics, visualization, ranking and human review.",
+        "resindb-comparison-decision.svg", "comparison-title", "Analyze / Decision support",
+        "Grade comparison and decision support", "Preserve raw values while exposing normalized trade-offs",
+        "Candidates move through normalization, visualization, scoring, Pareto analysis and human review.",
         "flow",
         (
-            ("Candidates", "filtered grades"),
-            ("Normalize", "units + scales"),
-            ("Visualize", "radar • scatter • parallel"),
-            ("Score", "similarity • TOPSIS"),
-            ("Trade-offs", "Pareto frontier"),
-            ("Review", "human decision"),
+            I("database", "Candidates", "filtered grades"),
+            I("formula", "Normalize", "units • scales"),
+            I("chart", "Visualize", "radar • scatter • parallel"),
+            I("compare", "Score", "similarity • TOPSIS"),
+            I("filter", "Trade-offs", "Pareto frontier"),
+            I("check", "Review", "human decision"),
         ),
-        ("Ranking ≠ certification", "Show missing data", "Keep raw values"),
+        ("Ranking ≠ certification", "Missing data visible", "Raw values retained"),
     ),
     Visual(
-        "resindb-ai-workflow.svg", "ai-title",
-        "AI-assisted analysis loop", "AI proposes; deterministic tools calculate; researchers approve",
-        "Five-stage AI-assisted workflow from question and evidence selection to computation, explanation and human sign-off.",
+        "resindb-ai-workflow.svg", "ai-title", "Assist / AI workflow",
+        "AI-assisted analysis loop", "AI explains; deterministic tools calculate; researchers approve",
+        "Evidence selection and deterministic calculation precede AI synthesis, challenge and professional sign-off.",
         "flow",
         (
-            ("Question", "research intent"),
-            ("Evidence", "selected records"),
-            ("Compute", "workers + formulas"),
-            ("Explain", "AI synthesis"),
-            ("Challenge", "limits + alternatives"),
-            ("Approve", "human sign-off"),
+            I("file", "Question", "research intent"),
+            I("database", "Evidence", "selected records"),
+            I("science", "Compute", "workers • formulas"),
+            I("spark", "Explain", "AI synthesis"),
+            I("shield", "Challenge", "limits • alternatives"),
+            I("check", "Approve", "human sign-off"),
         ),
         ("Optional endpoint", "No hidden execution", "Source-aware output"),
     ),
     Visual(
-        "resindb-local-first-privacy.svg", "privacy-title",
-        "Local-first privacy architecture", "Browser storage by default; remote services are explicit and bounded",
-        "Privacy boundary between browser-resident data and optional governed AI and remote REST gateways.",
+        "resindb-local-first-privacy.svg", "privacy-title", "Architecture / Privacy boundary",
+        "Local-first privacy architecture", "Browser storage by default; remote services are explicit",
+        "The design separates browser-owned deterministic state from optional governed AI and remote REST boundaries.",
         "split",
         (
-            ("IndexedDB", "records"),
-            ("Preferences", "theme + language"),
-            ("Feedback queue", "local export"),
-            ("AI gateway", "optional"),
-            ("Remote REST", "explicit adapter"),
-            ("Server controls", "auth + rate limits"),
+            I("database", "IndexedDB", "records • snapshots"),
+            I("tag", "Preferences", "theme • language"),
+            I("file", "Feedback queue", "local export"),
+            I("spark", "AI gateway", "optional endpoint"),
+            I("server", "Remote REST", "explicit adapter"),
+            I("shield", "Server controls", "auth • rate limit • audit"),
         ),
-        ("VITE_* is public", "No privileged client secret", "Export backups"),
+        ("VITE_* is public", "No privileged client secret", "Portable backups"),
     ),
     Visual(
-        "resindb-import-export.svg", "exchange-title",
+        "resindb-import-export.svg", "exchange-title", "Data / Exchange",
         "Import, export and report pipeline", "Portable formats reduce lock-in and preserve review packages",
-        "Data exchange pipeline for parsed imports, validation, editable records, charts, QA reports and portable exports.",
+        "Parsed files move through mapping, validation, editing, reporting and portable export with explicit errors.",
         "flow",
         (
-            ("Parse", "CSV • JSON • TXT"),
-            ("Map", "columns • fields"),
-            ("Validate", "shape • values"),
-            ("Edit", "grid • batch actions"),
-            ("Report", "charts • QA PDF"),
-            ("Export", "CSV • JSON • XML • PDF"),
+            I("import", "Parse", "CSV • JSON • TXT"),
+            I("tag", "Map", "columns • fields"),
+            I("check", "Validate", "shape • values"),
+            I("database", "Edit", "grid • batch actions"),
+            I("chart", "Report", "charts • QA PDF"),
+            I("file", "Export", "CSV • JSON • XML • PDF"),
         ),
         ("No fake upload success", "Explicit parse errors", "User-controlled files"),
     ),
     Visual(
-        "resindb-quality-gates.svg", "quality-title",
+        "resindb-quality-gates.svg", "quality-title", "Delivery / Quality gates",
         "Quality and validation gates", "A release is accepted only after every deterministic gate is green",
-        "Permanent gates for documentation, production-source hygiene, static analysis, regression, runtime smoke and full dependency audit.",
+        "Documentation, source hygiene, static analysis, regression, runtime and security checks remain independently attributable.",
         "grid",
         (
-            ("Documentation", "links • SVGs • evidence"),
-            ("Source hygiene", "production code • no injection"),
-            ("Static", "ESLint • TypeScript"),
-            ("Regression", "unit • science • workers"),
-            ("Runtime", "Vite • HTTP • Chromium"),
-            ("Security", "all dependencies • high gate"),
+            I("file", "Documentation", "links • SVGs • evidence"),
+            I("shield", "Source hygiene", "production code • no injection"),
+            I("check", "Static", "ESLint • TypeScript"),
+            I("science", "Regression", "unit • science • workers"),
+            I("server", "Runtime", "Vite • HTTP • Chromium"),
+            I("lock", "Security", "all dependencies • high gate"),
         ),
         ("Sole main branch", "No migration residue", "Artifacts retained temporarily"),
     ),
     Visual(
-        "resindb-research-workflow.svg", "research-title",
+        "resindb-research-workflow.svg", "research-title", "Workflow / Research evidence",
         "From material question to evidence package", "A repeatable workflow for exploratory polymer research",
-        "Research workflow from question definition and data curation through computation, comparison, reporting and review.",
+        "Question definition and curation precede computation, comparison, reporting and professional review.",
         "flow",
         (
-            ("Define", "question + criteria"),
-            ("Curate", "select + validate"),
-            ("Analyze", "models + uncertainty"),
-            ("Compare", "charts + rankings"),
-            ("Report", "portable package"),
-            ("Review", "professional sign-off"),
+            I("file", "Define", "question • criteria"),
+            I("database", "Curate", "select • validate"),
+            I("science", "Analyze", "models • uncertainty"),
+            I("compare", "Compare", "charts • rankings"),
+            I("file", "Report", "portable package"),
+            I("check", "Review", "professional sign-off"),
         ),
         ("Traceable inputs", "Reproducible settings", "Human approval"),
     ),
     Visual(
-        "resindb-security-deployment.svg", "deployment-title",
-        "Security and deployment boundary", "The browser demo is not an authentication or quality-release system",
-        "Layered deployment boundary for browser UI, server gateway, identity controls, remote data and operational audit.",
+        "resindb-security-deployment.svg", "deployment-title", "Architecture / Deployment boundary",
+        "Security and deployment boundary", "The browser demo is not an authentication or release system",
+        "Operational security is layered across browser UI, server gateway, data services and organizational governance.",
         "layers",
         (
-            ("Browser application", "demo roles • CSP • no privileged secrets"),
-            ("Server gateway", "authentication • authorization • validation • rate limiting"),
-            ("Data services", "remote database • backup • retention • audit"),
-            ("Operational governance", "HTTPS • monitoring • incident response • professional review"),
+            I("chart", "Browser application", "demo roles • CSP • no privileged secrets"),
+            I("shield", "Server gateway", "authentication • validation • rate limiting"),
+            I("server", "Data services", "database • backup • retention • audit"),
+            I("check", "Operational governance", "HTTPS • monitoring • incident response"),
         ),
         ("Demo roles ≠ auth", "AI output ≠ release", "Operator owns compliance"),
     ),
@@ -447,14 +545,14 @@ def svg_document(visual: Visual) -> str:
     body = renderer(visual)
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" height="{HEIGHT}"
  viewBox="0 0 {WIDTH} {HEIGHT}" role="img"
- aria-labelledby="{visual.title_id} {visual.title_id}-desc">
+ aria-labelledby="{visual.title_id} {visual.title_id}-desc"
+ data-design-system="resindb-uiux-pro-max-v1" shape-rendering="geometricPrecision">
 <title id="{visual.title_id}">{escape(visual.title)}</title>
 <desc id="{visual.title_id}-desc">{escape(visual.description)}</desc>
+<metadata>ResinDB UI UX Pro Max design system: Swiss modernism, Bento structure, WCAG-aware semantic colors, vector-only icons, 8-point spacing.</metadata>
 {DEFS}
-<rect width="{WIDTH}" height="{HEIGHT}" rx="28" fill="url(#bg)"/>
-<rect width="{WIDTH}" height="{HEIGHT}" rx="28" fill="url(#grid)"/>
-<circle cx="1040" cy="80" r="190" fill="#2563eb" fill-opacity=".07"/>
-<circle cx="110" cy="{HEIGHT - 20}" r="210" fill="#10b981" fill-opacity=".05"/>
+<rect width="{WIDTH}" height="{HEIGHT}" rx="24" fill="{TOKENS['canvas']}"/>
+<rect x="0" y="142" width="{WIDTH}" height="498" fill="url(#dot-grid)"/>
 {body}
 </svg>
 """
@@ -467,8 +565,12 @@ def validate_svg(content: str, filename: str) -> None:
         raise ValueError(f"{filename}: root is not SVG")
     if root.attrib.get("role") != "img" or not root.attrib.get("aria-labelledby"):
         raise ValueError(f"{filename}: missing accessible role/aria-labelledby")
+    if root.attrib.get("data-design-system") != "resindb-uiux-pro-max-v1":
+        raise ValueError(f"{filename}: missing design-system marker")
     if not root.findall(f"{namespace}title") or not root.findall(f"{namespace}desc"):
         raise ValueError(f"{filename}: missing title or desc")
+    if not root.findall(f"{namespace}metadata"):
+        raise ValueError(f"{filename}: missing design-system metadata")
 
 
 def generate(output: Path) -> None:
@@ -500,7 +602,7 @@ def check() -> None:
         ]
         if changed:
             raise SystemExit(f"visuals are not deterministic/current: {changed}")
-    print(f"validated {len(VISUALS)} deterministic README visuals")
+    print(f"validated {len(VISUALS)} deterministic UI UX Pro Max README visuals")
 
 
 def main() -> None:
