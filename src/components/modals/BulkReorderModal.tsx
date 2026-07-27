@@ -85,8 +85,8 @@ export const BulkReorderModal: React.FC<BulkReorderModalProps> = ({
   const handlePresetSort = (key: "gradeName" | "manufacturer" | "completeness" | "density" | "tensile") => {
     const nextList = [...items];
     nextList.sort((a, b) => {
-      let aVal: string | number = "";
-      let bVal: string | number = "";
+      let aVal: string | number;
+      let bVal: string | number;
 
       if (key === "gradeName") {
         aVal = a.gradeName;

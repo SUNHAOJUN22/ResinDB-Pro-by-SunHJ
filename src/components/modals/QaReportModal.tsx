@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   X, FileText, BadgeCheck, ShieldCheck, Download, 
@@ -22,8 +22,12 @@ export const QaReportModal: React.FC<QaReportModalProps> = ({ isOpen, onClose, p
   const { currentUser } = useAuth();
 
   const [inspector, setInspector] = useState(currentUser?.name || currentUser?.email || "Lab Analyst Code-Y");
-  const [reportNo, setReportNo] = useState(`QA-${Date.now().toString().slice(-6)}`);
+  const [reportNo, setReportNo] = useState("QA-PENDING");
   const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    setReportNo(`QA-${Date.now().toString().slice(-6)}`);
+  }, []);
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Constraints & Safety thresholds

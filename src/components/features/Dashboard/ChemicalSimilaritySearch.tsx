@@ -175,7 +175,7 @@ export const ChemicalSimilaritySearch: React.FC<ChemicalSimilaritySearchProps> =
           }
         });
 
-        let similarityScore = 0;
+        let similarityScore: number;
         const details: Record<string, { targetVal: number; targetNorm: number; candidateVal: number; candidateNorm: number }> = {};
 
         activeKeys.forEach(k => {

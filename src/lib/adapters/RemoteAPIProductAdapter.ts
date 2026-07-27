@@ -61,7 +61,7 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
       return response;
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new Error(`Remote API request timed out after ${DEFAULT_TIMEOUT_MS} ms`);
+        throw new Error(`Remote API request timed out after ${DEFAULT_TIMEOUT_MS} ms`, { cause: error });
       }
       throw error;
     } finally {
@@ -107,7 +107,7 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
       });
       return (await response.json()) as Product;
     } catch (error) {
-      throw new Error(`Remote create failed; no local write was applied: ${describeError(error)}`);
+      throw new Error(`Remote create failed; no local write was applied: ${describeError(error)}`, { cause: error });
     }
   }
 
@@ -120,7 +120,7 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
       });
       return (await response.json()) as Product;
     } catch (error) {
-      throw new Error(`Remote update failed; no local write was applied: ${describeError(error)}`);
+      throw new Error(`Remote update failed; no local write was applied: ${describeError(error)}`, { cause: error });
     }
   }
 
@@ -135,6 +135,7 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
     } catch (error) {
       throw new Error(
         `Remote batch update failed; no local write was applied: ${describeError(error)}`,
+        { cause: error },
       );
     }
   }
@@ -151,6 +152,7 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
     } catch (error) {
       throw new Error(
         `Remote batch create failed; no local write was applied: ${describeError(error)}`,
+        { cause: error },
       );
     }
   }
@@ -164,7 +166,7 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
         body: JSON.stringify({ ids }),
       });
     } catch (error) {
-      throw new Error(`Remote delete failed; no local write was applied: ${describeError(error)}`);
+      throw new Error(`Remote delete failed; no local write was applied: ${describeError(error)}`, { cause: error });
     }
   }
 
@@ -199,6 +201,7 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
     } catch (error) {
       throw new Error(
         `Remote snapshot restore failed; no local write was applied: ${describeError(error)}`,
+        { cause: error },
       );
     }
   }

@@ -283,12 +283,9 @@ export const ResinCapacityForecast: React.FC = () => {
     const growthRatePercent = currentVal > 0 ? ((predicted12m - currentVal) / currentVal) * 100 : 0;
 
     // Simulated R² or Confidence Score depending on historical volatility & window parameters
-    let confidenceScore = 96.2;
-    if (projectionType === 'moving_average') {
-      confidenceScore = 98.4 - (rollingWindow * 0.6);
-    } else {
-      confidenceScore = 95.8 - (Math.abs(growthMultiplier - 1) * 3);
-    }
+    const confidenceScore = projectionType === 'moving_average'
+      ? 98.4 - (rollingWindow * 0.6)
+      : 95.8 - (Math.abs(growthMultiplier - 1) * 3);
 
     // Cumulative projected volume for upcoming 12 months (tons total)
     let cumulativeProduction = 0;

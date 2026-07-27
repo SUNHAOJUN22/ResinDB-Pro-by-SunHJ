@@ -240,7 +240,7 @@ async function requestChat(options: ChatRequestOptions): Promise<string> {
     return text;
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error(`AI API request timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds.`);
+      throw new Error(`AI API request timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds.`, { cause: error });
     }
     throw error;
   } finally {

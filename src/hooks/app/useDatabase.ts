@@ -45,24 +45,22 @@ export function useDatabase(
 
   const columnManagement = useColumns(allProducts);
   const { columns } = columnManagement;
-  const columnsRef = useRef(columns);
-  useEffect(() => {
-    columnsRef.current = columns;
-  }, [columns]);
+  const propertyKeyLookup = useMemo(() => {
+    const lookup = new Map<string, string>();
+    for (const column of columns) {
+      lookup.set(column.key.toLowerCase(), column.key);
+      lookup.set(tProp(column.label).toLowerCase(), column.key);
+    }
+    for (const [key, translatedLabel] of Object.entries(propertyMap)) {
+      lookup.set(key.toLowerCase(), key);
+      lookup.set(translatedLabel.toLowerCase(), key);
+    }
+    return lookup;
+  }, [columns, tProp]);
 
   const resolvePropKey = useCallback(
-    (label: string): string | null => {
-      const cleanLabel = label.toLowerCase();
-      const directMatch = columnsRef.current.find(
-        (c) => c.key.toLowerCase() === cleanLabel || tProp(c.label).toLowerCase() === cleanLabel,
-      );
-      if (directMatch) return directMatch.key;
-      const reverseKey = Object.keys(propertyMap).find(
-        (key) => key.toLowerCase() === cleanLabel || propertyMap[key].toLowerCase() === cleanLabel,
-      );
-      return reverseKey || null;
-    },
-    [tProp],
+    (label: string): string | null => propertyKeyLookup.get(label.toLowerCase()) ?? null,
+    [propertyKeyLookup],
   );
 
   const fetchRequestId = useRef(0);
@@ -273,7 +271,7 @@ export function useDatabase(
       for (const filter of syntaxFilters) {
         const propertyValue = product.properties[filter.key]?.value;
         const numericValue = typeof propertyValue === 'number' ? propertyValue : parseFloat(String(propertyValue));
-        let matches = false;
+        let matches: boolean;
         if (Number.isNaN(numericValue) || typeof filter.value === 'string') {
           matches = getLower(String(propertyValue)).includes(filter.value as string);
         } else {

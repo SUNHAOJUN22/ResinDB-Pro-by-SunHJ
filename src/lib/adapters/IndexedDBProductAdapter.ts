@@ -250,7 +250,10 @@ export class IndexedDBProductAdapter implements IProductAdapter {
       return db;
     } catch (error) {
       logger.error("Failed to initialize database:", error);
-      throw new Error(`Database connection failed: ${error instanceof Error ? error.message : "Unknown error"}. This may be caused by Private Browsing mode or insufficient disk space.`);
+      throw new Error(
+        `Database connection failed: ${error instanceof Error ? error.message : "Unknown error"}. This may be caused by Private Browsing mode or insufficient disk space.`,
+        { cause: error },
+      );
     }
   }
 

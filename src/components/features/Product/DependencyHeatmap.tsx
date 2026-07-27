@@ -65,7 +65,7 @@ const evaluatePhysicalModel = (
       return null;
     };
 
-    let val: number | null = null;
+    let val: number | null;
     if (k === 'density') {
       val = getValFromKeys(['密度', 'density', 'Density']);
     } else if (k === 'mfr') {

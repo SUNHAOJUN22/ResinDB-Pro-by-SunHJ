@@ -285,12 +285,9 @@ export function predictPropertiesQSPR(
   );
 
   // 5. Shore Hardness Estimation
-  let hardness = "D60";
-  if (density < 0.88) {
-    hardness = `A${Math.round(50 + density * 30)}`; // elastomer/synthetic rubber
-  } else {
-    hardness = `D${Math.round(40 + (density - 0.88) * 180 + tensileYield * 0.4)}`;
-  }
+  const hardness = density < 0.88
+    ? `A${Math.round(50 + density * 30)}` // elastomer/synthetic rubber
+    : `D${Math.round(40 + (density - 0.88) * 180 + tensileYield * 0.4)}`;
 
   // 6. Polymeric molar volume calculations
   const monomerMassAverage = 42.08; // propylene average weights

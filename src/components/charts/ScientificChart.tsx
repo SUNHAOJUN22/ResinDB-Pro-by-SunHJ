@@ -193,10 +193,9 @@ export const ScientificChart: React.FC<ScientificChartProps> = React.memo(({
         }
       });
       return option;
-    } catch (err: unknown) {
-      throw new Error(
-        err instanceof Error ? err.message : "Failed to generate visualization",
-      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to generate visualization";
+      throw new Error(message, { cause: error });
     }
   }, [type, data, theme, language]);
 
