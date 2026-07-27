@@ -1,1 +1,1 @@
-Refine narrow flow layouts, regenerate all fourteen diagrams, run the complete documentation, source, application, scientific, browser and dependency validation, publish durable evidence, and self-clean.
+Execute the registered UI UX Pro Max visual proof now: refine layouts, regenerate fourteen diagrams, run all validation gates, publish durable evidence, and self-clean.
