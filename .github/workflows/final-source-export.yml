@@ -36,8 +36,8 @@ jobs:
             --exclude=coverage \
             --exclude=artifacts \
             -czf /tmp/resindb-final-source.tgz .
-          sha256sum /tmp/resindb-final-source.tgz | awk '{print $1}' > /tmp/archive.sha
-          base64 -w 0 /tmp/resindb-final-source.tgz | split -b 240000 -d -a 3 - reports/_final_source_export/part-
+          base64 -w 4000 /tmp/resindb-final-source.tgz \
+            | split -l 10 -d -a 3 - reports/_final_source_export/part-
           python3 - <<'PY'
           import hashlib
           import json
@@ -47,15 +47,17 @@ jobs:
           archive = Path('/tmp/resindb-final-source.tgz')
           parts = sorted(Path('reports/_final_source_export').glob('part-*'))
           payload = {
-              'schemaVersion': 1,
+              'schemaVersion': 2,
               'sourceCommit': os.environ['GITHUB_SHA'],
               'archiveBytes': archive.stat().st_size,
               'archiveSha256': hashlib.sha256(archive.read_bytes()).hexdigest(),
-              'encoding': 'base64-concatenated',
+              'encoding': 'base64-lines-concatenated',
+              'lineWidth': 4000,
               'parts': [
                   {
                       'path': str(path),
                       'bytes': path.stat().st_size,
+                      'lines': sum(1 for _ in path.open('r', encoding='ascii')),
                       'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
                   }
                   for path in parts
@@ -67,6 +69,6 @@ jobs:
           PY
           git config user.name "ResinDB Source Export Bot"
           git config user.email "actions@users.noreply.github.com"
-          git add reports/_final_source_export
-          git commit -m "chore: export final source snapshot [skip ci]"
+          git add -A reports/_final_source_export
+          git commit -m "chore: export line-chunked final source snapshot [skip ci]"
           git push origin HEAD:main
