@@ -22,7 +22,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 1
-      - name: Export repository snapshot to temporary chunks
+      - name: Build repository snapshot
         shell: bash
         run: |
           set -euo pipefail
@@ -36,8 +36,6 @@ jobs:
             --exclude=coverage \
             --exclude=artifacts \
             -czf /tmp/resindb-final-source.tgz .
-          base64 -w 4000 /tmp/resindb-final-source.tgz \
-            | split -l 10 -d -a 3 - reports/_final_source_export/part-
           python3 - <<'PY'
           import hashlib
           import json
@@ -45,30 +43,32 @@ jobs:
           from pathlib import Path
 
           archive = Path('/tmp/resindb-final-source.tgz')
-          parts = sorted(Path('reports/_final_source_export').glob('part-*'))
           payload = {
-              'schemaVersion': 2,
+              'schemaVersion': 3,
               'sourceCommit': os.environ['GITHUB_SHA'],
+              'runId': int(os.environ['GITHUB_RUN_ID']),
+              'runAttempt': int(os.environ['GITHUB_RUN_ATTEMPT']),
+              'artifactName': f"final-source-snapshot-{os.environ['GITHUB_SHA']}",
               'archiveBytes': archive.stat().st_size,
               'archiveSha256': hashlib.sha256(archive.read_bytes()).hexdigest(),
-              'encoding': 'base64-lines-concatenated',
-              'lineWidth': 4000,
-              'parts': [
-                  {
-                      'path': str(path),
-                      'bytes': path.stat().st_size,
-                      'lines': sum(1 for _ in path.open('r', encoding='ascii')),
-                      'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
-                  }
-                  for path in parts
-              ],
           }
-          Path('reports/_final_source_export/manifest.json').write_text(
+          Path('reports/_final_source_export/run.json').write_text(
               json.dumps(payload, indent=2) + '\n', encoding='utf-8'
           )
           PY
+      - name: Upload source snapshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: final-source-snapshot-${{ github.sha }}
+          path: /tmp/resindb-final-source.tgz
+          retention-days: 3
+          if-no-files-found: error
+      - name: Publish export receipt
+        shell: bash
+        run: |
+          set -euo pipefail
           git config user.name "ResinDB Source Export Bot"
           git config user.email "actions@users.noreply.github.com"
           git add -A reports/_final_source_export
-          git commit -m "chore: export line-chunked final source snapshot [skip ci]"
+          git commit -m "chore: publish final source export receipt [skip ci]"
           git push origin HEAD:main
