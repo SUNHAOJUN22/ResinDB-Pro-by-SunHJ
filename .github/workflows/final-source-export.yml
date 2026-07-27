@@ -1,0 +1,72 @@
+name: Final source export
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/final-source-export.trigger
+
+permissions:
+  contents: write
+
+concurrency:
+  group: final-source-export-main
+  cancel-in-progress: false
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+      - name: Export repository snapshot to temporary chunks
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf reports/_final_source_export
+          mkdir -p reports/_final_source_export
+          tar \
+            --exclude=.git \
+            --exclude=reports/_final_source_export \
+            --exclude=node_modules \
+            --exclude=dist \
+            --exclude=coverage \
+            --exclude=artifacts \
+            -czf /tmp/resindb-final-source.tgz .
+          sha256sum /tmp/resindb-final-source.tgz | awk '{print $1}' > /tmp/archive.sha
+          base64 -w 0 /tmp/resindb-final-source.tgz | split -b 240000 -d -a 3 - reports/_final_source_export/part-
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          archive = Path('/tmp/resindb-final-source.tgz')
+          parts = sorted(Path('reports/_final_source_export').glob('part-*'))
+          payload = {
+              'schemaVersion': 1,
+              'sourceCommit': os.environ['GITHUB_SHA'],
+              'archiveBytes': archive.stat().st_size,
+              'archiveSha256': hashlib.sha256(archive.read_bytes()).hexdigest(),
+              'encoding': 'base64-concatenated',
+              'parts': [
+                  {
+                      'path': str(path),
+                      'bytes': path.stat().st_size,
+                      'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                  }
+                  for path in parts
+              ],
+          }
+          Path('reports/_final_source_export/manifest.json').write_text(
+              json.dumps(payload, indent=2) + '\n', encoding='utf-8'
+          )
+          PY
+          git config user.name "ResinDB Source Export Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add reports/_final_source_export
+          git commit -m "chore: export final source snapshot [skip ci]"
+          git push origin HEAD:main
