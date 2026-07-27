@@ -1,0 +1,44 @@
+name: Performance baseline 2026-07-27
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/performance-baseline-20260727.trigger
+
+permissions:
+  contents: write
+
+concurrency:
+  group: resindb-performance-baseline-20260727
+  cancel-in-progress: true
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Collect baseline
+        shell: bash
+        run: bash scripts/phase0-performance-baseline.sh
+      - name: Publish baseline and self-clean
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/performance-baseline-20260727.yml
+          rm -f .github/performance-baseline-20260727.trigger
+          rm -f scripts/phase0-performance-baseline.sh
+          git config user.name "ResinDB Performance Audit Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "perf: restore lint baseline and capture performance evidence"
+          git pull --rebase origin main
+          git push origin HEAD:main
