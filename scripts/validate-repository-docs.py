@@ -92,6 +92,8 @@ FORBIDDEN_PATHS = (
     ".github/uiux-readme-visual-redesign-20260727.trigger",
     ".github/workflows/uiux-readme-visual-redesign-20260727.yml",
     "scripts/apply-uiux-readme-visual-system.py",
+    ".github/uiux-visual-final-proof-20260727.trigger",
+    ".github/workflows/uiux-visual-final-proof-20260727.yml",
     "docs/MIGRATION_v3.1.0.md",
     "docs/RELEASE_NOTES_v3.1.0.md",
     "reports/patch-diagnostic.json",

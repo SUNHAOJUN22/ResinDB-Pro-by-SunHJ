@@ -212,21 +212,35 @@ def render_flow(visual: Visual) -> str:
     count = len(visual.items)
     gap = 22
     width = (1072 - gap * (count - 1)) / count
-    y = 222
+    y = 204
     for index, item in enumerate(visual.items):
         x = 64 + index * (width + gap)
         accent = ACCENTS[index % len(ACCENTS)]
-        body += card(x, y, width, 178, item, accent, index + 1)
+        body += (
+  f'<g filter="url(#shadow-sm)">'
+  f'<rect x="{x}" y="{y}" width="{width}" height="204" rx="18" fill="{TOKENS["surface"]}" stroke="{TOKENS["border_soft"]}"/>'
+  f'<rect x="{x}" y="{y}" width="{width}" height="5" rx="2.5" fill="{accent}"/>'
+  f'</g>'
+  + icon_badge(x + width / 2 - 24, y + 26, item.icon, accent, 48)
+  + text(x + width - 24, y + 31, f"{index + 1:02d}", 11, TOKENS["muted"], 700, "middle", MONO)
+  + text(x + width / 2, y + 105, item.title, 14, TOKENS["ink"], 720, "middle")
+        )
+        subtitle_parts = item.subtitle.split(" • ")
+        if len(subtitle_parts) > 1:
+  body += text(x + width / 2, y + 132, subtitle_parts[0], 11, TOKENS["muted"], 500, "middle")
+  body += text(x + width / 2, y + 151, " • ".join(subtitle_parts[1:]), 11, TOKENS["muted"], 500, "middle")
+        else:
+  body += text(x + width / 2, y + 139, item.subtitle, 11, TOKENS["muted"], 500, "middle")
+        body += f'<circle cx="{x + width / 2}" cy="{y + 178}" r="4" fill="{accent}"/>'
         if index < count - 1:
-            body += line(x + width + 4, y + 89, x + width + gap - 5, y + 89,
-                         TOKENS["primary"], 2, False, "arrow")
+  body += line(x + width + 4, y + 102, x + width + gap - 5, y + 102,
+               TOKENS["primary"], 2, False, "arrow")
     body += (
         f'<rect x="64" y="442" width="1072" height="92" rx="18" fill="{TOKENS["surface_alt"]}" stroke="{TOKENS["border_soft"]}"/>'
         + text(88, 473, "DESIGN INTENT", 11, TOKENS["primary"], 750, family=MONO, letter_spacing=1.0)
         + text(88, 503, visual.description, 14, TOKENS["body"], 500)
     )
     return body + footer(visual)
-
 
 def render_grid(visual: Visual) -> str:
     body = header(visual)
@@ -257,8 +271,6 @@ def render_bento(visual: Visual) -> str:
     for index, (item, (x, y, width, height)) in enumerate(zip(visual.items, positions)):
         accent = ACCENTS[index % len(ACCENTS)]
         body += card(x, y, width, height, item, accent, index + 1)
-        if width > 400:
-            body += text(x + 26, y + height - 27, visual.description, 12, TOKENS["muted"], 500)
     return body + footer(visual)
 
 

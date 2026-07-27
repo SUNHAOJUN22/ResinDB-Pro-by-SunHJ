@@ -3,12 +3,12 @@
   "result": "failure",
   "repository": "SUNHAOJUN22/ResinDB-Pro-by-SunHJ",
   "version": "3.0.0",
-  "validatedInputCommit": "4e136eec2daf82a5bd752b44701db05bfc3392c3",
-  "completedAt": "2026-07-26T17:46:29.179955+00:00",
+  "validatedInputCommit": "de8361680e5920a74a9e788e282b44f2bef83b63",
+  "completedAt": "2026-07-27T04:35:38.063060+00:00",
   "runtime": {
     "node": "v22.23.1",
     "npm": "10.9.8",
-    "python": "Python 3.12.3",
+    "python": "Python 3.12.13",
     "runner": "Linux"
   },
   "remoteBranches": [
@@ -19,28 +19,24 @@
     "audit-prod": 0,
     "build": 0,
     "git-diff-check": 0,
-    "lint": 2,
+    "lint": 1,
     "npm-ci": 0,
     "only-main": 0,
     "smoke": 0,
-    "test-coverage": 0,
+    "test-coverage": 1,
     "test-science": 0,
     "test-ui": 0,
     "test-unit": 0,
-    "test": 0,
+    "test": 1,
     "typecheck": 0,
     "validate-docs": 1,
     "validate-source": 0,
-    "visuals-check": 0
+    "visuals-check": 1,
+    "visuals-generate": 1
   },
-  "testFilesPassed": 10,
+  "testFilesPassed": null,
   "testsPassed": 82,
-  "coveragePercent": {
-    "statements": 70.17,
-    "branches": 45.36,
-    "functions": 71.11,
-    "lines": 71.53
-  },
+  "coveragePercent": {},
   "visualCount": 14,
   "generatedVisuals": [
     "resindb-ai-platform-overview.svg",
@@ -106,15 +102,16 @@
     "runtimeDependenciesChanged": false,
     "lockfileRebuiltFromConsistentManifest": true
   },
-  "rawEvidenceArtifact": "resindb-final-current-tree-proof-4e136eec2daf82a5bd752b44701db05bfc3392c3",
+  "rawEvidenceArtifact": "resindb-uiux-visual-final-proof-de8361680e5920a74a9e788e282b44f2bef83b63",
   "currentTreeVerification": {
     "result": "failure",
-    "validatedInputCommit": "4e136eec2daf82a5bd752b44701db05bfc3392c3",
-    "completedAt": "2026-07-26T17:46:29.179955+00:00",
+    "validatedInputCommit": "de8361680e5920a74a9e788e282b44f2bef83b63",
+    "candidateTreeSha": "6071264d2807d557da9d1924a225c234149a6298",
+    "completedAt": "2026-07-27T04:35:38.063060+00:00",
     "runtime": {
       "node": "v22.23.1",
       "npm": "10.9.8",
-      "python": "Python 3.12.3",
+      "python": "Python 3.12.13",
       "runner": "Linux"
     },
     "remoteBranches": [
@@ -125,21 +122,34 @@
       "audit-prod": 0,
       "build": 0,
       "git-diff-check": 0,
-      "lint": 2,
+      "lint": 1,
       "npm-ci": 0,
       "only-main": 0,
       "smoke": 0,
-      "test-coverage": 0,
+      "test-coverage": 1,
       "test-science": 0,
       "test-ui": 0,
       "test-unit": 0,
-      "test": 0,
+      "test": 1,
       "typecheck": 0,
       "validate-docs": 1,
       "validate-source": 0,
-      "visuals-check": 0
+      "visuals-check": 1,
+      "visuals-generate": 1
     },
-    "scope": "final current-tree documentation, source, lint, type, application, scientific, coverage, build, HTTP, Chromium, visual and full dependency proof",
-    "rawEvidenceArtifact": "resindb-final-current-tree-proof-4e136eec2daf82a5bd752b44701db05bfc3392c3"
-  }
+    "scope": "UI UX Pro Max README visual system plus source, application, scientific, browser and dependency validation",
+    "rawEvidenceArtifact": "resindb-uiux-visual-final-proof-de8361680e5920a74a9e788e282b44f2bef83b63"
+  },
+  "candidateTreeSha": "6071264d2807d557da9d1924a225c234149a6298",
+  "visualDesignSystem": "resindb-uiux-pro-max-v1",
+  "visualDesignMethod": [
+    "Swiss Modernism 2.0",
+    "Bento Grid",
+    "Accessible & Ethical",
+    "Dimensional Layering"
+  ],
+  "visualDesignSources": [
+    "nextlevelbuilder/ui-ux-pro-max-skill",
+    "bbylw/ui-ux-pro-max-skill-cn"
+  ]
 }
