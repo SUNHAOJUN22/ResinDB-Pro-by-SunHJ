@@ -1,4 +1,4 @@
-name: ResinDB Final Object Builder
+name: ResinDB Incremental Final Object Builder
 
 on:
   push:
@@ -34,12 +34,7 @@ jobs:
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "$(jq -nc \
-              --arg state pending \
-              --arg context resindb/final-object \
-              --arg description 'Reconstructing the exact no-branch final Git tree' \
-              --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-              '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
+            -d "$(jq -nc --arg state pending --arg context resindb/final-object --arg description 'Building exact final tree from verified incremental entries' --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
 
       - name: Reconstruct and verify exact final index
         shell: bash
@@ -53,6 +48,7 @@ jobs:
           EXPECTED_TREE_SHA: 97f338a77ea3e8e2a8846deeb3d4e2971e7f05a1
         run: |
           set -euo pipefail
+          mkdir -p artifacts
 
           test "$(find .github/.resindb-v320-delta -maxdepth 1 -name 'part-*.txt' | wc -l | tr -d ' ')" -eq 10
           cat .github/.resindb-v320-delta/part-*.txt > /tmp/resindb-v320-delta.patch.xz.b64
@@ -73,12 +69,7 @@ jobs:
           xz -dc /tmp/resindb-v320-base.patch.xz > /tmp/resindb-v320-base.patch
           printf '%s  %s\n' "$OLD_PATCH_SHA256" /tmp/resindb-v320-base.patch | sha256sum -c -
 
-          exclusions=(
-            --exclude='.github/workflows/final-source-export.yml'
-            --exclude='.github/workflows/remediate-lockfile-20260726.yml'
-            --exclude='reports/*'
-            --exclude='reports/**'
-          )
+          exclusions=(--exclude='.github/workflows/final-source-export.yml' --exclude='.github/workflows/remediate-lockfile-20260726.yml' --exclude='reports/*' --exclude='reports/**')
           git apply --check --binary "${exclusions[@]}" /tmp/resindb-v320-base.patch
           git apply --binary "${exclusions[@]}" /tmp/resindb-v320-base.patch
           git apply --check --binary /tmp/resindb-v320-delta.patch
@@ -88,10 +79,7 @@ jobs:
           find .github -depth -type d -empty -delete || true
           rm -rf reports artifacts coverage dist node_modules
           mkdir -p reports artifacts
-          printf '%s\n' \
-            '# Validation reports' '' \
-            'Exact-tree HTML, PDF, screenshots, coverage and machine-readable receipts are generated into `artifacts/` by CI and uploaded as GitHub Actions artifacts. They are not fabricated or committed as stale evidence.' \
-            > reports/README.md
+          printf '%s\n' '# Validation reports' '' 'Exact-tree HTML, PDF, screenshots, coverage and machine-readable receipts are generated into `artifacts/` by CI and uploaded as GitHub Actions artifacts. They are not fabricated or committed as stale evidence.' > reports/README.md
           find . -type d -name __pycache__ -prune -exec rm -rf {} +
           find . -type f -name '*.pyc' -delete
 
@@ -103,7 +91,8 @@ jobs:
           test "$(find .github -type f | sort)" = '.github/workflows/ci.yml'
           test "$(find reports -type f | sort)" = 'reports/README.md'
 
-      - name: Create verified unreferenced GitHub commit object
+      - name: Create incremental remote tree and unreferenced commit
+        id: objects
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -112,14 +101,17 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           import base64
-          import concurrent.futures
           import json
           import os
           import pathlib
           import subprocess
+          import sys
+          import time
           import urllib.error
           import urllib.request
 
+          artifacts = pathlib.Path('artifacts')
+          artifacts.mkdir(exist_ok=True)
           repository = os.environ['GITHUB_REPOSITORY']
           token = os.environ['GH_TOKEN']
           expected_tree = os.environ['EXPECTED_TREE_SHA']
@@ -130,114 +122,133 @@ jobs:
               'Authorization': f'Bearer {token}',
               'X-GitHub-Api-Version': '2022-11-28',
               'Content-Type': 'application/json',
-              'User-Agent': 'resindb-final-object-builder',
+              'User-Agent': 'resindb-incremental-final-object-builder',
           }
 
           def request(method, path, payload=None):
               data = None if payload is None else json.dumps(payload).encode('utf-8')
-              req = urllib.request.Request(api_root + path, data=data, headers=headers, method=method)
-              try:
-                  with urllib.request.urlopen(req, timeout=60) as response:
-                      return json.load(response)
-              except urllib.error.HTTPError as exc:
-                  body = exc.read().decode('utf-8', errors='replace')
-                  raise RuntimeError(f'{method} {path} failed: HTTP {exc.code}: {body}') from exc
+              for attempt in range(7):
+                  req = urllib.request.Request(api_root + path, data=data, headers=headers, method=method)
+                  try:
+                      with urllib.request.urlopen(req, timeout=90) as response:
+                          return json.load(response)
+                  except urllib.error.HTTPError as exc:
+                      body = exc.read().decode('utf-8', errors='replace')
+                      retryable = exc.code in {403, 408, 409, 429, 500, 502, 503, 504}
+                      if retryable and attempt < 6:
+                          delay = max(float(exc.headers.get('Retry-After', '0') or 0), min(2 ** attempt, 30))
+                          print(f'retry {attempt + 1} for {method} {path}: HTTP {exc.code}; sleeping {delay}s', flush=True)
+                          time.sleep(delay)
+                          continue
+                      raise RuntimeError(f'{method} {path} failed: HTTP {exc.code}: {body}') from exc
+                  except OSError as exc:
+                      if attempt < 6:
+                          delay = min(2 ** attempt, 30)
+                          print(f'retry {attempt + 1} for {method} {path}: {exc}; sleeping {delay}s', flush=True)
+                          time.sleep(delay)
+                          continue
+                      raise
 
-          raw = subprocess.check_output(['git', 'ls-files', '-s', '-z'])
-          records = []
-          for item in raw.split(b'\0'):
-              if not item:
-                  continue
-              metadata, path_bytes = item.split(b'\t', 1)
-              mode, local_sha, stage = metadata.decode().split()
-              if stage != '0':
-                  raise RuntimeError(f'non-zero index stage for {path_bytes!r}: {stage}')
-              path = path_bytes.decode('utf-8')
-              records.append((mode, local_sha, path))
+          try:
+              base_tree = subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip()
+              raw = subprocess.check_output(['git', 'diff', '--cached', '--name-status', '-z', '--no-renames', 'HEAD'])
+              tokens = raw.split(b'\0')
+              changes = []
+              index = 0
+              while index < len(tokens) and tokens[index]:
+                  status = tokens[index].decode('ascii')
+                  path = tokens[index + 1].decode('utf-8')
+                  index += 2
+                  if status == 'D':
+                      changes.append({'path': path, 'mode': '100644', 'type': 'blob', 'sha': None})
+                      continue
+                  if status not in {'A', 'M', 'T'}:
+                      raise RuntimeError(f'unexpected diff status {status!r} for {path}')
+                  ls = subprocess.check_output(['git', 'ls-files', '-s', '--', path], text=True).strip()
+                  metadata, listed_path = ls.split('\t', 1)
+                  mode, local_sha, stage = metadata.split()
+                  if stage != '0' or listed_path != path:
+                      raise RuntimeError(f'index mismatch for {path}: {ls}')
+                  content = pathlib.Path(path).read_bytes()
+                  blob = request('POST', '/git/blobs', {
+                      'content': base64.b64encode(content).decode('ascii'),
+                      'encoding': 'base64',
+                  })
+                  if blob['sha'] != local_sha:
+                      raise RuntimeError(f'blob SHA mismatch for {path}: local={local_sha} remote={blob["sha"]}')
+                  changes.append({'path': path, 'mode': mode, 'type': 'blob', 'sha': local_sha})
+                  if len(changes) % 25 == 0:
+                      print(f'processed {len(changes)} changed entries', flush=True)
+                  time.sleep(0.03)
 
-          def create_blob(record):
-              mode, local_sha, path = record
-              content = pathlib.Path(path).read_bytes()
-              result = request('POST', '/git/blobs', {
-                  'content': base64.b64encode(content).decode('ascii'),
-                  'encoding': 'base64',
+              tree = request('POST', '/git/trees', {'base_tree': base_tree, 'tree': changes})
+              remote_tree = tree['sha']
+              if remote_tree != expected_tree:
+                  raise RuntimeError(f'tree SHA mismatch: expected={expected_tree} remote={remote_tree}')
+              commit = request('POST', '/git/commits', {
+                  'message': 'fix: harden ResinDB 3.2.0 trust boundaries and validation',
+                  'tree': remote_tree,
+                  'parents': [parent],
               })
-              remote_sha = result['sha']
-              if remote_sha != local_sha:
-                  raise RuntimeError(f'blob SHA mismatch for {path}: local={local_sha} remote={remote_sha}')
-              return {'path': path, 'mode': mode, 'type': 'blob', 'sha': remote_sha}
-
-          with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-              entries = list(executor.map(create_blob, records))
-
-          entries.sort(key=lambda entry: entry['path'].encode('utf-8'))
-          tree = request('POST', '/git/trees', {'tree': entries})
-          remote_tree = tree['sha']
-          if remote_tree != expected_tree:
-              raise RuntimeError(f'tree SHA mismatch: expected={expected_tree} remote={remote_tree}')
-
-          commit = request('POST', '/git/commits', {
-              'message': 'fix: harden ResinDB 3.2.0 trust boundaries and validation',
-              'tree': remote_tree,
-              'parents': [parent],
-          })
-          receipt = {
-              'schemaVersion': 1,
-              'repository': repository,
-              'parentSha': parent,
-              'expectedTreeSha': expected_tree,
-              'remoteTreeSha': remote_tree,
-              'commitSha': commit['sha'],
-              'fileCount': len(records),
-              'branchCreated': False,
-              'refMoved': False,
-          }
-          pathlib.Path('artifacts/final-object-receipt.json').write_text(
-              json.dumps(receipt, indent=2) + '\n', encoding='utf-8'
-          )
-          print(json.dumps(receipt, indent=2))
+              receipt = {
+                  'schemaVersion': 2,
+                  'repository': repository,
+                  'parentSha': parent,
+                  'baseTreeSha': base_tree,
+                  'expectedTreeSha': expected_tree,
+                  'remoteTreeSha': remote_tree,
+                  'commitSha': commit['sha'],
+                  'changedEntryCount': len(changes),
+                  'branchCreated': False,
+                  'refMoved': False,
+                  'status': 'success',
+              }
+              artifacts.joinpath('final-object-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
+              print(json.dumps(receipt, indent=2))
+          except Exception as exc:
+              error = {
+                  'schemaVersion': 2,
+                  'repository': repository,
+                  'parentSha': parent,
+                  'expectedTreeSha': expected_tree,
+                  'branchCreated': False,
+                  'refMoved': False,
+                  'status': 'failure',
+                  'errorType': type(exc).__name__,
+                  'error': str(exc),
+              }
+              artifacts.joinpath('final-object-error.json').write_text(json.dumps(error, indent=2) + '\n', encoding='utf-8')
+              print(json.dumps(error, indent=2), file=sys.stderr)
+              raise
           PY
 
-      - name: Upload final object receipt
+      - name: Upload final object evidence
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: resindb-final-object-${{ github.run_id }}
-          path: artifacts/final-object-receipt.json
+          path: |
+            artifacts/final-object-receipt.json
+            artifacts/final-object-error.json
+            artifacts/local-tree-sha.txt
           if-no-files-found: error
           retention-days: 7
 
-      - name: Publish object-builder success
-        if: success()
+      - name: Publish object-builder result
+        if: always()
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          state=failure
+          description='Final object creation failed closed; main was not moved'
+          if [ "${{ steps.objects.outcome }}" = success ]; then
+            state=success
+            description='Exact final tree and unreferenced commit object created'
+          fi
           curl -fsSL -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "$(jq -nc \
-              --arg state success \
-              --arg context resindb/final-object \
-              --arg description 'Exact final Git tree and unreferenced commit object created' \
-              --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-              '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
-
-      - name: Publish object-builder failure
-        if: failure()
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          curl -fsSL -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "$(jq -nc \
-              --arg state failure \
-              --arg context resindb/final-object \
-              --arg description 'Final object reconstruction failed closed; main was not moved' \
-              --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-              '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
+            -d "$(jq -nc --arg state "$state" --arg context resindb/final-object --arg description "$description" --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
