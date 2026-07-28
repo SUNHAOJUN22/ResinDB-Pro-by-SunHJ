@@ -1,4 +1,4 @@
-import * as echarts from "echarts";
+import * as echarts from "@/lib/echarts";
 import { materialEngine } from "@/lib/materialScience";
 import { translations } from "@/config/i18n";
 

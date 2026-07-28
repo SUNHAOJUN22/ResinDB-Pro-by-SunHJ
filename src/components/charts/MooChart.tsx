@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import * as echarts from 'echarts';
+import * as echarts from '@/lib/echarts';
 
 interface MooChartProps {
     evaluatedCandidates: { params: Record<string, number>; means: Record<string, number> }[];

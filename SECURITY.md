@@ -44,7 +44,7 @@ User-defined formulas are parsed by a white-listed numeric grammar. Dynamic Java
 
 ## Dependency response
 
-Use `npm ci` for reproducible installation and run `npm audit --omit=dev --audit-level=high` before release. A high or critical production advisory blocks release until the affected dependency is upgraded, removed, isolated from the production graph, or documented with a verified non-applicability rationale.
+Use `npm ci` for reproducible installation. Release CI runs both `npm audit --omit=dev --audit-level=high` and `npm audit --audit-level=high`; a high or critical advisory in either graph blocks release until the dependency is upgraded, removed, isolated with a verified non-applicability rationale, or replaced. The browser build does not claim an embedded Content Security Policy: production deployments must set and test CSP and other HTTP security headers at the hosting or gateway layer.
 
 ## Data and AI limitations
 

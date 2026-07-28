@@ -125,7 +125,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({
             </div>
             <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900 border-t border-slate-300 dark:border-slate-700 flex justify-center">
               <p className="text-[9px] font-mono text-slate-400 uppercase tracking-widest">
-                ResinDB Pro v3.1.0
+                ResinDB Pro v3.2.0
               </p>
             </div>
           </motion.div>

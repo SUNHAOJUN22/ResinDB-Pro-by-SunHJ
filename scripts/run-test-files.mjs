@@ -32,15 +32,17 @@ for (const absolute of files) {
   console.log(`\n=== isolated Vitest: ${file} ===`);
   const result = spawnSync(
     process.execPath,
-    [vitestBin, 'run', file, '--pool=forks', '--maxWorkers=1'],
+    [vitestBin, 'run', file, '--pool=forks', '--maxWorkers=1', '--fileParallelism=false', '--testTimeout=30000', '--hookTimeout=30000', '--teardownTimeout=10000'],
     {
       cwd: projectRoot,
       stdio: 'inherit',
       env: { ...process.env, CI: '1', TERM: 'dumb' },
+      timeout: 120_000,
+      killSignal: 'SIGKILL',
     },
   );
   if (result.error) {
-    console.error(result.error);
+    console.error(`Isolated Vitest failed to exit for ${file}:`, result.error);
     process.exit(1);
   }
   if (result.status !== 0) process.exit(result.status ?? 1);

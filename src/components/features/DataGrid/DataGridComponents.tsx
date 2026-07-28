@@ -3,7 +3,7 @@ import { Product, ColumnConfig } from '@/types/index';
 import { RADAR_KEYS } from '@/utils/productUtils';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Search, RotateCcw } from "lucide-react";
-import type { ECharts } from "echarts";
+import type { ECharts } from "@/lib/echarts";
 import { motion } from "motion/react";
 
 export const SkeletonRow: React.FC<{ columns: ColumnConfig[] }> = ({ columns }) => (
@@ -88,7 +88,7 @@ export const QuickRadarPopup: React.FC<{
     let active = true;
     let myChart: ECharts | null = null;
 
-    import("echarts").then((echartsLib) => {
+    import("@/lib/echarts").then((echartsLib) => {
       if (!active || !chartRef.current) return;
 
       myChart =

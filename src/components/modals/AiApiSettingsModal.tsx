@@ -47,16 +47,24 @@ export const AiApiSettingsModal: React.FC<AiApiSettingsModalProps> = ({
       setStatus('API endpoint and model are required.');
       return;
     }
-    saveAiConfig(config);
-    setStatus('Configuration saved in this browser.');
-    onSaved?.();
+    try {
+      saveAiConfig(config);
+      setStatus('Configuration saved in this browser.');
+      onSaved?.();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Unable to save configuration.');
+    }
   };
 
   const handleClear = () => {
-    clearAiConfig();
-    setConfig(EMPTY_CONFIG);
-    setStatus('Browser-stored AI API configuration cleared.');
-    onSaved?.();
+    try {
+      clearAiConfig();
+      setConfig(EMPTY_CONFIG);
+      setStatus('Browser-stored AI API configuration cleared.');
+      onSaved?.();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Unable to clear configuration.');
+    }
   };
 
   const handleTest = async () => {
@@ -65,10 +73,10 @@ export const AiApiSettingsModal: React.FC<AiApiSettingsModalProps> = ({
       return;
     }
 
-    saveAiConfig(config);
     setIsTesting(true);
     setStatus(null);
     try {
+      saveAiConfig(config);
       const result = await testAiConnection();
       setStatus(`Connection succeeded: ${result.trim().slice(0, 80) || 'OK'}`);
       onSaved?.();

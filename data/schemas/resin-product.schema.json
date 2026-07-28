@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://resindb.sunhj.example/schemas/resin-product.schema.json",
+  "title": "ResinDB product record",
+  "type": "object",
+  "required": ["id", "gradeName", "manufacturerId", "manufacturer", "categoryIds", "properties"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "gradeName": { "type": "string", "minLength": 1 },
+    "manufacturerId": { "type": "string", "minLength": 1 },
+    "manufacturer": { "type": "string", "minLength": 1 },
+    "categoryIds": { "type": "array", "minItems": 1, "items": { "type": "string" }, "uniqueItems": true },
+    "properties": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["value"],
+        "properties": {
+          "value": { "type": ["string", "number", "boolean"] },
+          "unit": { "type": "string" },
+          "standard": { "type": "string" },
+          "temperature": { "type": ["string", "number"] },
+          "annotation": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

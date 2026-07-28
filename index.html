@@ -32,7 +32,14 @@
     </script>
 </head>
   <body class="bg-[#f8fafc] text-slate-900 dark:bg-[#020617] dark:text-slate-100 selection:bg-primary-500/30 selection:text-primary-200 overflow-hidden">
-    <div id="root"></div>
+    <div id="root">
+      <div role="status" aria-live="polite" style="min-height:100vh;display:grid;place-items:center;font-family:system-ui,sans-serif;padding:2rem">
+        <div style="max-width:34rem;text-align:center">
+          <strong style="display:block;font-size:1.125rem">ResinDB Pro</strong>
+          <span style="display:block;margin-top:.5rem;color:#64748b">Loading external resin data and scientific modules… / 正在加载外部树脂数据与科学分析模块…</span>
+        </div>
+      </div>
+    </div>
   <script type="module" src="/src/index.tsx"></script>
 </body>
 </html>

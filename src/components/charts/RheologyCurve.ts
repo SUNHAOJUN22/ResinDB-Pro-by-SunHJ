@@ -1,4 +1,4 @@
-import * as echarts from "echarts";
+import * as echarts from "@/lib/echarts";
 import { Product } from '@/types/index';
 
 import { materialEngine } from "@/lib/materialScience";

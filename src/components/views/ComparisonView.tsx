@@ -17,7 +17,7 @@ import { PROPERTY_GROUPS } from '@/config/constants';
 import { RADAR_KEYS, isLowBest } from '@/utils/productUtils';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import * as echarts from "echarts";
+import * as echarts from "@/lib/echarts";
 
 const KEY_SPECS = [
   "CAS Number",

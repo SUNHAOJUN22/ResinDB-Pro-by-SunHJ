@@ -39,7 +39,7 @@ import {
 import { RADAR_KEYS, RADAR_DEFAULT_MAX } from '@/utils/productUtils';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { logger } from "@/lib/logger";
-import * as echarts from "echarts";
+import * as echarts from "@/lib/echarts";
 import Markdown from "react-markdown";
 import { findSimilarProducts } from "@/services/mathUtils";
 import { SimilarProductsRadar } from '@/components/charts/SimilarProductsRadar';

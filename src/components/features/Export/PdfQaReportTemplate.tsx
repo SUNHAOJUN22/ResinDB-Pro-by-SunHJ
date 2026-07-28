@@ -1,7 +1,7 @@
 import React, { forwardRef, useEffect, useRef } from "react";
 import { Product } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
-import * as echarts from "echarts";
+import * as echarts from "@/lib/echarts";
 
 interface PdfQaReportTemplateProps {
   products: Product[];

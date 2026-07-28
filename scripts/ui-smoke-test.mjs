@@ -2,16 +2,27 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { networkInterfaces } from 'node:os';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const viteBin = path.join(projectRoot, 'node_modules', 'vite', 'bin', 'vite.js');
-const host = '127.0.0.1';
+const host = '0.0.0.0';
+const healthHost = '127.0.0.1';
 const previewPort = 4174;
 const debugPort = 9224;
-const appUrl = `http://${host}:${previewPort}`;
+const healthUrl = `http://${healthHost}:${previewPort}`;
+const networkHosts = Object.values(networkInterfaces()).flat().filter(Boolean).filter((entry) => entry.family === 'IPv4' && !entry.internal).map((entry) => entry.address);
+const appUrlCandidates = [...new Set([process.env.RESINDB_UI_HOST, '127.0.0.1', 'localhost', ...networkHosts].filter(Boolean).map((candidate) => `http://${candidate}:${previewPort}`))];
 const artifactDir = path.join(projectRoot, 'artifacts');
-const screenshotZhPath = path.join(artifactDir, 'ui-smoke-dashboard-zh.png');
-const screenshotEnDarkPath = path.join(artifactDir, 'ui-smoke-dashboard-en-dark.png');
+const screenshotPaths = {
+  dashboard: path.join(artifactDir, 'ui-dashboard-zh-light.png'),
+  emptyState: path.join(artifactDir, 'ui-empty-state.png'),
+  productDetail: path.join(artifactDir, 'ui-product-detail.png'),
+  analytics: path.join(artifactDir, 'ui-scientific-analytics.png'),
+  dependencyMap: path.join(artifactDir, 'ui-dependency-map.png'),
+  dashboardEnDark: path.join(artifactDir, 'ui-dashboard-en-dark.png'),
+  mobile: path.join(artifactDir, 'ui-mobile-dashboard.png'),
+};
 
 const chromeCandidates = [
   process.env.CHROME_BIN,
@@ -44,9 +55,8 @@ const chrome = spawn(
     '--headless=new',
     '--no-sandbox',
     '--disable-gpu',
-    '--disable-dev-shm-usage',
-    '--no-first-run',
-    '--no-default-browser-check',
+    '--no-proxy-server',
+    '--proxy-bypass-list=<-loopback>',
     '--hide-scrollbars',
     '--remote-allow-origins=*',
     `--remote-debugging-port=${debugPort}`,
@@ -70,14 +80,8 @@ chrome.stderr.on('data', (chunk) => {
 
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-async function waitForHttp(url, attempts = 120) {
+async function waitForHttp(url, attempts = 60) {
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    if (url === appUrl && preview.exitCode !== null) {
-      throw new Error(`Preview exited before ${url} became ready (code ${preview.exitCode})`);
-    }
-    if (url.includes(`:${debugPort}/`) && chrome.exitCode !== null) {
-      throw new Error(`Chromium exited before the debug endpoint became ready (code ${chrome.exitCode})`);
-    }
     try {
       const response = await fetch(url, { signal: AbortSignal.timeout(1_000) });
       if (response.ok) return response;
@@ -136,13 +140,44 @@ async function evaluate(session, expression) {
     userGesture: true,
   });
   if (response.exceptionDetails) {
-    throw new Error(response.exceptionDetails.text || 'Runtime evaluation failed');
+    throw new Error(response.exceptionDetails.exception?.description || response.exceptionDetails.text || JSON.stringify(response.exceptionDetails));
   }
   return response.result?.value;
 }
 
+async function waitForCondition(session, expression, description, attempts = 80) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    if (await evaluate(session, expression)) return;
+    await sleep(125);
+  }
+  throw new Error(`Timed out waiting for ${description}`);
+}
+
+async function capture(session, targetPath) {
+  const screenshot = await session.command('Page.captureScreenshot', {
+    format: 'png',
+    captureBeyondViewport: false,
+    fromSurface: true,
+  });
+  writeFileSync(targetPath, Buffer.from(screenshot.data, 'base64'));
+}
+
+async function clickButtonByTitle(session, patterns) {
+  const serialized = JSON.stringify(patterns);
+  const clicked = await evaluate(session, `(() => {
+    const patterns = ${serialized};
+    const button = Array.from(document.querySelectorAll('button')).find((candidate) =>
+      patterns.some((pattern) => (candidate.title || '').includes(pattern))
+    );
+    if (!button) return false;
+    button.click();
+    return true;
+  })()`);
+  if (!clicked) throw new Error(`Unable to find button title matching: ${patterns.join(', ')}`);
+}
+
 async function waitForDashboard(session) {
-  for (let attempt = 1; attempt <= 120; attempt += 1) {
+  for (let attempt = 1; attempt <= 80; attempt += 1) {
     const state = await evaluate(
       session,
       `(() => ({
@@ -164,33 +199,16 @@ async function waitForDashboard(session) {
   throw new Error('Authenticated dashboard did not become ready');
 }
 
-async function waitForPageTarget(attempts = 120) {
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    if (chrome.exitCode !== null) {
-      throw new Error(`Chromium exited before exposing a page target (code ${chrome.exitCode})`);
-    }
-    try {
-      const pages = await fetch(`http://${host}:${debugPort}/json/list`, {
-        signal: AbortSignal.timeout(1_000),
-      }).then((response) => response.json());
-      const target = pages.find((page) => page.type === 'page');
-      if (target) return target;
-    } catch {
-      // The remote debugging target can lag behind the version endpoint.
-    }
-    await sleep(250);
-  }
-  throw new Error('Chromium did not expose a page target');
-}
-
 function stop(processHandle) {
   if (processHandle.exitCode === null) processHandle.kill('SIGTERM');
 }
 
 try {
-  await waitForHttp(appUrl);
-  await waitForHttp(`http://${host}:${debugPort}/json/version`);
-  const target = await waitForPageTarget();
+  await waitForHttp(healthUrl);
+  await waitForHttp(`http://${healthHost}:${debugPort}/json/version`);
+  const pages = await fetch(`http://${healthHost}:${debugPort}/json/list`).then((response) => response.json());
+  const target = pages.find((page) => page.type === 'page');
+  if (!target) throw new Error('Chromium did not expose a page target');
 
   const session = new CdpSession(target.webSocketDebuggerUrl);
   await session.open();
@@ -203,8 +221,26 @@ try {
     deviceScaleFactor: 1,
     mobile: false,
   });
-  await session.command('Page.navigate', { url: appUrl });
-  await sleep(1_500);
+  let appUrl = '';
+  const navigationErrors = [];
+  for (const candidate of appUrlCandidates) {
+    const navigation = await session.command('Page.navigate', { url: candidate });
+    if (navigation.errorText) {
+      navigationErrors.push(`${candidate}: ${navigation.errorText}`);
+      continue;
+    }
+    for (let attempt = 1; attempt <= 40; attempt += 1) {
+      const currentUrl = await evaluate(session, 'location.href');
+      if (currentUrl.startsWith(candidate)) {
+        appUrl = candidate;
+        break;
+      }
+      await sleep(100);
+    }
+    if (appUrl) break;
+    navigationErrors.push(`${candidate}: navigation did not settle`);
+  }
+  if (!appUrl) throw new Error(`Chromium could not reach preview. ${navigationErrors.join('; ')}`);
 
   const admin = JSON.stringify({
     id: 'demo-admin',
@@ -241,12 +277,70 @@ try {
   }
 
   mkdirSync(artifactDir, { recursive: true });
-  const screenshotZh = await session.command('Page.captureScreenshot', {
-    format: 'png',
-    captureBeyondViewport: false,
-    fromSurface: true,
+  await capture(session, screenshotPaths.dashboard);
+
+  await evaluate(session, `(() => {
+    const input = document.querySelector('#global-search-input');
+    if (!input) throw new Error('Global search input is unavailable');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    setter.call(input, '__NO_MATCH_RESINDB_UI_TEST__');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await waitForCondition(session, `document.querySelectorAll('tbody tr[data-index]').length === 0 && !!Array.from(document.querySelectorAll('button')).find((button) => /重置|Reset/.test(button.textContent || ''))`, 'empty-state feedback');
+  await capture(session, screenshotPaths.emptyState);
+
+  await evaluate(session, `(() => {
+    const input = document.querySelector('#global-search-input');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    setter.call(input, '');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await waitForCondition(session, `document.querySelectorAll('tbody tr[data-index]').length > 0`, 'data grid rows after clearing search');
+  await evaluate(session, `(() => {
+    const row = document.querySelector('tbody tr[data-index]');
+    if (!row) throw new Error('No product row available');
+    row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
+    return true;
+  })()`);
+  await waitForCondition(session, `!!document.querySelector('button[aria-label="Close details"]')`, 'product detail drawer');
+  await capture(session, screenshotPaths.productDetail);
+  await evaluate(session, `document.querySelector('button[aria-label="Close details"]').click()`);
+  await waitForCondition(session, `!document.querySelector('button[aria-label="Close details"]')`, 'product detail drawer close');
+
+  await clickButtonByTitle(session, ['科研可视化', 'Scientific Visualization']);
+  await waitForCondition(session, `document.body.innerText.includes('科学图表') || document.body.innerText.includes('Scientific Charts')`, 'scientific analytics view');
+  await waitForCondition(session, `document.querySelectorAll('canvas, svg').length > 0`, 'analytics visualization surface');
+  await capture(session, screenshotPaths.analytics);
+
+  await clickButtonByTitle(session, ['依赖网络谱图', 'Dependency']);
+  await waitForCondition(session, `!!document.querySelector('[data-testid="dependency-map-svg"]')`, 'dependency map');
+  await evaluate(session, `(() => {
+    const node = document.querySelector('[data-testid="dependency-map-svg"] g');
+    if (!node) throw new Error('Dependency map has no clickable nodes');
+    node.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    return true;
+  })()`);
+  await waitForCondition(session, `document.body.innerText.includes('CAS：') || document.body.innerText.includes('chemical') || document.body.innerText.includes('resin')`, 'dependency node details');
+  await capture(session, screenshotPaths.dependencyMap);
+
+  await clickButtonByTitle(session, ['数据仓库', 'Data Warehouse']);
+  await waitForCondition(session, `document.body.innerText.includes('13 RECORDS')`, 'dashboard before responsive capture');
+  await session.command('Emulation.setDeviceMetricsOverride', {
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 1,
+    mobile: true,
   });
-  writeFileSync(screenshotZhPath, Buffer.from(screenshotZh.data, 'base64'));
+  await sleep(500);
+  await capture(session, screenshotPaths.mobile);
+  await session.command('Emulation.setDeviceMetricsOverride', {
+    width: 1600,
+    height: 1000,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
 
   const preferenceState = await evaluate(
     session,
@@ -299,18 +393,38 @@ try {
     throw new Error(`Preference controls did not persist correctly: ${JSON.stringify(savedPreferences)}`);
   }
 
-  const screenshotEnDark = await session.command('Page.captureScreenshot', {
-    format: 'png',
-    captureBeyondViewport: false,
-    fromSurface: true,
-  });
-  writeFileSync(screenshotEnDarkPath, Buffer.from(screenshotEnDark.data, 'base64'));
+  await clickButtonByTitle(session, ['Scientific Visualization', '科研可视化']);
+  await clickButtonByTitle(session, ['Data Warehouse', '数据中心']);
+  await sleep(500);
+  await capture(session, screenshotPaths.dashboardEnDark);
+
+  const finalRuntimeErrors = session.events.filter(
+    (event) =>
+      event.method === 'Runtime.exceptionThrown' ||
+      (event.method === 'Runtime.consoleAPICalled' && event.params?.type === 'error') ||
+      (event.method === 'Log.entryAdded' && event.params?.entry?.level === 'error'),
+  );
+  if (finalRuntimeErrors.length > 0) {
+    const summaries = finalRuntimeErrors.map((event) => event.params?.entry?.text || event.params?.exceptionDetails?.exception?.description || event.params?.exceptionDetails?.text || event.method).join('; ');
+    throw new Error(`Browser runtime emitted ${finalRuntimeErrors.length} error(s) during interactive flows: ${summaries}`);
+  }
+
+  const artifactManifest = {
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    appUrl,
+    recordCount: bodyText.includes('13 RECORDS') ? 13 : null,
+    screenshots: Object.fromEntries(Object.entries(screenshotPaths).map(([name, file]) => [name, path.basename(file)])),
+    preferences: savedPreferences,
+  };
+  writeFileSync(path.join(artifactDir, 'ui-smoke-manifest.json'), `${JSON.stringify(artifactManifest, null, 2)}
+`);
   session.close();
 
   console.log(
-    `UI smoke test passed: authenticated dashboard rendered ${bodyText.includes('13 RECORDS') ? '13 records' : 'successfully'} and persisted language/theme/palette controls.`,
+    `UI smoke test passed: dashboard, empty state, product details, analytics, dependency map, responsive layout and preferences are interactive.`,
   );
-  console.log(`Screenshots: ${screenshotZhPath}, ${screenshotEnDarkPath}`);
+  console.log(`Screenshots: ${Object.values(screenshotPaths).join(', ')}`);
 } catch (error) {
   const diagnostics = [
     error instanceof Error ? error.stack || error.message : String(error),

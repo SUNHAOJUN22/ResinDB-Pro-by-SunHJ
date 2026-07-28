@@ -1,14 +1,5 @@
 import type { Category, Manufacturer, Product, Reference } from '@/types/index';
 import type { MaterialRecord } from '@/lib/adapters/types';
-import taxonomyDoc from './resin-taxonomy.json';
-import propertyGroupsDoc from './resin-property-groups.json';
-import manufacturersDoc from './resin-manufacturers.json';
-import referencesDoc from './resin-references.json';
-import productDoc from './polymerDatabase.json';
-import labDoc from './myLabUniverse.json';
-import marketDoc from './openMarketUniverse.json';
-import networkDoc from './resin-network.json';
-import aliasesDoc from './resin-category-aliases.json';
 
 export interface VersionedDataDocument<T> {
   schemaVersion: string;
@@ -19,27 +10,71 @@ export interface VersionedDataDocument<T> {
   data: T;
 }
 
-export interface ResinNetworkNode { id: string; group: 'chemical' | 'resin'; radius?: number; desc?: string; formula?: string; cas?: string }
+export interface ResinNetworkNode {
+  id: string;
+  group: 'chemical' | 'resin';
+  radius?: number;
+  desc?: string;
+  formula?: string;
+  cas?: string;
+}
+
 export interface ResinNetworkLink { source: string; target: string; value?: number }
 export interface CategoryAlias { categoryId: string; canonicalName: string; aliases: string[] }
 
+export interface ResinDataFailure { asset: string; message: string }
+export interface ResinDataStatus {
+  baseUrl: string;
+  loadedAt: string;
+  usingFallback: boolean;
+  failures: ResinDataFailure[];
+}
+
+export interface ResinDataCatalog {
+  categoryTree: Category[];
+  propertyGroups: Record<string, string[]>;
+  manufacturers: Manufacturer[];
+  references: Reference[];
+  productCatalog: Product[];
+  labRecords: MaterialRecord[];
+  openMarketRecords: MaterialRecord[];
+  network: { nodes: ResinNetworkNode[]; links: ResinNetworkLink[] };
+  categoryAliases: CategoryAlias[];
+}
+
 const EXPECTED_SCHEMA = '1.0.0';
+const NORMALIZED_BASE_URL = `${import.meta.env.BASE_URL.replace(/\/?$/, '/') }data/resins`;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export function validateDocument<T>(raw: unknown, kind: string, validateData: (value: unknown) => value is T): VersionedDataDocument<T> {
-  if (!isRecord(raw) || raw.schemaVersion !== EXPECTED_SCHEMA || raw.dataKind !== kind || !validateData(raw.data)) {
+export function validateDocument<T>(
+  raw: unknown,
+  kind: string,
+  validateData: (value: unknown) => value is T,
+): VersionedDataDocument<T> {
+  if (
+    !isRecord(raw) ||
+    raw.schemaVersion !== EXPECTED_SCHEMA ||
+    raw.dataKind !== kind ||
+    typeof raw.sourceType !== 'string' ||
+    typeof raw.updatedAt !== 'string' ||
+    !['demo', 'reference', 'measured', 'imported'].includes(String(raw.recordStatus)) ||
+    !validateData(raw.data)
+  ) {
     throw new Error(`Invalid or unsupported ResinDB data document: ${kind}`);
   }
   return raw as unknown as VersionedDataDocument<T>;
 }
 
 const isArray = (value: unknown): value is unknown[] => Array.isArray(value);
-const isCategoryArray = (value: unknown): value is Category[] => Array.isArray(value) && value.every((item) => isRecord(item) && typeof item.id === 'string' && typeof item.name === 'string');
-const isProductArray = (value: unknown): value is Product[] => Array.isArray(value) && value.every((item) => isRecord(item) && typeof item.id === 'string' && typeof item.gradeName === 'string' && Array.isArray(item.categoryIds) && isRecord(item.properties));
-const isMaterialRecordArray = (value: unknown): value is MaterialRecord[] => Array.isArray(value) && value.every((item) => isRecord(item) && typeof item.id === 'string' && typeof item.grade === 'string' && isRecord(item.properties));
+const isCategoryArray = (value: unknown): value is Category[] =>
+  Array.isArray(value) && value.every((item) => isRecord(item) && typeof item.id === 'string' && typeof item.name === 'string');
+const isProductArray = (value: unknown): value is Product[] =>
+  Array.isArray(value) && value.every((item) => isRecord(item) && typeof item.id === 'string' && typeof item.gradeName === 'string' && Array.isArray(item.categoryIds) && isRecord(item.properties));
+const isMaterialRecordArray = (value: unknown): value is MaterialRecord[] =>
+  Array.isArray(value) && value.every((item) => isRecord(item) && typeof item.id === 'string' && typeof item.grade === 'string' && isRecord(item.properties));
 
 function assertUniqueIds(items: Array<{ id: string }>, label: string): void {
   const seen = new Set<string>();
@@ -60,48 +95,155 @@ function flattenCategories(tree: Category[], stack = new Set<string>(), out: Cat
   return out;
 }
 
+const fallbackCategoryTree: Category[] = [
+  { id: 'root_plastic', name: '树脂数据暂不可用 (Data unavailable)', children: [] },
+];
+
 const fallbackProducts: Product[] = [
   {
-    id: 'demo-fallback-hdpe', gradeName: 'HDPE Demo Fallback', manufacturerId: 'demo-manufacturer', manufacturer: 'Demo dataset',
-    categoryIds: ['root_plastic', 'cat_pe', 'sub_hdpe'], createdAt: '2026-07-24', updatedAt: '2026-07-24',
-    properties: { 密度: { value: 0.95, unit: 'g/cm³', annotation: 'Deterministic demo fallback; not a manufacturer specification.' } },
+    id: 'demo-fallback-hdpe',
+    gradeName: 'HDPE Demo Fallback',
+    manufacturerId: 'demo-manufacturer',
+    manufacturer: 'Deterministic fallback dataset',
+    categoryIds: ['root_plastic'],
+    createdAt: '2026-07-25',
+    updatedAt: '2026-07-25',
+    properties: {
+      密度: {
+        value: 0.95,
+        unit: 'g/cm³',
+        annotation: 'External data assets failed to load; not a manufacturer specification.',
+      },
+      典型应用: { value: 'Runtime recovery record only' },
+    },
   },
 ];
 
-function safeLoad<T>(raw: unknown, kind: string, validateData: (value: unknown) => value is T, fallback: T, allowLegacyArray = false): T {
-  try {
-    if (allowLegacyArray && validateData(raw)) return raw;
-    return validateDocument(raw, kind, validateData).data;
-  } catch (error) {
-    console.warn(`[ResinDB data fallback] ${kind}`, error);
-    return fallback;
+export async function loadResinDataCatalog(
+  fetcher: typeof fetch = globalThis.fetch.bind(globalThis),
+  baseUrl = NORMALIZED_BASE_URL,
+): Promise<{ catalog: ResinDataCatalog; status: ResinDataStatus }> {
+  const failures: ResinDataFailure[] = [];
+
+  async function load<T>(
+    asset: string,
+    kind: string,
+    validateData: (value: unknown) => value is T,
+    fallback: T,
+  ): Promise<T> {
+    try {
+      const response = await fetcher(`${baseUrl}/${asset}`, {
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+      const raw: unknown = await response.json();
+      return validateDocument(raw, kind, validateData).data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      failures.push({ asset, message });
+      console.warn(`[ResinDB external data fallback] ${asset}: ${message}`);
+      return fallback;
+    }
   }
+
+  const [
+    categoryTree,
+    propertyGroups,
+    manufacturers,
+    references,
+    productCatalog,
+    labRecords,
+    openMarketRecords,
+    network,
+    categoryAliases,
+  ] = await Promise.all([
+    load('resin-taxonomy.json', 'resin-taxonomy', isCategoryArray, fallbackCategoryTree),
+    load('resin-property-groups.json', 'resin-property-groups', (value): value is Record<string, string[]> => isRecord(value) && Object.values(value).every((entry) => Array.isArray(entry) && entry.every((item) => typeof item === 'string')), {}),
+    load('resin-manufacturers.json', 'resin-manufacturers', (value): value is Manufacturer[] => Array.isArray(value) && value.every((item) => isRecord(item) && typeof item.id === 'string' && typeof item.name === 'string'), []),
+    load('resin-references.json', 'resin-references', (value): value is Reference[] => Array.isArray(value) && value.every((item) => isRecord(item) && typeof item.id === 'string' && typeof item.name === 'string'), []),
+    load('polymerDatabase.json', 'resin-seed-products', isProductArray, fallbackProducts),
+    load('myLabUniverse.json', 'laboratory-material-records', isMaterialRecordArray, []),
+    load('openMarketUniverse.json', 'market-material-records', isMaterialRecordArray, []),
+    load('resin-network.json', 'resin-reaction-network', (value): value is { nodes: ResinNetworkNode[]; links: ResinNetworkLink[] } => isRecord(value) && isArray(value.nodes) && isArray(value.links), { nodes: [], links: [] }),
+    load('resin-category-aliases.json', 'resin-category-aliases', (value): value is CategoryAlias[] => Array.isArray(value) && value.every((item) => isRecord(item) && typeof item.categoryId === 'string' && typeof item.canonicalName === 'string' && Array.isArray(item.aliases)), []),
+  ]);
+
+  const flatCategories = flattenCategories(categoryTree);
+  assertUniqueIds(flatCategories, 'category');
+  assertUniqueIds(manufacturers, 'manufacturer');
+  assertUniqueIds(references, 'reference');
+  assertUniqueIds(productCatalog, 'product');
+  assertUniqueIds(labRecords, 'laboratory record');
+  assertUniqueIds(openMarketRecords, 'market record');
+  assertUniqueIds(network.nodes, 'network node');
+
+  return {
+    catalog: {
+      categoryTree,
+      propertyGroups,
+      manufacturers,
+      references,
+      productCatalog,
+      labRecords,
+      openMarketRecords,
+      network,
+      categoryAliases,
+    },
+    status: {
+      baseUrl,
+      loadedAt: new Date().toISOString(),
+      usingFallback: failures.length > 0,
+      failures,
+    },
+  };
 }
 
-export const CATEGORY_TREE = safeLoad(taxonomyDoc, 'resin-taxonomy', isCategoryArray, [] as Category[]);
+const runtimeData = await loadResinDataCatalog();
+
+export const CATEGORY_TREE = runtimeData.catalog.categoryTree;
+export const PROPERTY_GROUPS = runtimeData.catalog.propertyGroups;
+export const MANUFACTURERS = runtimeData.catalog.manufacturers;
+export const REFERENCES = runtimeData.catalog.references;
+export const PRODUCT_CATALOG = runtimeData.catalog.productCatalog;
+export const LAB_RECORDS = runtimeData.catalog.labRecords;
+export const OPEN_MARKET_RECORDS = runtimeData.catalog.openMarketRecords;
+export const RESIN_NETWORK = runtimeData.catalog.network;
+export const CATEGORY_ALIASES = runtimeData.catalog.categoryAliases;
+export const RESIN_DATA_STATUS = runtimeData.status;
+
 const flatCategories = flattenCategories(CATEGORY_TREE);
-assertUniqueIds(flatCategories, 'category');
 
-export const PROPERTY_GROUPS = safeLoad(propertyGroupsDoc, 'resin-property-groups', (v): v is Record<string, string[]> => isRecord(v) && Object.values(v).every((x) => Array.isArray(x) && x.every((s) => typeof s === 'string')), {});
-export const MANUFACTURERS = safeLoad(manufacturersDoc, 'resin-manufacturers', (v): v is Manufacturer[] => Array.isArray(v) && v.every((x) => isRecord(x) && typeof x.id === 'string' && typeof x.name === 'string'), []);
-export const REFERENCES = safeLoad(referencesDoc, 'resin-references', (v): v is Reference[] => Array.isArray(v) && v.every((x) => isRecord(x) && typeof x.id === 'string' && typeof x.name === 'string'), []);
-assertUniqueIds(MANUFACTURERS, 'manufacturer');
-assertUniqueIds(REFERENCES, 'reference');
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
-export const PRODUCT_CATALOG = safeLoad(productDoc, 'resin-seed-products', isProductArray, fallbackProducts, true);
-assertUniqueIds(PRODUCT_CATALOG, 'product');
-export const LAB_RECORDS = safeLoad(labDoc, 'laboratory-material-records', isMaterialRecordArray, [] as MaterialRecord[], true);
-export const OPEN_MARKET_RECORDS = safeLoad(marketDoc, 'market-material-records', isMaterialRecordArray, [] as MaterialRecord[], true);
+function matchesCategoryAlias(normalizedText: string, rawAlias: string): boolean {
+  const alias = rawAlias.trim().toLowerCase();
+  if (!alias) return false;
+  if (normalizedText === alias) return true;
 
-export const RESIN_NETWORK = safeLoad(networkDoc, 'resin-reaction-network', (v): v is { nodes: ResinNetworkNode[]; links: ResinNetworkLink[] } => isRecord(v) && isArray(v.nodes) && isArray(v.links), { nodes: [], links: [] });
-export const CATEGORY_ALIASES = safeLoad(aliasesDoc, 'resin-category-aliases', (v): v is CategoryAlias[] => Array.isArray(v) && v.every((x) => isRecord(x) && typeof x.categoryId === 'string' && typeof x.canonicalName === 'string' && Array.isArray(x.aliases)), []);
+  // Short ASCII aliases such as PE/PP/PC must match a complete token. Using a
+  // raw substring would incorrectly classify TPE as PE and PPR as PP.
+  if (/^[a-z0-9-]{1,3}$/.test(alias)) {
+    return new RegExp(`(^|[^a-z0-9])${escapeRegExp(alias)}([^a-z0-9]|$)`, 'i').test(normalizedText);
+  }
+  return normalizedText.includes(alias);
+}
 
 export function categoryIdFromText(text: string): string {
   const normalized = text.trim().toLowerCase();
-  const match = CATEGORY_ALIASES.find((entry) => entry.aliases.some((alias) => normalized === alias.toLowerCase() || normalized.includes(alias.toLowerCase())));
-  return match?.categoryId ?? 'root_plastic';
+  if (!normalized) return 'root_plastic';
+
+  const aliases = CATEGORY_ALIASES.flatMap((entry) =>
+    entry.aliases.map((alias) => ({ entry, alias })),
+  ).sort((a, b) => b.alias.length - a.alias.length);
+  return aliases.find(({ alias }) => matchesCategoryAlias(normalized, alias))?.entry.categoryId ?? 'root_plastic';
 }
 
 export function categoryNameFromId(id: string): string {
-  return CATEGORY_ALIASES.find((entry) => entry.categoryId === id)?.canonicalName ?? flatCategories.find((entry) => entry.id === id)?.name ?? 'Resin';
+  return CATEGORY_ALIASES.find((entry) => entry.categoryId === id)?.canonicalName ??
+    flatCategories.find((entry) => entry.id === id)?.name ??
+    'Resin';
 }

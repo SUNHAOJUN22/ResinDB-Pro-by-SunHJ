@@ -1,4 +1,4 @@
-import * as echarts from "echarts";
+import * as echarts from "@/lib/echarts";
 
 interface RadarData {
   name: string;

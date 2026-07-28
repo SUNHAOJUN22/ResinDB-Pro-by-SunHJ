@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useMemo } from 'react';
-import * as echarts from 'echarts';
+import * as echarts from '@/lib/echarts';
 import { SimilarityNode, SimilarityEdge } from '@/workers/similarityWorker';
 
 interface SimilarityGraphProps {

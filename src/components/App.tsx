@@ -13,6 +13,7 @@ import React, {
 // This is handled via a useEffect hook inside AppContent to prevent memory leaks and duplicate listeners.
 
 import { CATEGORY_TREE } from '@/config/constants';
+import { RESIN_DATA_STATUS } from '@/data/resinData';
 import { safeStorage } from "@/lib/utils";
 import {
   Manufacturer,
@@ -377,6 +378,18 @@ const AppContent = memo(() => {
     <div className="flex h-[100dvh] w-full bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300">
       <ToastContainer toasts={toasts} onRemove={removeToast} />
       <FloatingParticles />
+      {RESIN_DATA_STATUS.usingFallback && (
+        <div
+          role="alert"
+          data-testid="external-data-warning"
+          className="fixed bottom-4 left-1/2 z-[260] max-w-[min(92vw,760px)] -translate-x-1/2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-xl dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+        >
+          <strong>{t("externalDataFallback", "外部树脂数据部分加载失败")}</strong>
+          <span className="ml-2">
+            {RESIN_DATA_STATUS.failures.map((failure) => failure.asset).join(", ")}
+          </span>
+        </div>
+      )}
 
       <div className="print:hidden">
         <SystemNav
@@ -771,11 +784,6 @@ const AppContent = memo(() => {
     </div>
   );
 });
-
-async function startApp() {
-  // Any async bootstrap logic here
-}
-startApp();
 
 const App: React.FC = () => (
   <LanguageProvider>

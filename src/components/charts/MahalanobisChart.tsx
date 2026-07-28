@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import * as echarts from 'echarts';
+import * as echarts from '@/lib/echarts';
 
 interface MahalanobisChartProps {
     distances: { index: number; id: string; name: string; distance: number; isOutlier: boolean }[];

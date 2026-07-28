@@ -1,3 +1,4 @@
+import { APP_VERSION } from '@/config/version';
 import React, { useMemo, useState } from 'react';
 import { Download, MessageSquare, X } from 'lucide-react';
 import { safeStorage } from '@/lib/utils';
@@ -13,7 +14,7 @@ export interface FeedbackRecord { id:string; createdAt:string; type:FeedbackType
 export const buildFeedbackRecord=(input:Omit<FeedbackRecord,'id'|'createdAt'|'environment'|'privacy'>):FeedbackRecord=>({
   ...input,title:redactFeedbackText(input.title.trim()),description:redactFeedbackText(input.description.trim()),steps:redactFeedbackText(input.steps.trim()),
   id:`feedback-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,createdAt:new Date().toISOString(),
-  environment:{version:'3.0.0',url:location.pathname,language:document.documentElement.lang||'unknown',theme:document.documentElement.classList.contains('dark')?'dark':'light',userAgent:navigator.userAgent},
+  environment:{version:APP_VERSION,url:location.pathname,language:document.documentElement.lang||'unknown',theme:document.documentElement.classList.contains('dark')?'dark':'light',userAgent:navigator.userAgent},
   privacy:'No API keys, passwords or complete resin database records are intentionally collected.',
 });
 const readQueue=():FeedbackRecord[]=>{try{return JSON.parse(safeStorage.local.getItem(STORAGE_KEY)||'[]') as FeedbackRecord[];}catch{return[];}};

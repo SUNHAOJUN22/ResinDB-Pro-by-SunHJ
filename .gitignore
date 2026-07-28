@@ -16,6 +16,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 outputs/
+FINAL_RELEASE_REPORT.md
 *.inspect.ndjson
 *-audit.json
 *.trigger

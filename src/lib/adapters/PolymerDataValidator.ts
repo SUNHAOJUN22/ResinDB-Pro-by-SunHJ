@@ -6,7 +6,7 @@ import { isPlaceholderValue } from '@/utils/productUtils';
  * 
  * 遵循国际专业数据库（如 Campus Plastics, MatWeb, UL Prospector）标准对进入系统的物数据实施铁律级审计。
  * 1. 物理/力学参数与国际标准 (ISO/ASTM) 强约束校验（密度、熔指、拉伸强度、弯曲模量、冲击强度）。
- * 2. 强类型多维空值丢弃机制：剔除 "unknown", "n/a", "-", "0", "null" 等无效槽位。
+ * 2. 强类型多维空值丢弃机制：剔除 "unknown", "n/a", "-", "null" 等显式缺失槽位；数值 0 由各物性边界规则单独判定。
  * 3. 熔断线判定 (Hard Melt-down Line)：如果有效指标少于 2 项，自动熔断、忽略或删除该条虚假/残缺记录。
  */
 export class PolymerDataValidator {

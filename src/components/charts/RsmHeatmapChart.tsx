@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import * as echarts from "echarts";
+import * as echarts from "@/lib/echarts";
 
 interface RsmHeatmapChartProps {
   grid: {x1: number, x2: number, y: number}[][];

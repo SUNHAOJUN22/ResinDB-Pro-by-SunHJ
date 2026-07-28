@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Product } from '@/types/index';
-import ReactECharts from "echarts-for-react";
+import ReactEChartsCore from "echarts-for-react/lib/core";
+import { echarts } from "@/lib/echarts";
 
 interface DegradationSimulatorProps {
   product: Product;
@@ -132,7 +133,7 @@ export const DegradationSimulator: React.FC<DegradationSimulatorProps> = ({ prod
          </div>
       </div>
       <div className="h-64 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/50 rounded-lg">
-         <ReactECharts option={options} style={{ height: '100%', width: '100%' }} />
+         <ReactEChartsCore echarts={echarts} option={options} style={{ height: '100%', width: '100%' }} />
       </div>
     </div>
   );

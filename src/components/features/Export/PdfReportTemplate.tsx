@@ -2,7 +2,7 @@ import React, { forwardRef, useEffect, useRef } from "react";
 import { Product, PropertyValue } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { PROPERTY_GROUPS } from '@/config/constants';
-import * as echarts from "echarts";
+import * as echarts from "@/lib/echarts";
 import { RADAR_KEYS, RADAR_DEFAULT_MAX } from '@/utils/productUtils';
 import { useFormulas } from '@/hooks/math/useFormulas';
 import { formulaEngine } from '@/lib/formulaParser';

@@ -39,7 +39,7 @@ import {
   GitMerge,
   Zap
 } from "lucide-react";
-import * as echarts from "echarts";
+import * as echarts from "@/lib/echarts";
 import { Product, FormulaConfig } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { logger } from "@/lib/logger";

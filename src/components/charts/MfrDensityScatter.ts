@@ -1,4 +1,4 @@
-import * as echarts from "echarts";
+import * as echarts from "@/lib/echarts";
 
 // Chart: MFR vs Density Scatter Plot Option Configuration - Scientific Refinement
 export const getMfrDensityChartOption = (
