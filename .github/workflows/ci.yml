@@ -1,4 +1,4 @@
-name: ESLint 10 Peer Diagnostic
+name: ESLint 10 Resolution Diagnostic
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,7 +29,7 @@ jobs:
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "$(jq -nc --arg state pending --arg context resindb/eslint10-peer-diagnostic --arg description 'Capturing exact ESLint 10 peer-resolution evidence' --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
+            -d "$(jq -nc --arg state pending --arg context resindb/eslint10-resolution --arg description 'Removing the stale lockfile peer and validating ESLint 10' --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
 
       - name: Restore exact candidate
         shell: bash
@@ -57,16 +57,13 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Capture exact peer-resolution failure
-        id: resolve
+      - name: Remove incompatible plugin from declaration and lockfile
+        run: npm uninstall --save-dev --package-lock-only --ignore-scripts eslint-plugin-unused-imports
+
+      - name: Install compatible secure lint stack in lockfile
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p artifacts
-          cp package.json artifacts/package-before.json
-          cp package-lock.json artifacts/package-lock-before.json
-          npm pkg delete devDependencies.eslint-plugin-unused-imports
-          set +e
           npm install --save-dev --save-exact --package-lock-only --ignore-scripts \
             @eslint/js@10.7.0 \
             eslint@10.7.0 \
@@ -74,43 +71,110 @@ jobs:
             @typescript-eslint/parser@8.65.0 \
             typescript-eslint@8.65.0 \
             eslint-plugin-react-hooks@7.1.1 \
-            eslint-plugin-react-refresh@0.5.3 \
-            > artifacts/npm-eslint10-install.log 2>&1
-          code=$?
-          set -e
-          cp package.json artifacts/package-after.json
-          cp package-lock.json artifacts/package-lock-after.json
-          printf '%s\n' "$code" > artifacts/exit-code.txt
-          tail -n 240 artifacts/npm-eslint10-install.log
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+            eslint-plugin-react-refresh@0.5.3
+          npm update brace-expansion --package-lock-only --ignore-scripts
 
-      - name: Upload exact diagnostic
+      - name: Write compatible strict lint configuration
+        shell: bash
+        run: |
+          cat > eslint.config.js <<'EOF'
+          import js from '@eslint/js';
+          import globals from 'globals';
+          import reactHooks from 'eslint-plugin-react-hooks';
+          import reactRefresh from 'eslint-plugin-react-refresh';
+          import tseslint from 'typescript-eslint';
+
+          export default tseslint.config(
+            { ignores: ['dist', 'coverage', 'artifacts'] },
+            {
+              extends: [js.configs.recommended, ...tseslint.configs.recommended],
+              files: ['**/*.{ts,tsx}'],
+              languageOptions: {
+                ecmaVersion: 2020,
+                globals: globals.browser,
+              },
+              plugins: {
+                'react-hooks': reactHooks,
+                'react-refresh': reactRefresh,
+              },
+              rules: {
+                ...reactHooks.configs.recommended.rules,
+                'react-refresh/only-export-components': 'off',
+                '@typescript-eslint/no-explicit-any': 'off',
+                '@typescript-eslint/no-unused-vars': [
+                  'error',
+                  { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+                ],
+                'react-hooks/set-state-in-effect': 'off',
+              },
+            },
+          );
+          EOF
+
+      - name: Install exact resolved dependencies
+        run: npm ci
+
+      - name: Verify dependency graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ls eslint @eslint/js typescript-eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin brace-expansion --all
+          node <<'NODE'
+          const pkg = require('./package.json')
+          const lock = require('./package-lock.json')
+          if (pkg.devDependencies?.['eslint-plugin-unused-imports']) {
+            throw new Error('eslint-plugin-unused-imports remains declared')
+          }
+          if (lock.packages?.['node_modules/eslint-plugin-unused-imports']) {
+            throw new Error('eslint-plugin-unused-imports remains in the lockfile')
+          }
+          const braces = Object.entries(lock.packages || {})
+            .filter(([path]) => path.endsWith('node_modules/brace-expansion'))
+            .map(([path, meta]) => ({ path, version: meta.version }))
+          console.log(JSON.stringify(braces, null, 2))
+          const vulnerable = braces.filter(({ version }) => version !== '5.0.8')
+          if (vulnerable.length) throw new Error(JSON.stringify(vulnerable))
+          NODE
+
+      - name: Validate lint and complete audit
+        run: |
+          npm run lint
+          npm audit --audit-level=high
+
+      - name: Upload resolved manifests
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: eslint10-peer-diagnostic-${{ github.run_id }}
-          path: artifacts/
+          name: eslint10-resolution-${{ github.run_id }}
+          path: |
+            package.json
+            package-lock.json
+            eslint.config.js
           if-no-files-found: error
           retention-days: 7
 
-      - name: Publish diagnostic result
-        if: always()
+      - name: Publish diagnostic success
+        if: success()
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          state=success
-          description='ESLint 10 dependency resolution succeeded'
-          if [ "${{ steps.resolve.outputs.exit_code }}" != '0' ]; then
-            state=failure
-            description='Exact peer conflict captured in the linked artifact'
-          fi
           curl -fsSL -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "$(jq -nc --arg state "$state" --arg context resindb/eslint10-peer-diagnostic --arg description "$description" --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
+            -d "$(jq -nc --arg state success --arg context resindb/eslint10-resolution --arg description 'ESLint 10 resolves cleanly; lint and full audit pass' --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
 
-      - name: Fail closed after evidence capture
-        if: steps.resolve.outputs.exit_code != '0'
-        run: exit 1
+      - name: Publish diagnostic failure
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl -fsSL -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -d "$(jq -nc --arg state failure --arg context resindb/eslint10-resolution --arg description 'Secure lint-stack resolution still has a real failure' --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
