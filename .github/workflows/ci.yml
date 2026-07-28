@@ -97,7 +97,7 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts
           set +e
-          npm run audit:prod -- --json > artifacts/npm-audit-prod.json
+          npm audit --omit=dev --audit-level=high --json > artifacts/npm-audit-prod.json
           code=$?
           set -e
           jq '.metadata.vulnerabilities' artifacts/npm-audit-prod.json
@@ -108,7 +108,7 @@ jobs:
         run: |
           set -euo pipefail
           set +e
-          npm run audit:all -- --json > artifacts/npm-audit-all.json
+          npm audit --audit-level=high --json > artifacts/npm-audit-all.json
           code=$?
           set -e
           jq '.metadata.vulnerabilities' artifacts/npm-audit-all.json
