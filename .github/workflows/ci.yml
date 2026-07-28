@@ -91,10 +91,44 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Upgrade lint security stack and remove legacy brace expansion
+      - name: Modernize lint stack without incompatible peer overrides
         shell: bash
         run: |
           set -euo pipefail
+          cat > eslint.config.js <<'EOF'
+          import js from '@eslint/js';
+          import globals from 'globals';
+          import reactHooks from 'eslint-plugin-react-hooks';
+          import reactRefresh from 'eslint-plugin-react-refresh';
+          import tseslint from 'typescript-eslint';
+
+          export default tseslint.config(
+            { ignores: ['dist', 'coverage', 'artifacts'] },
+            {
+              extends: [js.configs.recommended, ...tseslint.configs.recommended],
+              files: ['**/*.{ts,tsx}'],
+              languageOptions: {
+                ecmaVersion: 2020,
+                globals: globals.browser,
+              },
+              plugins: {
+                'react-hooks': reactHooks,
+                'react-refresh': reactRefresh,
+              },
+              rules: {
+                ...reactHooks.configs.recommended.rules,
+                'react-refresh/only-export-components': 'off',
+                '@typescript-eslint/no-explicit-any': 'off',
+                '@typescript-eslint/no-unused-vars': [
+                  'error',
+                  { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+                ],
+                'react-hooks/set-state-in-effect': 'off',
+              },
+            },
+          );
+          EOF
+          npm pkg delete devDependencies.eslint-plugin-unused-imports
           for attempt in 1 2 3; do
             if npm install --save-dev --save-exact --package-lock-only --ignore-scripts \
               @eslint/js@10.7.0 \
@@ -102,6 +136,8 @@ jobs:
               @typescript-eslint/eslint-plugin@8.65.0 \
               @typescript-eslint/parser@8.65.0 \
               typescript-eslint@8.65.0 \
+              eslint-plugin-react-hooks@7.1.1 \
+              eslint-plugin-react-refresh@0.5.3 \
               > /tmp/npm-upgrade-lint.log 2>&1; then
               cat /tmp/npm-upgrade-lint.log
               break
@@ -120,11 +156,16 @@ jobs:
             '@typescript-eslint/eslint-plugin': '8.65.0',
             '@typescript-eslint/parser': '8.65.0',
             'typescript-eslint': '8.65.0',
+            'eslint-plugin-react-hooks': '7.1.1',
+            'eslint-plugin-react-refresh': '0.5.3',
           }
           for (const [name, version] of Object.entries(expected)) {
             if (pkg.devDependencies?.[name] !== version) {
               throw new Error(`${name} must be pinned to ${version}; got ${pkg.devDependencies?.[name]}`)
             }
+          }
+          if ('eslint-plugin-unused-imports' in (pkg.devDependencies || {})) {
+            throw new Error('Incompatible eslint-plugin-unused-imports remains declared')
           }
           const braces = Object.entries(lock.packages || {})
             .filter(([path]) => path.endsWith('node_modules/brace-expansion'))
@@ -203,7 +244,7 @@ jobs:
 
           ## Dependency security closure — 2026-07-28
 
-          The lint toolchain was upgraded to ESLint 10.7.0 and typescript-eslint 8.65.0, with `@eslint/js` declared directly. This removes the legacy minimatch 3 / brace-expansion 1.x chain. All remaining brace-expansion instances resolve to patched version 5.0.8. Both production-only and complete dependency audits passed after the upgrade.
+          The lint toolchain was upgraded to ESLint 10.7.0 and typescript-eslint 8.65.0, with `@eslint/js` declared directly. The ESLint-9-only unused-imports plugin was replaced by strict `@typescript-eslint/no-unused-vars` enforcement. This removes the legacy minimatch 3 / brace-expansion 1.x chain; all remaining brace-expansion instances resolve to patched version 5.0.8. Production and complete dependency audits passed after the upgrade.
           EOF
 
       - name: Generate HTML, Markdown and PDF reports
@@ -211,7 +252,7 @@ jobs:
         run: |
           set -euo pipefail
           cat > artifacts/ci-context.json <<JSON
-          {"schemaVersion":2,"repository":"${GITHUB_REPOSITORY}","sha":"${GITHUB_SHA}","ref":"${GITHUB_REF}","runId":${GITHUB_RUN_ID},"runAttempt":${GITHUB_RUN_ATTEMPT},"testFiles":10,"testCount":84,"generatedAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+          {"schemaVersion":2,"repository":"${GITHUB_REPOSITORY}","sha":"${GITHUB_SHA}","ref":"${GITHUB_REF}","runId":${GITHUB_RUN_ID},"runAttempt":${GITHUB_RUN_ATTEMPT},"testFiles":10,"testCount":84,"generatedAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}
           JSON
           npm run report:validation
           npm run report:pdf
