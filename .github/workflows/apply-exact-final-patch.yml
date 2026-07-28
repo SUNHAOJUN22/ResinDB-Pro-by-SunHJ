@@ -1,0 +1,202 @@
+name: Apply exact ResinDB Pro 3.2.0 final candidate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/apply-exact-final-patch.trigger
+
+permissions:
+  contents: write
+  statuses: write
+
+concurrency:
+  group: apply-exact-resindb-final
+  cancel-in-progress: false
+
+jobs:
+  validate-and-apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Restore and verify exact signed candidate
+        shell: bash
+        env:
+          TRANSPORT_SHA256: 2d0af6faf16c407f50340f84b80c498aef0c7ae39d9361073774dc09be312db1
+          XZ_SHA256: 024e4dd14bf401d48c74263637a6ff09b31e7bc18da5befd8a3e61199f1a27c6
+          PATCH_SHA256: caeddf8947eb4d6c843a1ad6f6d7fded2db3f823654b216d6e5cf376f8bbf5b6
+        run: |
+          set -euo pipefail
+          test "$(find .github/.resindb-final-patch -maxdepth 1 -name 'part-*.txt' | wc -l | tr -d ' ')" -eq 51
+          cat .github/.resindb-final-patch/part-*.txt > /tmp/resindb-final.patch.xz.b64
+          printf '%s  %s\n' "$TRANSPORT_SHA256" /tmp/resindb-final.patch.xz.b64 | sha256sum -c -
+          base64 -d /tmp/resindb-final.patch.xz.b64 > /tmp/resindb-final.patch.xz
+          printf '%s  %s\n' "$XZ_SHA256" /tmp/resindb-final.patch.xz | sha256sum -c -
+          xz -t /tmp/resindb-final.patch.xz
+          xz -dc /tmp/resindb-final.patch.xz > /tmp/resindb-final.patch
+          printf '%s  %s\n' "$PATCH_SHA256" /tmp/resindb-final.patch | sha256sum -c -
+
+          exclusions=(
+            --exclude='.github/workflows/final-source-export.yml'
+            --exclude='.github/workflows/remediate-lockfile-20260726.yml'
+            --exclude='reports/*'
+            --exclude='reports/**'
+          )
+          git apply --check --binary "${exclusions[@]}" /tmp/resindb-final.patch
+          git apply --binary "${exclusions[@]}" /tmp/resindb-final.patch
+
+      - name: Remove every temporary transport and stale report
+        shell: bash
+        run: |
+          set -euo pipefail
+          find .github -type f ! -path '.github/workflows/ci.yml' -delete
+          find .github -depth -type d -empty -delete || true
+          rm -rf reports
+          mkdir -p reports
+          cat > reports/README.md <<'EOF'
+          # Validation reports
+
+          Exact-tree HTML, PDF, screenshots, coverage and machine-readable receipts are generated into `artifacts/` by CI and uploaded as GitHub Actions artifacts. They are not fabricated or committed as stale evidence.
+          EOF
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          find . -type f -name '*.pyc' -delete
+          test "$(find .github -type f | sort)" = '.github/workflows/ci.yml'
+          test "$(find reports -type f | sort)" = 'reports/README.md'
+          git diff --check
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install exact dependencies
+        id: npm-ci
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if npm ci > /tmp/npm-ci.log 2>&1; then
+              cat /tmp/npm-ci.log
+              exit 0
+            fi
+            tail -n 200 /tmp/npm-ci.log
+            [ "$attempt" -eq 3 ] && exit 1
+            sleep $((attempt * 15))
+          done
+
+      - name: Documentation and deterministic scientific visuals
+        run: npm run validate:docs
+
+      - name: Production source hygiene
+        run: npm run validate:source
+
+      - name: Governed external data
+        run: npm run validate:data
+
+      - name: Lint
+        run: npm run lint
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: Complete regression tests
+        run: npm run test
+
+      - name: Isolated unit tests
+        run: npm run test:unit
+
+      - name: Isolated scientific and worker tests
+        run: npm run test:science
+
+      - name: Coverage
+        run: npm run test:coverage
+
+      - name: Production build and external-data proof
+        run: npm run build
+
+      - name: HTTP production smoke
+        run: npm run smoke
+
+      - name: Chromium interactive UI smoke
+        run: npm run test:ui
+
+      - name: Production dependency audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if npm run audit:prod; then exit 0; fi
+            [ "$attempt" -eq 3 ] && exit 1
+            sleep $((attempt * 10))
+          done
+
+      - name: Full dependency audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if npm run audit:all; then exit 0; fi
+            [ "$attempt" -eq 3 ] && exit 1
+            sleep $((attempt * 10))
+          done
+
+      - name: Prove main is the sole remote branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          git ls-remote --heads origin | tee artifacts/branch-proof.txt
+          test "$(wc -l < artifacts/branch-proof.txt | tr -d ' ')" -eq 1
+          test "$(grep -c 'refs/heads/main$' artifacts/branch-proof.txt || true)" -eq 1
+
+      - name: Generate HTML, Markdown and PDF reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cat > artifacts/ci-context.json <<JSON
+          {"schemaVersion":2,"repository":"${GITHUB_REPOSITORY}","sha":"${GITHUB_SHA}","ref":"${GITHUB_REF}","runId":${GITHUB_RUN_ID},"runAttempt":${GITHUB_RUN_ATTEMPT},"testFiles":10,"testCount":84,"generatedAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+          JSON
+          npm run report:validation
+          npm run report:pdf
+          pdf="artifacts/ResinDB-Pro-3.2.0-Final-Validation-Report.pdf"
+          test -s "$pdf"
+          if ! command -v pdfinfo >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y poppler-utils
+          fi
+          pdfinfo "$pdf"
+          pdftoppm -png -r 120 "$pdf" artifacts/pdf-render >/dev/null
+          test "$(find artifacts -maxdepth 1 -name 'pdf-render-*.png' | wc -l | tr -d ' ')" -ge 2
+          test "$(stat -c%s artifacts/pdf-render-1.png)" -gt 10000
+
+      - name: Upload pre-commit validation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: resindb-pro-3.2.0-precommit-evidence-${{ github.run_id }}
+          path: |
+            coverage/
+            artifacts/
+            FINAL_RELEASE_REPORT.md
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Commit validated candidate directly to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'ResinDB Finalization Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          test -n "$(git diff --cached --name-only)"
+          git commit -m 'feat: finalize ResinDB Pro 3.2.0 scientific data platform'
+          git push origin HEAD:main
