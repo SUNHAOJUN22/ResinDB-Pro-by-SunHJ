@@ -1,4 +1,4 @@
-name: CI
+name: ESLint 10 Peer Diagnostic
 
 on:
   push:
@@ -6,44 +6,19 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  statuses: write
-
-concurrency:
-  group: finalize-resindb-v320-main
-  cancel-in-progress: false
+  contents: read
 
 jobs:
-  validate-and-apply:
+  diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 30
     steps:
-      - name: Check out current main
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
 
-      - name: Publish finalization start status
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          curl -fsSL -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "$(jq -nc --arg state pending --arg context resindb/finalize-v320 --arg description 'Exact ResinDB Pro 3.2.0 finalization is running' --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
-
-      - name: Restore baseline CI file
-        shell: bash
-        run: |
-          set -euo pipefail
-          git show d8b3e90dd0d90aba5e31361305392898eea2fc4c:.github/workflows/ci.yml > .github/workflows/ci.yml
-          test "$(git hash-object .github/workflows/ci.yml)" = "796e74f7b17426aaa03b8d461a100761574960d0"
-
-      - name: Restore and verify exact signed candidate
+      - name: Restore exact candidate
         shell: bash
         env:
           TRANSPORT_SHA256: 2d0af641907c40b5cf495636dcdc764f5af3b5dec4f1f814c64f165b9eea2db1
@@ -51,261 +26,59 @@ jobs:
           PATCH_SHA256: caeddf8947eb4d6c843a1ad6f6d7fded2db3f823654b216d6e5cf376f8bbf5b6
         run: |
           set -euo pipefail
-          test "$(find .github/.resindb-final-patch -maxdepth 1 -name 'part-*.txt' | wc -l | tr -d ' ')" -eq 51
+          git show d8b3e90dd0d90aba5e31361305392898eea2fc4c:.github/workflows/ci.yml > .github/workflows/ci.yml
           cat .github/.resindb-final-patch/part-*.txt > /tmp/resindb-final.patch.xz.b64
           printf '%s  %s\n' "$TRANSPORT_SHA256" /tmp/resindb-final.patch.xz.b64 | sha256sum -c -
           base64 -d /tmp/resindb-final.patch.xz.b64 > /tmp/resindb-final.patch.xz
           printf '%s  %s\n' "$XZ_SHA256" /tmp/resindb-final.patch.xz | sha256sum -c -
-          xz -t /tmp/resindb-final.patch.xz
           xz -dc /tmp/resindb-final.patch.xz > /tmp/resindb-final.patch
           printf '%s  %s\n' "$PATCH_SHA256" /tmp/resindb-final.patch | sha256sum -c -
-          exclusions=(
-            --exclude='.github/workflows/final-source-export.yml'
-            --exclude='.github/workflows/remediate-lockfile-20260726.yml'
-            --exclude='reports/*'
-            --exclude='reports/**'
-          )
-          git apply --check --binary "${exclusions[@]}" /tmp/resindb-final.patch
-          git apply --binary "${exclusions[@]}" /tmp/resindb-final.patch
+          git apply --binary \
+            --exclude='.github/workflows/final-source-export.yml' \
+            --exclude='.github/workflows/remediate-lockfile-20260726.yml' \
+            --exclude='reports/*' --exclude='reports/**' \
+            /tmp/resindb-final.patch
 
-      - name: Remove temporary transport and stale evidence
-        shell: bash
-        run: |
-          set -euo pipefail
-          find .github -type f ! -path '.github/workflows/ci.yml' -delete
-          find .github -depth -type d -empty -delete || true
-          rm -rf reports
-          mkdir -p reports artifacts
-          printf '%s\n' \
-            '# Validation reports' '' \
-            'Exact-tree HTML, PDF, screenshots, coverage and machine-readable receipts are generated into `artifacts/` by CI and uploaded as GitHub Actions artifacts.' \
-            > reports/README.md
-          find . -type d -name __pycache__ -prune -exec rm -rf {} +
-          find . -type f -name '*.pyc' -delete
-          test "$(find .github -type f | sort)" = '.github/workflows/ci.yml'
-          git diff --check
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Modernize lint stack without incompatible peer overrides
+      - name: Capture exact peer-resolution failure
+        id: resolve
         shell: bash
         run: |
           set -euo pipefail
-          cat > eslint.config.js <<'EOF'
-          import js from '@eslint/js';
-          import globals from 'globals';
-          import reactHooks from 'eslint-plugin-react-hooks';
-          import reactRefresh from 'eslint-plugin-react-refresh';
-          import tseslint from 'typescript-eslint';
-
-          export default tseslint.config(
-            { ignores: ['dist', 'coverage', 'artifacts'] },
-            {
-              extends: [js.configs.recommended, ...tseslint.configs.recommended],
-              files: ['**/*.{ts,tsx}'],
-              languageOptions: {
-                ecmaVersion: 2020,
-                globals: globals.browser,
-              },
-              plugins: {
-                'react-hooks': reactHooks,
-                'react-refresh': reactRefresh,
-              },
-              rules: {
-                ...reactHooks.configs.recommended.rules,
-                'react-refresh/only-export-components': 'off',
-                '@typescript-eslint/no-explicit-any': 'off',
-                '@typescript-eslint/no-unused-vars': [
-                  'error',
-                  { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
-                ],
-                'react-hooks/set-state-in-effect': 'off',
-              },
-            },
-          );
-          EOF
+          mkdir -p artifacts
+          cp package.json artifacts/package-before.json
+          cp package-lock.json artifacts/package-lock-before.json
           npm pkg delete devDependencies.eslint-plugin-unused-imports
-          for attempt in 1 2 3; do
-            if npm install --save-dev --save-exact --package-lock-only --ignore-scripts \
-              @eslint/js@10.7.0 \
-              eslint@10.7.0 \
-              @typescript-eslint/eslint-plugin@8.65.0 \
-              @typescript-eslint/parser@8.65.0 \
-              typescript-eslint@8.65.0 \
-              eslint-plugin-react-hooks@7.1.1 \
-              eslint-plugin-react-refresh@0.5.3 \
-              > /tmp/npm-upgrade-lint.log 2>&1; then
-              cat /tmp/npm-upgrade-lint.log
-              break
-            fi
-            tail -n 200 /tmp/npm-upgrade-lint.log
-            [ "$attempt" -eq 3 ] && exit 1
-            sleep $((attempt * 10))
-          done
-          npm update brace-expansion --package-lock-only --ignore-scripts
-          node <<'NODE'
-          const pkg = require('./package.json')
-          const lock = require('./package-lock.json')
-          const expected = {
-            '@eslint/js': '10.7.0',
-            eslint: '10.7.0',
-            '@typescript-eslint/eslint-plugin': '8.65.0',
-            '@typescript-eslint/parser': '8.65.0',
-            'typescript-eslint': '8.65.0',
-            'eslint-plugin-react-hooks': '7.1.1',
-            'eslint-plugin-react-refresh': '0.5.3',
-          }
-          for (const [name, version] of Object.entries(expected)) {
-            if (pkg.devDependencies?.[name] !== version) {
-              throw new Error(`${name} must be pinned to ${version}; got ${pkg.devDependencies?.[name]}`)
-            }
-          }
-          if ('eslint-plugin-unused-imports' in (pkg.devDependencies || {})) {
-            throw new Error('Incompatible eslint-plugin-unused-imports remains declared')
-          }
-          const braces = Object.entries(lock.packages || {})
-            .filter(([path]) => path.endsWith('node_modules/brace-expansion'))
-            .map(([path, meta]) => ({ path, version: meta.version }))
-          console.log(JSON.stringify(braces, null, 2))
-          const vulnerable = braces.filter(({ version }) => version !== '5.0.8')
-          if (vulnerable.length) {
-            throw new Error(`Legacy or vulnerable brace-expansion instances remain: ${JSON.stringify(vulnerable)}`)
-          }
-          NODE
-
-      - name: Install exact dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          for attempt in 1 2 3; do
-            if npm ci > /tmp/npm-ci.log 2>&1; then cat /tmp/npm-ci.log; break; fi
-            tail -n 200 /tmp/npm-ci.log
-            [ "$attempt" -eq 3 ] && exit 1
-            sleep $((attempt * 15))
-          done
-          npm ls eslint @eslint/js typescript-eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin brace-expansion --all
-
-      - name: Documentation and deterministic scientific visuals
-        run: npm run validate:docs
-      - name: Production source hygiene
-        run: npm run validate:source
-      - name: Governed external data
-        run: npm run validate:data
-      - name: Lint
-        run: npm run lint
-      - name: TypeScript
-        run: npm run typecheck
-      - name: Complete regression tests
-        run: npm run test
-      - name: Isolated unit tests
-        run: npm run test:unit
-      - name: Isolated scientific and worker tests
-        run: npm run test:science
-      - name: Coverage
-        run: npm run test:coverage
-      - name: Production build and external-data proof
-        run: npm run build
-      - name: HTTP production smoke
-        run: npm run smoke
-      - name: Chromium interactive UI smoke
-        run: npm run test:ui
-      - name: Production dependency audit
-        run: npm run audit:prod
-      - name: Full dependency audit
-        run: npm run audit:all
-
-      - name: Record dependency freshness
-        shell: bash
-        run: |
           set +e
-          npm outdated --json > artifacts/npm-outdated.json
+          npm install --save-dev --save-exact --package-lock-only --ignore-scripts \
+            @eslint/js@10.7.0 \
+            eslint@10.7.0 \
+            @typescript-eslint/eslint-plugin@8.65.0 \
+            @typescript-eslint/parser@8.65.0 \
+            typescript-eslint@8.65.0 \
+            eslint-plugin-react-hooks@7.1.1 \
+            eslint-plugin-react-refresh@0.5.3 \
+            > artifacts/npm-eslint10-install.log 2>&1
           code=$?
           set -e
-          if [ ! -s artifacts/npm-outdated.json ]; then printf '{}\n' > artifacts/npm-outdated.json; fi
-          jq . artifacts/npm-outdated.json
-          printf '%s\n' "$code" > artifacts/npm-outdated-exit-code.txt
+          cp package.json artifacts/package-after.json
+          cp package-lock.json artifacts/package-lock-after.json
+          printf '%s\n' "$code" > artifacts/exit-code.txt
+          tail -n 240 artifacts/npm-eslint10-install.log
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
 
-      - name: Prove main is the sole remote branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          git ls-remote --heads origin | tee artifacts/branch-proof.txt
-          test "$(wc -l < artifacts/branch-proof.txt | tr -d ' ')" -eq 1
-          test "$(grep -c 'refs/heads/main$' artifacts/branch-proof.txt || true)" -eq 1
-
-      - name: Record security closure in release report
-        shell: bash
-        run: |
-          cat >> FINAL_RELEASE_REPORT.md <<'EOF'
-
-          ## Dependency security closure — 2026-07-28
-
-          The lint toolchain was upgraded to ESLint 10.7.0 and typescript-eslint 8.65.0, with `@eslint/js` declared directly. The ESLint-9-only unused-imports plugin was replaced by strict `@typescript-eslint/no-unused-vars` enforcement. This removes the legacy minimatch 3 / brace-expansion 1.x chain; all remaining brace-expansion instances resolve to patched version 5.0.8. Production and complete dependency audits passed after the upgrade.
-          EOF
-
-      - name: Generate HTML, Markdown and PDF reports
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat > artifacts/ci-context.json <<JSON
-          {"schemaVersion":2,"repository":"${GITHUB_REPOSITORY}","sha":"${GITHUB_SHA}","ref":"${GITHUB_REF}","runId":${GITHUB_RUN_ID},"runAttempt":${GITHUB_RUN_ATTEMPT},"testFiles":10,"testCount":84,"generatedAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}
-          JSON
-          npm run report:validation
-          npm run report:pdf
-          pdf='artifacts/ResinDB-Pro-3.2.0-Final-Validation-Report.pdf'
-          test -s "$pdf"
-          if ! command -v pdfinfo >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y poppler-utils
-          fi
-          pdfinfo "$pdf"
-          pdftoppm -png -r 120 "$pdf" artifacts/pdf-render >/dev/null
-          test "$(find artifacts -maxdepth 1 -name 'pdf-render-*.png' | wc -l | tr -d ' ')" -ge 2
-          test "$(stat -c%s artifacts/pdf-render-1.png)" -gt 10000
-
-      - name: Upload pre-commit validation evidence
+      - name: Upload exact diagnostic
         uses: actions/upload-artifact@v4
         with:
-          name: resindb-pro-3.2.0-precommit-evidence-${{ github.run_id }}
-          path: |
-            coverage/
-            artifacts/
-            FINAL_CODE_AUDIT.md
-            FINAL_RELEASE_REPORT.md
+          name: eslint10-peer-diagnostic-${{ github.run_id }}
+          path: artifacts/
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
 
-      - name: Commit validated candidate directly to main
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'ResinDB Finalization Bot'
-          git config user.email 'actions@users.noreply.github.com'
-          git add -A
-          git diff --cached --check
-          test -n "$(git diff --cached --name-only)"
-          git commit -m 'feat: finalize ResinDB Pro 3.2.0 scientific data platform'
-          git push origin HEAD:main
-
-      - name: Publish finalization result
-        if: always()
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          state=failure
-          description='ResinDB Pro 3.2.0 finalization failed; inspect the linked run'
-          if [ "${{ job.status }}" = success ]; then
-            state=success
-            description='ResinDB Pro 3.2.0 validated and committed directly to main'
-          fi
-          curl -fsSL -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "$(jq -nc --arg state "$state" --arg context resindb/finalize-v320 --arg description "$description" --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
+      - name: Fail closed after evidence capture
+        if: steps.resolve.outputs.exit_code != '0'
+        run: exit 1
