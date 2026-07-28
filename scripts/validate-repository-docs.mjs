@@ -112,7 +112,7 @@ if (residue.length) fail(`Temporary migration/diagnostic residue remains: ${JSON
 const pythonFiles = readdirSync(resolve(ROOT, 'scripts')).filter((name) => name.endsWith('.py'))
 if (pythonFiles.length) fail(`Stage-one Node-only tooling is incomplete: ${JSON.stringify(pythonFiles)}`)
 const ci = readFileSync(resolve(ROOT, '.github/workflows/ci.yml'), 'utf8')
-for (const phrase of ['branches: [main]', 'contents: read', 'npm run validate:docs', 'npm run validate:source', 'npm run audit:all', 'npm run report:pdf']) {
+for (const phrase of ['branches: [main]', 'contents: read', 'npm run validate:docs', 'npm run validate:source', 'npm audit --omit=dev --audit-level=high --json', 'npm audit --audit-level=high --json', 'npm run report:pdf']) {
   if (!ci.includes(phrase)) fail(`Permanent CI missing: ${phrase}`)
 }
 if (ci.includes('contents: write')) fail('Permanent CI must be read-only')
