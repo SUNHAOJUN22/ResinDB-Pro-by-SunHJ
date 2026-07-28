@@ -91,31 +91,48 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Apply compatible brace-expansion security patches
+      - name: Upgrade lint security stack and remove legacy brace expansion
         shell: bash
         run: |
           set -euo pipefail
           for attempt in 1 2 3; do
-            if npm update brace-expansion --package-lock-only --ignore-scripts > /tmp/npm-update-brace.log 2>&1; then
-              cat /tmp/npm-update-brace.log
+            if npm install --save-dev --save-exact --package-lock-only --ignore-scripts \
+              @eslint/js@10.7.0 \
+              eslint@10.7.0 \
+              @typescript-eslint/eslint-plugin@8.65.0 \
+              @typescript-eslint/parser@8.65.0 \
+              typescript-eslint@8.65.0 \
+              > /tmp/npm-upgrade-lint.log 2>&1; then
+              cat /tmp/npm-upgrade-lint.log
               break
             fi
-            tail -n 160 /tmp/npm-update-brace.log
+            tail -n 200 /tmp/npm-upgrade-lint.log
             [ "$attempt" -eq 3 ] && exit 1
             sleep $((attempt * 10))
           done
+          npm update brace-expansion --package-lock-only --ignore-scripts
           node <<'NODE'
+          const pkg = require('./package.json')
           const lock = require('./package-lock.json')
-          const entries = Object.entries(lock.packages || {})
+          const expected = {
+            '@eslint/js': '10.7.0',
+            eslint: '10.7.0',
+            '@typescript-eslint/eslint-plugin': '8.65.0',
+            '@typescript-eslint/parser': '8.65.0',
+            'typescript-eslint': '8.65.0',
+          }
+          for (const [name, version] of Object.entries(expected)) {
+            if (pkg.devDependencies?.[name] !== version) {
+              throw new Error(`${name} must be pinned to ${version}; got ${pkg.devDependencies?.[name]}`)
+            }
+          }
+          const braces = Object.entries(lock.packages || {})
             .filter(([path]) => path.endsWith('node_modules/brace-expansion'))
             .map(([path, meta]) => ({ path, version: meta.version }))
-          console.log(JSON.stringify(entries, null, 2))
-          const versions = new Set(entries.map((entry) => entry.version))
-          if (versions.has('5.0.7') || versions.has('1.1.14')) {
-            throw new Error('Vulnerable brace-expansion versions remain in package-lock.json')
-          }
-          if (!versions.has('5.0.8') || !versions.has('1.1.16')) {
-            throw new Error(`Expected patched versions 5.0.8 and 1.1.16, found: ${[...versions].join(', ')}`)
+          console.log(JSON.stringify(braces, null, 2))
+          const vulnerable = braces.filter(({ version }) => version !== '5.0.8')
+          if (vulnerable.length) {
+            throw new Error(`Legacy or vulnerable brace-expansion instances remain: ${JSON.stringify(vulnerable)}`)
           }
           NODE
 
@@ -124,11 +141,12 @@ jobs:
         run: |
           set -euo pipefail
           for attempt in 1 2 3; do
-            if npm ci > /tmp/npm-ci.log 2>&1; then cat /tmp/npm-ci.log; exit 0; fi
+            if npm ci > /tmp/npm-ci.log 2>&1; then cat /tmp/npm-ci.log; break; fi
             tail -n 200 /tmp/npm-ci.log
             [ "$attempt" -eq 3 ] && exit 1
             sleep $((attempt * 15))
           done
+          npm ls eslint @eslint/js typescript-eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin brace-expansion --all
 
       - name: Documentation and deterministic scientific visuals
         run: npm run validate:docs
@@ -154,7 +172,6 @@ jobs:
         run: npm run smoke
       - name: Chromium interactive UI smoke
         run: npm run test:ui
-
       - name: Production dependency audit
         run: npm run audit:prod
       - name: Full dependency audit
@@ -186,7 +203,7 @@ jobs:
 
           ## Dependency security closure — 2026-07-28
 
-          The exact lockfile was refreshed within declared compatible ranges to replace vulnerable transitive `brace-expansion` releases 5.0.7 and 1.1.14 with patched releases 5.0.8 and 1.1.16. Both production-only and complete dependency audits passed after the update.
+          The lint toolchain was upgraded to ESLint 10.7.0 and typescript-eslint 8.65.0, with `@eslint/js` declared directly. This removes the legacy minimatch 3 / brace-expansion 1.x chain. All remaining brace-expansion instances resolve to patched version 5.0.8. Both production-only and complete dependency audits passed after the upgrade.
           EOF
 
       - name: Generate HTML, Markdown and PDF reports
