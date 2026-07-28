@@ -35,6 +35,18 @@ describe('stage-one Node-only tooling', () => {
     }
   })
 
+  it('writes machine-readable audit JSON without npm-run banner noise', () => {
+    const workflow = readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8')
+    expect(workflow).toContain(
+      'npm audit --omit=dev --audit-level=high --json > artifacts/npm-audit-prod.json',
+    )
+    expect(workflow).toContain(
+      'npm audit --audit-level=high --json > artifacts/npm-audit-all.json',
+    )
+    expect(workflow).not.toContain('npm run audit:prod -- --json')
+    expect(workflow).not.toContain('npm run audit:all -- --json')
+  })
+
   it('documents the stage-one implementation contract', () => {
     const taskbook = readFileSync(resolve(root, 'docs/PHASE_1_IMPLEMENTATION_TASKBOOK.md'), 'utf8')
     expect(taskbook).toContain('工具链统一与跨平台兼容基线')
