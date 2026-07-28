@@ -1,4 +1,4 @@
-name: ResinDB Stage-One Direct Main Applier
+name: ResinDB Stage-One Reconstruction Diagnostic
 
 on:
   push:
@@ -6,17 +6,17 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   statuses: write
 
 concurrency:
-  group: resindb-stage-one-main-applier
+  group: resindb-stage-one-reconstruction-diagnostic
   cancel-in-progress: false
 
 jobs:
-  apply-stage-one:
+  diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - name: Check out current main
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -24,7 +24,7 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Publish application start
+      - name: Publish diagnostic start
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -34,14 +34,10 @@ jobs:
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "$(jq -nc \
-              --arg state pending \
-              --arg context resindb/stage1-apply \
-              --arg description 'Reconstructing and applying the exact Node-only stage-one tree' \
-              --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-              '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
+            -d "$(jq -nc --arg state pending --arg context resindb/stage1-reconstruct --arg description 'Capturing exact stage-one reconstruction evidence' --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
 
-      - name: Reconstruct and verify the exact stage-one tree
+      - name: Reconstruct exact stage-one tree with full log
+        id: reconstruct
         shell: bash
         env:
           BASE_TRANSPORT_SHA256: 2d0af641907c40b5cf495636dcdc764f5af3b5dec4f1f814c64f165b9eea2db1
@@ -56,150 +52,105 @@ jobs:
           EXPECTED_TREE_SHA: d389544745fc541602a0c342bc4519802da0603b
           EXPECTED_PERMANENT_CI_BLOB: d908548352c24d20535afe866f0e2d351466ccd7
         run: |
-          set -euo pipefail
-          mkdir -p /tmp/resindb-stage1 artifacts
-          cp -a .github/workflows /tmp/resindb-current-workflows
+          mkdir -p artifacts /tmp/resindb-stage1
+          set +e
+          (
+            set -euxo pipefail
+            printf 'HEAD=%s\n' "$(git rev-parse HEAD)"
+            printf 'HEAD_TREE=%s\n' "$(git rev-parse HEAD^{tree})"
+            find .github -maxdepth 3 -type f | sort
 
-          reconstruct_patch() {
-            local directory="$1"
-            local expected_count="$2"
-            local transport_sha="$3"
-            local xz_sha="$4"
-            local patch_sha="$5"
-            local output_prefix="$6"
+            reconstruct_patch() {
+              local directory="$1" expected_count="$2" transport_sha="$3" xz_sha="$4" patch_sha="$5" output_prefix="$6"
+              local count
+              count="$(find "$directory" -maxdepth 1 -name 'part-*.txt' | wc -l | tr -d ' ')"
+              printf '%s count=%s expected=%s\n' "$output_prefix" "$count" "$expected_count"
+              test "$count" -eq "$expected_count"
+              cat "$directory"/part-*.txt > "/tmp/resindb-stage1/${output_prefix}.patch.xz.b64"
+              sha256sum "/tmp/resindb-stage1/${output_prefix}.patch.xz.b64"
+              printf '%s  %s\n' "$transport_sha" "/tmp/resindb-stage1/${output_prefix}.patch.xz.b64" | sha256sum -c -
+              base64 -d "/tmp/resindb-stage1/${output_prefix}.patch.xz.b64" > "/tmp/resindb-stage1/${output_prefix}.patch.xz"
+              sha256sum "/tmp/resindb-stage1/${output_prefix}.patch.xz"
+              printf '%s  %s\n' "$xz_sha" "/tmp/resindb-stage1/${output_prefix}.patch.xz" | sha256sum -c -
+              xz -t "/tmp/resindb-stage1/${output_prefix}.patch.xz"
+              xz -dc "/tmp/resindb-stage1/${output_prefix}.patch.xz" > "/tmp/resindb-stage1/${output_prefix}.patch"
+              sha256sum "/tmp/resindb-stage1/${output_prefix}.patch"
+              printf '%s  %s\n' "$patch_sha" "/tmp/resindb-stage1/${output_prefix}.patch" | sha256sum -c -
+            }
 
-            local count
-            count="$(find "$directory" -maxdepth 1 -name 'part-*.txt' | wc -l | tr -d ' ')"
-            test "$count" -eq "$expected_count"
-            cat "$directory"/part-*.txt > "/tmp/resindb-stage1/${output_prefix}.patch.xz.b64"
-            printf '%s  %s\n' "$transport_sha" "/tmp/resindb-stage1/${output_prefix}.patch.xz.b64" | sha256sum -c -
-            base64 -d "/tmp/resindb-stage1/${output_prefix}.patch.xz.b64" > "/tmp/resindb-stage1/${output_prefix}.patch.xz"
-            printf '%s  %s\n' "$xz_sha" "/tmp/resindb-stage1/${output_prefix}.patch.xz" | sha256sum -c -
-            xz -t "/tmp/resindb-stage1/${output_prefix}.patch.xz"
-            xz -dc "/tmp/resindb-stage1/${output_prefix}.patch.xz" > "/tmp/resindb-stage1/${output_prefix}.patch"
-            printf '%s  %s\n' "$patch_sha" "/tmp/resindb-stage1/${output_prefix}.patch" | sha256sum -c -
-          }
+            reconstruct_patch .github/.resindb-final-patch 51 "$BASE_TRANSPORT_SHA256" "$BASE_XZ_SHA256" "$BASE_PATCH_SHA256" base
+            reconstruct_patch .github/.resindb-v320-delta 10 "$HARDEN_TRANSPORT_SHA256" "$HARDEN_XZ_SHA256" "$HARDEN_PATCH_SHA256" harden
+            reconstruct_patch .github/.resindb-stage1-delta 10 "$STAGE1_TRANSPORT_SHA256" "$STAGE1_XZ_SHA256" "$STAGE1_PATCH_SHA256" stage1
 
-          reconstruct_patch .github/.resindb-final-patch 51 \
-            "$BASE_TRANSPORT_SHA256" "$BASE_XZ_SHA256" "$BASE_PATCH_SHA256" base
-          reconstruct_patch .github/.resindb-v320-delta 10 \
-            "$HARDEN_TRANSPORT_SHA256" "$HARDEN_XZ_SHA256" "$HARDEN_PATCH_SHA256" harden
-          reconstruct_patch .github/.resindb-stage1-delta 10 \
-            "$STAGE1_TRANSPORT_SHA256" "$STAGE1_XZ_SHA256" "$STAGE1_PATCH_SHA256" stage1
+            rm -rf .github/workflows
+            mkdir -p .github/workflows
+            git show d8b3e90dd0d90aba5e31361305392898eea2fc4c:.github/workflows/ci.yml > .github/workflows/ci.yml
+            printf 'BASELINE_CI_BLOB=%s\n' "$(git hash-object .github/workflows/ci.yml)"
+            test "$(git hash-object .github/workflows/ci.yml)" = 796e74f7b17426aaa03b8d461a100761574960d0
 
-          rm -rf .github/workflows
-          mkdir -p .github/workflows
-          git show d8b3e90dd0d90aba5e31361305392898eea2fc4c:.github/workflows/ci.yml > .github/workflows/ci.yml
-          test "$(git hash-object .github/workflows/ci.yml)" = 796e74f7b17426aaa03b8d461a100761574960d0
+            base_exclusions=(--exclude='.github/workflows/final-source-export.yml' --exclude='.github/workflows/remediate-lockfile-20260726.yml' --exclude='reports/*' --exclude='reports/**')
+            git apply --check --verbose --binary "${base_exclusions[@]}" /tmp/resindb-stage1/base.patch
+            git apply --verbose --binary "${base_exclusions[@]}" /tmp/resindb-stage1/base.patch
+            git apply --check --verbose --binary /tmp/resindb-stage1/harden.patch
+            git apply --verbose --binary /tmp/resindb-stage1/harden.patch
+            git apply --check --verbose --binary /tmp/resindb-stage1/stage1.patch
+            git apply --verbose --binary /tmp/resindb-stage1/stage1.patch
 
-          base_exclusions=(
-            --exclude='.github/workflows/final-source-export.yml'
-            --exclude='.github/workflows/remediate-lockfile-20260726.yml'
-            --exclude='reports/*'
-            --exclude='reports/**'
-          )
-          git apply --check --binary "${base_exclusions[@]}" /tmp/resindb-stage1/base.patch
-          git apply --binary "${base_exclusions[@]}" /tmp/resindb-stage1/base.patch
-          git apply --check --binary /tmp/resindb-stage1/harden.patch
-          git apply --binary /tmp/resindb-stage1/harden.patch
-          git apply --check --binary /tmp/resindb-stage1/stage1.patch
-          git apply --binary /tmp/resindb-stage1/stage1.patch
+            find .github -type f ! -path '.github/workflows/ci.yml' -delete
+            find .github -depth -type d -empty -delete || true
+            rm -rf reports coverage dist node_modules
+            mkdir -p reports
+            printf '%s\n' '# Validation reports' '' 'Exact-tree HTML, PDF, screenshots, coverage and machine-readable receipts are generated into `artifacts/` by CI and uploaded as GitHub Actions artifacts. They are not fabricated or committed as stale evidence.' > reports/README.md
+            find . -type d -name __pycache__ -prune -exec rm -rf {} +
+            find . -type f -name '*.pyc' -delete
 
-          find .github -type f ! -path '.github/workflows/ci.yml' -delete
-          find .github -depth -type d -empty -delete || true
-          rm -rf reports artifacts coverage dist node_modules
-          mkdir -p reports artifacts
-          printf '%s\n' \
-            '# Validation reports' '' \
-            'Exact-tree HTML, PDF, screenshots, coverage and machine-readable receipts are generated into `artifacts/` by CI and uploaded as GitHub Actions artifacts. They are not fabricated or committed as stale evidence.' \
-            > reports/README.md
-          find . -type d -name __pycache__ -prune -exec rm -rf {} +
-          find . -type f -name '*.pyc' -delete
+            git add -A
+            git diff --cached --check
+            git diff --cached --name-status > artifacts/staged-name-status.txt
+            git ls-files -s > artifacts/final-index.txt
+            actual_tree="$(git write-tree)"
+            printf '%s\n' "$actual_tree" | tee artifacts/actual-tree-sha.txt
+            printf '%s\n' "$EXPECTED_TREE_SHA" > artifacts/expected-tree-sha.txt
+            printf 'PERMANENT_CI_BLOB=%s\n' "$(git hash-object .github/workflows/ci.yml)" | tee artifacts/permanent-ci-blob.txt
+            find .github -type f | sort | tee artifacts/github-files.txt
+            find reports -type f | sort | tee artifacts/report-files.txt
+            test "$actual_tree" = "$EXPECTED_TREE_SHA"
+            test "$(git hash-object .github/workflows/ci.yml)" = "$EXPECTED_PERMANENT_CI_BLOB"
+          ) > artifacts/reconstruction.log 2>&1
+          code=$?
+          printf '%s\n' "$code" > artifacts/exit-code.txt
+          cat artifacts/reconstruction.log
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
 
-          git add -A
-          git diff --cached --check
-          desired_tree="$(git write-tree)"
-          test "$desired_tree" = "$EXPECTED_TREE_SHA"
-          test "$(git hash-object .github/workflows/ci.yml)" = "$EXPECTED_PERMANENT_CI_BLOB"
-          test "$(find .github -type f | sort)" = '.github/workflows/ci.yml'
-          test "$(find reports -type f | sort)" = 'reports/README.md'
-          cp .github/workflows/ci.yml /tmp/resindb-stage1/permanent-ci.yml
-
-          rm -rf .github/workflows
-          cp -a /tmp/resindb-current-workflows .github/workflows
-          find .github -type f ! -path '.github/workflows/*' -delete
-          find .github -depth -type d -empty -delete || true
-          git add -A
-          git diff --cached --check
-          test -z "$(git diff --cached --name-only -- .github/workflows)"
-
-          cat > /tmp/resindb-stage1/reconstruction-receipt.json <<JSON
-          {
-            "schemaVersion": 1,
-            "repository": "${GITHUB_REPOSITORY}",
-            "triggerSha": "${GITHUB_SHA}",
-            "expectedFinalTreeSha": "${EXPECTED_TREE_SHA}",
-            "reconstructedFinalTreeSha": "${desired_tree}",
-            "expectedPermanentCiBlob": "${EXPECTED_PERMANENT_CI_BLOB}",
-            "branchCreated": false,
-            "pullRequestCreated": false
-          }
-          JSON
-
-      - name: Commit business and tooling changes directly to main
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin main
-          test "$(git rev-parse origin/main)" = "$GITHUB_SHA"
-          git config user.name 'ResinDB Stage-One Bot'
-          git config user.email 'actions@users.noreply.github.com'
-          test -n "$(git diff --cached --name-only)"
-          git commit -m 'feat: complete stage-one Node-only tooling migration'
-          business_sha="$(git rev-parse HEAD)"
-          git push origin HEAD:main
-          printf '%s\n' "$business_sha" > /tmp/resindb-stage1/business-commit-sha.txt
-
-      - name: Prepare stage-one handoff evidence
-        if: success()
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p artifacts
-          cp /tmp/resindb-stage1/permanent-ci.yml artifacts/permanent-ci.yml
-          cp /tmp/resindb-stage1/reconstruction-receipt.json artifacts/reconstruction-receipt.json
-          cp /tmp/resindb-stage1/business-commit-sha.txt artifacts/business-commit-sha.txt
-          sha256sum artifacts/permanent-ci.yml > artifacts/permanent-ci.sha256
-
-      - name: Upload stage-one handoff evidence
-        if: success()
+      - name: Upload reconstruction evidence
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: resindb-stage-one-handoff-${{ github.run_id }}
+          name: resindb-stage-one-reconstruction-${{ github.run_id }}
           path: artifacts/
           if-no-files-found: error
           retention-days: 7
 
-      - name: Publish application result
+      - name: Publish diagnostic result
         if: always()
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          state=failure
-          description='Stage-one reconstruction or direct-main application failed closed'
-          if [ "${{ job.status }}" = success ]; then
-            state=success
-            description='Stage-one Node-only business tree committed directly to main'
+          state=success
+          description='Exact stage-one tree reconstructed successfully'
+          if [ "${{ steps.reconstruct.outputs.exit_code }}" != '0' ]; then
+            state=failure
+            description='Exact reconstruction failure captured in linked artifact'
           fi
           curl -fsSL -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
-            -d "$(jq -nc \
-              --arg state "$state" \
-              --arg context resindb/stage1-apply \
-              --arg description "$description" \
-              --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-              '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
+            -d "$(jq -nc --arg state "$state" --arg context resindb/stage1-reconstruct --arg description "$description" --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" '{state:$state,context:$context,description:$description,target_url:$target_url}')" >/dev/null
+
+      - name: Fail closed after evidence capture
+        if: steps.reconstruct.outputs.exit_code != '0'
+        run: exit 1
