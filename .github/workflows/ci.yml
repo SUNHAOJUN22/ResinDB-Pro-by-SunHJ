@@ -39,7 +39,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TRANSPORT_SHA256: 2d0af6faf16c407f50340f84b80c498aef0c7ae39d9361073774dc09be312db1
+          TRANSPORT_SHA256: 2d0af641907c40b5cf495636dcdc764f5af3b5dec4f1f814c64f165b9eea2db1
           XZ_SHA256: 024e4dd14bf401d48c74263637a6ff09b31e7bc18da5befd8a3e61199f1a27c6
           PATCH_SHA256: caeddf8947eb4d6c843a1ad6f6d7fded2db3f823654b216d6e5cf376f8bbf5b6
         run: |
