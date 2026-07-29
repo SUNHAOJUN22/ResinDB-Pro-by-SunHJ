@@ -1,5 +1,6 @@
+import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -32,6 +33,27 @@ describe('stage-one Node-only tooling', () => {
       const content = readFileSync(path)
       expect(content.length).toBe(metadata.size)
       expect(createHash('sha256').update(content).digest('hex')).toBe(metadata.sha256)
+    }
+  })
+
+  it('rejects future stage-one delta transport residue', () => {
+    const residueDirectory = resolve(root, '.github/.resindb-stage1-delta-test')
+    mkdirSync(residueDirectory, { recursive: true })
+    writeFileSync(resolve(residueDirectory, 'part-999.txt'), 'TRANSPORT_PLACEHOLDER\n', 'utf8')
+
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [resolve(root, 'scripts/validate-repository-docs.mjs')],
+        { cwd: root, encoding: 'utf8', timeout: 30_000 },
+      )
+      expect(result.status).not.toBe(0)
+      expect(`${result.stdout}${result.stderr}`).toContain(
+        'Temporary migration/diagnostic residue remains',
+      )
+      expect(`${result.stdout}${result.stderr}`).toContain('.resindb-stage1-delta-test')
+    } finally {
+      rmSync(residueDirectory, { recursive: true, force: true })
     }
   })
 
