@@ -9,7 +9,7 @@ import {
 import type { FormulaConfig, Product, PropertyValue } from '@/types/index';
 import { formulaEngine } from '@/lib/formulaParser';
 
-const MONTE_CARLO_MODEL_VERSION = 'monte-carlo-formula-1.0.0';
+const MONTE_CARLO_MODEL_VERSION = 'monte-carlo-formula-2.0.0';
 const NORMAL_TRANSFORM_VERSION = 'box-muller-1.0.0';
 const MAX_ITERATIONS = 1_000_000;
 
@@ -36,6 +36,12 @@ export interface MonteCarloReproducibility {
   acceptedSamples: number;
 }
 
+export interface MonteCarloPerformance {
+  stochasticProperties: number;
+  workObjectReused: true;
+  typedResultBuffer: true;
+}
+
 export interface MonteCarloResponse {
   type: 'SIMULATION_COMPLETE' | 'ERROR';
   payload?: {
@@ -45,9 +51,10 @@ export interface MonteCarloResponse {
       stdDev: number;
       p5: number;
       p95: number;
-      kde: {x: number, y: number}[];
+      kde: {x: number; y: number}[];
     };
     reproducibility: MonteCarloReproducibility;
+    performance: MonteCarloPerformance;
   };
   error?: string;
 }
@@ -66,12 +73,17 @@ function validateVariancePercent(value: number, key: string): number {
   return value;
 }
 
-function calculateKDE(data: number[], bandwidth: number, steps: number = 100): {x: number, y: number}[] {
+function calculateKDE(
+  data: ArrayLike<number>,
+  bandwidth: number,
+  steps = 100,
+): {x: number; y: number}[] {
   if (data.length === 0) return [];
   const safeSteps = Number.isInteger(steps) && steps > 0 ? steps : 100;
   let min = data[0];
   let max = data[0];
-  for (const value of data) {
+  for (let index = 1; index < data.length; index++) {
+    const value = data[index];
     if (value < min) min = value;
     if (value > max) max = value;
   }
@@ -81,15 +93,17 @@ function calculateKDE(data: number[], bandwidth: number, steps: number = 100): {
   min -= margin;
   max += margin;
   const span = max - min;
-  const kde: {x: number, y: number}[] = [];
-  for (let index = 0; index <= safeSteps; index++) {
-    const x = min + (index / safeSteps) * span;
+  const normalization = data.length * safeBandwidth;
+  const gaussianNormalization = Math.sqrt(2 * Math.PI);
+  const kde: {x: number; y: number}[] = [];
+  for (let step = 0; step <= safeSteps; step++) {
+    const x = min + (step / safeSteps) * span;
     let sum = 0;
-    for (const value of data) {
-      const standardized = (x - value) / safeBandwidth;
-      sum += Math.exp(-0.5 * standardized * standardized) / Math.sqrt(2 * Math.PI);
+    for (let index = 0; index < data.length; index++) {
+      const standardized = (x - data[index]) / safeBandwidth;
+      sum += Math.exp(-0.5 * standardized * standardized) / gaussianNormalization;
     }
-    kde.push({ x, y: sum / (data.length * safeBandwidth) });
+    kde.push({ x, y: sum / normalization });
   }
   return kde;
 }
@@ -105,7 +119,8 @@ self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
       seed,
     } = event.data.payload;
     const iterations = validateIterations(requestedIterations);
-    const actualSeed = seed ?? deriveRandomSeed('monte-carlo-formula-v1', {
+    for (const [key, variance] of Object.entries(variances)) validateVariancePercent(variance, key);
+    const actualSeed = seed ?? deriveRandomSeed('monte-carlo-formula-v2', {
       targetFormulaId,
       formulas,
       product,
@@ -114,10 +129,26 @@ self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
     });
     const random = createSeededRandom(actualSeed);
     const evaluator = formulaEngine.compileGraph(formulas);
-    const results: number[] = [];
-    const baseProperties = product.properties;
-    const progressInterval = Math.max(1, Math.floor(iterations / 20));
+    const workingProperties = Object.fromEntries(
+      Object.entries(product.properties).map(([key, property]) => [key, { ...property }]),
+    ) as Record<string, PropertyValue>;
+    const workingProduct = { ...product, properties: workingProperties } as Product;
+    const stochasticProperties: { key: string; mean: number; standardDeviation: number }[] = [];
+    for (const [key, property] of Object.entries(workingProperties)) {
+      const mean = Number(property.value);
+      const variancePercent = variances[key] ?? 0;
+      if (Number.isFinite(mean) && variancePercent > 0) {
+        stochasticProperties.push({
+          key,
+          mean,
+          standardDeviation: Math.abs(mean) * (variancePercent / 100),
+        });
+      }
+    }
 
+    const resultBuffer = new Float64Array(iterations);
+    let acceptedSamples = 0;
+    const progressInterval = Math.max(1, Math.floor(iterations / 20));
     self.postMessage(createWorkerProgressMessage({
       ratio: 0,
       completed: 0,
@@ -126,25 +157,17 @@ self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
     }));
 
     for (let iteration = 0; iteration < iterations; iteration++) {
-      const perturbedProperties: Record<string, PropertyValue> = {};
-      for (const [key, property] of Object.entries(baseProperties)) {
-        const numericValue = Number(property.value);
-        const variancePercent = variances[key];
-        if (Number.isFinite(numericValue) && variancePercent !== undefined && variancePercent !== 0) {
-          const validatedVariance = validateVariancePercent(variancePercent, key);
-          const standardDeviation = Math.abs(numericValue) * (validatedVariance / 100);
-          perturbedProperties[key] = {
-            ...property,
-            value: random.normal(numericValue, standardDeviation),
-          };
-        } else {
-          perturbedProperties[key] = property;
-        }
+      for (const stochastic of stochasticProperties) {
+        workingProperties[stochastic.key].value = random.normal(
+          stochastic.mean,
+          stochastic.standardDeviation,
+        );
       }
-
-      const testProduct = { ...product, properties: perturbedProperties } as Product;
-      const result = evaluator(testProduct)[targetFormulaId];
-      if (Number.isFinite(result)) results.push(result);
+      const result = evaluator(workingProduct)[targetFormulaId];
+      if (Number.isFinite(result)) {
+        resultBuffer[acceptedSamples] = result;
+        acceptedSamples += 1;
+      }
 
       const completed = iteration + 1;
       if (completed % progressInterval === 0 || completed === iterations) {
@@ -156,20 +179,24 @@ self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
         }));
       }
     }
-
-    if (results.length === 0) {
-      throw new Error('Simulation yielded no valid finite numeric results.');
-    }
+    if (acceptedSamples === 0) throw new Error('Simulation yielded no valid finite numeric results.');
 
     self.postMessage(createWorkerProgressMessage({ ratio: 0.9, phase: 'statistics' }));
-    results.sort((left, right) => left - right);
-    const mean = results.reduce((sum, value) => sum + value, 0) / results.length;
-    const variance = results.reduce((sum, value) => sum + (value - mean) ** 2, 0) / results.length;
-    const stdDev = Math.sqrt(variance);
-    const p5 = results[Math.min(results.length - 1, Math.floor(results.length * 0.05))];
-    const p95 = results[Math.min(results.length - 1, Math.floor(results.length * 0.95))];
-    const bandwidth = 1.06 * stdDev * Math.pow(results.length, -0.2);
-    const kde = calculateKDE(results, bandwidth, 100);
+    const validResults = resultBuffer.subarray(0, acceptedSamples);
+    validResults.sort();
+    let sum = 0;
+    for (let index = 0; index < validResults.length; index++) sum += validResults[index];
+    const mean = sum / validResults.length;
+    let squaredDeviationSum = 0;
+    for (let index = 0; index < validResults.length; index++) {
+      squaredDeviationSum += (validResults[index] - mean) ** 2;
+    }
+    const stdDev = Math.sqrt(squaredDeviationSum / validResults.length);
+    const p5 = validResults[Math.min(validResults.length - 1, Math.floor(validResults.length * 0.05))];
+    const p95 = validResults[Math.min(validResults.length - 1, Math.floor(validResults.length * 0.95))];
+    const bandwidth = 1.06 * stdDev * Math.pow(validResults.length, -0.2);
+    const kde = calculateKDE(validResults, bandwidth, 100);
+    const results = Array.from(validResults);
     self.postMessage(createWorkerProgressMessage({ ratio: 1, phase: 'complete' }));
 
     self.postMessage({
@@ -185,14 +212,19 @@ self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
           normalTransformVersion: NORMAL_TRANSFORM_VERSION,
           modelVersion: MONTE_CARLO_MODEL_VERSION,
           requestedIterations: iterations,
-          acceptedSamples: results.length,
+          acceptedSamples,
+        },
+        performance: {
+          stochasticProperties: stochasticProperties.length,
+          workObjectReused: true,
+          typedResultBuffer: true,
         },
       },
-    });
+    } satisfies MonteCarloResponse);
   } catch (error) {
     self.postMessage({
       type: 'ERROR',
       error: error instanceof Error ? error.message : String(error),
-    });
+    } satisfies MonteCarloResponse);
   }
 };
