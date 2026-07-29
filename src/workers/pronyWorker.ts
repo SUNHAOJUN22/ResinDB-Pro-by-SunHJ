@@ -1,9 +1,14 @@
+import { createWorkerProgressMessage } from '@/compute/workerProtocol';
+
+const PRONY_MODEL_VERSION = 'generalized-maxwell-nnls-fista-2.0.0';
+const MAX_TERMS = 50;
+const MAX_OPTIMIZATION_ITERATIONS = 10_000;
 
 export interface PronyMessage {
   type: 'RUN_PRONY';
   payload: {
-    data: { omega: number; storage: number; loss: number }[]; // omega: rad/s, storage: MPa, loss: MPa
-    numTerms: number; 
+    data: { omega: number; storage: number; loss: number }[];
+    numTerms: number;
   };
 }
 
@@ -11,173 +16,250 @@ export interface PronyResponse {
   type: 'PRONY_RESULT' | 'ERROR';
   payload?: {
     E_inf: number;
-    E_sum: number; // for Abaqus normalisation
+    E_sum: number;
     terms: { tau: number; E: number }[];
     points: { omega: number; storage: number; loss: number; storage_fit: number; loss_fit: number }[];
     error_metric: number;
     abaqusCard: string;
+    modelVersion: typeof PRONY_MODEL_VERSION;
+    optimization: {
+      solver: 'nonnegative-fista-ridge';
+      iterations: number;
+      maxIterations: typeof MAX_OPTIMIZATION_ITERATIONS;
+      converged: boolean;
+      ridgeLambda: number;
+      lipschitzConstant: number;
+      tolerance: number;
+    };
+    abaqusAssumption: 'identical-shear-and-bulk-relaxation-ratios';
   };
   error?: string;
 }
 
-self.onmessage = (e: MessageEvent<PronyMessage>) => {
-    try {
-        const { data, numTerms } = e.data.payload;
-        if (data.length < 3) throw new Error("At least 3 data points required.");
-        
-        // Sort data by omega
-        data.sort((a,b) => a.omega - b.omega);
-        
-        const M = data.length;
-        const minOmega = Math.max(1e-12, Math.min(...data.map(d=>d.omega)));
-        const maxOmega = Math.max(1e-12, Math.max(...data.map(d=>d.omega)));
-        
-        const minTau = 1 / maxOmega;
-        const maxTau = 1 / minOmega;
-        
-        const tau = [];
-        if (numTerms === 1) {
-            tau.push(Math.sqrt(minTau * maxTau));
-        } else {
-            const logMin = Math.log10(minTau);
-            const logMax = Math.log10(maxTau);
-            const step = (logMax - logMin) / (numTerms - 1);
-            for (let i=0; i<numTerms; i++) {
-                tau.push(Math.pow(10, logMin + i * step));
-            }
-        }
-        
-        const b = new Float64Array(2 * M);
-        for(let j=0; j<M; j++){
-            b[j] = data[j].storage;
-            b[j+M] = data[j].loss;
-        }
-        
-        const N = numTerms + 1; 
-        const A = new Array(2*M).fill(0).map(()=>new Float64Array(N));
-        
-        for(let j=0; j<M; j++){
-            const w = data[j].omega;
-            A[j][0] = 1;  // E_infinity constant contribution to Storage
-            A[j+M][0] = 0; // E_infinity has 0 contribution to Loss
-            for(let i=0; i<numTerms; i++){
-                const t = tau[i];
-                const wt = w * t;
-                const wt2 = wt * wt;
-                const denom = 1 + wt2;
-                A[j][1+i] = wt2 / denom; // Storage coefficient
-                A[j+M][1+i] = wt / denom; // Loss coefficient
-            }
-        }
-        
-        const x = new Float64Array(N); 
-        const maxE = Math.max(...data.map(d => d.storage));
-        for(let i=0; i<N; i++) x[i] = maxE / N; // Start with decent uniform guess
-        
-        const AtA = new Array(N).fill(0).map(()=>new Float64Array(N));
-        const Atb = new Float64Array(N);
-        
-        for(let i=0; i<N; i++){
-            for(let j=0; j<N; j++){
-                for(let k=0; k<2*M; k++){
-                    AtA[i][j] += A[k][i] * A[k][j];
-                }
-            }
-            for(let k=0; k<2*M; k++){
-                Atb[i] += A[k][i] * b[k];
-            }
-        }
-        
-        // Tikhonov Regularization to prevent singular matrix / smooth terms
-        let maxDiag = 0;
-        for(let i=0; i<N; i++) maxDiag = Math.max(maxDiag, AtA[i][i]);
-        const lambda = 1e-4 * maxDiag;
-        for(let i=0; i<N; i++){
-            AtA[i][i] += lambda;
-        }
-        
-        // Projected Gradient Descent for Non-negative Least Squares
-        const maxIter = 100000;
-        const lr = maxDiag > 0 ? 0.05 / maxDiag : 1e-3;
-
-        for(let iter=0; iter<maxIter; iter++){
-            let diff = 0;
-            const grad = new Float64Array(N);
-            for(let i=0; i<N; i++){
-                for(let j=0; j<N; j++){
-                    grad[i] += AtA[i][j] * x[j];
-                }
-                grad[i] -= Atb[i];
-            }
-            for(let i=0; i<N; i++){
-                const old = x[i];
-                x[i] = Math.max(0, x[i] - lr * grad[i]);
-                diff += Math.abs(x[i] - old);
-            }
-            if(diff < 1e-8) break;
-        }
-        
-        const E_inf = x[0];
-        const terms = [];
-        let E_sum = E_inf;
-        for(let i=0; i<numTerms; i++) {
-            terms.push({ tau: tau[i], E: x[1+i] });
-            E_sum += x[1+i];
-        }
-        
-        const points = [];
-        let sse = 0;
-        for(let j=0; j<M; j++){
-            let st_fit = E_inf;
-            let ls_fit = 0;
-            const w = data[j].omega;
-            for(let i=0; i<numTerms; i++){
-                const t = tau[i];
-                const E = x[1+i];
-                const wt = w * t;
-                const wt2 = wt * wt;
-                const denom = 1 + wt2;
-                st_fit += E * wt2 / denom;
-                ls_fit += E * wt / denom;
-            }
-            sse += Math.pow(st_fit - data[j].storage, 2) + Math.pow(ls_fit - data[j].loss, 2);
-            points.push({
-                omega: data[j].omega,
-                storage: data[j].storage,
-                loss: data[j].loss,
-                storage_fit: st_fit,
-                loss_fit: ls_fit
-            });
-        }
-        
-        // Sort terms by relaxation time tau
-        terms.sort((a,b)=>a.tau - b.tau);
-        
-        let abaqusStr = "*VISCOELASTIC, TIME=PRONY\n";
-        terms.forEach(t => {
-            if (t.E > 1e-10) {
-                const safeESum = Math.abs(E_sum) > 1e-15 ? E_sum : 1e-15;
-                const ratio = t.E / safeESum;
-                abaqusStr += `${(ratio).toExponential(5)}, ${(ratio).toExponential(5)}, ${t.tau.toExponential(5)}\n`;
-            }
-        });
-        
-        self.postMessage({
-            type: 'PRONY_RESULT',
-            payload: {
-                E_inf,
-                E_sum,
-                terms: terms.filter(t => t.E > 1e-10),
-                points,
-                error_metric: Math.sqrt(sse / (2*M)),
-                abaqusCard: abaqusStr
-            }
-        });
-        
-    } catch(e) {
-        self.postMessage({
-            type: 'ERROR',
-            error: e instanceof Error ? e.message : String(e)
-        });
+function estimateLargestEigenvalue(matrix: Float64Array, size: number): number {
+  let vector = new Float64Array(size);
+  vector.fill(1 / Math.sqrt(size));
+  let eigenvalue = 0;
+  for (let iteration = 0; iteration < 30; iteration++) {
+    const next = new Float64Array(size);
+    let normSquared = 0;
+    for (let row = 0; row < size; row++) {
+      let value = 0;
+      for (let column = 0; column < size; column++) {
+        value += matrix[row * size + column] * vector[column];
+      }
+      next[row] = value;
+      normSquared += value * value;
     }
+    const norm = Math.sqrt(normSquared);
+    if (!(norm > 0)) return 1;
+    for (let index = 0; index < size; index++) vector[index] = next[index] / norm;
+  }
+  for (let row = 0; row < size; row++) {
+    let value = 0;
+    for (let column = 0; column < size; column++) {
+      value += matrix[row * size + column] * vector[column];
+    }
+    eigenvalue += vector[row] * value;
+  }
+  return Math.max(eigenvalue, Number.EPSILON);
 }
+
+self.onmessage = (event: MessageEvent<PronyMessage>) => {
+  try {
+    const { data, numTerms } = event.data.payload;
+    if (!Number.isInteger(numTerms) || numTerms < 1 || numTerms > MAX_TERMS) {
+      throw new RangeError(`numTerms must be an integer between 1 and ${MAX_TERMS}.`);
+    }
+    const validData = (data ?? []).filter((point) => (
+      point
+      && Number.isFinite(point.omega)
+      && Number.isFinite(point.storage)
+      && Number.isFinite(point.loss)
+      && point.omega > 0
+      && point.storage >= 0
+      && point.loss >= 0
+    )).sort((left, right) => left.omega - right.omega);
+    if (validData.length < 3) throw new Error('At least three complete physical data points are required.');
+    if (numTerms + 1 > 2 * validData.length) {
+      throw new Error('The requested Prony term count exceeds the available storage/loss information.');
+    }
+
+    const observationCount = validData.length;
+    const minimumOmega = validData[0].omega;
+    const maximumOmega = validData[observationCount - 1].omega;
+    const minimumTau = 1 / maximumOmega;
+    const maximumTau = 1 / minimumOmega;
+    const tau = new Array<number>(numTerms);
+    if (numTerms === 1) {
+      tau[0] = Math.sqrt(minimumTau * maximumTau);
+    } else {
+      const minimumLogTau = Math.log10(minimumTau);
+      const step = (Math.log10(maximumTau) - minimumLogTau) / (numTerms - 1);
+      for (let term = 0; term < numTerms; term++) tau[term] = 10 ** (minimumLogTau + term * step);
+    }
+
+    const coefficientCount = numTerms + 1;
+    const equationCount = 2 * observationCount;
+    const design = new Float64Array(equationCount * coefficientCount);
+    const target = new Float64Array(equationCount);
+    for (let observation = 0; observation < observationCount; observation++) {
+      const point = validData[observation];
+      target[observation] = point.storage;
+      target[observation + observationCount] = point.loss;
+      design[observation * coefficientCount] = 1;
+      for (let term = 0; term < numTerms; term++) {
+        const omegaTau = point.omega * tau[term];
+        const omegaTauSquared = omegaTau * omegaTau;
+        const denominator = 1 + omegaTauSquared;
+        design[observation * coefficientCount + term + 1] = omegaTauSquared / denominator;
+        design[(observation + observationCount) * coefficientCount + term + 1] = omegaTau / denominator;
+      }
+    }
+
+    const normalMatrix = new Float64Array(coefficientCount * coefficientCount);
+    const normalTarget = new Float64Array(coefficientCount);
+    for (let row = 0; row < coefficientCount; row++) {
+      for (let equation = 0; equation < equationCount; equation++) {
+        const left = design[equation * coefficientCount + row];
+        normalTarget[row] += left * target[equation];
+        for (let column = 0; column <= row; column++) {
+          normalMatrix[row * coefficientCount + column] += (
+            left * design[equation * coefficientCount + column]
+          );
+        }
+      }
+    }
+    let maximumDiagonal = 0;
+    for (let row = 0; row < coefficientCount; row++) {
+      for (let column = 0; column <= row; column++) {
+        normalMatrix[column * coefficientCount + row] = normalMatrix[row * coefficientCount + column];
+      }
+      maximumDiagonal = Math.max(maximumDiagonal, normalMatrix[row * coefficientCount + row]);
+    }
+    if (!(maximumDiagonal > 0)) throw new Error('Prony design matrix contains no usable information.');
+    const ridgeLambda = maximumDiagonal * 1e-4;
+    for (let index = 0; index < coefficientCount; index++) {
+      normalMatrix[index * coefficientCount + index] += ridgeLambda;
+    }
+
+    const lipschitzConstant = estimateLargestEigenvalue(normalMatrix, coefficientCount);
+    const stepSize = 1 / lipschitzConstant;
+    const maximumStorage = Math.max(...validData.map((point) => point.storage));
+    let coefficients = new Float64Array(coefficientCount);
+    coefficients.fill(maximumStorage / coefficientCount);
+    let accelerated = new Float64Array(coefficients);
+    let momentum = 1;
+    let converged = false;
+    let iterations = 0;
+    const tolerance = 1e-9;
+    self.postMessage(createWorkerProgressMessage({ ratio: 0, phase: 'nnls-optimization' }));
+
+    for (let iteration = 0; iteration < MAX_OPTIMIZATION_ITERATIONS; iteration++) {
+      const next = new Float64Array(coefficientCount);
+      let differenceSquared = 0;
+      let coefficientNormSquared = 0;
+      for (let row = 0; row < coefficientCount; row++) {
+        let gradient = -normalTarget[row];
+        for (let column = 0; column < coefficientCount; column++) {
+          gradient += normalMatrix[row * coefficientCount + column] * accelerated[column];
+        }
+        next[row] = Math.max(0, accelerated[row] - stepSize * gradient);
+        differenceSquared += (next[row] - coefficients[row]) ** 2;
+        coefficientNormSquared += next[row] ** 2;
+      }
+      iterations = iteration + 1;
+      if (Math.sqrt(differenceSquared) <= tolerance * (1 + Math.sqrt(coefficientNormSquared))) {
+        coefficients = next;
+        converged = true;
+        break;
+      }
+      const nextMomentum = (1 + Math.sqrt(1 + 4 * momentum * momentum)) / 2;
+      const extrapolation = (momentum - 1) / nextMomentum;
+      for (let index = 0; index < coefficientCount; index++) {
+        accelerated[index] = next[index] + extrapolation * (next[index] - coefficients[index]);
+      }
+      coefficients = next;
+      momentum = nextMomentum;
+      if (iterations % 250 === 0) {
+        self.postMessage(createWorkerProgressMessage({
+          ratio: Math.min(0.9, iterations / MAX_OPTIMIZATION_ITERATIONS),
+          completed: iterations,
+          total: MAX_OPTIMIZATION_ITERATIONS,
+          phase: 'nnls-optimization',
+        }));
+      }
+    }
+
+    const E_inf = coefficients[0];
+    const terms = tau.map((relaxationTime, index) => ({
+      tau: relaxationTime,
+      E: coefficients[index + 1],
+    })).filter((term) => term.E > 1e-10);
+    const E_sum = E_inf + terms.reduce((sum, term) => sum + term.E, 0);
+    const points: {
+      omega: number;
+      storage: number;
+      loss: number;
+      storage_fit: number;
+      loss_fit: number;
+    }[] = [];
+    let squaredError = 0;
+    for (const point of validData) {
+      let storageFit = E_inf;
+      let lossFit = 0;
+      for (let term = 0; term < numTerms; term++) {
+        const omegaTau = point.omega * tau[term];
+        const omegaTauSquared = omegaTau * omegaTau;
+        const denominator = 1 + omegaTauSquared;
+        storageFit += coefficients[term + 1] * omegaTauSquared / denominator;
+        lossFit += coefficients[term + 1] * omegaTau / denominator;
+      }
+      squaredError += (storageFit - point.storage) ** 2 + (lossFit - point.loss) ** 2;
+      points.push({
+        omega: point.omega,
+        storage: point.storage,
+        loss: point.loss,
+        storage_fit: storageFit,
+        loss_fit: lossFit,
+      });
+    }
+    terms.sort((left, right) => left.tau - right.tau);
+
+    let abaqusCard = '*VISCOELASTIC, TIME=PRONY\n';
+    if (E_sum > 0) {
+      for (const term of terms) {
+        const ratio = term.E / E_sum;
+        abaqusCard += `${ratio.toExponential(5)}, ${ratio.toExponential(5)}, ${term.tau.toExponential(5)}\n`;
+      }
+    }
+    self.postMessage(createWorkerProgressMessage({ ratio: 1, phase: 'complete' }));
+    self.postMessage({
+      type: 'PRONY_RESULT',
+      payload: {
+        E_inf,
+        E_sum,
+        terms,
+        points,
+        error_metric: Math.sqrt(squaredError / (2 * observationCount)),
+        abaqusCard,
+        modelVersion: PRONY_MODEL_VERSION,
+        optimization: {
+          solver: 'nonnegative-fista-ridge',
+          iterations,
+          maxIterations: MAX_OPTIMIZATION_ITERATIONS,
+          converged,
+          ridgeLambda,
+          lipschitzConstant,
+          tolerance,
+        },
+        abaqusAssumption: 'identical-shear-and-bulk-relaxation-ratios',
+      },
+    } satisfies PronyResponse);
+  } catch (error) {
+    self.postMessage({
+      type: 'ERROR',
+      error: error instanceof Error ? error.message : String(error),
+    } satisfies PronyResponse);
+  }
+};
