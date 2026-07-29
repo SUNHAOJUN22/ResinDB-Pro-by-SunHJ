@@ -1,7 +1,25 @@
+import {
+  createGaussianProcessScratch,
+  factorizeGaussianProcessRbf,
+  predictGaussianProcessRbf,
+  solveGaussianProcessAlpha,
+} from '@/compute/gaussianProcess';
+import {
+  createSeededRandom,
+  deriveRandomSeed,
+  type RandomSeed,
+  SEEDED_RANDOM_ALGORITHM,
+  SEEDED_RANDOM_ALGORITHM_VERSION,
+} from '@/compute/random';
+import { createWorkerProgressMessage } from '@/compute/workerProtocol';
+
+const MOO_MODEL_VERSION = 'multiobjective-rbf-gp-2.0.0';
+const MAX_CANDIDATES = 50_000;
+const MAX_RETURNED_CANDIDATES = 1_000;
 
 export interface MooTarget {
-    name: string;
-    maximize: boolean;
+  name: string;
+  maximize: boolean;
 }
 
 export interface MooMessage {
@@ -11,242 +29,288 @@ export interface MooMessage {
     features: string[];
     targets: MooTarget[];
     iterations?: number;
+    seed?: RandomSeed;
+    maxReturnedCandidates?: number;
   };
+}
+
+interface MooCandidate {
+  params: Record<string, number>;
+  means: Record<string, number>;
+  stds: Record<string, number>;
+}
+
+export interface MooReproducibility {
+  seed: string;
+  seedSource: 'user' | 'derived';
+  randomAlgorithm: typeof SEEDED_RANDOM_ALGORITHM;
+  randomAlgorithmVersion: typeof SEEDED_RANDOM_ALGORITHM_VERSION;
+  modelVersion: typeof MOO_MODEL_VERSION;
+}
+
+export interface MooPerformance {
+  candidatesEvaluated: number;
+  evaluatedCandidatesRetained: number;
+  paretoStrategy: 'two-objective-sort-sweep' | 'incremental-nondominated-front';
+  sharedKernelFactorizations: 1;
+  targetModels: number;
+  factorizationJitter: number;
 }
 
 export interface MooResponse {
   type: 'MOO_RESULT' | 'ERROR';
   payload?: {
-    paretoFront: { params: Record<string, number>; means: Record<string, number>; stds: Record<string, number> }[];
+    paretoFront: MooCandidate[];
     evaluatedCandidates: { params: Record<string, number>; means: Record<string, number> }[];
     historical: Record<string, number>[];
     targets: MooTarget[];
+    reproducibility: MooReproducibility;
+    performance: MooPerformance;
   };
   error?: string;
 }
 
-// Simple RBF, Cholesky, etc...
-// To avoid duplication and complexity, we can re-implement slightly simplified GP here for MOO.
-
-function cholesky(A: number[][], maxJitter = 1.0): number[][] {
-    const n = A.length;
-    let jitter = 1e-9;
-    
-    while (jitter < maxJitter) {
-        let success = true;
-        const L = Array.from({length: n}, () => new Array(n).fill(0));
-        
-        for (let i = 0; i < n; i++) {
-            for (let j = 0; j <= i; j++) {
-                let sum = 0;
-                for (let k = 0; k < j; k++) {
-                    sum += L[i][k] * L[j][k];
-                }
-                if (i === j) {
-                    const val = A[i][i] + (jitter === 1e-9 ? 0 : jitter) - sum;
-                    if (val <= 0) {
-                        success = false;
-                        break;
-                    }
-                    L[i][j] = Math.sqrt(Math.max(val, 0));
-                } else {
-                    const safeLjj = Math.abs(L[j][j]) > 1e-15 ? L[j][j] : 1e-15;
-                    L[i][j] = (1.0 / safeLjj) * (A[i][j] - sum);
-                }
-            }
-            if (!success) break;
-        }
-        if (success) return L;
-        jitter *= 10;
-    }
-    throw new Error("Kriging Covariance Matrix is not positive definite.");
+function validateCandidateCount(value: number): number {
+  if (!Number.isInteger(value) || value < 10 || value > MAX_CANDIDATES) {
+    throw new RangeError(`MOO candidate count must be an integer between 10 and ${MAX_CANDIDATES}`);
+  }
+  return value;
 }
 
-function forwardSolve(L: number[][], B: number[]): number[] {
-    const n = L.length;
-    const Y = new Array(n).fill(0);
-    for (let i = 0; i < n; i++) {
-        let sum = 0;
-        for (let j = 0; j < i; j++) sum += L[i][j] * Y[j];
-        const safeLii_f = Math.abs(L[i][i]) > 1e-15 ? L[i][i] : 1e-15;
-        Y[i] = (B[i] - sum) / safeLii_f;
-    }
-    return Y;
+function validateReturnedCandidateCount(value: number): number {
+  if (!Number.isInteger(value) || value < 1 || value > MAX_RETURNED_CANDIDATES) {
+    throw new RangeError(`maxReturnedCandidates must be an integer between 1 and ${MAX_RETURNED_CANDIDATES}`);
+  }
+  return value;
 }
 
-function backwardSolve(L: number[][], Y: number[]): number[] {
-    const n = L.length;
-    const X = new Array(n).fill(0);
-    for (let i = n - 1; i >= 0; i--) {
-        let sum = 0;
-        for (let j = i + 1; j < n; j++) sum += L[j][i] * X[j];
-        const safeLii_b = Math.abs(L[i][i]) > 1e-15 ? L[i][i] : 1e-15;
-        X[i] = (Y[i] - sum) / safeLii_b;
+function dominates(
+  left: Record<string, number>,
+  right: Record<string, number>,
+  targets: readonly MooTarget[],
+): boolean {
+  let strictlyBetter = false;
+  for (const target of targets) {
+    const leftValue = left[target.name];
+    const rightValue = right[target.name];
+    if (target.maximize) {
+      if (leftValue < rightValue) return false;
+      if (leftValue > rightValue) strictlyBetter = true;
+    } else {
+      if (leftValue > rightValue) return false;
+      if (leftValue < rightValue) strictlyBetter = true;
     }
-    return X;
+  }
+  return strictlyBetter;
 }
 
-function rbf(x1: number[], x2: number[], l: number): number {
-    let sum = 0;
-    for (let i = 0; i < x1.length; i++) sum += Math.pow(x1[i] - x2[i], 2);
-    return Math.exp(-0.5 * sum / (l * l));
+function addToIncrementalFront(
+  front: MooCandidate[],
+  candidate: MooCandidate,
+  targets: readonly MooTarget[],
+): void {
+  for (const existing of front) {
+    if (dominates(existing.means, candidate.means, targets)) return;
+  }
+  for (let index = front.length - 1; index >= 0; index--) {
+    if (dominates(candidate.means, front[index].means, targets)) front.splice(index, 1);
+  }
+  front.push(candidate);
 }
 
-function isParetoDominating(a: Record<string, number>, b: Record<string, number>, targets: MooTarget[]): boolean {
-    // Returns true if 'a' dominates 'b'
-    let strictlyBetter = false;
-    for (const t of targets) {
-        const valA = a[t.name];
-        const valB = b[t.name];
-        if (t.maximize) {
-            if (valA < valB) return false; // a is worse in at least one target
-            if (valA > valB) strictlyBetter = true;
-        } else {
-            if (valA > valB) return false;
-            if (valA < valB) strictlyBetter = true;
-        }
+function extractTwoObjectiveFront(
+  candidates: readonly MooCandidate[],
+  targets: readonly [MooTarget, MooTarget],
+): MooCandidate[] {
+  const scored = candidates.map((candidate) => ({
+    candidate,
+    first: targets[0].maximize ? -candidate.means[targets[0].name] : candidate.means[targets[0].name],
+    second: targets[1].maximize ? -candidate.means[targets[1].name] : candidate.means[targets[1].name],
+  }));
+  scored.sort((left, right) => left.first - right.first || left.second - right.second);
+  const front: MooCandidate[] = [];
+  let bestSecond = Infinity;
+  let bestFirstAtBestSecond = Infinity;
+  for (const entry of scored) {
+    if (entry.second < bestSecond) {
+      front.push(entry.candidate);
+      bestSecond = entry.second;
+      bestFirstAtBestSecond = entry.first;
+    } else if (entry.second === bestSecond && entry.first === bestFirstAtBestSecond) {
+      front.push(entry.candidate);
     }
-    return strictlyBetter;
+  }
+  return front;
 }
 
-self.onmessage = (e: MessageEvent<MooMessage>) => {
-    try {
-        const { data, features, targets, iterations = 10000 } = e.data.payload;
-        
-        if (features.length === 0) throw new Error("No features selected.");
-        if (targets.length < 2) throw new Error("At least 2 targets required for MOO.");
-        if (data.length < 3) throw new Error("At least 3 valid data points are required.");
+function kernelMean(alpha: ArrayLike<number>, kernel: Float64Array): number {
+  let mean = 0;
+  for (let index = 0; index < kernel.length; index++) mean += alpha[index] * kernel[index];
+  return mean;
+}
 
-        const n = data.length;
-        const d = features.length;
-        
-        const X: number[][] = [];
-        
-        for (const row of data) {
-            X.push(features.map(f => row[f]));
-        }
-        
-        // Normalize X
-        const xMin = new Array(d).fill(Infinity);
-        const xMax = new Array(d).fill(-Infinity);
-        for (let i = 0; i < n; i++) {
-            for (let j = 0; j < d; j++) {
-                if (X[i][j] < xMin[j]) xMin[j] = X[i][j];
-                if (X[i][j] > xMax[j]) xMax[j] = X[i][j];
-            }
-        }
-        
-        const X_norm = X.map(row => 
-            row.map((val, j) => {
-                const range = xMax[j] - xMin[j];
-                return range === 0 ? 0 : (val - xMin[j]) / range;
-            })
-        );
+self.onmessage = (event: MessageEvent<MooMessage>) => {
+  try {
+    const {
+      data,
+      features,
+      targets,
+      iterations: requestedIterations = 10_000,
+      seed,
+      maxReturnedCandidates: requestedReturnedCandidates = MAX_RETURNED_CANDIDATES,
+    } = event.data.payload;
+    const iterations = validateCandidateCount(requestedIterations);
+    const maxReturnedCandidates = validateReturnedCandidateCount(requestedReturnedCandidates);
+    if (features.length === 0) throw new Error('No features selected.');
+    if (targets.length < 2) throw new Error('At least 2 targets are required for multi-objective optimization.');
 
-        // GP Models for each target
-        const l = Math.sqrt(d) * 0.5; // heuristic length scale
-        const noise = 1e-4;
-        
-        const K = Array.from({length: n}, () => new Array(n).fill(0));
-        for (let i = 0; i < n; i++) {
-            for (let j = 0; j <= i; j++) {
-                const val = rbf(X_norm[i], X_norm[j], l);
-                K[i][j] = val;
-                K[j][i] = val;
-            }
-            K[i][i] += noise;
-        }
-        
-        const L = cholesky(K);
+    const validData = (data ?? []).filter((row) => (
+      row
+      && features.every((feature) => Number.isFinite(Number(row[feature])))
+      && targets.every((target) => Number.isFinite(Number(row[target.name])))
+    ));
+    if (validData.length < 3) throw new Error('At least 3 valid data points are required.');
 
-        const gps = targets.map(t => {
-            const Y = data.map(row => row[t.name]);
-            const safeN = n > 0 ? n : 1;
-            const yMean = Y.reduce((a, b) => a + b, 0) / safeN;
-            let yStd = Math.sqrt(Math.max(0, Y.reduce((sum, y) => sum + Math.pow(y - yMean, 2), 0) / safeN));
-            if (yStd === 0) yStd = 1;
-            const Y_norm = Y.map(y => (y - yMean) / yStd);
-            const alpha = backwardSolve(L, forwardSolve(L, Y_norm));
-            return { name: t.name, maximize: t.maximize, yMean, yStd, alpha };
-        });
-        
-        // Generate Candidates and predict
-        const candidates: { params: Record<string, number>; means: Record<string, number>; stds: Record<string, number> }[] = [];
-        
-        for (let i = 0; i < iterations; i++) {
-            const xStarNorm = new Array(d).fill(0).map(() => Math.random());
-            const kStar = X_norm.map(x => rbf(x, xStarNorm, l));
-            
-            const v = forwardSolve(L, kStar);
-            let vTv = 0;
-            for (let j=0; j<n; j++) vTv += v[j]*v[j];
-            const varStarNorm = Math.max(1e-12, 1.0 - vTv);
-            const stdStarNorm = Math.sqrt(varStarNorm);
-
-            const means: Record<string, number> = {};
-            const stds: Record<string, number> = {};
-
-            for (const gp of gps) {
-                let meanStarNorm = 0;
-                for (let j = 0; j < n; j++) meanStarNorm += kStar[j] * gp.alpha[j];
-                
-                means[gp.name] = meanStarNorm * gp.yStd + gp.yMean;
-                stds[gp.name] = stdStarNorm * gp.yStd;
-            }
-
-            const params = features.reduce((acc, f, idx) => {
-                const range = xMax[idx] - xMin[idx];
-                acc[f] = range === 0 ? xMin[idx] : (xStarNorm[idx] * range) + xMin[idx];
-                return acc;
-            }, {} as Record<string, number>);
-
-            candidates.push({ params, means, stds });
-        }
-        
-        // Extract Pareto Front among candidates
-        const paretoFront: typeof candidates = [];
-        for (let i = 0; i < candidates.length; i++) {
-            const c = candidates[i];
-            let isDominated = false;
-            for (let j = 0; j < candidates.length; j++) {
-                if (i !== j) {
-                    if (isParetoDominating(candidates[j].means, c.means, targets)) {
-                        isDominated = true;
-                        break;
-                    }
-                }
-            }
-            if (!isDominated) {
-                paretoFront.push(c);
-            }
-        }
-
-        // To bound visual output, maybe sample evaluated candidates
-        // We'll just return a random subset of 1000 evaluated candidates so the scatter plot is not overwhelmed.
-        // We ensure all pareto front points are returned in paretoFront
-        
-        // Randomly shuffle candidates
-        for (let i = candidates.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
-        }
-
-        const sampledCandidates = candidates.slice(0, 1000);
-
-        self.postMessage({
-            type: 'MOO_RESULT',
-            payload: {
-                paretoFront,
-                evaluatedCandidates: sampledCandidates,
-                historical: data,
-                targets: targets
-            }
-        });
-
-    } catch (error) {
-        self.postMessage({
-            type: 'ERROR',
-            error: error instanceof Error ? error.message : String(error)
-        });
+    const sampleCount = validData.length;
+    const dimensions = features.length;
+    const inputs = validData.map((row) => features.map((feature) => Number(row[feature])));
+    const minima = new Array<number>(dimensions).fill(Infinity);
+    const maxima = new Array<number>(dimensions).fill(-Infinity);
+    for (const row of inputs) {
+      for (let dimension = 0; dimension < dimensions; dimension++) {
+        minima[dimension] = Math.min(minima[dimension], row[dimension]);
+        maxima[dimension] = Math.max(maxima[dimension], row[dimension]);
+      }
     }
+    const normalizedInputs = inputs.map((row) => row.map((value, dimension) => {
+      const range = maxima[dimension] - minima[dimension];
+      return range === 0 ? 0 : (value - minima[dimension]) / range;
+    }));
+
+    const factorization = factorizeGaussianProcessRbf(normalizedInputs, {
+      lengthScale: Math.sqrt(dimensions) * 0.5,
+      noise: 1e-4,
+    });
+    const targetModels = targets.map((target) => {
+      const values = validData.map((row) => Number(row[target.name]));
+      const mean = values.reduce((sum, value) => sum + value, 0) / sampleCount;
+      let standardDeviation = Math.sqrt(
+        values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / sampleCount,
+      );
+      if (!(standardDeviation > 0)) standardDeviation = 1;
+      const normalized = values.map((value) => (value - mean) / standardDeviation);
+      return {
+        target,
+        mean,
+        standardDeviation,
+        alpha: solveGaussianProcessAlpha(factorization, normalized),
+      };
+    });
+
+    const actualSeed = seed ?? deriveRandomSeed('multiobjective-rbf-gp-v2', {
+      inputs,
+      targets,
+      iterations,
+      maxReturnedCandidates,
+    });
+    const random = createSeededRandom(actualSeed);
+    const reservoirRandom = createSeededRandom(deriveRandomSeed('moo-reservoir-v1', random.seed));
+    const point = new Float64Array(dimensions);
+    const scratch = createGaussianProcessScratch(sampleCount);
+    const returnedCandidates: { params: Record<string, number>; means: Record<string, number> }[] = [];
+    const allTwoObjectiveCandidates: MooCandidate[] = [];
+    const incrementalFront: MooCandidate[] = [];
+    const progressInterval = Math.max(1, Math.floor(iterations / 20));
+    self.postMessage(createWorkerProgressMessage({ ratio: 0, phase: 'candidate-evaluation' }));
+
+    for (let iteration = 0; iteration < iterations; iteration++) {
+      for (let dimension = 0; dimension < dimensions; dimension++) point[dimension] = random.next();
+      const firstPrediction = predictGaussianProcessRbf(
+        factorization,
+        targetModels[0].alpha,
+        point,
+        scratch,
+      );
+      const means: Record<string, number> = {};
+      const stds: Record<string, number> = {};
+      for (let modelIndex = 0; modelIndex < targetModels.length; modelIndex++) {
+        const model = targetModels[modelIndex];
+        const normalizedMean = modelIndex === 0
+          ? firstPrediction.mean
+          : kernelMean(model.alpha, scratch.kernel);
+        means[model.target.name] = normalizedMean * model.standardDeviation + model.mean;
+        stds[model.target.name] = firstPrediction.standardDeviation * model.standardDeviation;
+      }
+      const params: Record<string, number> = {};
+      for (let dimension = 0; dimension < dimensions; dimension++) {
+        const range = maxima[dimension] - minima[dimension];
+        params[features[dimension]] = range === 0
+          ? minima[dimension]
+          : point[dimension] * range + minima[dimension];
+      }
+      const candidate: MooCandidate = { params, means, stds };
+      if (targets.length === 2) allTwoObjectiveCandidates.push(candidate);
+      else addToIncrementalFront(incrementalFront, candidate, targets);
+
+      const sampledCandidate = { params, means };
+      if (returnedCandidates.length < maxReturnedCandidates) {
+        returnedCandidates.push(sampledCandidate);
+      } else {
+        const replacementIndex = Math.floor(reservoirRandom.next() * (iteration + 1));
+        if (replacementIndex < maxReturnedCandidates) returnedCandidates[replacementIndex] = sampledCandidate;
+      }
+
+      const completed = iteration + 1;
+      if (completed % progressInterval === 0 || completed === iterations) {
+        self.postMessage(createWorkerProgressMessage({
+          ratio: (completed / iterations) * 0.9,
+          completed,
+          total: iterations,
+          phase: 'candidate-evaluation',
+        }));
+      }
+    }
+
+    self.postMessage(createWorkerProgressMessage({ ratio: 0.95, phase: 'pareto-extraction' }));
+    const paretoStrategy = targets.length === 2
+      ? 'two-objective-sort-sweep'
+      : 'incremental-nondominated-front';
+    const paretoFront = targets.length === 2
+      ? extractTwoObjectiveFront(
+          allTwoObjectiveCandidates,
+          [targets[0], targets[1]],
+        )
+      : incrementalFront;
+    self.postMessage(createWorkerProgressMessage({ ratio: 1, phase: 'complete' }));
+
+    self.postMessage({
+      type: 'MOO_RESULT',
+      payload: {
+        paretoFront,
+        evaluatedCandidates: returnedCandidates,
+        historical: validData,
+        targets,
+        reproducibility: {
+          seed: random.seed,
+          seedSource: seed === undefined ? 'derived' : 'user',
+          randomAlgorithm: random.algorithm,
+          randomAlgorithmVersion: random.algorithmVersion,
+          modelVersion: MOO_MODEL_VERSION,
+        },
+        performance: {
+          candidatesEvaluated: iterations,
+          evaluatedCandidatesRetained: returnedCandidates.length,
+          paretoStrategy,
+          sharedKernelFactorizations: 1,
+          targetModels: targetModels.length,
+          factorizationJitter: factorization.jitter,
+        },
+      },
+    } satisfies MooResponse);
+  } catch (error) {
+    self.postMessage({
+      type: 'ERROR',
+      error: error instanceof Error ? error.message : String(error),
+    } satisfies MooResponse);
+  }
 };
