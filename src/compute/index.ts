@@ -3,6 +3,8 @@ export * from './capabilityProbe';
 export * from './computeEngine';
 export * from './computeEvidence';
 export * from './kernelRegistry';
+export * from './leastSquares';
+export * from './random';
 export * from './taskProtocol';
 export * from './transferables';
 export * from './types';
