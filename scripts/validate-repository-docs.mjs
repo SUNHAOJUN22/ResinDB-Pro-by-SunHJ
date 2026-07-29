@@ -2,7 +2,7 @@
 
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { dirname, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -35,10 +35,30 @@ const FORBIDDEN = [
   '.github/remediate-lockfile-20260726.trigger', '.github/workflows/remediate-lockfile-20260726.yml',
   'reports/_final_source_export', 'reports/patch-diagnostic.json', '.resindb-delete-manifest.txt',
   '.github/.resindb-final-patch', '.github/.resindb-v320-delta',
+  '.github/.resindb-stage1-delta',
+]
+const FORBIDDEN_PATH_PATTERNS = [
+  /^\.github\/\.resindb-[^/]*(?:delta|patch|transport)[^/]*(?:\/|$)/i,
 ]
 
 function fail(message) { throw new Error(message) }
 function sha256(content) { return createHash('sha256').update(content).digest('hex') }
+
+function listRepositoryPaths(relativeRoot) {
+  const absoluteRoot = resolve(ROOT, relativeRoot)
+  if (!existsSync(absoluteRoot)) return []
+  const paths = []
+  const visit = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const absolutePath = resolve(directory, entry.name)
+      const repositoryPath = relative(ROOT, absolutePath).split(sep).join('/')
+      paths.push(repositoryPath)
+      if (entry.isDirectory()) visit(absolutePath)
+    }
+  }
+  visit(absoluteRoot)
+  return paths
+}
 
 function validateLinks(text) {
   const patterns = [/<(?:img|a)\b[^>]*(?:src|href)="([^"]+)"/gi, /!?\[[^\]]*]\(([^)]+)\)/g]
@@ -107,7 +127,14 @@ for (const [key, value] of Object.entries(requiredScripts)) {
 for (const path of ['data/manifest.json', 'data/version.json', 'data/metadata.json', 'data/resins/manifest.json']) {
   if (!existsSync(resolve(ROOT, path))) fail('Governed root data contract is incomplete')
 }
-const residue = FORBIDDEN.filter((path) => existsSync(resolve(ROOT, path)))
+const discoveredPaths = [
+  ...listRepositoryPaths('.github'),
+  ...listRepositoryPaths('reports'),
+]
+const residue = [...new Set([
+  ...FORBIDDEN.filter((path) => existsSync(resolve(ROOT, path))),
+  ...discoveredPaths.filter((path) => FORBIDDEN_PATH_PATTERNS.some((pattern) => pattern.test(path))),
+])].sort()
 if (residue.length) fail(`Temporary migration/diagnostic residue remains: ${JSON.stringify(residue)}`)
 const pythonFiles = readdirSync(resolve(ROOT, 'scripts')).filter((name) => name.endsWith('.py'))
 if (pythonFiles.length) fail(`Stage-one Node-only tooling is incomplete: ${JSON.stringify(pythonFiles)}`)
