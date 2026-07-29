@@ -89,6 +89,26 @@ describe('LazyWorkerPool', () => {
     pool.dispose();
   });
 
+  it('keeps the total worker inventory within the configured cap by evicting the oldest idle worker', async () => {
+    const workers: FakeWorker[] = [];
+    const pool = new LazyWorkerPool({ maxWorkers: 2, idleTimeoutMs: 10_000 });
+    const createWorker = workerFactory(workers);
+
+    for (const key of ['one', 'two']) {
+      const handle = pool.submit({ poolKey: key, createWorker, message: key, successType: 'DONE' });
+      workers.at(-1)?.emitMessage({ type: 'DONE', payload: key });
+      await handle.promise;
+    }
+    expect(pool.getStats().workers).toBe(2);
+
+    const third = pool.submit({ poolKey: 'three', createWorker, message: 'three', successType: 'DONE' });
+    expect(workers[0].terminated).toBe(true);
+    expect(pool.getStats().workers).toBe(2);
+    workers.at(-1)?.emitMessage({ type: 'DONE', payload: 'three' });
+    await third.promise;
+    pool.dispose();
+  });
+
   it('orders queued tasks by priority while preserving FIFO within each priority', async () => {
     const workers: FakeWorker[] = [];
     const pool = new LazyWorkerPool({ maxWorkers: 1, idleTimeoutMs: 1_000 });
