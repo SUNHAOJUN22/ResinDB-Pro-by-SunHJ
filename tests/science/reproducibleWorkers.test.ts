@@ -25,7 +25,7 @@ async function runWorker(
   await loader();
   expect(scope.onmessage).toBeTypeOf('function');
   scope.onmessage!({ data: message } as MessageEvent);
-  const response = replies.findLast((value) => (
+  const response = [...replies].reverse().find((value) => (
     value !== null
     && typeof value === 'object'
     && (value as { type?: unknown }).type === successType
@@ -135,7 +135,11 @@ describe('reproducible scientific workers', () => {
     const rankDeficient = await runWorker(loaders.rsm, {
       type: 'CALCULATE_RSM', payload: { data: rankDeficientData },
     }, 'RSM_CALCULATED');
-    expect(rankDeficient.payload.diagnostics).toMatchObject({ solver: 'svd-jacobi-pseudoinverse' });
+    expect(rankDeficient.payload.diagnostics).toMatchObject({
+      solver: 'svd-jacobi-pseudoinverse',
+      conditionNumber: null,
+      conditionNumberStatus: 'infinite',
+    });
     expect((rankDeficient.payload.beta as number[]).every(Number.isFinite)).toBe(true);
   });
 });
