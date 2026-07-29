@@ -1,35 +1,48 @@
-import { Product } from '@/types/index';
+import { createSeededRandom, deriveRandomSeed, type RandomSeed } from '@/compute/random';
+import type { Product } from '@/types/index';
+
+const SCENARIO_MODEL_VERSION = 'rule-based-aging-scenario-projection-3.0.0';
+const BAND_MULTIPLIER = 1.96;
+const MAX_MONTHLY_LOSS = 0.25;
+
+type ScenarioAlgorithm = 'linear' | 'exponential' | 'holt-linear' | 'holt-winters';
+type NormalizedScenarioAlgorithm = Exclude<ScenarioAlgorithm, 'holt-winters'>;
+type ScenarioCondition = 'thermal' | 'uv' | 'hydrolysis' | 'cyclic';
 
 export interface ForecastingWorkerMessage {
   type: 'RUN_FORECAST';
   payload: {
     products: Product[];
     propertyKey: string;
-    algorithm: 'linear' | 'exponential' | 'holt-winters';
-    condition: 'thermal' | 'uv' | 'hydrolysis' | 'cyclic';
-    stressFactor: number; // e.g., temperature in °C, UV hours, etc.
-    alpha?: number;       // Holt-winters level smoothing
-    beta?: number;        // Holt-winters trend smoothing
+    algorithm: ScenarioAlgorithm;
+    condition: ScenarioCondition;
+    stressFactor: number;
+    alpha?: number;
+    beta?: number;
+    seed?: RandomSeed;
   };
 }
 
 export interface DayTrendPoint {
-  month: number; // Range: -12 to +12
+  month: number;
   monthLabel: string;
-  observed: number | null; // actual value, null for future
-  predicted: number | null; // forecasted trend line
-  lowerBound: number | null; // 95% confidence lower limit
-  upperBound: number | null; // 95% confidence upper limit
+  observed: number | null;
+  predicted: number | null;
+  lowerBound: number | null;
+  upperBound: number | null;
+  source: 'rule-generated-baseline-path' | 'scenario-projection';
 }
 
 export interface ForecastMetrics {
   currentValue: number;
   projectedValue12m: number;
   retentionPercent: number;
-  halfLifeMonths: number | string; // Month when properties will decay to 50%
-  degradationRatePercent: number; // Annualized degradation rate
+  halfLifeMonths: number | string;
+  scenarioT50Months: number | string;
+  degradationRatePercent: number;
   safetyStatus: 'safe' | 'warning' | 'danger';
   safetyMessage: string;
+  retentionBand: 'high-retention' | 'moderate-retention' | 'low-retention';
 }
 
 export interface ForecastingWorkerResponse {
@@ -39,316 +52,357 @@ export interface ForecastingWorkerResponse {
     metrics: ForecastMetrics;
     propertyName: string;
     productCount: number;
+    modelVersion: typeof SCENARIO_MODEL_VERSION;
+    analysis: {
+      analysisType: 'rule-based-scenario-projection-not-validated-forecast';
+      baselineSource: 'cross-sectional-product-mean';
+      baselinePathSource: 'rule-generated-synthetic-path';
+      intervalMeaning: 'heuristic-scenario-band-not-confidence-interval';
+      algorithm: 'linear-ols' | 'log-linear-exponential' | 'holt-linear-trend-no-seasonality';
+      legacyAlgorithmAliasUsed: boolean;
+      conditionModel:
+        | 'q10-style-thermal-loss-rule-not-arrhenius-fit'
+        | 'uv-exposure-loss-rule'
+        | 'relative-humidity-loss-rule'
+        | 'cyclic-load-loss-rule';
+      requestedStressFactor: number;
+      effectiveStressFactor: number;
+      monthlyLossFraction: number;
+      monthlyLossCapped: boolean;
+      bandMultiplier: typeof BAND_MULTIPLIER;
+      seed: string;
+      seedSource: 'user' | 'derived';
+      observationsInBaseline: number;
+      assumptions: string[];
+      modelParameters: Record<string, number | string>;
+    };
   };
   error?: string;
 }
 
-// Helpers
-function parseValue(val: any): number | null {
-  if (val === undefined || val === null) return null;
-  const strVal = String(val).trim();
-  if (strVal === '') return null;
-  const parsed = parseFloat(strVal);
-  return isNaN(parsed) ? null : parsed;
+interface ProjectionPoint {
+  month: number;
+  predicted: number;
+  standardError: number;
 }
 
-self.onmessage = (e: MessageEvent<ForecastingWorkerMessage>) => {
+interface ProjectionFit {
+  points: ProjectionPoint[];
+  algorithm: ForecastingWorkerResponse['payload'] extends infer Payload
+    ? Payload extends { analysis: { algorithm: infer Algorithm } } ? Algorithm : never
+    : never;
+  modelParameters: Record<string, number | string>;
+  t50Months: number | null;
+}
+
+function parseValue(value: unknown): number | null {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  if (!text) return null;
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+function validateSmoothing(value: number, name: string): number {
+  if (!Number.isFinite(value) || value <= 0 || value >= 1) {
+    throw new RangeError(`${name} must be greater than 0 and less than 1.`);
+  }
+  return value;
+}
+
+function scenarioLoss(
+  condition: ScenarioCondition,
+  stressFactor: number,
+): {
+  rawLoss: number;
+  effectiveStressFactor: number;
+  conditionModel: NonNullable<ForecastingWorkerResponse['payload']>['analysis']['conditionModel'];
+} {
+  if (!Number.isFinite(stressFactor)) throw new TypeError('Scenario stress factor must be finite.');
+  if (condition === 'thermal') {
+    const temperature = clamp(stressFactor, -273.14, 250);
+    const acceleration = 2 ** (Math.max(0, temperature - 25) / 10);
+    return {
+      rawLoss: 0.005 * acceleration,
+      effectiveStressFactor: temperature,
+      conditionModel: 'q10-style-thermal-loss-rule-not-arrhenius-fit',
+    };
+  }
+  if (condition === 'uv') {
+    const hoursPerDay = clamp(stressFactor, 0, 24);
+    return {
+      rawLoss: 0.004 * (hoursPerDay / 4),
+      effectiveStressFactor: hoursPerDay,
+      conditionModel: 'uv-exposure-loss-rule',
+    };
+  }
+  if (condition === 'hydrolysis') {
+    const relativeHumidity = clamp(stressFactor, 0, 100);
+    return {
+      rawLoss: 0.003 * (relativeHumidity / 50),
+      effectiveStressFactor: relativeHumidity,
+      conditionModel: 'relative-humidity-loss-rule',
+    };
+  }
+  const load = clamp(stressFactor, 0, 1_000);
+  return {
+    rawLoss: 0.006 * (load / 10),
+    effectiveStressFactor: load,
+    conditionModel: 'cyclic-load-loss-rule',
+  };
+}
+
+function linearProjection(months: Float64Array, values: Float64Array): ProjectionFit {
+  const count = months.length;
+  let meanMonth = 0;
+  let meanValue = 0;
+  for (let index = 0; index < count; index++) {
+    meanMonth += months[index];
+    meanValue += values[index];
+  }
+  meanMonth /= count;
+  meanValue /= count;
+  let centeredMonths = 0;
+  let centeredCross = 0;
+  for (let index = 0; index < count; index++) {
+    centeredMonths += (months[index] - meanMonth) ** 2;
+    centeredCross += (months[index] - meanMonth) * (values[index] - meanValue);
+  }
+  if (!(centeredMonths > 0)) throw new Error('Scenario baseline path has no usable time variation.');
+  const slope = centeredCross / centeredMonths;
+  const intercept = meanValue - slope * meanMonth;
+  let residualSquares = 0;
+  for (let index = 0; index < count; index++) {
+    residualSquares += (values[index] - (intercept + slope * months[index])) ** 2;
+  }
+  const residualStandardDeviation = Math.sqrt(residualSquares / Math.max(1, count - 2));
+  const points = Array.from({ length: 12 }, (_, index) => {
+    const month = index + 1;
+    const standardError = residualStandardDeviation * Math.sqrt(
+      1 + 1 / count + ((month - meanMonth) ** 2) / centeredMonths,
+    );
+    return { month, predicted: intercept + slope * month, standardError };
+  });
+  const baseline = values[count - 1];
+  const crossing = slope < 0 ? (baseline * 0.5 - intercept) / slope : NaN;
+  return {
+    points,
+    algorithm: 'linear-ols',
+    modelParameters: { intercept, slope, residualStandardDeviation },
+    t50Months: Number.isFinite(crossing) && crossing > 0 ? crossing : null,
+  };
+}
+
+function exponentialProjection(months: Float64Array, values: Float64Array): ProjectionFit {
+  const count = months.length;
+  const logValues = Float64Array.from(values, (value) => Math.log(value));
+  let meanMonth = 0;
+  let meanLogValue = 0;
+  for (let index = 0; index < count; index++) {
+    meanMonth += months[index];
+    meanLogValue += logValues[index];
+  }
+  meanMonth /= count;
+  meanLogValue /= count;
+  let centeredMonths = 0;
+  let centeredCross = 0;
+  for (let index = 0; index < count; index++) {
+    centeredMonths += (months[index] - meanMonth) ** 2;
+    centeredCross += (months[index] - meanMonth) * (logValues[index] - meanLogValue);
+  }
+  if (!(centeredMonths > 0)) throw new Error('Scenario baseline path has no usable time variation.');
+  const exponent = centeredCross / centeredMonths;
+  const logScale = meanLogValue - exponent * meanMonth;
+  const scale = Math.exp(logScale);
+  let residualSquares = 0;
+  for (let index = 0; index < count; index++) {
+    residualSquares += (values[index] - scale * Math.exp(exponent * months[index])) ** 2;
+  }
+  const residualStandardDeviation = Math.sqrt(residualSquares / Math.max(1, count - 2));
+  const points = Array.from({ length: 12 }, (_, index) => {
+    const month = index + 1;
+    return {
+      month,
+      predicted: scale * Math.exp(exponent * month),
+      standardError: residualStandardDeviation * Math.sqrt(1 + month / 12),
+    };
+  });
+  const baseline = values[count - 1];
+  const crossing = exponent < 0 ? Math.log((baseline * 0.5) / scale) / exponent : NaN;
+  return {
+    points,
+    algorithm: 'log-linear-exponential',
+    modelParameters: { scale, exponent, residualStandardDeviation },
+    t50Months: Number.isFinite(crossing) && crossing > 0 ? crossing : null,
+  };
+}
+
+function holtLinearProjection(
+  values: Float64Array,
+  alpha: number,
+  beta: number,
+): ProjectionFit {
+  let level = values[0];
+  let trend = values[1] - values[0];
+  let residualSquares = 0;
+  let residualCount = 0;
+  for (let index = 1; index < values.length; index++) {
+    const oneStepPrediction = level + trend;
+    residualSquares += (values[index] - oneStepPrediction) ** 2;
+    residualCount += 1;
+    const previousLevel = level;
+    level = alpha * values[index] + (1 - alpha) * (level + trend);
+    trend = beta * (level - previousLevel) + (1 - beta) * trend;
+  }
+  const residualStandardDeviation = Math.sqrt(residualSquares / Math.max(1, residualCount - 2));
+  const points = Array.from({ length: 12 }, (_, index) => {
+    const month = index + 1;
+    return {
+      month,
+      predicted: level + month * trend,
+      standardError: residualStandardDeviation * Math.sqrt(1 + month / 4),
+    };
+  });
+  const baseline = values[values.length - 1];
+  const crossing = trend < 0 ? (baseline * 0.5 - level) / trend : NaN;
+  return {
+    points,
+    algorithm: 'holt-linear-trend-no-seasonality',
+    modelParameters: { alpha, beta, level, trend, residualStandardDeviation },
+    t50Months: Number.isFinite(crossing) && crossing > 0 ? crossing : null,
+  };
+}
+
+function formatScenarioT50(value: number | null): string {
+  if (value === null) return 'Not reached';
+  if (value > 240) return '>20 years';
+  return `${Math.max(1, Math.round(value))} months`;
+}
+
+self.onmessage = (event: MessageEvent<ForecastingWorkerMessage>) => {
   try {
-    const { products, propertyKey, algorithm, condition, stressFactor, alpha = 0.4, beta = 0.3 } = e.data.payload;
+    const {
+      products,
+      propertyKey,
+      algorithm,
+      condition,
+      stressFactor,
+      alpha: requestedAlpha = 0.4,
+      beta: requestedBeta = 0.3,
+      seed,
+    } = event.data.payload;
+    if (!products?.length) throw new Error('Select at least one resin grade for scenario projection.');
+    if (!propertyKey.trim()) throw new Error('Select a material property for scenario projection.');
 
-    if (!products || products.length === 0) {
-      throw new Error("No products selected. Please select resin grades for forecasting.");
+    const values = products
+      .map((product) => parseValue(product.properties?.[propertyKey]?.value))
+      .filter((value): value is number => value !== null);
+    if (values.length === 0) {
+      throw new Error(`The selected property "${propertyKey}" has no finite numeric values.`);
     }
+    const baselineValue = values.reduce((sum, value) => sum + value, 0) / values.length;
+    if (!(baselineValue > 0)) {
+      throw new Error('Retention scenarios require a strictly positive cross-sectional baseline value.');
+    }
+    let squaredDeviation = 0;
+    for (const value of values) squaredDeviation += (value - baselineValue) ** 2;
+    const baselineStandardDeviation = values.length > 1
+      ? Math.sqrt(squaredDeviation / (values.length - 1))
+      : Math.abs(baselineValue) * 0.03;
 
-    // 1. Compute aggregate/average baseline value of the property for the current products
-    let sumValues = 0;
-    let countValues = 0;
-    const valuesArray: number[] = [];
-
-    products.forEach(p => {
-      const propObj = p.properties?.[propertyKey];
-      if (propObj) {
-        const v = parseValue(propObj.value);
-        if (v !== null) {
-          sumValues += v;
-          countValues++;
-          valuesArray.push(v);
-        }
-      }
+    const lossRule = scenarioLoss(condition, stressFactor);
+    const experimentalCount = products.filter((product) => product.isExperimental).length;
+    const experimentalMultiplier = experimentalCount > products.length / 2 ? 1.25 : 1;
+    const uncappedMonthlyLoss = lossRule.rawLoss * experimentalMultiplier;
+    const monthlyLossFraction = clamp(uncappedMonthlyLoss, 0, MAX_MONTHLY_LOSS);
+    const monthlyLossCapped = monthlyLossFraction !== uncappedMonthlyLoss;
+    const noiseFraction = 0.015 * (experimentalMultiplier > 1 ? 1.8 : 1);
+    const actualSeed = seed ?? deriveRandomSeed('aging-scenario-projection-v3', {
+      productIds: products.map((product) => product.id).sort(),
+      propertyKey,
+      condition,
+      stressFactor: lossRule.effectiveStressFactor,
+      baselineValue,
+      monthlyLossFraction,
+      algorithm,
+      requestedAlpha,
+      requestedBeta,
     });
+    const random = createSeededRandom(actualSeed);
 
-    if (countValues === 0) {
-      throw new Error(`The selected property "${propertyKey}" has no numeric data points in the selected material workspace.`);
+    const syntheticPath: { month: number; value: number }[] = [{ month: 0, value: baselineValue }];
+    let currentValue = baselineValue;
+    for (let month = -1; month >= -12; month--) {
+      const previousWithoutNoise = currentValue / (1 - monthlyLossFraction);
+      const perturbation = clamp(random.normal(0, noiseFraction), -3 * noiseFraction, 3 * noiseFraction);
+      currentValue = Math.max(Number.EPSILON, previousWithoutNoise * (1 + perturbation));
+      syntheticPath.push({ month, value: currentValue });
     }
+    syntheticPath.reverse();
+    const months = Float64Array.from(syntheticPath, (point) => point.month);
+    const pathValues = Float64Array.from(syntheticPath, (point) => point.value);
 
-    const baselineValue = sumValues / countValues;
-
-    // Determine variance of the baseline value to style standard error
-    let sumSqrDiff = 0;
-    valuesArray.forEach(v => {
-      sumSqrDiff += Math.pow(v - baselineValue, 2);
-    });
-    const baseVariance = countValues > 1 ? sumSqrDiff / (countValues - 1) : baselineValue * 0.05;
-    const baseStdDev = Math.sqrt(baseVariance) || (baselineValue * 0.03);
-
-    // 2. Simulate historical data (-12 to 0 months) based on selected environmental stress condition
-    // Each environmental condition causes a different historical drift & degradation kinetics
-    let monthlyDrift = 0;       // fractional change per month
-    let randomNoiseFactor = 0.015; // standard deviation deviation noise (1.5%)
-
-    if (condition === 'thermal') {
-      // Arrhenius-like aging. Higher thermal stress temperature = faster degradation
-      // e.g. typical Arrhenius rule of doubling degradation rate every 10°C rise above 25°C
-      const deltaT = Math.max(0, stressFactor - 25);
-      const thermalAcceleration = Math.pow(2, deltaT / 10);
-      monthlyDrift = -0.005 * thermalAcceleration; // e.g. -0.5% base loss * multiplier
-    } else if (condition === 'uv') {
-      // Photo-oxidative degradation (UV exposure hours per day, stressFactor represents hours/day)
-      const uvExposureHrs = Math.max(0, Math.min(24, stressFactor));
-      monthlyDrift = -0.004 * (uvExposureHrs / 4);
-    } else if (condition === 'hydrolysis') {
-      // Hot Water Hydrolysis degradation, stressFactor represents Relative Humidity (0-100%) or temperature
-      monthlyDrift = -0.003 * (stressFactor / 50);
-    } else if (condition === 'cyclic') {
-      // Cyclic mechanical fatigue. StressFactor represents load (MPa / 10)
-      monthlyDrift = -0.006 * (stressFactor / 10);
-    }
-
-    // Adjust drift slightly if the product is experimental vs industrial
-    const experimentalCount = products.filter(p => p.isExperimental).length;
-    if (experimentalCount > products.length / 2) {
-      monthlyDrift *= 1.25; // Experimental resins degrade faster or exhibit higher fluctuations
-      randomNoiseFactor *= 1.8;
-    }
-
-    // Build the 13 historical points (Month -12 to Month 0)
-    // Month 0 MUST be matched to the current baseline value
-    const historicalPoints: { month: number; val: number }[] = [];
-    
-    // Simulate backwards from Month 0 to Month -12
-    let currentVal = baselineValue;
-    historicalPoints.push({ month: 0, val: currentVal });
-
-    for (let m = -1; m >= -12; m--) {
-      // Apply inverse drift to get backwards historical point
-      // e.g. backwards value was higher before degradations
-      const driftVal = currentVal / (1 + monthlyDrift);
-      
-      // Seeded mock noise
-      const seed = Math.sin(m * 123.456 + m);
-      const noise = driftVal * randomNoiseFactor * seed;
-      
-      currentVal = driftVal + noise;
-      historicalPoints.push({ month: m, val: currentVal });
-    }
-
-    // Reverse to chronological order (Month -12 to Month 0)
-    historicalPoints.reverse();
-
-    // 3. Compute forecasts (Month 1 to Month 12)
-    const futureMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-    const forecastPoints: { month: number; predicted: number; sError: number }[] = [];
-
-    const histX = historicalPoints.map(p => p.month);
-    const histY = historicalPoints.map(p => p.val);
-    const nHist = historicalPoints.length;
-
-    if (algorithm === 'linear') {
-      // Linear Regression calculation
-      let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-      for (let i = 0; i < nHist; i++) {
-        sumX += histX[i];
-        sumY += histY[i];
-        sumXY += histX[i] * histY[i];
-        sumXX += histX[i] * histX[i];
-      }
-
-      const slopeDenom = nHist * sumXX - sumX * sumX;
-      const slope = (nHist * sumXY - sumX * sumY) / (Math.abs(slopeDenom) > 1e-15 ? slopeDenom : 1e-15);
-      const safeNHist = nHist > 0 ? nHist : 1;
-      const intercept = (sumY - slope * sumX) / safeNHist;
-
-      // Fit residual sum of squares to estimate standard error of forecasting
-      let sumResidualSquares = 0;
-      for (let i = 0; i < nHist; i++) {
-        const predictedVal = slope * histX[i] + intercept;
-        sumResidualSquares += Math.pow(histY[i] - predictedVal, 2);
-      }
-      const residualStdDev = Math.sqrt(Math.max(0, sumResidualSquares / (nHist > 2 ? nHist - 2 : 1))) || (baselineValue * 0.02);
-
-      futureMonths.forEach(m => {
-        const predicted = slope * m + intercept;
-        // Forecasting error expands as we move further into the future
-        const safeNHistSE = nHist > 0 ? nHist : 1;
-        const seDenom = sumXX - (sumX * sumX) / safeNHistSE;
-        const sError = residualStdDev * Math.sqrt(Math.max(0, 1 + 1 / safeNHistSE + Math.pow(m, 2) / (Math.abs(seDenom) > 1e-15 ? seDenom : 1e-15)));
-        forecastPoints.push({ month: m, predicted, sError });
-      });
-
-    } else if (algorithm === 'exponential') {
-      // Exponential decay fitting: y = A * e^(B * m) -> ln(y) = ln(A) + B * m
-      let sumX = 0, sumLnY = 0, sumXLnY = 0, sumXX = 0;
-      let validHistPointsCount = 0;
-
-      for (let i = 0; i < nHist; i++) {
-        if (histY[i] > 0) {
-          const lnY = Math.log(histY[i]);
-          sumX += histX[i];
-          sumLnY += lnY;
-          sumXLnY += histX[i] * lnY;
-          sumXX += histX[i] * histX[i];
-          validHistPointsCount++;
-        }
-      }
-
-      if (validHistPointsCount < 2) {
-        // Fallback to simplistic decay
-        const k = Math.max(0.001, -monthlyDrift);
-        futureMonths.forEach(m => {
-          const predicted = baselineValue * Math.exp(-k * m);
-          const sError = baseStdDev * Math.sqrt(m) * 0.4;
-          forecastPoints.push({ month: m, predicted, sError });
-        });
-      } else {
-        const expDenom = validHistPointsCount * sumXX - sumX * sumX;
-        const b = (validHistPointsCount * sumXLnY - sumX * sumLnY) / (Math.abs(expDenom) > 1e-15 ? expDenom : 1e-15);
-        const safeVHPC = validHistPointsCount > 0 ? validHistPointsCount : 1;
-        const lnA = (sumLnY - b * sumX) / safeVHPC;
-        const a = Math.exp(lnA);
-
-        let sumResSquares = 0;
-        for (let i = 0; i < nHist; i++) {
-          const predictedExp = a * Math.exp(b * histX[i]);
-          sumResSquares += Math.pow(histY[i] - predictedExp, 2);
-        }
-        const residualStdDev = Math.sqrt(Math.max(0, sumResSquares / (validHistPointsCount > 2 ? validHistPointsCount - 2 : 1))) || (baselineValue * 0.03);
-
-        futureMonths.forEach(m => {
-          const predicted = a * Math.exp(b * m);
-          const sError = residualStdDev * Math.sqrt(1 + m * 0.15);
-          forecastPoints.push({ month: m, predicted, sError });
-        });
-      }
-
-    } else if (algorithm === 'holt-winters') {
-      // Holt-Winters Double Exponential Smoothing (Additive Trend)
-      // Level (L_t), Trend (T_t)
-      // Initialize levels at Month -12
-      let l = histY[0];
-      let t = histY[1] - histY[0]; // simple initial trend
-
-      // Smooth through historical points
-      for (let i = 1; i < nHist; i++) {
-        const yObs = histY[i];
-        const nextL = alpha * yObs + (1 - alpha) * (l + t);
-        const nextT = beta * (nextL - l) + (1 - beta) * t;
-        l = nextL;
-        t = nextT;
-      }
-
-      // Project future points
-      let cumError = baseStdDev;
-      futureMonths.forEach((m, futIdx) => {
-        const h = futIdx + 1; // forecast steps ahead
-        const predicted = l + h * t;
-        cumError += (baseStdDev * 0.15); // growing variance
-        forecastPoints.push({ month: m, predicted, sError: cumError });
-      });
-    }
-
-    // 4. Assemble consolidated trendPoints array (-12 to +12)
-    const trendPoints: DayTrendPoint[] = [];
-
-    // Historical points
-    historicalPoints.forEach(p => {
-      // Add standard baseline variance boundaries to historical values (to display consistency band)
-      const isCurrentMonth = p.month === 0;
-      const lowerBound = isCurrentMonth ? p.val - baseStdDev * 1.96 : null;
-      const upperBound = isCurrentMonth ? p.val + baseStdDev * 1.96 : null;
-
-      trendPoints.push({
-        month: p.month,
-        monthLabel: p.month === 0 ? 'Current' : `M${p.month}`,
-        observed: p.val,
-        predicted: p.month === 0 ? p.val : null,
-        lowerBound,
-        upperBound
-      });
-    });
-
-    // Future points
-    forecastPoints.forEach(p => {
-      trendPoints.push({
-        month: p.month,
-        monthLabel: `F+${p.month}m`,
-        observed: null,
-        predicted: p.predicted,
-        lowerBound: Math.max(0, p.predicted - p.sError * 1.96), // 95% CI bound
-        upperBound: p.predicted + p.sError * 1.96
-      });
-    });
-
-    // 5. Compute performance diagnostics and metrics
-    const projectedValue12m = forecastPoints[forecastPoints.length - 1].predicted;
-    const safeBaseline = Math.abs(baselineValue) > 1e-15 ? baselineValue : 1e-15;
-    const retentionPercent = Math.max(0, Math.min(100, (projectedValue12m / safeBaseline) * 100));
-    const degradationRatePercent = ((baselineValue - projectedValue12m) / safeBaseline) * 100;
-
-    // Estimate T50 Half-Life
-    let halfLifeMonths: number | string = 'N/A';
-    if (projectedValue12m < baselineValue) {
-      if (algorithm === 'exponential') {
-        // formula math solver: A e^(B * m) = A * 0.5 -> B * m = ln(0.5) = -0.693 -> m = -0.693 / B
-        // find B from fitting
-        const validHistPointsCount = historicalPoints.filter(p => p.val > 0).length;
-        if (validHistPointsCount >= 2) {
-          let sumX = 0, sumLnY = 0, sumXLnY = 0, sumXX = 0;
-          for (let i = 0; i < nHist; i++) {
-            if (histY[i] > 0) {
-              const lnY = Math.log(histY[i]);
-              sumX += histX[i];
-              sumLnY += lnY;
-              sumXLnY += histX[i] * lnY;
-              sumXX += histX[i] * histX[i];
-            }
-          }
-          const hlDenom = validHistPointsCount * sumXX - sumX * sumX;
-          const b = (validHistPointsCount * sumXLnY - sumX * sumLnY) / (Math.abs(hlDenom) > 1e-15 ? hlDenom : 1e-15);
-          if (b < -1e-15) {
-            halfLifeMonths = Math.round(-Math.log(2) / b);
-          }
-        }
-      } else {
-        // Linearly or through step scan
-        const slope = (projectedValue12m - baselineValue) / 12;
-        if (slope < -1e-15) {
-          halfLifeMonths = Math.round((baselineValue * 0.5 - baselineValue) / slope);
-        }
-      }
-    }
-
-    if (typeof halfLifeMonths === 'number' && halfLifeMonths > 240) {
-      halfLifeMonths = '>20 years';
-    } else if (typeof halfLifeMonths === 'number' && halfLifeMonths <= 0) {
-      halfLifeMonths = 'Not Degrading';
-    } else if (typeof halfLifeMonths === 'number') {
-      halfLifeMonths = `${halfLifeMonths} months`;
-    }
-
-    // Determine safety indicators
-    let safetyStatus: 'safe' | 'warning' | 'danger' = 'safe';
-    let safetyMessage = '';
-
-    if (retentionPercent >= 85) {
-      safetyStatus = 'safe';
-      safetyMessage = `Excellent thermal and UV durability stability. Material retains over 85% of physical specifications at 12 months under active stress.`;
-    } else if (retentionPercent >= 65) {
-      safetyStatus = 'warning';
-      safetyMessage = `Moderate physical parameter deterioration flagged. Critical structural degradation warnings recommended if subjected to prolonged stress outside laboratory configurations.`;
+    const normalizedAlgorithm: NormalizedScenarioAlgorithm = algorithm === 'holt-winters'
+      ? 'holt-linear'
+      : algorithm;
+    let projection: ProjectionFit;
+    if (normalizedAlgorithm === 'linear') {
+      projection = linearProjection(months, pathValues);
+    } else if (normalizedAlgorithm === 'exponential') {
+      projection = exponentialProjection(months, pathValues);
     } else {
-      safetyStatus = 'danger';
-      safetyMessage = `EXTREME degradation threshold breached. Projected physical properties fall below 65% of base configurations. Curing stabilizers or compound UV blockers strongly recommended!`;
+      projection = holtLinearProjection(
+        pathValues,
+        validateSmoothing(requestedAlpha, 'alpha'),
+        validateSmoothing(requestedBeta, 'beta'),
+      );
     }
+
+    const trendPoints: DayTrendPoint[] = syntheticPath.map((point) => ({
+      month: point.month,
+      monthLabel: point.month === 0 ? 'Now' : `S${point.month}`,
+      observed: point.value,
+      predicted: point.month === 0 ? point.value : null,
+      lowerBound: point.month === 0 ? Math.max(0, point.value - BAND_MULTIPLIER * baselineStandardDeviation) : null,
+      upperBound: point.month === 0 ? point.value + BAND_MULTIPLIER * baselineStandardDeviation : null,
+      source: 'rule-generated-baseline-path',
+    }));
+    for (const point of projection.points) {
+      trendPoints.push({
+        month: point.month,
+        monthLabel: `P+${point.month}m`,
+        observed: null,
+        predicted: point.predicted,
+        lowerBound: Math.max(0, point.predicted - BAND_MULTIPLIER * point.standardError),
+        upperBound: point.predicted + BAND_MULTIPLIER * point.standardError,
+        source: 'scenario-projection',
+      });
+    }
+
+    const projectedValue12m = projection.points[projection.points.length - 1].predicted;
+    if (!Number.isFinite(projectedValue12m)) throw new Error('Scenario projection produced a non-finite result.');
+    const retentionPercent = Math.max(0, projectedValue12m / baselineValue * 100);
+    const degradationRatePercent = 100 - retentionPercent;
+    const scenarioT50Months = formatScenarioT50(projection.t50Months);
+    const retentionBand: ForecastMetrics['retentionBand'] = retentionPercent >= 85
+      ? 'high-retention'
+      : retentionPercent >= 65
+        ? 'moderate-retention'
+        : 'low-retention';
+    const safetyStatus: ForecastMetrics['safetyStatus'] = retentionBand === 'high-retention'
+      ? 'safe'
+      : retentionBand === 'moderate-retention'
+        ? 'warning'
+        : 'danger';
+    const safetyMessage = retentionBand === 'high-retention'
+      ? 'High-retention rule-based scenario. This is not material certification or validated lifetime prediction.'
+      : retentionBand === 'moderate-retention'
+        ? 'Moderate-retention rule-based scenario. Confirm with measured aging data before engineering decisions.'
+        : 'Low-retention rule-based scenario. Treat this as a screening signal only, not a failure prediction or certification result.';
 
     self.postMessage({
       type: 'FORECAST_RESULT',
@@ -358,20 +412,45 @@ self.onmessage = (e: MessageEvent<ForecastingWorkerMessage>) => {
           currentValue: baselineValue,
           projectedValue12m,
           retentionPercent,
-          halfLifeMonths,
+          halfLifeMonths: scenarioT50Months,
+          scenarioT50Months,
           degradationRatePercent,
           safetyStatus,
-          safetyMessage
+          safetyMessage,
+          retentionBand,
         },
         propertyName: propertyKey,
-        productCount: products.length
-      }
-    } as ForecastingWorkerResponse);
-
+        productCount: products.length,
+        modelVersion: SCENARIO_MODEL_VERSION,
+        analysis: {
+          analysisType: 'rule-based-scenario-projection-not-validated-forecast',
+          baselineSource: 'cross-sectional-product-mean',
+          baselinePathSource: 'rule-generated-synthetic-path',
+          intervalMeaning: 'heuristic-scenario-band-not-confidence-interval',
+          algorithm: projection.algorithm,
+          legacyAlgorithmAliasUsed: algorithm === 'holt-winters',
+          conditionModel: lossRule.conditionModel,
+          requestedStressFactor: stressFactor,
+          effectiveStressFactor: lossRule.effectiveStressFactor,
+          monthlyLossFraction,
+          monthlyLossCapped,
+          bandMultiplier: BAND_MULTIPLIER,
+          seed: random.seed,
+          seedSource: seed === undefined ? 'derived' : 'user',
+          observationsInBaseline: values.length,
+          assumptions: [
+            'The baseline path is generated from a cross-sectional mean and rule-based stress loss, not measured time-series data.',
+            'Projection bands are heuristic scenario bands and are not statistical confidence or prediction intervals.',
+            'Retention categories are screening labels and are not safety certification, service-life validation, or material qualification.',
+          ],
+          modelParameters: projection.modelParameters,
+        },
+      },
+    } satisfies ForecastingWorkerResponse);
   } catch (error) {
     self.postMessage({
       type: 'ERROR',
-      error: error instanceof Error ? error.message : String(error)
-    } as ForecastingWorkerResponse);
+      error: error instanceof Error ? error.message : String(error),
+    } satisfies ForecastingWorkerResponse);
   }
 };
