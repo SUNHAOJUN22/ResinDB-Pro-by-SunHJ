@@ -1,3 +1,5 @@
+const SPEARMAN_MODEL_VERSION = 'average-rank-pearson-complete-cases-2.0.0';
+
 export type SpearmanMessage = {
   type: 'COMPUTE_SPEARMAN';
   payload: {
@@ -11,93 +13,124 @@ export type SpearmanResponse = {
   payload: {
     matrix: number[][];
     keys: string[];
+    modelVersion: typeof SPEARMAN_MODEL_VERSION;
+    diagnostics: {
+      observations: number;
+      missingDataPolicy: 'listwise-complete-cases';
+      tiePolicy: 'average-ranks';
+      constantCorrelationPolicy: 'zero-not-defined';
+      constantKeys: string[];
+    };
   };
 } | {
   type: 'ERROR';
   payload: { message: string };
 };
 
-// Compute ranks
-function getRanks(arr: number[]): number[] {
-  const sorted = arr.map((val, i) => ({ val, i })).sort((a, b) => a.val - b.val);
-  const ranks = new Array(arr.length);
-  
-  let i = 0;
-  while (i < sorted.length) {
-    let j = i;
-    let sum = 0;
-    while (j < sorted.length && sorted[j].val === sorted[i].val) {
-      sum += j + 1;
-      j++;
-    }
-    const avgRank = sum / (j - i);
-    for (let k = i; k < j; k++) {
-      ranks[sorted[k].i] = avgRank;
-    }
-    i = j;
+function getRanks(values: readonly number[]): Float64Array {
+  const sorted = values.map((value, index) => ({ value, index }))
+    .sort((left, right) => left.value - right.value);
+  const ranks = new Float64Array(values.length);
+  let cursor = 0;
+  while (cursor < sorted.length) {
+    let end = cursor + 1;
+    while (end < sorted.length && sorted[end].value === sorted[cursor].value) end += 1;
+    const averageRank = ((cursor + 1) + end) / 2;
+    for (let index = cursor; index < end; index++) ranks[sorted[index].index] = averageRank;
+    cursor = end;
   }
   return ranks;
 }
 
-self.onmessage = (e: MessageEvent<SpearmanMessage>) => {
+self.onmessage = (event: MessageEvent<SpearmanMessage>) => {
   try {
-    const { data, keys } = e.data.payload;
+    const { data, keys } = event.data.payload;
+    if (new Set(keys).size !== keys.length) throw new Error('Spearman feature keys must be unique.');
     if (!data.length || keys.length < 2) {
-      self.postMessage({ type: 'SPEARMAN_RESULT', payload: { matrix: [], keys } });
+      self.postMessage({
+        type: 'SPEARMAN_RESULT',
+        payload: {
+          matrix: [],
+          keys,
+          modelVersion: SPEARMAN_MODEL_VERSION,
+          diagnostics: {
+            observations: 0,
+            missingDataPolicy: 'listwise-complete-cases',
+            tiePolicy: 'average-ranks',
+            constantCorrelationPolicy: 'zero-not-defined',
+            constantKeys: [],
+          },
+        },
+      } satisfies SpearmanResponse);
       return;
     }
 
-    const validData = data.filter(d => 
-       d && d.values && 
-       keys.every(k => typeof d.values[k] === 'number' && !isNaN(d.values[k]))
-    );
-
-    if (!validData.length) {
-      self.postMessage({ type: 'SPEARMAN_RESULT', payload: { matrix: [], keys } });
-      return;
+    const validData = data.filter((item) => (
+      item
+      && item.values
+      && keys.every((key) => Number.isFinite(item.values[key]))
+    ));
+    const observations = validData.length;
+    if (observations < 2) {
+      throw new Error('Spearman correlation requires at least two complete finite observations.');
     }
 
-    const n = validData.length;
-    const ranksByKey: Record<string, number[]> = {};
-
-    for (const key of keys) {
-      const values = validData.map(d => d.values[key] ?? 0);
-      ranksByKey[key] = getRanks(values);
+    const ranksByKey = new Map<string, Float64Array>();
+    const centeredNormSquared = new Float64Array(keys.length);
+    const rankMean = (observations + 1) / 2;
+    const constantKeys: string[] = [];
+    for (let keyIndex = 0; keyIndex < keys.length; keyIndex++) {
+      const key = keys[keyIndex];
+      const values = validData.map((item) => item.values[key]);
+      const ranks = getRanks(values);
+      ranksByKey.set(key, ranks);
+      let sumSquared = 0;
+      for (let observation = 0; observation < observations; observation++) {
+        sumSquared += (ranks[observation] - rankMean) ** 2;
+      }
+      centeredNormSquared[keyIndex] = sumSquared;
+      if (!(sumSquared > 0)) constantKeys.push(key);
     }
 
-    const matrix = Array(keys.length).fill(0).map(() => Array(keys.length).fill(0));
-
-    for (let i = 0; i < keys.length; i++) {
-      matrix[i][i] = 1;
-      const rankX = ranksByKey[keys[i]];
-      const meanX = (n + 1) / 2; // mean of ranks 1 to n is (n+1)/2
-
-      let sumSqX = 0;
-      for (const r of rankX) sumSqX += Math.pow(r - meanX, 2);
-
-      for (let j = i + 1; j < keys.length; j++) {
-        const rankY = ranksByKey[keys[j]];
-        const meanY = meanX; // Same mean
-        
-        // Let's use standard Pearson on ranks for ties properly
-        let sumSqY = 0;
-        for (const r of rankY) sumSqY += Math.pow(r - meanY, 2);
-
-        let sumXY = 0;
-        for (let k = 0; k < n; k++) {
-          sumXY += (rankX[k] - meanX) * (rankY[k] - meanY);
+    const matrix = Array.from({ length: keys.length }, () => new Array<number>(keys.length).fill(0));
+    for (let left = 0; left < keys.length; left++) {
+      matrix[left][left] = centeredNormSquared[left] > 0 ? 1 : 0;
+      const rankLeft = ranksByKey.get(keys[left])!;
+      for (let right = left + 1; right < keys.length; right++) {
+        const denominator = Math.sqrt(centeredNormSquared[left] * centeredNormSquared[right]);
+        let rho = 0;
+        if (denominator > 0) {
+          const rankRight = ranksByKey.get(keys[right])!;
+          let covariance = 0;
+          for (let observation = 0; observation < observations; observation++) {
+            covariance += (rankLeft[observation] - rankMean) * (rankRight[observation] - rankMean);
+          }
+          rho = Math.max(-1, Math.min(1, covariance / denominator));
         }
-
-        const denom = Math.sqrt(Math.max(0, sumSqX * sumSqY));
-        const rho = Math.abs(denom) < 1e-15 ? 0 : sumXY / denom;
-        
-        matrix[i][j] = rho;
-        matrix[j][i] = rho;
+        matrix[left][right] = rho;
+        matrix[right][left] = rho;
       }
     }
 
-    self.postMessage({ type: 'SPEARMAN_RESULT', payload: { matrix, keys } } as SpearmanResponse);
+    self.postMessage({
+      type: 'SPEARMAN_RESULT',
+      payload: {
+        matrix,
+        keys,
+        modelVersion: SPEARMAN_MODEL_VERSION,
+        diagnostics: {
+          observations,
+          missingDataPolicy: 'listwise-complete-cases',
+          tiePolicy: 'average-ranks',
+          constantCorrelationPolicy: 'zero-not-defined',
+          constantKeys,
+        },
+      },
+    } satisfies SpearmanResponse);
   } catch (error) {
-    self.postMessage({ type: 'ERROR', payload: { message: error instanceof Error ? error.message : 'Unknown error' } } as SpearmanResponse);
+    self.postMessage({
+      type: 'ERROR',
+      payload: { message: error instanceof Error ? error.message : 'Unknown error' },
+    } satisfies SpearmanResponse);
   }
 };
