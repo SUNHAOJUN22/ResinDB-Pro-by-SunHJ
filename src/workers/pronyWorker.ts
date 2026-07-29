@@ -37,7 +37,7 @@ export interface PronyResponse {
 }
 
 function estimateLargestEigenvalue(matrix: Float64Array, size: number): number {
-  let vector = new Float64Array(size);
+  const vector = new Float64Array(size);
   vector.fill(1 / Math.sqrt(size));
   let eigenvalue = 0;
   for (let iteration = 0; iteration < 30; iteration++) {
@@ -148,7 +148,7 @@ self.onmessage = (event: MessageEvent<PronyMessage>) => {
     const maximumStorage = Math.max(...validData.map((point) => point.storage));
     let coefficients = new Float64Array(coefficientCount);
     coefficients.fill(maximumStorage / coefficientCount);
-    let accelerated = new Float64Array(coefficients);
+    const accelerated = new Float64Array(coefficients);
     let momentum = 1;
     let converged = false;
     let iterations = 0;
