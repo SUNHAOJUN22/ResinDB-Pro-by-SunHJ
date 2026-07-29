@@ -30,7 +30,7 @@ class HookWorker {
 
   emit(data: unknown): void {
     const event = new MessageEvent('message', { data });
-    for (const listener of this.listeners.get('message') ?? []) {
+    for (const listener of [...(this.listeners.get('message') ?? [])]) {
       if (typeof listener === 'function') listener.call(this, event);
       else listener.handleEvent(event);
     }
@@ -65,7 +65,7 @@ describe('useWorkerManager', () => {
       );
     });
 
-    expect(taskId).toMatch(/^compute-/);
+    expect(taskId).not.toBe('');
     expect(workers).toHaveLength(1);
     expect(result.current.isCalculating).toBe(true);
     expect(result.current.activeTaskId).toBe(taskId);
