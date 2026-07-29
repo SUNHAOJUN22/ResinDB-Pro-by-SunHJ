@@ -4,5 +4,8 @@ export * from './computeEngine';
 export * from './computeEvidence';
 export * from './kernelRegistry';
 export * from './taskProtocol';
+export * from './transferables';
 export * from './types';
+export * from './workerPool';
+export * from './workerProtocol';
 export * from './backends/typescriptBackend';
