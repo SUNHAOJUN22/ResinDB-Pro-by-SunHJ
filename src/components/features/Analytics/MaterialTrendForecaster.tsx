@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForecastingWorker } from '@/hooks/workers/useForecastingWorker';
 import type { Product } from '@/types/index';
 import {
@@ -80,7 +80,7 @@ export const MaterialTrendForecaster: React.FC<MaterialTrendForecasterProps> = (
     setStressFactor(defaults[condition]);
   }, [condition]);
 
-  const runScenario = () => {
+  const runScenario = useCallback(() => {
     if (activeProducts.length > 0 && selectedProperty) {
       runCalculatedForecast(
         activeProducts,
@@ -92,13 +92,11 @@ export const MaterialTrendForecaster: React.FC<MaterialTrendForecasterProps> = (
         beta,
       );
     }
-  };
+  }, [activeProducts, selectedProperty, algorithm, condition, stressFactor, alpha, beta, runCalculatedForecast]);
 
   useEffect(() => {
     runScenario();
-  // runScenario intentionally depends on the explicit inputs below.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProducts, selectedProperty, algorithm, condition, stressFactor, alpha, beta]);
+  }, [runScenario]);
 
   const conditionLabel: Record<ScenarioCondition, string> = {
     thermal: 'Q10-style thermal loss rule (°C; not an Arrhenius fit)',
@@ -183,8 +181,8 @@ export const MaterialTrendForecaster: React.FC<MaterialTrendForecasterProps> = (
               <input
                 aria-label="Scenario stress input"
                 type="range"
-                min={condition === 'thermal' ? 30 : condition === 'uv' ? 0 : condition === 'hydrolysis' ? 0 : 0}
-                max={condition === 'thermal' ? 180 : condition === 'uv' ? 24 : condition === 'hydrolysis' ? 100 : 100}
+                min={condition === 'thermal' ? 30 : 0}
+                max={condition === 'thermal' ? 180 : condition === 'uv' ? 24 : 100}
                 step={1}
                 value={stressFactor}
                 onChange={(event) => setStressFactor(Number(event.target.value))}
