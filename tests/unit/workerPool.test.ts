@@ -35,7 +35,7 @@ class FakeWorker {
   }
 
   private dispatch(type: string, event: Event): void {
-    for (const listener of this.listeners.get(type) ?? []) {
+    for (const listener of [...(this.listeners.get(type) ?? [])]) {
       if (typeof listener === 'function') listener.call(this, event);
       else listener.handleEvent(event);
     }
