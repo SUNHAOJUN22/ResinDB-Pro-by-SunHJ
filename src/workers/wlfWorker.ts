@@ -1,3 +1,17 @@
+import { createWorkerProgressMessage } from '@/compute/workerProtocol';
+
+const WLF_MODEL_VERSION = 'tts-horizontal-wlf-coarse-fine-2.0.0';
+const SEARCH_MIN = -10;
+const SEARCH_MAX = 10;
+const COARSE_STEP = 0.25;
+const FINE_HALF_WIDTH = 0.3;
+const FINE_STEP = 0.01;
+
+interface LogCurve {
+  x: Float64Array;
+  y: Float64Array;
+}
+
 export interface WlfMessage {
   type: 'CALCULATE_WLF';
   payload: {
@@ -13,167 +27,240 @@ export interface WlfResponse {
     c1: number;
     c2: number;
     refTemp: number;
-    shiftFactors: { temp: number; aT: number }[];
+    shiftFactors: { temp: number; aT: number; logAT: number; alignmentMse: number }[];
     masterCurve: { temp: number; points: { rate: number; visc: number; originalRate: number; originalVisc: number }[] }[];
+    modelVersion: typeof WLF_MODEL_VERSION;
+    diagnostics: {
+      shiftSearch: 'coarse-to-fine-grid';
+      interpolation: 'binary-search-linear';
+      coarseStep: typeof COARSE_STEP;
+      fineStep: typeof FINE_STEP;
+      objectiveEvaluations: number;
+      validCurves: number;
+      wlfFitPoints: number;
+      fallbackConstantsUsed: boolean;
+      verticalShiftAssumption: 'logViscosityShiftEqualsNegativeLogAT';
+    };
   };
   error?: string;
 }
 
-// Helper: Linearly interpolate Y(log visc) at X(log rate)
-function interpolateCurve(logRate: number, logCurvePoints: { x: number; y: number }[]): number | null {
-   if (logCurvePoints.length < 2) return null;
-   if (logRate < logCurvePoints[0].x || logRate > logCurvePoints[logCurvePoints.length - 1].x) {
-       return null;
-   }
-   for (let i = 0; i < logCurvePoints.length - 1; i++) {
-       const p1 = logCurvePoints[i];
-       const p2 = logCurvePoints[i+1];
-       if (logRate >= p1.x && logRate <= p2.x) {
-           const t = (logRate - p1.x) / (p2.x - p1.x);
-           return p1.y + t * (p2.y - p1.y);
-       }
-   }
-   return null;
+function buildLogCurve(points: readonly { rate: number; visc: number }[]): LogCurve {
+  const sorted = points
+    .filter((point) => point && Number.isFinite(point.rate) && point.rate > 0 && Number.isFinite(point.visc) && point.visc > 0)
+    .map((point) => ({ x: Math.log10(point.rate), y: Math.log10(point.visc) }))
+    .sort((left, right) => left.x - right.x);
+  if (sorted.length < 2) throw new Error('Each WLF curve requires at least two positive finite rate-viscosity points.');
+
+  const compactX: number[] = [];
+  const compactY: number[] = [];
+  let cursor = 0;
+  while (cursor < sorted.length) {
+    const x = sorted[cursor].x;
+    let sumY = sorted[cursor].y;
+    let count = 1;
+    cursor += 1;
+    while (cursor < sorted.length && sorted[cursor].x === x) {
+      sumY += sorted[cursor].y;
+      count += 1;
+      cursor += 1;
+    }
+    compactX.push(x);
+    compactY.push(sumY / count);
+  }
+  if (compactX.length < 2) throw new Error('Each WLF curve requires at least two distinct shear-rate values.');
+  return { x: Float64Array.from(compactX), y: Float64Array.from(compactY) };
 }
 
-self.onmessage = (e: MessageEvent<WlfMessage>) => {
+function interpolateBinary(logRate: number, curve: LogCurve): number | null {
+  const { x, y } = curve;
+  if (logRate < x[0] || logRate > x[x.length - 1]) return null;
+  let low = 0;
+  let high = x.length - 1;
+  while (high - low > 1) {
+    const middle = (low + high) >>> 1;
+    if (x[middle] <= logRate) low = middle;
+    else high = middle;
+  }
+  if (logRate === x[low]) return y[low];
+  if (logRate === x[high]) return y[high];
+  const fraction = (logRate - x[low]) / (x[high] - x[low]);
+  return y[low] + fraction * (y[high] - y[low]);
+}
+
+function alignmentObjective(shift: number, curve: LogCurve, reference: LogCurve): number {
+  let squaredError = 0;
+  let overlap = 0;
+  for (let index = 0; index < curve.x.length; index++) {
+    const referenceValue = interpolateBinary(curve.x[index] + shift, reference);
+    if (referenceValue !== null) {
+      const difference = curve.y[index] - shift - referenceValue;
+      squaredError += difference * difference;
+      overlap += 1;
+    }
+  }
+  return overlap > 1 ? squaredError / overlap + 1e-4 * Math.abs(shift) : Infinity;
+}
+
+function searchShift(curve: LogCurve, reference: LogCurve): {
+  shift: number;
+  error: number;
+  evaluations: number;
+} {
+  let bestShift = 0;
+  let bestError = Infinity;
+  let evaluations = 0;
+  const evaluateRange = (start: number, end: number, step: number) => {
+    const count = Math.floor((end - start) / step + 0.5);
+    for (let index = 0; index <= count; index++) {
+      const shift = Math.min(end, start + index * step);
+      const error = alignmentObjective(shift, curve, reference);
+      evaluations += 1;
+      if (error < bestError) {
+        bestError = error;
+        bestShift = shift;
+      }
+    }
+  };
+  evaluateRange(SEARCH_MIN, SEARCH_MAX, COARSE_STEP);
+  const fineStart = Math.max(SEARCH_MIN, bestShift - FINE_HALF_WIDTH);
+  const fineEnd = Math.min(SEARCH_MAX, bestShift + FINE_HALF_WIDTH);
+  evaluateRange(fineStart, fineEnd, FINE_STEP);
+  if (!Number.isFinite(bestError)) {
+    throw new Error('A temperature curve has insufficient overlap with the reference curve for WLF shifting.');
+  }
+  return { shift: bestShift, error: bestError, evaluations };
+}
+
+self.onmessage = (event: MessageEvent<WlfMessage>) => {
   try {
-    const { curves, refTemp } = e.data.payload;
-    if (curves.length < 2) throw new Error("At least 2 temperature curves required for TTS master curve.");
-    
-    // Sort points in each curve by rate just in case
-    const sortedCurves = curves.map(c => ({
-        temp: c.temp,
-        points: [...c.points].sort((a,b) => a.rate - b.rate)
-    }));
+    const { curves, refTemp } = event.data.payload;
+    if (!Number.isFinite(refTemp)) throw new TypeError('WLF reference temperature must be finite.');
+    const validCurves = (curves ?? [])
+      .filter((curve) => curve && Number.isFinite(curve.temp))
+      .map((curve) => ({
+        temp: curve.temp,
+        points: curve.points
+          .filter((point) => point && Number.isFinite(point.rate) && point.rate > 0 && Number.isFinite(point.visc) && point.visc > 0)
+          .map((point) => ({ ...point }))
+          .sort((left, right) => left.rate - right.rate),
+      }))
+      .filter((curve) => curve.points.length >= 2);
+    if (validCurves.length < 2) throw new Error('At least 2 complete temperature curves are required for TTS.');
 
-    // Find ref curve
-    let refCurve = sortedCurves.find(c => c.temp === refTemp);
-    if (!refCurve) {
-       // If exact ref temp not found, take the closest one
-       refCurve = [...sortedCurves].sort((a, b) => Math.abs(a.temp - refTemp) - Math.abs(b.temp - refTemp))[0];
+    let referenceIndex = 0;
+    let referenceDistance = Math.abs(validCurves[0].temp - refTemp);
+    for (let index = 1; index < validCurves.length; index++) {
+      const distance = Math.abs(validCurves[index].temp - refTemp);
+      if (distance < referenceDistance) {
+        referenceDistance = distance;
+        referenceIndex = index;
+      }
     }
-    
-    const theRefTemp = refCurve.temp;
-    
-    const logRefPoints = refCurve.points.map(p => ({ x: Math.log10(Math.max(p.rate, 1e-15)), y: Math.log10(Math.max(p.visc, 1e-15)) }));
-    
-    // 1. Numerically find best horizontal shift factor log(aT) for each curve relative to refCurve
-    // We assume mainly horizontal shift: log(rate_master) = log(rate) + log(aT)
-    // Vertical shift is usually bT = rho(T_ref)*T_ref / (rho(T)*T). We assume ≈ 1 for simplicity out of polymers class.
-    // So log(visc_master) = log(visc) - log(aT)
-    // Which means: we shift the curve by dx = u, dy = -u.
-    // We want to find u = log(aT) that minimizes distance to ref curve.
-    
-    const shiftFactors = sortedCurves.map(c => {
-       if (c.temp === theRefTemp) return { temp: c.temp, aT: 1, logAT: 0 };
-       
-       const logPoints = c.points.map(p => ({ x: Math.log10(Math.max(p.rate, 1e-15)), y: Math.log10(Math.max(p.visc, 1e-15)) }));
-       
-       // Grid search for u in [-10, 10]
-       let bestU = 0;
-       let minError = Infinity;
-       
-       for (let u = -10; u <= 10; u += 0.05) {
-           let error = 0;
-           let validPoints = 0;
-           
-           for (const p of logPoints) {
-               const shiftedX = p.x + u;
-               const shiftedY = p.y - u; // using aT for both freq and visc
-               
-               const refY = interpolateCurve(shiftedX, logRefPoints);
-               if (refY !== null) {
-                   error += Math.pow(shiftedY - refY, 2);
-                   validPoints++;
-               }
-           }
-           
-           if (validPoints > 1) {
-               const mse = error / validPoints;
-               // Add a tiny penalty to u to prevent unbounded shifting if curves just perfectly parallel but far
-               const penalizedMse = mse + 1e-4 * Math.abs(u);
-               if (penalizedMse < minError) {
-                   minError = penalizedMse;
-                   bestU = u;
-               }
-           }
-       }
-       
-       return { temp: c.temp, aT: Math.pow(10, bestU), logAT: bestU };
+    const referenceTemperature = validCurves[referenceIndex].temp;
+    const logCurves = validCurves.map((curve) => buildLogCurve(curve.points));
+    const reference = logCurves[referenceIndex];
+    let objectiveEvaluations = 0;
+    self.postMessage(createWorkerProgressMessage({ ratio: 0, phase: 'shift-factor-search' }));
+
+    const shiftFactors = validCurves.map((curve, index) => {
+      if (index === referenceIndex) return { temp: curve.temp, aT: 1, logAT: 0, alignmentMse: 0 };
+      const result = searchShift(logCurves[index], reference);
+      objectiveEvaluations += result.evaluations;
+      self.postMessage(createWorkerProgressMessage({
+        ratio: ((index + 1) / validCurves.length) * 0.8,
+        completed: index + 1,
+        total: validCurves.length,
+        phase: 'shift-factor-search',
+      }));
+      return {
+        temp: curve.temp,
+        aT: 10 ** result.shift,
+        logAT: result.shift,
+        alignmentMse: result.error,
+      };
     });
-    
-    // 2. Fit WLF: log(aT) = -C1 (T - Tref) / (C2 + T - Tref)
-    // => - (T - Tref) / log(aT) = (1/C1) * (T - Tref) + (C2/C1)
-    // This is linear standard form: Y = mX + B
-    // X = (T - Tref), Y = -(T - Tref) / log(aT)
-    // C1 = 1 / m
-    // C2 = B / m = B * C1
-    
-    const fitData = [];
-    for (const f of shiftFactors) {
-       if (f.temp === theRefTemp || Math.abs(f.logAT) < 0.01) continue;
-       const X = f.temp - theRefTemp;
-       const Y = -X / f.logAT;
-       fitData.push({ X, Y });
+
+    const fitData: { x: number; y: number }[] = [];
+    for (const factor of shiftFactors) {
+      if (factor.temp === referenceTemperature || Math.abs(factor.logAT) < 0.01) continue;
+      const temperatureDifference = factor.temp - referenceTemperature;
+      fitData.push({ x: temperatureDifference, y: -temperatureDifference / factor.logAT });
     }
-    
+
     let c1 = 8.86;
-    let c2 = 101.6; // default universal fallback
-    
+    let c2 = 101.6;
+    let fallbackConstantsUsed = true;
     if (fitData.length >= 2) {
-       const n = fitData.length;
-       let sumX = 0, sumY = 0;
-       for (const d of fitData) {
-           sumX += d.X;
-           sumY += d.Y;
-       }
-       const meanX = sumX / n;
-       const meanY = sumY / n;
-       
-       let ssX = 0;
-       let ssXY = 0;
-       for (const d of fitData) {
-           ssX += Math.pow(d.X - meanX, 2);
-           ssXY += (d.X - meanX) * (d.Y - meanY);
-       }
-       
-       if (Math.abs(ssX) > 1e-6) {
-           const m = ssXY / ssX;
-           const b = meanY - m * meanX;
-           
-           if (Math.abs(m) > 1e-6) {
-               c1 = 1 / m;
-               c2 = b * c1;
-           }
-       }
+      let meanX = 0;
+      let meanY = 0;
+      for (const point of fitData) {
+        meanX += point.x;
+        meanY += point.y;
+      }
+      meanX /= fitData.length;
+      meanY /= fitData.length;
+      let varianceX = 0;
+      let covariance = 0;
+      for (const point of fitData) {
+        varianceX += (point.x - meanX) ** 2;
+        covariance += (point.x - meanX) * (point.y - meanY);
+      }
+      if (varianceX > 1e-12) {
+        const slope = covariance / varianceX;
+        const intercept = meanY - slope * meanX;
+        if (Math.abs(slope) > 1e-12) {
+          const fittedC1 = 1 / slope;
+          const fittedC2 = intercept * fittedC1;
+          if (Number.isFinite(fittedC1) && Number.isFinite(fittedC2)) {
+            c1 = fittedC1;
+            c2 = fittedC2;
+            fallbackConstantsUsed = false;
+          }
+        }
+      }
     }
-    
-    // 3. Generate Master Curve Data
-    const masterCurve = sortedCurves.map(c => {
-       const shift = shiftFactors.find(sf => sf.temp === c.temp);
-       const aT = shift ? shift.aT : 1;
-       
-       return {
-           temp: c.temp,
-           points: c.points.map(p => ({
-               originalRate: p.rate,
-               originalVisc: p.visc,
-               rate: p.rate * aT,
-               visc: p.visc / aT
-           }))
-       };
-    });
 
+    const shiftByTemperature = new Map(shiftFactors.map((factor) => [factor.temp, factor.aT]));
+    const masterCurve = validCurves.map((curve) => {
+      const aT = shiftByTemperature.get(curve.temp) ?? 1;
+      return {
+        temp: curve.temp,
+        points: curve.points.map((point) => ({
+          originalRate: point.rate,
+          originalVisc: point.visc,
+          rate: point.rate * aT,
+          visc: point.visc / aT,
+        })),
+      };
+    });
+    self.postMessage(createWorkerProgressMessage({ ratio: 1, phase: 'complete' }));
     self.postMessage({
       type: 'WLF_RESULT',
-      payload: { c1, c2, refTemp: theRefTemp, shiftFactors, masterCurve }
-    } as WlfResponse);
-
+      payload: {
+        c1,
+        c2,
+        refTemp: referenceTemperature,
+        shiftFactors,
+        masterCurve,
+        modelVersion: WLF_MODEL_VERSION,
+        diagnostics: {
+          shiftSearch: 'coarse-to-fine-grid',
+          interpolation: 'binary-search-linear',
+          coarseStep: COARSE_STEP,
+          fineStep: FINE_STEP,
+          objectiveEvaluations,
+          validCurves: validCurves.length,
+          wlfFitPoints: fitData.length,
+          fallbackConstantsUsed,
+          verticalShiftAssumption: 'logViscosityShiftEqualsNegativeLogAT',
+        },
+      },
+    } satisfies WlfResponse);
   } catch (error) {
     self.postMessage({
       type: 'ERROR',
-      error: error instanceof Error ? error.message : String(error)
-    });
+      error: error instanceof Error ? error.message : String(error),
+    } satisfies WlfResponse);
   }
 };
