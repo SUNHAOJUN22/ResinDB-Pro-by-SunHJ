@@ -52,6 +52,7 @@ interface WorkerSlot {
   key: string;
   worker: Worker;
   busy: boolean;
+  lastUsedAt: number;
   idleTimer?: ReturnType<typeof setTimeout>;
 }
 
@@ -177,6 +178,7 @@ export class LazyWorkerPool {
       throw new RangeError('maxWorkers must be a positive integer');
     }
     this.maxWorkers = maxWorkers;
+    this.trimIdleWorkers();
     this.pump();
   }
 
@@ -256,9 +258,25 @@ export class LazyWorkerPool {
     if (idle) {
       if (idle.idleTimer !== undefined) clearTimeout(idle.idleTimer);
       idle.idleTimer = undefined;
+      idle.lastUsedAt = Date.now();
       return idle;
     }
-    const slot: WorkerSlot = { key: poolKey, worker: factory(), busy: false };
+
+    const allSlots = [...this.slots.values()].flat();
+    if (allSlots.length >= this.maxWorkers) {
+      const eviction = allSlots
+        .filter((slot) => !slot.busy)
+        .sort((left, right) => left.lastUsedAt - right.lastUsedAt)[0];
+      if (!eviction) throw new Error('Worker pool capacity is exhausted');
+      this.terminateSlot(eviction);
+    }
+
+    const slot: WorkerSlot = {
+      key: poolKey,
+      worker: factory(),
+      busy: false,
+      lastUsedAt: Date.now(),
+    };
     existing.push(slot);
     this.slots.set(poolKey, existing);
     return slot;
@@ -347,6 +365,7 @@ export class LazyWorkerPool {
         this.terminateSlot(slot);
       } else {
         slot.busy = false;
+        slot.lastUsedAt = Date.now();
         this.scheduleIdleDisposal(slot);
       }
     }
@@ -354,6 +373,17 @@ export class LazyWorkerPool {
     if (error !== undefined) task.reject(error);
     else task.resolve(response);
     this.pump();
+  }
+
+  private trimIdleWorkers(): void {
+    const idle = [...this.slots.values()]
+      .flat()
+      .filter((slot) => !slot.busy)
+      .sort((left, right) => left.lastUsedAt - right.lastUsedAt);
+    while ([...this.slots.values()].flat().length > this.maxWorkers && idle.length > 0) {
+      const slot = idle.shift();
+      if (slot) this.terminateSlot(slot);
+    }
   }
 
   private scheduleIdleDisposal(slot: WorkerSlot): void {
