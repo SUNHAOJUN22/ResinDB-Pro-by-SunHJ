@@ -5,6 +5,7 @@ export * from './computeEvidence';
 export * from './kernelRegistry';
 export * from './leastSquares';
 export * from './random';
+export * from './seededRng';
 export * from './taskProtocol';
 export * from './transferables';
 export * from './types';
