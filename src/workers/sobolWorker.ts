@@ -11,7 +11,7 @@ import {
 import type { FormulaConfig, Product, PropertyValue } from '@/types/index';
 import { formulaEngine } from '@/lib/formulaParser';
 
-const SENSITIVITY_MODEL_VERSION = 'saltelli-jansen-normal-1.0.0';
+const SENSITIVITY_MODEL_VERSION = 'saltelli-jansen-normal-2.0.0';
 const MAX_BASE_SAMPLE_SIZE = 250_000;
 
 export interface SobolMessage {
@@ -46,6 +46,13 @@ export interface SobolAnalysisMetadata {
   boundedVariables: number;
 }
 
+export interface SobolPerformanceMetadata {
+  matrixStorage: 'flat-float64';
+  workObjectReused: true;
+  hybridOutputStreaming: true;
+  allocatedMatrixValues: number;
+}
+
 export interface SobolResponse {
   type: 'SOBOL_COMPLETE' | 'ERROR';
   payload?: {
@@ -53,6 +60,7 @@ export interface SobolResponse {
     totalEffect: { name: string; value: number }[];
     interactions: { name: string; value: number }[];
     analysis: SobolAnalysisMetadata;
+    performance: SobolPerformanceMetadata;
   };
   error?: string;
 }
@@ -83,7 +91,8 @@ self.onmessage = (event: MessageEvent<SobolMessage>) => {
       bounds,
     } = event.data.payload;
     const baseSampleSize = validateBaseSampleSize(requestedIterations);
-    const actualSeed = seed ?? deriveRandomSeed('saltelli-jansen-normal-v1', {
+    for (const [key, variance] of Object.entries(variances)) validateVariancePercent(variance, key);
+    const actualSeed = seed ?? deriveRandomSeed('saltelli-jansen-normal-v2', {
       targetFormulaId,
       formulas,
       product,
@@ -103,57 +112,39 @@ self.onmessage = (event: MessageEvent<SobolMessage>) => {
       const numericValue = Number(property.value);
       const variancePercent = variances[key];
       if (Number.isFinite(numericValue) && variancePercent !== undefined && variancePercent > 0) {
-        const validatedVariance = validateVariancePercent(variancePercent, key);
         inputKeys.push(key);
         inputMeans.push(numericValue);
-        inputStandardDeviations.push(Math.abs(numericValue) * (validatedVariance / 100));
+        inputStandardDeviations.push(Math.abs(numericValue) * (variancePercent / 100));
         inputBounds.push(bounds?.[key]);
       }
     }
-
     const dimensions = inputKeys.length;
     if (dimensions === 0) {
       throw new Error('No finite input variables with variance greater than zero were provided for sensitivity analysis.');
     }
     const boundedVariables = inputBounds.filter((value) => value !== undefined).length;
     const progressInterval = Math.max(1, Math.floor(baseSampleSize / 20));
+    const matrixLength = baseSampleSize * dimensions;
+    const matrixA = new Float64Array(matrixLength);
+    const matrixB = new Float64Array(matrixLength);
+
     self.postMessage(createWorkerProgressMessage({ ratio: 0, phase: 'sampling' }));
-
-    const evaluate = (inputs: number[]): number => {
-      const perturbedProperties: Record<string, PropertyValue> = { ...baseProperties };
-      for (let dimension = 0; dimension < dimensions; dimension++) {
-        const key = inputKeys[dimension];
-        perturbedProperties[key] = { ...perturbedProperties[key], value: inputs[dimension] };
-      }
-      const testProduct = { ...product, properties: perturbedProperties } as Product;
-      const result = evaluator(testProduct)[targetFormulaId];
-      if (!Number.isFinite(result)) {
-        throw new Error(`Sensitivity model produced a non-finite value for formula ${targetFormulaId}`);
-      }
-      return result;
-    };
-
-    const matrixA: number[][] = [];
-    const matrixB: number[][] = [];
     for (let sample = 0; sample < baseSampleSize; sample++) {
-      const rowA = new Array<number>(dimensions);
-      const rowB = new Array<number>(dimensions);
+      const offset = sample * dimensions;
       for (let dimension = 0; dimension < dimensions; dimension++) {
-        rowA[dimension] = sampleNormalWithinBounds(
+        matrixA[offset + dimension] = sampleNormalWithinBounds(
           random,
           inputMeans[dimension],
           inputStandardDeviations[dimension],
           inputBounds[dimension],
         );
-        rowB[dimension] = sampleNormalWithinBounds(
+        matrixB[offset + dimension] = sampleNormalWithinBounds(
           random,
           inputMeans[dimension],
           inputStandardDeviations[dimension],
           inputBounds[dimension],
         );
       }
-      matrixA.push(rowA);
-      matrixB.push(rowB);
       const completed = sample + 1;
       if (completed % progressInterval === 0 || completed === baseSampleSize) {
         self.postMessage(createWorkerProgressMessage({
@@ -165,11 +156,36 @@ self.onmessage = (event: MessageEvent<SobolMessage>) => {
       }
     }
 
+    const workingProperties = Object.fromEntries(
+      Object.entries(baseProperties).map(([key, property]) => [key, { ...property }]),
+    ) as Record<string, PropertyValue>;
+    const workingProduct = { ...product, properties: workingProperties } as Product;
+    const evaluate = (
+      primary: Float64Array,
+      sample: number,
+      secondary?: Float64Array,
+      swappedDimension = -1,
+    ): number => {
+      const offset = sample * dimensions;
+      for (let dimension = 0; dimension < dimensions; dimension++) {
+        workingProperties[inputKeys[dimension]].value = (
+          secondary && dimension === swappedDimension
+            ? secondary[offset + dimension]
+            : primary[offset + dimension]
+        );
+      }
+      const result = evaluator(workingProduct)[targetFormulaId];
+      if (!Number.isFinite(result)) {
+        throw new Error(`Sensitivity model produced a non-finite value for formula ${targetFormulaId}`);
+      }
+      return result;
+    };
+
     const outputA = new Float64Array(baseSampleSize);
     const outputB = new Float64Array(baseSampleSize);
     for (let sample = 0; sample < baseSampleSize; sample++) {
-      outputA[sample] = evaluate(matrixA[sample]);
-      outputB[sample] = evaluate(matrixB[sample]);
+      outputA[sample] = evaluate(matrixA, sample);
+      outputB[sample] = evaluate(matrixB, sample);
       const completed = sample + 1;
       if (completed % progressInterval === 0 || completed === baseSampleSize) {
         self.postMessage(createWorkerProgressMessage({
@@ -194,23 +210,16 @@ self.onmessage = (event: MessageEvent<SobolMessage>) => {
       throw new Error('Output variance is numerically zero; sensitivity indices cannot be estimated.');
     }
 
-    const firstOrder: {name: string, value: number}[] = [];
-    const totalEffect: {name: string, value: number}[] = [];
-    const interactions: {name: string, value: number}[] = [];
-
+    const firstOrder: {name: string; value: number}[] = [];
+    const totalEffect: {name: string; value: number}[] = [];
+    const interactions: {name: string; value: number}[] = [];
     for (let dimension = 0; dimension < dimensions; dimension++) {
-      const outputAB = new Float64Array(baseSampleSize);
-      for (let sample = 0; sample < baseSampleSize; sample++) {
-        const hybrid = [...matrixA[sample]];
-        hybrid[dimension] = matrixB[sample][dimension];
-        outputAB[sample] = evaluate(hybrid);
-      }
-
       let totalContribution = 0;
       let firstContributionComplement = 0;
       for (let sample = 0; sample < baseSampleSize; sample++) {
-        totalContribution += (outputA[sample] - outputAB[sample]) ** 2;
-        firstContributionComplement += (outputB[sample] - outputAB[sample]) ** 2;
+        const outputHybrid = evaluate(matrixA, sample, matrixB, dimension);
+        totalContribution += (outputA[sample] - outputHybrid) ** 2;
+        firstContributionComplement += (outputB[sample] - outputHybrid) ** 2;
       }
       const totalIndex = Math.max(0, totalContribution / (2 * baseSampleSize * outputVariance));
       let firstIndex = Math.max(0, 1 - firstContributionComplement / (2 * baseSampleSize * outputVariance));
@@ -253,12 +262,18 @@ self.onmessage = (event: MessageEvent<SobolMessage>) => {
           modelEvaluations: baseSampleSize * (dimensions + 2),
           boundedVariables,
         },
+        performance: {
+          matrixStorage: 'flat-float64',
+          workObjectReused: true,
+          hybridOutputStreaming: true,
+          allocatedMatrixValues: matrixA.length + matrixB.length + outputA.length + outputB.length,
+        },
       },
-    });
+    } satisfies SobolResponse);
   } catch (error) {
     self.postMessage({
       type: 'ERROR',
       error: error instanceof Error ? error.message : String(error),
-    });
+    } satisfies SobolResponse);
   }
 };
