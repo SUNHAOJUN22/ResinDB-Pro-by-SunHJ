@@ -1,8 +1,15 @@
+import { solveBoundedNonlinearLeastSquares } from '@/compute/nonlinearLeastSquares';
+import { createWorkerProgressMessage } from '@/compute/workerProtocol';
+
+const CARREAU_MODEL_VERSION = 'carreau-yasuda-zero-eta-infinity-bounded-lm-3.0.0';
+const STARTS_TO_OPTIMIZE = 8;
+const MAX_ITERATIONS_PER_START = 80;
+
 export interface CarreauMessage {
   type: 'FIT_CARREAU';
   payload: {
-    shearRates: number[]; // x
-    viscosities: number[]; // y
+    shearRates: number[];
+    viscosities: number[];
   };
 }
 
@@ -13,154 +20,268 @@ export interface CarreauResponse {
     lambda: number;
     n: number;
     a: number;
-    fittedData: [number, number][]; // [x, y]
+    fittedData: [number, number][];
     rSquared: number;
+    logRSquared: number;
+    modelVersion: typeof CARREAU_MODEL_VERSION;
+    method: 'bounded-multistart-levenberg-marquardt-log-viscosity';
+    assumption: 'zero-infinite-shear-viscosity';
+    diagnostics: {
+      observations: number;
+      startsEvaluated: number;
+      startsOptimized: number;
+      iterations: number;
+      functionEvaluations: number;
+      converged: boolean;
+      termination: string;
+      logRmse: number;
+      gradientInfinityNorm: number;
+      jacobianRank: number | null;
+      jacobianConditionNumber: number | null;
+      jacobianConditionStatus: 'finite' | 'infinite' | 'unavailable';
+      parameterBounds: {
+        eta0: [number, number];
+        lambda: [number, number];
+        n: [number, number];
+        a: [number, number];
+      };
+      uncertaintyStatus: 'not-estimated-identifiability-diagnostics-only';
+    };
   };
   error?: string;
 }
 
-// eta = eta0 * (1 + (lambda * gamma_dot)^a)^((n - 1) / a)
-function carreauEval(x: number, eta0: number, lambda: number, n: number, a: number) {
-   const term = Math.max(0, lambda * x);
-   const safeA = Math.abs(a) > 1e-15 ? a : 1e-15;
-   return eta0 * Math.pow(Math.max(1e-15, 1 + Math.pow(term, a)), (n - 1) / safeA);
+interface CarreauParameters {
+  eta0: number;
+  lambda: number;
+  n: number;
+  a: number;
 }
 
-function calculateRSquared(x: number[], y: number[], eta0: number, lambda: number, n: number, a: number) {
-    if (y.length === 0) return 0;
-    let yMean = 0;
-    for (let i = 0; i < y.length; i++) yMean += y[i];
-    yMean /= y.length;
-
-    let ssTot = 0;
-    let ssRes = 0;
-    
-    for (let i = 0; i < x.length; i++) {
-        const yPred = carreauEval(x[i], eta0, lambda, n, a);
-        ssTot += Math.pow(y[i] - yMean, 2);
-        ssRes += Math.pow(y[i] - yPred, 2);
-    }
-    
-    if (ssTot === 0) return 1;
-    return 1 - (ssRes / ssTot);
+function softplus(value: number): number {
+  if (value > 40) return value;
+  if (value < -40) return Math.exp(value);
+  return Math.log1p(Math.exp(value));
 }
 
-self.onmessage = (e: MessageEvent<CarreauMessage>) => {
+function logCarreau(
+  logShearRate: number,
+  eta0: number,
+  lambda: number,
+  n: number,
+  a: number,
+): number {
+  const transition = a * (Math.log(lambda) + logShearRate);
+  return Math.log(eta0) + ((n - 1) / a) * softplus(transition);
+}
+
+function carreauValue(rate: number, parameters: CarreauParameters): number {
+  return Math.exp(logCarreau(
+    Math.log(rate),
+    parameters.eta0,
+    parameters.lambda,
+    parameters.n,
+    parameters.a,
+  ));
+}
+
+function sumSquaredResiduals(
+  logRates: Float64Array,
+  logViscosities: Float64Array,
+  parameters: CarreauParameters,
+): number {
+  let objective = 0;
+  for (let index = 0; index < logRates.length; index++) {
+    const residual = logCarreau(
+      logRates[index],
+      parameters.eta0,
+      parameters.lambda,
+      parameters.n,
+      parameters.a,
+    ) - logViscosities[index];
+    objective += residual * residual;
+  }
+  return objective;
+}
+
+function interior(value: number, minimum: number, maximum: number): number {
+  const margin = (maximum - minimum) * 1e-6;
+  return Math.max(minimum + margin, Math.min(maximum - margin, value));
+}
+
+function coefficientOfDetermination(observed: Float64Array, predicted: Float64Array): number {
+  let mean = 0;
+  for (const value of observed) mean += value;
+  mean /= observed.length;
+  let total = 0;
+  let residual = 0;
+  for (let index = 0; index < observed.length; index++) {
+    total += (observed[index] - mean) ** 2;
+    residual += (observed[index] - predicted[index]) ** 2;
+  }
+  if (!(total > 0)) return residual <= Number.EPSILON ? 1 : 0;
+  return Math.max(-1, Math.min(1, 1 - residual / total));
+}
+
+self.onmessage = (event: MessageEvent<CarreauMessage>) => {
   try {
-    const { shearRates, viscosities } = e.data.payload;
-    const validRates: number[] = [];
-    const validViscosities: number[] = [];
-    for (let i = 0; i < shearRates.length; i++) {
-      if (shearRates[i] > 0 && viscosities[i] > 0) {
-        validRates.push(shearRates[i]);
-        validViscosities.push(viscosities[i]);
+    const { shearRates, viscosities } = event.data.payload;
+    if (shearRates.length !== viscosities.length) {
+      throw new Error('Shear-rate and viscosity arrays must have the same length.');
+    }
+    const observations = shearRates
+      .map((rate, index) => ({ rate: Number(rate), viscosity: Number(viscosities[index]) }))
+      .filter((point) => (
+        Number.isFinite(point.rate)
+        && Number.isFinite(point.viscosity)
+        && point.rate > 0
+        && point.viscosity > 0
+      ))
+      .sort((left, right) => left.rate - right.rate);
+    if (observations.length < 5) {
+      throw new Error('Carreau-Yasuda fitting requires at least five complete positive observations.');
+    }
+
+    const rates = Float64Array.from(observations, (point) => point.rate);
+    const measured = Float64Array.from(observations, (point) => point.viscosity);
+    const logRates = Float64Array.from(rates, Math.log);
+    const logViscosities = Float64Array.from(measured, Math.log);
+    const minimumRate = rates[0];
+    const maximumRate = rates[rates.length - 1];
+    const maximumViscosity = Math.max(...measured);
+
+    const eta0Bounds: [number, number] = [maximumViscosity * 0.5, maximumViscosity * 1_000];
+    const lambdaBounds: [number, number] = [1 / (maximumRate * 1_000), 1_000 / minimumRate];
+    const nBounds: [number, number] = [0.01, 1];
+    const aBounds: [number, number] = [0.1, 5];
+
+    const eta0Initials = [maximumViscosity, maximumViscosity * 2, maximumViscosity * 10];
+    const geometricRate = Math.sqrt(minimumRate * maximumRate);
+    const lambdaInitials = [1 / maximumRate, 1 / geometricRate, 1 / minimumRate];
+    const nInitials = [0.2, 0.5, 0.8];
+    const aInitials = [0.5, 1.5, 3];
+    const initialCandidates: { parameters: CarreauParameters; objective: number }[] = [];
+
+    for (const eta0Value of eta0Initials) {
+      for (const lambdaValue of lambdaInitials) {
+        for (const nValue of nInitials) {
+          for (const aValue of aInitials) {
+            const parameters: CarreauParameters = {
+              eta0: interior(eta0Value, ...eta0Bounds),
+              lambda: interior(lambdaValue, ...lambdaBounds),
+              n: interior(nValue, ...nBounds),
+              a: interior(aValue, ...aBounds),
+            };
+            initialCandidates.push({
+              parameters,
+              objective: sumSquaredResiduals(logRates, logViscosities, parameters),
+            });
+          }
+        }
       }
     }
+    initialCandidates.sort((left, right) => left.objective - right.objective);
+    const selectedStarts = initialCandidates.slice(0, STARTS_TO_OPTIMIZE);
+    self.postMessage(createWorkerProgressMessage({
+      ratio: 0,
+      completed: 0,
+      total: selectedStarts.length,
+      phase: 'bounded-multistart-fit',
+    }));
 
-    if (validRates.length < 3) {
-       throw new Error("Insufficient valid data points (shear rate > 0 and viscosity > 0) for fitting.");
+    let best: ReturnType<typeof solveBoundedNonlinearLeastSquares> | null = null;
+    let totalEvaluations = 0;
+    for (let startIndex = 0; startIndex < selectedStarts.length; startIndex++) {
+      const start = selectedStarts[startIndex].parameters;
+      const fit = solveBoundedNonlinearLeastSquares({
+        parameters: [
+          { initial: start.eta0, min: eta0Bounds[0], max: eta0Bounds[1] },
+          { initial: start.lambda, min: lambdaBounds[0], max: lambdaBounds[1] },
+          { initial: start.n, min: nBounds[0], max: nBounds[1] },
+          { initial: start.a, min: aBounds[0], max: aBounds[1] },
+        ],
+        observationCount: observations.length,
+        maxIterations: MAX_ITERATIONS_PER_START,
+        evaluateResiduals(parameters, output) {
+          for (let index = 0; index < observations.length; index++) {
+            output[index] = logCarreau(
+              logRates[index],
+              parameters[0],
+              parameters[1],
+              parameters[2],
+              parameters[3],
+            ) - logViscosities[index];
+          }
+        },
+      });
+      totalEvaluations += fit.evaluations;
+      if (!best || fit.objective < best.objective) best = fit;
+      self.postMessage(createWorkerProgressMessage({
+        ratio: (startIndex + 1) / selectedStarts.length,
+        completed: startIndex + 1,
+        total: selectedStarts.length,
+        phase: 'bounded-multistart-fit',
+      }));
     }
+    if (!best) throw new Error('Carreau-Yasuda fitting did not produce a candidate solution.');
 
-    // Grid search roughly
-    // eta0: roughly max viscosity
-    const maxEta = Math.max(...validViscosities);
-    
-    let bestParams = { eta0: maxEta, lambda: 0.1, n: 0.5, a: 1 };
-    let bestR2 = -Infinity;
-    
-    // We'll perform a coarse grid search to find the best starting point
-    // Note: normally we'd use Levenberg-Marquardt, but a dense grid search for 3-4 params can work for UI purposes if bounded.
-    const eta0Options = [maxEta, maxEta * 1.5, maxEta * 2];
-    const lambdaOptions = [0.001, 0.01, 0.1, 1, 10];
-    const nOptions = [0.1, 0.3, 0.5, 0.7, 0.9];
-    const aOptions = [1, 2]; // usually 1 or 2
-    
-    for (const eta0 of eta0Options) {
-        for (const lambda of lambdaOptions) {
-            for (const n of nOptions) {
-                for (const a of aOptions) {
-                    const r2 = calculateRSquared(validRates, validViscosities, eta0, lambda, n, a);
-                    if (r2 > bestR2) {
-                        bestR2 = r2;
-                        bestParams = { eta0, lambda, n, a };
-                    }
-                }
-            }
-        }
-    }
-    
-    // Gradient Descent fine-tuning (simplified)
-    let { eta0, lambda, n } = bestParams;
-    const { a } = bestParams;
-    const lrEta = eta0 * 0.001;
-    const lrLambda = 0.001;
-    const lrN = 0.001;
-    
-    for (let iter = 0; iter < 1000; iter++) {
-        let gradEta = 0;
-        let gradLambda = 0;
-        let gradN = 0;
-        
-        for (let i = 0; i < validRates.length; i++) {
-            const x = validRates[i];
-            const y = validViscosities[i];
-            
-            const safeLambda = Math.max(1e-5, lambda);
-            const safeA = Math.abs(a) > 1e-15 ? a : 1e-15;
-            const base = Math.max(1e-15, 1 + Math.pow(safeLambda * x, a));
-            const power = (n - 1) / safeA;
-            const yPred = eta0 * Math.pow(base, power);
-            
-            const diff = yPred - y;
-            
-            gradEta += diff * Math.pow(base, power);
-            gradLambda += diff * eta0 * power * Math.pow(base, Math.max(-100, power - 1)) * a * Math.pow(x, a) * Math.pow(safeLambda, a - 1);
-            gradN += diff * eta0 * Math.pow(base, power) * Math.log(base) / safeA;
-        }
-        
-        const rateLen = validRates.length > 0 ? validRates.length : 1;
-        eta0 -= lrEta * gradEta / rateLen;
-        lambda -= lrLambda * gradLambda / rateLen;
-        n -= lrN * gradN / rateLen;
-        
-        // Bounds
-        if (eta0 < maxEta * 0.5) eta0 = maxEta * 0.5;
-        if (lambda < 0.0001) lambda = 0.0001;
-        if (n < 0.01) n = 0.01;
-        if (n > 1) n = 1;
-    }
-    
-    const finalR2 = calculateRSquared(validRates, validViscosities, eta0, lambda, n, a);
-    
-    // Generate fitted curve data
-    const minX = Math.min(...validRates);
-    const maxX = Math.max(...validRates);
-    
+    const parameters: CarreauParameters = {
+      eta0: best.parameters[0],
+      lambda: best.parameters[1],
+      n: best.parameters[2],
+      a: best.parameters[3],
+    };
+    const predictedMeasured = Float64Array.from(rates, (rate) => carreauValue(rate, parameters));
+    const predictedLogs = Float64Array.from(predictedMeasured, Math.log);
+    const rSquared = coefficientOfDetermination(measured, predictedMeasured);
+    const logRSquared = coefficientOfDetermination(logViscosities, predictedLogs);
+
     const fittedData: [number, number][] = [];
-    const steps = 100;
-    
-    // log scale generation
-    const logMinX = Math.log10(minX > 0 ? minX : 0.1);
-    const logMaxX = Math.log10(maxX > 0 ? maxX : 1.0);
-    
-    for (let i = 0; i <= steps; i++) {
-        const currentLogX = logMinX + (logMaxX - logMinX) * (i / steps);
-        const x = Math.pow(10, currentLogX);
-        const y = carreauEval(x, eta0, lambda, n, a);
-        fittedData.push([x, y]);
+    const minimumLogRate = Math.log10(minimumRate);
+    const maximumLogRate = Math.log10(maximumRate);
+    for (let index = 0; index <= 100; index++) {
+      const rate = 10 ** (minimumLogRate + (index / 100) * (maximumLogRate - minimumLogRate));
+      fittedData.push([rate, carreauValue(rate, parameters)]);
     }
 
+    const jacobianDiagnostics = best.jacobianDiagnostics;
     self.postMessage({
       type: 'CARREAU_FITTED',
       payload: {
-        eta0, lambda, n, a, fittedData, rSquared: finalR2
-      }
-    });
-
+        ...parameters,
+        fittedData,
+        rSquared,
+        logRSquared,
+        modelVersion: CARREAU_MODEL_VERSION,
+        method: 'bounded-multistart-levenberg-marquardt-log-viscosity',
+        assumption: 'zero-infinite-shear-viscosity',
+        diagnostics: {
+          observations: observations.length,
+          startsEvaluated: initialCandidates.length,
+          startsOptimized: selectedStarts.length,
+          iterations: best.iterations,
+          functionEvaluations: totalEvaluations,
+          converged: best.converged,
+          termination: best.termination,
+          logRmse: Math.sqrt(best.objective / observations.length),
+          gradientInfinityNorm: best.gradientInfinityNorm,
+          jacobianRank: jacobianDiagnostics?.rank ?? null,
+          jacobianConditionNumber: jacobianDiagnostics?.conditionNumber ?? null,
+          jacobianConditionStatus: jacobianDiagnostics?.conditionNumberStatus ?? 'unavailable',
+          parameterBounds: {
+            eta0: eta0Bounds,
+            lambda: lambdaBounds,
+            n: nBounds,
+            a: aBounds,
+          },
+          uncertaintyStatus: 'not-estimated-identifiability-diagnostics-only',
+        },
+      },
+    } satisfies CarreauResponse);
   } catch (error) {
     self.postMessage({
       type: 'ERROR',
-      error: error instanceof Error ? error.message : String(error)
-    });
+      error: error instanceof Error ? error.message : String(error),
+    } satisfies CarreauResponse);
   }
 };
