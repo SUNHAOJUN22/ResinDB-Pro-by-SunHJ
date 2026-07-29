@@ -1,3 +1,5 @@
+const WEIBULL_MODEL_VERSION = 'two-parameter-median-rank-ols-2.0.0';
+
 export interface WeibullMessage {
   type: 'CALCULATE_WEIBULL';
   payload: {
@@ -8,88 +10,82 @@ export interface WeibullMessage {
 export interface WeibullResponse {
   type: 'WEIBULL_RESULT' | 'ERROR';
   payload?: {
-    m: number; // Weibull Modulus (Shape)
-    eta: number; // Scale Parameter
+    m: number;
+    eta: number;
     points: { value: number; x: number; y: number; p: number }[];
-    safeValue95: number; // 95% survival (5% failure)
+    safeValue95: number;
     rSquared: number;
+    modelVersion: typeof WEIBULL_MODEL_VERSION;
+    estimator: 'bernard-median-rank-linear-regression-not-mle';
+    failureProbabilityForSafeValue: 0.05;
+    observations: number;
   };
   error?: string;
 }
 
-self.onmessage = (e: MessageEvent<WeibullMessage>) => {
+self.onmessage = (event: MessageEvent<WeibullMessage>) => {
   try {
-    const { data } = e.data.payload;
-    if (!data || data.length < 3) {
-      throw new Error("Weibull analysis requires at least 3 data points.");
+    const sorted = (event.data.payload.data ?? [])
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .sort((left, right) => left - right);
+    const observations = sorted.length;
+    if (observations < 3) throw new Error('Weibull analysis requires at least three finite positive observations.');
+
+    const points: { value: number; x: number; y: number; p: number }[] = [];
+    let meanX = 0;
+    let meanY = 0;
+    for (let index = 0; index < observations; index++) {
+      const rank = index + 1;
+      const p = (rank - 0.3) / (observations + 0.4);
+      const x = Math.log(sorted[index]);
+      const y = Math.log(-Math.log1p(-p));
+      points.push({ value: sorted[index], x, y, p });
+      meanX += x;
+      meanY += y;
     }
-
-    // 1. Sort data
-    const sorted = [...data].filter(v => v > 0).sort((a, b) => a - b);
-    const n = sorted.length;
-
-    if (n < 3) {
-      throw new Error("Requires at least 3 positive data points.");
+    meanX /= observations;
+    meanY /= observations;
+    let centeredXX = 0;
+    let centeredYY = 0;
+    let centeredXY = 0;
+    for (const point of points) {
+      centeredXX += (point.x - meanX) ** 2;
+      centeredYY += (point.y - meanY) ** 2;
+      centeredXY += (point.x - meanX) * (point.y - meanY);
     }
-
-    const points = [];
-    let sumX = 0;
-    let sumY = 0;
-
-    // 2. Median Rank and Linearization
-    for (let i = 0; i < n; i++) {
-      const rank = i + 1;
-      const p = (rank - 0.3) / (n + 0.4); // Bernard's Median Rank approximation
-      
-      const value = sorted[i];
-      const lnX = Math.log(Math.max(value, 1e-15));
-      const innerLog = -Math.log(Math.max(1 - p, 1e-15));
-      const lnLnY = Math.log(Math.max(innerLog, 1e-15));
-
-      points.push({ value, x: lnX, y: lnLnY, p });
-
-      sumX += lnX;
-      sumY += lnLnY;
+    if (!(centeredXX > Number.EPSILON)) throw new Error('Weibull observations have no usable logarithmic spread.');
+    const m = centeredXY / centeredXX;
+    if (!(m > 0) || !Number.isFinite(m)) {
+      throw new Error('The fitted Weibull shape parameter is not positive and finite.');
     }
-
-    // 3. Least Squares Linear Regression
-    const safeN = n > 0 ? n : 1;
-    const meanX = sumX / safeN;
-    const meanY = sumY / safeN;
-    
-    let ssX = 0;
-    let ssY = 0;
-    let ssXY = 0;
-    
-    for (const pt of points) {
-        ssX += Math.pow(pt.x - meanX, 2);
-        ssY += Math.pow(pt.y - meanY, 2);
-        ssXY += (pt.x - meanX) * (pt.y - meanY);
-    }
-
-    const safeSsX = Math.abs(ssX) > 1e-15 ? ssX : 1e-15;
-    const m = ssXY / safeSsX;
     const intercept = meanY - m * meanX;
-    const safeM = Math.abs(m) > 1e-15 ? m : 1e-15;
-    const eta = Math.exp(-intercept / safeM);
-    
-    // R^2 calculation
-    const rSquaredDenom = ssX * ssY;
-    const rSquared = Math.pow(ssXY, 2) / (Math.abs(rSquaredDenom) > 1e-15 ? rSquaredDenom : 1e-15);
-
-    // 4. Safe limit (5% failure -> 95% reliable)
-    // p = 1 - exp(-(x/eta)^m) => x = eta * (-ln(1-p))^(1/m)
-    const safeValue95 = eta * Math.pow(Math.max(-Math.log(1 - 0.05), 1e-15), 1 / safeM);
+    const eta = Math.exp(-intercept / m);
+    if (!(eta > 0) || !Number.isFinite(eta)) throw new Error('The fitted Weibull scale is invalid.');
+    const denominator = centeredXX * centeredYY;
+    const rSquared = denominator > 0
+      ? Math.max(0, Math.min(1, centeredXY * centeredXY / denominator))
+      : 0;
+    const failureProbabilityForSafeValue = 0.05 as const;
+    const safeValue95 = eta * (-Math.log1p(-failureProbabilityForSafeValue)) ** (1 / m);
 
     self.postMessage({
       type: 'WEIBULL_RESULT',
-      payload: { m, eta, points, safeValue95, rSquared }
-    } as WeibullResponse);
-
+      payload: {
+        m,
+        eta,
+        points,
+        safeValue95,
+        rSquared,
+        modelVersion: WEIBULL_MODEL_VERSION,
+        estimator: 'bernard-median-rank-linear-regression-not-mle',
+        failureProbabilityForSafeValue,
+        observations,
+      },
+    } satisfies WeibullResponse);
   } catch (error) {
     self.postMessage({
       type: 'ERROR',
-      error: error instanceof Error ? error.message : String(error)
-    });
+      error: error instanceof Error ? error.message : String(error),
+    } satisfies WeibullResponse);
   }
 };
