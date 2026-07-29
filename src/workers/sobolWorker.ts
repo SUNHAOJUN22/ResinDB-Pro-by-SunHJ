@@ -1,3 +1,4 @@
+import { createWorkerProgressMessage } from '@/compute/workerProtocol';
 import { FormulaConfig, Product, PropertyValue } from '@/types/index';
 import { formulaEngine } from '@/lib/formulaParser';
 
@@ -7,8 +8,8 @@ export interface SobolMessage {
     targetFormulaId: string;
     formulas: FormulaConfig[];
     product: Product;
-    variances: Record<string, number>; // std dev as % of base value (e.g., 5 for 5%)
-    iterations?: number; // N, total samples will be N * (D + 2)
+    variances: Record<string, number>;
+    iterations?: number;
   };
 }
 
@@ -17,15 +18,14 @@ export interface SobolResponse {
   payload?: {
     firstOrder: { name: string; value: number }[];
     totalEffect: { name: string; value: number }[];
-    interactions: { name: string; value: number }[]; // Total - FirstOrder
+    interactions: { name: string; value: number }[];
   };
   error?: string;
 }
 
-// Box-Muller transform for normal distribution sampling
 function randomNormal(mean: number, stdDev: number): number {
   let u = 0, v = 0;
-  while(u === 0) u = Math.random(); //Converting [0,1) to (0,1)
+  while(u === 0) u = Math.random();
   while(v === 0) v = Math.random();
   const num = Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
   return num * stdDev + mean;
@@ -34,15 +34,13 @@ function randomNormal(mean: number, stdDev: number): number {
 self.onmessage = (e: MessageEvent<SobolMessage>) => {
   try {
     const { targetFormulaId, formulas, product, variances, iterations = 2000 } = e.data.payload;
-    
+
     const evaluator = formulaEngine.compileGraph(formulas);
-    
-    // Determine which properties actually need variance (inputs for Sobol)
     const baseProperties = product.properties;
     const inputKeys: string[] = [];
     const inputMeans: number[] = [];
     const inputStdDevs: number[] = [];
-    
+
     for (const [key, val] of Object.entries(baseProperties)) {
         const numVal = parseFloat(String(val.value));
         if (!isNaN(numVal) && variances[key] && variances[key] > 0) {
@@ -51,15 +49,16 @@ self.onmessage = (e: MessageEvent<SobolMessage>) => {
             inputStdDevs.push(numVal * (variances[key] / 100));
         }
     }
-    
+
     const D = inputKeys.length;
     if (D === 0) {
         throw new Error("No variables with variance > 0 provided for Sobol analysis.");
     }
 
     const N = iterations;
+    const progressInterval = Math.max(1, Math.floor(N / 20));
+    self.postMessage(createWorkerProgressMessage({ ratio: 0, phase: 'sampling' }));
 
-    // Helper to evaluate model from an array of inputs matching inputKeys
     const evaluate = (inputs: number[]): number => {
         const perturbedProps: Record<string, PropertyValue> = { ...baseProperties };
         for (let i = 0; i < D; i++) {
@@ -70,7 +69,6 @@ self.onmessage = (e: MessageEvent<SobolMessage>) => {
         return evaluator(testProduct)[targetFormulaId] || 0;
     };
 
-    // Generate A and B matrices (N x D)
     const A: number[][] = [];
     const B: number[][] = [];
     for (let i = 0; i < N; i++) {
@@ -82,17 +80,33 @@ self.onmessage = (e: MessageEvent<SobolMessage>) => {
         }
         A.push(rowA);
         B.push(rowB);
+        const completed = i + 1;
+        if (completed % progressInterval === 0 || completed === N) {
+          self.postMessage(createWorkerProgressMessage({
+            ratio: (completed / N) * 0.15,
+            completed,
+            total: N,
+            phase: 'sampling',
+          }));
+        }
     }
 
-    // Evaluate yA and yB
     const yA = new Float64Array(N);
     const yB = new Float64Array(N);
     for (let i = 0; i < N; i++) {
         yA[i] = evaluate(A[i]);
         yB[i] = evaluate(B[i]);
+        const completed = i + 1;
+        if (completed % progressInterval === 0 || completed === N) {
+          self.postMessage(createWorkerProgressMessage({
+            ratio: 0.15 + (completed / N) * 0.3,
+            completed,
+            total: N,
+            phase: 'base-evaluation',
+          }));
+        }
     }
 
-    // Calculate Variance V(Y) from yA (and yB combined for better estimate)
     let sum = 0;
     let sumSq = 0;
     for (let i = 0; i < N; i++) {
@@ -110,17 +124,14 @@ self.onmessage = (e: MessageEvent<SobolMessage>) => {
     const totalEffect: {name: string, value: number}[] = [];
     const interactions: {name: string, value: number}[] = [];
 
-    // For each variable
     for (let i = 0; i < D; i++) {
         const yABi = new Float64Array(N);
         for (let j = 0; j < N; j++) {
-            // A_B^(i): B's i-th column, A's other columns
             const rowAB = [...A[j]];
             rowAB[i] = B[j][i];
             yABi[j] = evaluate(rowAB);
         }
 
-        // Jansen estimator
         let sumVti = 0;
         let sumVi = 0;
         for (let j = 0; j < N; j++) {
@@ -131,21 +142,27 @@ self.onmessage = (e: MessageEvent<SobolMessage>) => {
             sumVi += diffB * diffB;
         }
 
-        const vti = sumVti / (2 * N); // Total variance contribution
-        const vi = varY - (sumVi / (2 * N)); // First order variance contribution
+        const vti = sumVti / (2 * N);
+        const vi = varY - (sumVi / (2 * N));
 
         const safeVarY = Math.abs(varY) > 1e-15 ? varY : 1e-15;
         const sTi = Math.max(0, vti / safeVarY);
         let sI = Math.max(0, vi / safeVarY);
-        if (sI > sTi) sI = sTi; // Numeric precision guard
+        if (sI > sTi) sI = sTi;
 
         firstOrder.push({ name: inputKeys[i], value: sI });
         totalEffect.push({ name: inputKeys[i], value: sTi });
         interactions.push({ name: inputKeys[i], value: sTi - sI });
+        self.postMessage(createWorkerProgressMessage({
+          ratio: 0.45 + ((i + 1) / D) * 0.5,
+          completed: i + 1,
+          total: D,
+          phase: 'sensitivity-estimation',
+        }));
     }
 
-    // Sort by Total Effect descending
     const indices = Array.from({length: D}, (_, i) => i).sort((a, b) => totalEffect[b].value - totalEffect[a].value);
+    self.postMessage(createWorkerProgressMessage({ ratio: 1, phase: 'complete' }));
 
     self.postMessage({
       type: 'SOBOL_COMPLETE',
