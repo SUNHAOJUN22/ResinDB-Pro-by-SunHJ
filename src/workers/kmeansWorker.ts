@@ -7,7 +7,11 @@ import {
   SEEDED_RANDOM_ALGORITHM_VERSION,
 } from '@/compute/random';
 
-const KMEANS_MODEL_VERSION = 'kmeans-plus-plus-full-silhouette-1.0.0';
+const KMEANS_MODEL_VERSION = 'kmeans-plus-plus-adaptive-silhouette-2.0.0';
+const FULL_SILHOUETTE_LIMIT = 1_500;
+const DEFAULT_MAX_SILHOUETTE_SAMPLE = 1_000;
+
+export type KMeansSelectionMode = 'auto' | 'full' | 'sampled';
 
 export type KMeansMessage = {
   type: 'COMPUTE_KMEANS';
@@ -16,6 +20,8 @@ export type KMeansMessage = {
     keys: string[];
     maxK?: number;
     seed?: RandomSeed;
+    selectionMode?: KMeansSelectionMode;
+    silhouetteSampleSize?: number;
   };
 };
 
@@ -27,6 +33,14 @@ export interface KMeansReproducibility {
   modelVersion: typeof KMEANS_MODEL_VERSION;
 }
 
+export interface KMeansModelSelection {
+  method: 'full-silhouette' | 'sampled-silhouette';
+  evaluatedSamples: number;
+  totalSamples: number;
+  candidateCount: number;
+  missingValuesImputed: number;
+}
+
 export type KMeansResponse = {
   type: 'KMEANS_RESULT';
   payload: {
@@ -35,6 +49,7 @@ export type KMeansResponse = {
     centroids: number[][];
     silhouetteScore: number | null;
     reproducibility: KMeansReproducibility;
+    modelSelection: KMeansModelSelection;
   };
 } | {
   type: 'ERROR';
@@ -54,17 +69,80 @@ function validateMaxK(maxK: number): number {
   return maxK;
 }
 
+function validateSelectionMode(mode: KMeansSelectionMode): KMeansSelectionMode {
+  if (mode !== 'auto' && mode !== 'full' && mode !== 'sampled') {
+    throw new TypeError('selectionMode must be auto, full, or sampled');
+  }
+  return mode;
+}
+
+function selectEvaluationIndices(
+  sampleCount: number,
+  requestedMode: KMeansSelectionMode,
+  requestedSampleSize: number | undefined,
+  seed: string,
+): { indices: number[]; method: KMeansModelSelection['method'] } {
+  const useFull = requestedMode === 'full'
+    || (requestedMode === 'auto' && sampleCount <= FULL_SILHOUETTE_LIMIT);
+  if (useFull) {
+    return {
+      indices: Array.from({ length: sampleCount }, (_, index) => index),
+      method: 'full-silhouette',
+    };
+  }
+  const adaptiveSize = Math.min(
+    DEFAULT_MAX_SILHOUETTE_SAMPLE,
+    Math.max(200, Math.ceil(Math.sqrt(sampleCount) * 10)),
+  );
+  const sampleSize = requestedSampleSize ?? adaptiveSize;
+  if (!Number.isInteger(sampleSize) || sampleSize < 2) {
+    throw new RangeError('silhouetteSampleSize must be an integer of at least 2');
+  }
+  const retained = Math.min(sampleCount, sampleSize);
+  if (retained === sampleCount) {
+    return {
+      indices: Array.from({ length: sampleCount }, (_, index) => index),
+      method: 'full-silhouette',
+    };
+  }
+  const random = createSeededRandom(deriveRandomSeed('kmeans-silhouette-sample-v1', {
+    seed,
+    sampleCount,
+    retained,
+  }));
+  const indices = Array.from({ length: retained }, (_, index) => index);
+  for (let index = retained; index < sampleCount; index++) {
+    const replacement = Math.floor(random.next() * (index + 1));
+    if (replacement < retained) indices[replacement] = index;
+  }
+  indices.sort((left, right) => left - right);
+  return { indices, method: 'sampled-silhouette' };
+}
+
 self.onmessage = (event: MessageEvent<KMeansMessage>) => {
   try {
-    const { data, keys, maxK: requestedMaxK = 10, seed } = event.data.payload;
+    const {
+      data,
+      keys,
+      maxK: requestedMaxK = 10,
+      seed,
+      selectionMode: requestedSelectionMode = 'auto',
+      silhouetteSampleSize,
+    } = event.data.payload;
     const maxK = validateMaxK(requestedMaxK);
-    const actualSeed = seed ?? deriveRandomSeed('kmeans-v1', { data, keys, maxK });
-    const random = createSeededRandom(actualSeed);
+    const selectionMode = validateSelectionMode(requestedSelectionMode);
+    const actualSeed = seed ?? deriveRandomSeed('kmeans-v2', {
+      data,
+      keys,
+      maxK,
+      selectionMode,
+      silhouetteSampleSize,
+    });
     const reproducibility: KMeansReproducibility = {
-      seed: random.seed,
+      seed: String(actualSeed),
       seedSource: seed === undefined ? 'derived' : 'user',
-      randomAlgorithm: random.algorithm,
-      randomAlgorithmVersion: random.algorithmVersion,
+      randomAlgorithm: SEEDED_RANDOM_ALGORITHM,
+      randomAlgorithmVersion: SEEDED_RANDOM_ALGORITHM_VERSION,
       modelVersion: KMEANS_MODEL_VERSION,
     };
 
@@ -72,7 +150,20 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
       self.postMessage(createWorkerProgressMessage({ ratio: 1, phase: 'complete' }));
       self.postMessage({
         type: 'KMEANS_RESULT',
-        payload: { clusters: {}, k: 0, centroids: [], silhouetteScore: null, reproducibility },
+        payload: {
+          clusters: {},
+          k: 0,
+          centroids: [],
+          silhouetteScore: null,
+          reproducibility,
+          modelSelection: {
+            method: 'full-silhouette',
+            evaluatedSamples: 0,
+            totalSamples: 0,
+            candidateCount: 0,
+            missingValuesImputed: 0,
+          },
+        },
       } satisfies KMeansResponse);
       return;
     }
@@ -80,22 +171,47 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
     self.postMessage(createWorkerProgressMessage({ ratio: 0, phase: 'normalization' }));
     const dimensions = keys.length;
     const sampleCount = data.length;
-    const rawMatrix = data.map((item) => keys.map((key) => item.values[key] ?? 0));
-    const means = new Array<number>(dimensions).fill(0);
-    const standardDeviations = new Array<number>(dimensions).fill(0);
-
+    const featureMeans = new Array<number>(dimensions).fill(0);
+    const finiteCounts = new Array<number>(dimensions).fill(0);
+    for (const item of data) {
+      for (let dimension = 0; dimension < dimensions; dimension++) {
+        const value = item.values[keys[dimension]];
+        if (Number.isFinite(value)) {
+          featureMeans[dimension] += value;
+          finiteCounts[dimension] += 1;
+        }
+      }
+    }
     for (let dimension = 0; dimension < dimensions; dimension++) {
-      for (let sample = 0; sample < sampleCount; sample++) means[dimension] += rawMatrix[sample][dimension];
-      means[dimension] /= sampleCount;
+      featureMeans[dimension] = finiteCounts[dimension] > 0
+        ? featureMeans[dimension] / finiteCounts[dimension]
+        : 0;
+    }
+
+    let missingValuesImputed = 0;
+    const rawMatrix = data.map((item) => keys.map((key, dimension) => {
+      const value = item.values[key];
+      if (Number.isFinite(value)) return value;
+      missingValuesImputed += 1;
+      return featureMeans[dimension];
+    }));
+    const standardDeviations = new Array<number>(dimensions).fill(0);
+    for (let dimension = 0; dimension < dimensions; dimension++) {
       for (let sample = 0; sample < sampleCount; sample++) {
-        standardDeviations[dimension] += (rawMatrix[sample][dimension] - means[dimension]) ** 2;
+        standardDeviations[dimension] += (rawMatrix[sample][dimension] - featureMeans[dimension]) ** 2;
       }
       standardDeviations[dimension] = Math.sqrt(standardDeviations[dimension] / sampleCount) || 1;
     }
-
     const matrix = rawMatrix.map((row) => row.map((value, dimension) => (
-      (value - means[dimension]) / standardDeviations[dimension]
+      (value - featureMeans[dimension]) / standardDeviations[dimension]
     )));
+
+    const evaluation = selectEvaluationIndices(
+      sampleCount,
+      selectionMode,
+      silhouetteSampleSize,
+      String(actualSeed),
+    );
     const maxTestedK = Math.min(maxK, Math.floor(sampleCount / 2), 10);
     let bestK = 1;
     let bestAssignments = new Array<number>(sampleCount).fill(0);
@@ -103,13 +219,18 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
     let bestCentroids: number[][] = [];
 
     const runKMeans = (k: number) => {
+      const random = createSeededRandom(deriveRandomSeed('kmeans-run-v2', {
+        seed: String(actualSeed),
+        k,
+      }));
       const centroids: number[][] = [];
       centroids.push([...matrix[Math.floor(random.next() * sampleCount)]]);
-
       for (let centroidIndex = 1; centroidIndex < k; centroidIndex++) {
         const distances = matrix.map((row) => {
           let minimumDistance = Infinity;
-          for (const centroid of centroids) minimumDistance = Math.min(minimumDistance, distanceSquared(row, centroid));
+          for (const centroid of centroids) {
+            minimumDistance = Math.min(minimumDistance, distanceSquared(row, centroid));
+          }
           return minimumDistance;
         });
         const distanceSum = distances.reduce((sum, value) => sum + value, 0);
@@ -129,12 +250,11 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
 
       const assignments = new Array<number>(sampleCount).fill(-1);
       let changed = true;
-      let iterations = 0;
-      while (changed && iterations < 50) {
+      let iteration = 0;
+      while (changed && iteration < 50) {
         changed = false;
         const newCentroids = Array.from({ length: k }, () => new Array<number>(dimensions).fill(0));
         const counts = new Array<number>(k).fill(0);
-
         for (let sample = 0; sample < sampleCount; sample++) {
           let bestCluster = -1;
           let minimumDistance = Infinity;
@@ -154,7 +274,6 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
           }
           counts[bestCluster] += 1;
         }
-
         for (let cluster = 0; cluster < k; cluster++) {
           if (counts[cluster] > 0) {
             for (let dimension = 0; dimension < dimensions; dimension++) {
@@ -165,15 +284,15 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
             changed = true;
           }
         }
-        iterations += 1;
+        iteration += 1;
       }
       return { assignments, centroids };
     };
 
     const calculateSilhouette = (assignments: number[], k: number) => {
-      if (k < 2) return -1;
+      if (k < 2 || evaluation.indices.length === 0) return -1;
       let total = 0;
-      for (let sample = 0; sample < sampleCount; sample++) {
+      for (const sample of evaluation.indices) {
         const ownCluster = assignments[sample];
         let ownDistance = 0;
         let ownCount = 0;
@@ -200,7 +319,7 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
         const denominator = Math.max(a, b);
         total += denominator > 0 && Number.isFinite(denominator) ? (b - a) / denominator : 0;
       }
-      return total / sampleCount;
+      return total / evaluation.indices.length;
     };
 
     if (maxTestedK < 2) {
@@ -208,7 +327,6 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
       bestAssignments = singleCluster.assignments;
       bestCentroids = singleCluster.centroids;
       bestK = 1;
-      bestScore = -1;
       self.postMessage(createWorkerProgressMessage({ ratio: 0.95, phase: 'model-selection' }));
     } else {
       const candidateCount = maxTestedK - 1;
@@ -241,6 +359,13 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
         centroids: bestCentroids,
         silhouetteScore: bestScore >= 0 ? bestScore : null,
         reproducibility,
+        modelSelection: {
+          method: evaluation.method,
+          evaluatedSamples: evaluation.indices.length,
+          totalSamples: sampleCount,
+          candidateCount: Math.max(0, maxTestedK - 1),
+          missingValuesImputed,
+        },
       },
     } satisfies KMeansResponse);
   } catch (error) {
