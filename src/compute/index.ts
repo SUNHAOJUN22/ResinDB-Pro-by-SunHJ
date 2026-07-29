@@ -2,6 +2,7 @@ export * from './backendRouter';
 export * from './capabilityProbe';
 export * from './computeEngine';
 export * from './computeEvidence';
+export * from './gaussianProcess';
 export * from './kernelRegistry';
 export * from './leastSquares';
 export * from './random';
