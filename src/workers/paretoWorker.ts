@@ -1,3 +1,7 @@
+import { paretoFrontIndices, type ParetoDirection } from '@/compute/pareto';
+
+const PARETO_MODEL_VERSION = 'pareto-frontier-2.0.0';
+
 export type ParetoObjective = {
   key: string;
   minimize: boolean;
@@ -15,108 +19,59 @@ export type ParetoResponse = {
   type: 'PARETO_RESULT';
   payload: {
     paretoIds: string[];
+    modelVersion: typeof PARETO_MODEL_VERSION;
+    algorithm: 'two-objective-sort-sweep' | 'incremental-front-maintenance';
+    validPoints: number;
   };
 } | {
   type: 'ERROR';
   payload: { message: string };
 };
 
-// Dominance check for multi-dimensional pareto
-function dominates(a: number[], b: number[], minimize: boolean[]): boolean {
-  let strictlyBetter = false;
-  for (let i = 0; i < a.length; i++) {
-    if (minimize[i]) {
-      if (a[i] > b[i]) return false;
-      if (a[i] < b[i]) strictlyBetter = true;
-    } else {
-      if (a[i] < b[i]) return false;
-      if (a[i] > b[i]) strictlyBetter = true;
-    }
-  }
-  return strictlyBetter;
-}
-
-self.onmessage = (e: MessageEvent<ParetoMessage>) => {
+self.onmessage = (event: MessageEvent<ParetoMessage>) => {
   try {
-    const { data, objectives } = e.data.payload;
+    const { data, objectives } = event.data.payload;
     if (!objectives.length || !data.length) {
-      self.postMessage({ type: 'PARETO_RESULT', payload: { paretoIds: (data || []).map(d => d.id) } });
+      self.postMessage({
+        type: 'PARETO_RESULT',
+        payload: {
+          paretoIds: (data ?? []).map((item) => item.id),
+          modelVersion: PARETO_MODEL_VERSION,
+          algorithm: objectives.length === 2
+            ? 'two-objective-sort-sweep'
+            : 'incremental-front-maintenance',
+          validPoints: data?.length ?? 0,
+        },
+      } satisfies ParetoResponse);
       return;
     }
-
-    const minimizeMap = objectives.map(o => o.minimize);
-    const keys = objectives.map(o => o.key);
-
-    const validData = data.filter(d => 
-      d && d.values && 
-      keys.every(k => typeof d.values[k] === 'number' && !isNaN(d.values[k]))
-    );
-
-    const points = validData.map(d => ({
-      id: d.id,
-      values: keys.map(k => d.values[k] ?? (minimizeMap[keys.indexOf(k)] ? Infinity : -Infinity))
-    }));
-
-    const paretoIds: string[] = [];
-
-    // Simple O(N^2) dominance check - for < 100,000 points this is often fast enough with early pruning
-    // For strictly 2 objectives, we could sort and do O(N log N)
-    if (objectives.length === 2) {
-       // O(N log N) sweep line
-       // Sort by primary objective (better first)
-       const o1Min = minimizeMap[0];
-       const o2Min = minimizeMap[1];
-       
-       points.sort((a, b) => {
-          if (a.values[0] !== b.values[0]) {
-             return o1Min ? a.values[0] - b.values[0] : b.values[0] - a.values[0];
-          }
-          return o2Min ? a.values[1] - b.values[1] : b.values[1] - a.values[1];
-       });
-
-       let bestO2SoFar = o2Min ? Infinity : -Infinity;
-       let lastParetoPoint: typeof points[0] | null = null;
-       
-       for (const p of points) {
-           const v2 = p.values[1];
-           if (o2Min) {
-               if (v2 < bestO2SoFar) {
-                   paretoIds.push(p.id);
-                   bestO2SoFar = v2;
-                   lastParetoPoint = p;
-               } else if (v2 === bestO2SoFar && lastParetoPoint && p.values[0] === lastParetoPoint.values[0]) {
-                   // identical points
-                   paretoIds.push(p.id);
-               }
-           } else {
-               if (v2 > bestO2SoFar) {
-                   paretoIds.push(p.id);
-                   bestO2SoFar = v2;
-                   lastParetoPoint = p;
-               } else if (v2 === bestO2SoFar && lastParetoPoint && p.values[0] === lastParetoPoint.values[0]) {
-                   paretoIds.push(p.id);
-               }
-           }
-       }
-    } else {
-       // O(N^2)
-       for (let i = 0; i < points.length; i++) {
-         let dominated = false;
-         for (let j = 0; j < points.length; j++) {
-           if (i === j) continue;
-           if (dominates(points[j].values, points[i].values, minimizeMap)) {
-             dominated = true;
-             break;
-           }
-         }
-         if (!dominated) {
-           paretoIds.push(points[i].id);
-         }
-       }
-    }
-
-    self.postMessage({ type: 'PARETO_RESULT', payload: { paretoIds } } as ParetoResponse);
+    const keys = objectives.map((objective) => objective.key);
+    if (new Set(keys).size !== keys.length) throw new Error('Pareto objective keys must be unique.');
+    const validData = data.filter((item) => (
+      item
+      && item.values
+      && keys.every((key) => Number.isFinite(Number(item.values[key])))
+    ));
+    const points = validData.map((item) => keys.map((key) => Number(item.values[key])));
+    const directions: ParetoDirection[] = objectives.map((objective) => (
+      objective.minimize ? 'minimize' : 'maximize'
+    ));
+    const frontIndices = paretoFrontIndices(points, directions);
+    self.postMessage({
+      type: 'PARETO_RESULT',
+      payload: {
+        paretoIds: frontIndices.map((index) => validData[index].id),
+        modelVersion: PARETO_MODEL_VERSION,
+        algorithm: objectives.length === 2
+          ? 'two-objective-sort-sweep'
+          : 'incremental-front-maintenance',
+        validPoints: validData.length,
+      },
+    } satisfies ParetoResponse);
   } catch (error) {
-    self.postMessage({ type: 'ERROR', payload: { message: error instanceof Error ? error.message : 'Unknown error' } } as ParetoResponse);
+    self.postMessage({
+      type: 'ERROR',
+      payload: { message: error instanceof Error ? error.message : 'Unknown error' },
+    } satisfies ParetoResponse);
   }
 };
