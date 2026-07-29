@@ -10,7 +10,8 @@ export interface LeastSquaresDiagnostics {
   rows: number;
   columns: number;
   rank: number;
-  conditionNumber: number;
+  conditionNumber: number | null;
+  conditionNumberStatus: 'finite' | 'infinite';
   residualNorm: number;
   tolerance: number;
   singularValues: number[];
@@ -234,11 +235,13 @@ export function solveLeastSquares(
   const rank = svd.singularValues.filter((value) => value > tolerance).length;
   if (rank === 0) throw new Error('Least-squares design matrix has zero numerical rank');
   const minimumResolvedSingularValue = svd.singularValues[rank - 1];
-  const conditionNumber = rank < columns ? Infinity : maximumSingularValue / minimumResolvedSingularValue;
+  const finiteConditionNumber = maximumSingularValue / minimumResolvedSingularValue;
+  const conditionNumber = rank < columns ? null : finiteConditionNumber;
+  const conditionNumberStatus = rank < columns ? 'infinite' : 'finite';
 
   let solver: LeastSquaresSolver;
   let scaledSolution: number[];
-  if (rows >= columns && rank === columns && conditionNumber <= conditionLimit) {
+  if (rows >= columns && rank === columns && finiteConditionNumber <= conditionLimit) {
     solver = 'qr-householder';
     scaledSolution = householderQrSolve(scaledDesign, target, tolerance);
   } else {
@@ -255,6 +258,7 @@ export function solveLeastSquares(
       columns,
       rank,
       conditionNumber,
+      conditionNumberStatus,
       residualNorm: residualNorm(design, target, solution),
       tolerance,
       singularValues: [...svd.singularValues],
