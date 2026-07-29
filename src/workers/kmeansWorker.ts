@@ -1,3 +1,5 @@
+import { createWorkerProgressMessage } from '@/compute/workerProtocol';
+
 export type KMeansMessage = {
   type: 'COMPUTE_KMEANS';
   payload: {
@@ -10,7 +12,7 @@ export type KMeansMessage = {
 export type KMeansResponse = {
   type: 'KMEANS_RESULT';
   payload: {
-    clusters: Record<string, number>; // id -> clusterIndex
+    clusters: Record<string, number>;
     k: number;
     centroids: number[][];
   };
@@ -19,7 +21,6 @@ export type KMeansResponse = {
   payload: { message: string };
 };
 
-// Compute Euclidean distance squared
 function distSq(a: number[], b: number[]): number {
   let sum = 0;
   for (let i = 0; i < a.length; i++) {
@@ -32,39 +33,34 @@ self.onmessage = (e: MessageEvent<KMeansMessage>) => {
   try {
     const { data, keys, maxK = 10 } = e.data.payload;
     if (!data.length || !keys.length) {
+      self.postMessage(createWorkerProgressMessage({ ratio: 1, phase: 'complete' }));
       self.postMessage({ type: 'KMEANS_RESULT', payload: { clusters: {}, k: 0, centroids: [] } });
       return;
     }
 
+    self.postMessage(createWorkerProgressMessage({ ratio: 0, phase: 'normalization' }));
     const m = keys.length;
     const n = data.length;
-
-    // Build data matrix and normalize it (Z-score)
     const rawMatrix = data.map(d => keys.map(k => d.values[k] ?? 0));
-    
+
     const means = new Array(m).fill(0);
     const stds = new Array(m).fill(0);
-    
+
     for (let j = 0; j < m; j++) {
       for (let i = 0; i < n; i++) means[j] += rawMatrix[i][j];
       means[j] /= n;
       for (let i = 0; i < n; i++) stds[j] += (rawMatrix[i][j] - means[j]) ** 2;
-      stds[j] = Math.sqrt(stds[j] / n) || 1; // avoid div by 0
+      stds[j] = Math.sqrt(stds[j] / n) || 1;
     }
 
     const mat = rawMatrix.map(row => row.map((v, j) => (v - means[j]) / stds[j]));
-
-    // Run KMeans for k = 2 to Math.min(maxK, Math.floor(n / 2))
-    // We'll use Silhouette score to find the best K
     const maxTestedK = Math.min(maxK, Math.floor(n / 2), 10);
     let bestK = 1;
     let bestClusters: number[] = new Array(n).fill(0);
     let bestScore = -1;
     let bestCentroids: number[][] = [];
 
-    // Simple k-means function
     const runKMeans = (k: number) => {
-      // Initialize with k-means++
       const centroids: number[][] = [];
       centroids.push([...mat[Math.floor(Math.random() * n)]]);
 
@@ -120,7 +116,6 @@ self.onmessage = (e: MessageEvent<KMeansMessage>) => {
           if (counts[c] > 0) {
             for (let j = 0; j < m; j++) centroids[c][j] = newCentroids[c][j] / counts[c];
           } else {
-            // Re-init empty cluster
             centroids[c] = [...mat[Math.floor(Math.random() * n)]];
             changed = true;
           }
@@ -171,7 +166,9 @@ self.onmessage = (e: MessageEvent<KMeansMessage>) => {
     if (maxTestedK < 2) {
       bestClusters = runKMeans(1).assignments;
       bestK = 1;
+      self.postMessage(createWorkerProgressMessage({ ratio: 0.95, phase: 'model-selection' }));
     } else {
+      const candidateCount = maxTestedK - 1;
       for (let k = 2; k <= maxTestedK; k++) {
         const { assignments, centroids } = runKMeans(k);
         const score = calcSilhouette(assignments, k);
@@ -181,6 +178,12 @@ self.onmessage = (e: MessageEvent<KMeansMessage>) => {
           bestK = k;
           bestCentroids = centroids;
         }
+        self.postMessage(createWorkerProgressMessage({
+          ratio: 0.1 + ((k - 1) / candidateCount) * 0.85,
+          completed: k - 1,
+          total: candidateCount,
+          phase: 'model-selection',
+        }));
       }
     }
 
@@ -189,6 +192,7 @@ self.onmessage = (e: MessageEvent<KMeansMessage>) => {
       clustersRecord[data[i].id] = bestClusters[i];
     }
 
+    self.postMessage(createWorkerProgressMessage({ ratio: 1, phase: 'complete' }));
     self.postMessage({ type: 'KMEANS_RESULT', payload: { clusters: clustersRecord, k: bestK, centroids: bestCentroids } } as KMeansResponse);
   } catch (error) {
     self.postMessage({ type: 'ERROR', payload: { message: error instanceof Error ? error.message : 'Unknown error' } } as KMeansResponse);
