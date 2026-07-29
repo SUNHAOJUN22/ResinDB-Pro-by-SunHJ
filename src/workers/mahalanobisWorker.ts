@@ -1,10 +1,18 @@
+import { chiSquareUpperTailQuantileWilsonHilferty } from '@/compute/distributions';
+import {
+  choleskyFactorize,
+  dotProduct,
+  solveCholesky,
+} from '@/compute/linearAlgebra';
+
+const MAHALANOBIS_MODEL_VERSION = 'regularized-cholesky-mahalanobis-2.0.0';
 
 export interface MahalanobisMessage {
   type: 'CALCULATE_MAHALANOBIS';
   payload: {
-    data: (Record<string, number> & { _id: string, name: string })[];
+    data: (Record<string, number> & { _id: string; name: string })[];
     features: string[];
-    alpha?: number; // e.g. 0.05 or 0.01 for Chi-Square
+    alpha?: number;
   };
 }
 
@@ -14,161 +22,124 @@ export interface MahalanobisResponse {
     distances: { index: number; id: string; name: string; distance: number; isOutlier: boolean }[];
     threshold: number;
     mean: Record<string, number>;
+    modelVersion: typeof MAHALANOBIS_MODEL_VERSION;
+    diagnostics: {
+      distanceDefinition: 'squared-mahalanobis';
+      thresholdApproximation: 'wilson-hilferty-with-acklam-normal-quantile';
+      alpha: number;
+      observations: number;
+      dimensions: number;
+      covarianceRegularization: number;
+      choleskyJitter: number;
+      choleskyAttempts: number;
+    };
   };
   error?: string;
 }
 
-function invertMatrix(matrix: number[][]): number[][] {
-    const n = matrix.length;
-    const a = matrix.map(r => [...r]);
-    const i = Array.from({length: n}, (_, row) => Array.from({length:n}, (_, col) => row===col ? 1 : 0));
-    
-    for (let j = 0; j < n; j++) {
-        let max_idx = j;
-        for (let i_row = j + 1; i_row < n; i_row++) {
-            if (Math.abs(a[i_row][j]) > Math.abs(a[max_idx][j])) {
-                max_idx = i_row;
-            }
-        }
-        
-        const temp = a[j];
-        a[j] = a[max_idx];
-        a[max_idx] = temp;
-        
-        const tempI = i[j];
-        i[j] = i[max_idx];
-        i[max_idx] = tempI;
-        
-        const pivot = a[j][j];
-        if (Math.abs(pivot) < 1e-12) {
-             throw new Error("协方差矩阵存在严重多重共线性（无法求逆），请减少相关性过高的特征或提供更多不重复样本。");
-        }
-        
-        for (let k = 0; k < n; k++) {
-            a[j][k] /= pivot;
-            i[j][k] /= pivot;
-        }
-        
-        for (let i_row = 0; i_row < n; i_row++) {
-            if (i_row !== j) {
-                const factor = a[i_row][j];
-                for (let k = 0; k < n; k++) {
-                    a[i_row][k] -= factor * a[j][k];
-                    i[i_row][k] -= factor * i[j][k];
-                }
-            }
-        }
+self.onmessage = (event: MessageEvent<MahalanobisMessage>) => {
+  try {
+    const { data, features, alpha = 0.01 } = event.data.payload;
+    if (features.length < 2) throw new Error('请至少选择2个特征进行多元异常检测。');
+    if (new Set(features).size !== features.length) throw new Error('特征名称不得重复。');
+    if (!Number.isFinite(alpha) || alpha <= 0 || alpha >= 0.5) {
+      throw new RangeError('显著性水平 alpha 必须位于 0 与 0.5 之间。');
     }
-    return i;
-}
 
-// Wilson-Hilferty transformation for Chi-Square inverse approximation
-function getChiSquareThreshold(df: number, a: number): number {
-    let Z = 1.64485; // alpha 0.05
-    if (Math.abs(a - 0.05) < 1e-4) Z = 1.64485;
-    else if (Math.abs(a - 0.01) < 1e-4) Z = 2.32635;
-    else if (Math.abs(a - 0.001) < 1e-4) Z = 3.09023;
-    
-    const term1 = 1 - 2 / (9 * df);
-    const term2 = Z * Math.sqrt(2 / (9 * df));
-    return df * Math.pow(Math.max(0, term1 + term2), 3);
-}
-
-self.onmessage = (e: MessageEvent<MahalanobisMessage>) => {
-    try {
-        const { data, features, alpha = 0.01 } = e.data.payload;
-        if (features.length < 2) {
-            throw new Error("请至少选择2个特征进行多元异常检测。");
-        }
-        
-        // Filter out items that don't have all features as valid numbers
-        const validData = (data || []).filter(d => 
-            d && 
-            features.every(f => typeof d[f] === 'number' && !isNaN(d[f]))
-        );
-
-        if (validData.length <= features.length) {
-            throw new Error(`需要至少 ${features.length + 1} 个有效观察样本以建立全秩协方差矩阵，当前可用样本数: ${validData.length}。`);
-        }
-        
-        const n = validData.length;
-        const p = features.length;
-        
-        // 1. Calculate Mean
-        const mean: number[] = new Array(p).fill(0);
-        for (let i = 0; i < n; i++) {
-            for (let j = 0; j < p; j++) {
-                mean[j] += validData[i][features[j]];
-            }
-        }
-        const safeN = n > 0 ? n : 1;
-        for (let j = 0; j < p; j++) mean[j] /= safeN;
-        
-        // 2. Covariance Matrix
-        const cov: number[][] = Array.from({length: p}, () => new Array(p).fill(0));
-        for (let i = 0; i < n; i++) {
-            for (let j = 0; j < p; j++) {
-                for (let k = 0; k < p; k++) {
-                    cov[j][k] += (validData[i][features[j]] - mean[j]) * (validData[i][features[k]] - mean[k]);
-                }
-            }
-        }
-        const safeNm1 = n > 1 ? n - 1 : 1;
-        for (let j = 0; j < p; j++) {
-            for (let k = 0; k < p; k++) {
-                cov[j][k] /= safeNm1;
-                // regularize diagonal
-                if (j === k) cov[j][k] += 1e-8; 
-            }
-        }
-        
-        const invCov = invertMatrix(cov);
-        
-        const threshold = getChiSquareThreshold(p, alpha);
-        
-        const distances = [];
-        for (let i = 0; i < n; i++) {
-            const diff = new Array(p).fill(0);
-            for (let j = 0; j < p; j++) {
-                diff[j] = validData[i][features[j]] - mean[j];
-            }
-            
-            let distSq = 0; // D^2 (Mahalanobis Distance Squared, follows Chi-Square)
-            for (let j = 0; j < p; j++) {
-                let temp = 0;
-                for (let k = 0; k < p; k++) {
-                    temp += invCov[j][k] * diff[k];
-                }
-                distSq += diff[j] * temp;
-            }
-            
-            distances.push({
-                index: i + 1,
-                id: validData[i]._id,
-                name: validData[i].name,
-                distance: distSq,
-                isOutlier: distSq > threshold
-            });
-        }
-        
-        const meanObj = features.reduce((acc, f, i) => {
-            acc[f] = mean[i];
-            return acc;
-        }, {} as Record<string, number>);
-
-        self.postMessage({
-            type: 'MAHALANOBIS_RESULT',
-            payload: {
-                distances,
-                threshold,
-                mean: meanObj
-            }
-        });
-
-    } catch (e) {
-        self.postMessage({
-            type: 'ERROR',
-            error: e instanceof Error ? e.message : String(e)
-        });
+    const validData = (data ?? []).filter((row) => (
+      row
+      && features.every((feature) => Number.isFinite(Number(row[feature])))
+    ));
+    const observations = validData.length;
+    const dimensions = features.length;
+    if (observations <= dimensions) {
+      throw new Error(`需要至少 ${dimensions + 1} 个完整有限样本，当前可用样本数: ${observations}。`);
     }
+
+    const mean = new Float64Array(dimensions);
+    for (const row of validData) {
+      for (let dimension = 0; dimension < dimensions; dimension++) {
+        mean[dimension] += Number(row[features[dimension]]);
+      }
+    }
+    for (let dimension = 0; dimension < dimensions; dimension++) mean[dimension] /= observations;
+
+    const covariance = new Float64Array(dimensions * dimensions);
+    for (const row of validData) {
+      for (let left = 0; left < dimensions; left++) {
+        const leftDifference = Number(row[features[left]]) - mean[left];
+        for (let right = 0; right <= left; right++) {
+          covariance[left * dimensions + right] += (
+            leftDifference * (Number(row[features[right]]) - mean[right])
+          );
+        }
+      }
+    }
+    const denominator = observations - 1;
+    let maximumVariance = 0;
+    for (let left = 0; left < dimensions; left++) {
+      for (let right = 0; right <= left; right++) {
+        const value = covariance[left * dimensions + right] / denominator;
+        covariance[left * dimensions + right] = value;
+        covariance[right * dimensions + left] = value;
+      }
+      maximumVariance = Math.max(maximumVariance, Math.abs(covariance[left * dimensions + left]));
+    }
+    const covarianceRegularization = Math.max(maximumVariance, 1) * 1e-10;
+    for (let dimension = 0; dimension < dimensions; dimension++) {
+      covariance[dimension * dimensions + dimension] += covarianceRegularization;
+    }
+    const factorization = choleskyFactorize(covariance, dimensions);
+    const threshold = chiSquareUpperTailQuantileWilsonHilferty(dimensions, alpha);
+
+    const distances = validData.map((row, index) => {
+      const difference = new Float64Array(dimensions);
+      for (let dimension = 0; dimension < dimensions; dimension++) {
+        difference[dimension] = Number(row[features[dimension]]) - mean[dimension];
+      }
+      const solved = solveCholesky(factorization, difference);
+      const rawDistance = dotProduct(difference, solved);
+      const distance = rawDistance < 0 && rawDistance > -1e-10 ? 0 : rawDistance;
+      if (!Number.isFinite(distance) || distance < 0) {
+        throw new Error('Mahalanobis distance calculation produced an invalid value.');
+      }
+      return {
+        index: index + 1,
+        id: row._id,
+        name: row.name,
+        distance,
+        isOutlier: distance > threshold,
+      };
+    });
+
+    const meanObject = features.reduce<Record<string, number>>((record, feature, index) => {
+      record[feature] = mean[index];
+      return record;
+    }, {});
+
+    self.postMessage({
+      type: 'MAHALANOBIS_RESULT',
+      payload: {
+        distances,
+        threshold,
+        mean: meanObject,
+        modelVersion: MAHALANOBIS_MODEL_VERSION,
+        diagnostics: {
+          distanceDefinition: 'squared-mahalanobis',
+          thresholdApproximation: 'wilson-hilferty-with-acklam-normal-quantile',
+          alpha,
+          observations,
+          dimensions,
+          covarianceRegularization,
+          choleskyJitter: factorization.jitter,
+          choleskyAttempts: factorization.attempts,
+        },
+      },
+    } satisfies MahalanobisResponse);
+  } catch (error) {
+    self.postMessage({
+      type: 'ERROR',
+      error: error instanceof Error ? error.message : String(error),
+    } satisfies MahalanobisResponse);
+  }
 };
