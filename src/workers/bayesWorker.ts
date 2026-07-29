@@ -1,3 +1,21 @@
+import {
+  createGaussianProcessScratch,
+  factorizeGaussianProcessRbf,
+  predictGaussianProcessRbf,
+  solveGaussianProcessAlpha,
+} from '@/compute/gaussianProcess';
+import {
+  createSeededRandom,
+  deriveRandomSeed,
+  type RandomSeed,
+  SEEDED_RANDOM_ALGORITHM,
+  SEEDED_RANDOM_ALGORITHM_VERSION,
+} from '@/compute/random';
+import { createWorkerProgressMessage } from '@/compute/workerProtocol';
+
+const BAYES_MODEL_VERSION = 'bayesian-optimization-rbf-ei-2.0.0';
+const MAX_CANDIDATES = 20_000;
+const TOP_SUGGESTIONS = 5;
 
 export interface BayesMessage {
   type: 'RUN_BAYES';
@@ -7,7 +25,24 @@ export interface BayesMessage {
     target: string;
     maximize: boolean;
     iterations?: number;
+    seed?: RandomSeed;
   };
+}
+
+export interface BayesReproducibility {
+  seed: string;
+  seedSource: 'user' | 'derived';
+  randomAlgorithm: typeof SEEDED_RANDOM_ALGORITHM;
+  randomAlgorithmVersion: typeof SEEDED_RANDOM_ALGORITHM_VERSION;
+  modelVersion: typeof BAYES_MODEL_VERSION;
+}
+
+export interface BayesPerformance {
+  candidatesEvaluated: number;
+  candidatesRetained: number;
+  candidateStorage: 'streaming-top-k';
+  kernelFactorizations: 1;
+  factorizationJitter: number;
 }
 
 export interface BayesResponse {
@@ -18,255 +53,225 @@ export interface BayesResponse {
     convergence: { index: number; currentBest: number }[];
     targetName: string;
     maximize: boolean;
+    reproducibility: BayesReproducibility;
+    performance: BayesPerformance;
   };
   error?: string;
 }
 
-function erf(x: number): number {
-    const sign = (x >= 0) ? 1 : -1;
-    x = Math.abs(x);
-    const a1 =  0.254829592;
-    const a2 = -0.284496736;
-    const a3 =  1.421413741;
-    const a4 = -1.453152027;
-    const a5 =  1.061405429;
-    const p  =  0.3275911;
-    const t = 1.0 / (1.0 + p * x);
-    const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
-    return sign * y;
+function erf(value: number): number {
+  const sign = value >= 0 ? 1 : -1;
+  const x = Math.abs(value);
+  const a1 = 0.254829592;
+  const a2 = -0.284496736;
+  const a3 = 1.421413741;
+  const a4 = -1.453152027;
+  const a5 = 1.061405429;
+  const p = 0.3275911;
+  const t = 1 / (1 + p * x);
+  const approximation = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+  return sign * approximation;
 }
 
-function cdf(x: number): number {
-    return 0.5 * (1 + erf(x / Math.SQRT2));
+function normalCdf(value: number): number {
+  return 0.5 * (1 + erf(value / Math.SQRT2));
 }
 
-function pdf(x: number): number {
-    return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+function normalPdf(value: number): number {
+  return Math.exp(-0.5 * value * value) / Math.sqrt(2 * Math.PI);
 }
 
-function cholesky(A: number[][], maxJitter = 1.0): number[][] {
-    const n = A.length;
-    let jitter = 1e-9;
-    
-    while (jitter < maxJitter) {
-        let success = true;
-        const L = Array.from({length: n}, () => new Array(n).fill(0));
-        
-        for (let i = 0; i < n; i++) {
-            for (let j = 0; j <= i; j++) {
-                let sum = 0;
-                for (let k = 0; k < j; k++) {
-                    sum += L[i][k] * L[j][k];
-                }
-                if (i === j) {
-                    const val = A[i][i] + (jitter === 1e-9 ? 0 : jitter) - sum;
-                    if (val <= 0) {
-                        success = false;
-                        break;
-                    }
-                    L[i][j] = Math.sqrt(val);
-                } else {
-                    const safeLjj = Math.abs(L[j][j]) > 1e-15 ? L[j][j] : 1e-15;
-                    L[i][j] = (1.0 / safeLjj) * (A[i][j] - sum);
-                }
-            }
-            if (!success) break;
-        }
-        if (success) return L;
-        jitter *= 10;
+function validateCandidateCount(value: number): number {
+  if (!Number.isInteger(value) || value < 10 || value > MAX_CANDIDATES) {
+    throw new RangeError(`Bayesian candidate count must be an integer between 10 and ${MAX_CANDIDATES}`);
+  }
+  return value;
+}
+
+function retainTopSuggestion(
+  suggestions: { params: Record<string, number>; mean: number; std: number; ei: number }[],
+  candidate: { params: Record<string, number>; mean: number; std: number; ei: number },
+): void {
+  if (suggestions.length < TOP_SUGGESTIONS) {
+    suggestions.push(candidate);
+    suggestions.sort((left, right) => right.ei - left.ei);
+    return;
+  }
+  if (candidate.ei <= suggestions[suggestions.length - 1].ei) return;
+  suggestions[suggestions.length - 1] = candidate;
+  suggestions.sort((left, right) => right.ei - left.ei);
+}
+
+self.onmessage = (event: MessageEvent<BayesMessage>) => {
+  try {
+    const {
+      data,
+      features,
+      target,
+      maximize,
+      iterations: requestedIterations = 10_000,
+      seed,
+    } = event.data.payload;
+    const iterations = validateCandidateCount(requestedIterations);
+    if (features.length === 0) throw new Error('No features selected for Bayesian optimization.');
+    if (!target) throw new Error('No target selected.');
+
+    const inputs: number[][] = [];
+    const outputs: number[] = [];
+    for (const row of data ?? []) {
+      if (!row) continue;
+      const input = features.map((feature) => Number(row[feature]));
+      const output = Number(row[target]);
+      if (input.every(Number.isFinite) && Number.isFinite(output)) {
+        inputs.push(input);
+        outputs.push(output);
+      }
     }
-    throw new Error("Kriging Covariance Matrix is not positive definite, too much multicollinearity in data.");
-}
-
-function forwardSolve(L: number[][], B: number[]): number[] {
-    const n = L.length;
-    const Y = new Array(n).fill(0);
-    for (let i = 0; i < n; i++) {
-        let sum = 0;
-        for (let j = 0; j < i; j++) sum += L[i][j] * Y[j];
-        const safeLii = Math.abs(L[i][i]) > 1e-15 ? L[i][i] : 1e-15;
-        Y[i] = (B[i] - sum) / safeLii;
+    const sampleCount = outputs.length;
+    if (sampleCount < 3) {
+      throw new Error('At least 3 valid data points with numeric features and target are required to build the Gaussian process.');
     }
-    return Y;
-}
 
-function backwardSolve(L: number[][], Y: number[]): number[] {
-    const n = L.length;
-    const X = new Array(n).fill(0);
-    for (let i = n - 1; i >= 0; i--) {
-        let sum = 0;
-        for (let j = i + 1; j < n; j++) sum += L[j][i] * X[j];
-        const safeLii = Math.abs(L[i][i]) > 1e-15 ? L[i][i] : 1e-15;
-        X[i] = (Y[i] - sum) / safeLii;
+    const dimensions = features.length;
+    const minima = new Array<number>(dimensions).fill(Infinity);
+    const maxima = new Array<number>(dimensions).fill(-Infinity);
+    for (const row of inputs) {
+      for (let dimension = 0; dimension < dimensions; dimension++) {
+        minima[dimension] = Math.min(minima[dimension], row[dimension]);
+        maxima[dimension] = Math.max(maxima[dimension], row[dimension]);
+      }
     }
-    return X;
-}
+    const normalizedInputs = inputs.map((row) => row.map((value, dimension) => {
+      const range = maxima[dimension] - minima[dimension];
+      return range === 0 ? 0 : (value - minima[dimension]) / range;
+    }));
 
-function rbf(x1: number[], x2: number[], l: number): number {
-    let sum = 0;
-    for (let i = 0; i < x1.length; i++) sum += Math.pow(x1[i] - x2[i], 2);
-    return Math.exp(-0.5 * sum / (l * l));
-}
+    const outputMean = outputs.reduce((sum, value) => sum + value, 0) / sampleCount;
+    let outputStd = Math.sqrt(outputs.reduce((sum, value) => sum + (value - outputMean) ** 2, 0) / sampleCount);
+    if (!(outputStd > 0)) outputStd = 1;
+    const normalizedOutputs = outputs.map((value) => (value - outputMean) / outputStd);
 
-self.onmessage = (e: MessageEvent<BayesMessage>) => {
-    try {
-        const { data, features, target, maximize, iterations = 10000 } = e.data.payload;
-        const safeIterations = Math.max(10, Math.min(20000, Number(iterations) || 10000));
-        
-        if (features.length === 0) throw new Error("No features selected for Bayesian Optimization.");
-        if (!target) throw new Error("No target selected.");
+    const lengthScale = Math.sqrt(dimensions) * 0.5;
+    const factorization = factorizeGaussianProcessRbf(normalizedInputs, {
+      lengthScale,
+      noise: 1e-4,
+    });
+    const alpha = solveGaussianProcessAlpha(factorization, normalizedOutputs);
+    const scratch = createGaussianProcessScratch(sampleCount);
+    const point = new Float64Array(dimensions);
 
-        const d = features.length;
-        const X: number[][] = [];
-        const Y: number[] = [];
-        
-        for (const row of data || []) {
-            if (!row) continue;
-            const xRow = features.map(f => Number(row[f]));
-            const yVal = Number(row[target]);
-            if (xRow.every(v => Number.isFinite(v)) && Number.isFinite(yVal)) {
-                X.push(xRow);
-                Y.push(yVal);
-            }
-        }
-        
-        const n = Y.length;
-        if (n < 3) throw new Error("At least 3 valid data points with numeric features and target are required to build GP.");
-        
-        // Normalize X
-        const xMin = new Array(d).fill(Infinity);
-        const xMax = new Array(d).fill(-Infinity);
-        for (let i = 0; i < n; i++) {
-            for (let j = 0; j < d; j++) {
-                if (X[i][j] < xMin[j]) xMin[j] = X[i][j];
-                if (X[i][j] > xMax[j]) xMax[j] = X[i][j];
-            }
-        }
-        
-        const X_norm = X.map(row => 
-            row.map((val, j) => {
-                const range = xMax[j] - xMin[j];
-                return range === 0 ? 0 : (val - xMin[j]) / range;
-            })
-        );
-        
-        // Standardize Y
-        const safeN = n > 0 ? n : 1;
-        const yMean = Y.reduce((a, b) => a + b, 0) / safeN;
-        let yStd = Math.sqrt(Math.max(0, Y.reduce((sum, y) => sum + Math.pow(y - yMean, 2), 0) / safeN));
-        if (yStd === 0) yStd = 1;
-        
-        const Y_norm = Y.map(y => (y - yMean) / yStd);
-        
-        // GP Params
-        const l = Math.sqrt(d) * 0.5; // heuristic length scale
-        const noise = 1e-4;
-        
-        // Build K
-        const K = Array.from({length: n}, () => new Array(n).fill(0));
-        for (let i = 0; i < n; i++) {
-            for (let j = 0; j <= i; j++) {
-                const val = rbf(X_norm[i], X_norm[j], l);
-                K[i][j] = val;
-                K[j][i] = val;
-            }
-            K[i][i] += noise;
-        }
-        
-        const L = cholesky(K);
-        const alpha = backwardSolve(L, forwardSolve(L, Y_norm));
-        
-        const yBestNorm = maximize ? Math.max(...Y_norm) : Math.min(...Y_norm);
-        
-        // Random Search for EI
-        const suggestions: { params: Record<string, number>; mean: number; std: number; ei: number }[] = [];
-        
-        for (let i = 0; i < safeIterations; i++) {
-            const xStarNorm = new Array(d).fill(0).map(() => Math.random());
-            const kStar = X_norm.map(x => rbf(x, xStarNorm, l));
-            
-            let meanStarNorm = 0;
-            for (let j = 0; j < n; j++) meanStarNorm += kStar[j] * alpha[j];
-            
-            const v = forwardSolve(L, kStar);
-            let vTv = 0;
-            for (let j=0; j<n; j++) vTv += v[j]*v[j];
-            const varStarNorm = Math.max(1e-12, 1.0 - vTv);
-            const stdStarNorm = Math.sqrt(varStarNorm);
-            
-            let ei = 0;
-            const delta = maximize ? (meanStarNorm - yBestNorm) : (yBestNorm - meanStarNorm);
-            const z = delta / stdStarNorm;
-            
-            if (stdStarNorm > 0) {
-                ei = delta * cdf(z) + stdStarNorm * pdf(z);
-            }
-            
-            suggestions.push({
-                params: features.reduce((acc, f, idx) => {
-                    const range = xMax[idx] - xMin[idx];
-                    acc[f] = range === 0 ? xMin[idx] : (xStarNorm[idx] * range) + xMin[idx];
-                    return acc;
-                }, {} as Record<string, number>),
-                mean: meanStarNorm * yStd + yMean,
-                std: stdStarNorm * yStd,
-                ei: ei
-            });
-        }
-        
-        suggestions.sort((a, b) => b.ei - a.ei);
-        const topSuggestions = suggestions.slice(0, 5);
-        
-        // Historical points to check self-consistency
-        const historical = [];
-        for (let i = 0; i < n; i++) {
-            const kStar = X_norm.map(x => rbf(x, X_norm[i], l));
-            let meanStarNorm = 0;
-            for (let j = 0; j < n; j++) meanStarNorm += kStar[j] * alpha[j];
-            
-            const v = forwardSolve(L, kStar);
-            let vTv = 0;
-            for (let j=0; j<n; j++) vTv += v[j]*v[j];
-            const varStarNorm = Math.max(1e-12, 1.0 - vTv);
-            
-            historical.push({
-                index: i + 1,
-                y: Y[i],
-                y_pred: meanStarNorm * yStd + yMean,
-                y_std: Math.sqrt(varStarNorm) * yStd
-            });
-        }
-        
-        // sort by Y to make a clean monotonically increasing/decreasing line
-        historical.sort((a, b) => a.y - b.y);
-        
-        // Cumulative max/min convergence path
-        const convergence = [];
-        let currentBest = Y[0];
-        for (let i = 0; i < n; i++) {
-            if (maximize) {
-                if (Y[i] > currentBest) currentBest = Y[i];
-            } else {
-                if (Y[i] < currentBest) currentBest = Y[i];
-            }
-            convergence.push({ index: i + 1, currentBest });
-        }
+    let bestNormalized = normalizedOutputs[0];
+    for (let index = 1; index < normalizedOutputs.length; index++) {
+      bestNormalized = maximize
+        ? Math.max(bestNormalized, normalizedOutputs[index])
+        : Math.min(bestNormalized, normalizedOutputs[index]);
+    }
 
-        self.postMessage({
-            type: 'BAYES_RESULT',
-            payload: {
-                historical,
-                suggestions: topSuggestions,
-                convergence,
-                targetName: target,
-                maximize
-            }
+    const actualSeed = seed ?? deriveRandomSeed('bayesian-optimization-rbf-ei-v2', {
+      data: inputs,
+      outputs,
+      features,
+      target,
+      maximize,
+      iterations,
+    });
+    const random = createSeededRandom(actualSeed);
+    const suggestions: { params: Record<string, number>; mean: number; std: number; ei: number }[] = [];
+    const progressInterval = Math.max(1, Math.floor(iterations / 20));
+    self.postMessage(createWorkerProgressMessage({ ratio: 0, phase: 'candidate-evaluation' }));
+
+    for (let iteration = 0; iteration < iterations; iteration++) {
+      for (let dimension = 0; dimension < dimensions; dimension++) point[dimension] = random.next();
+      const prediction = predictGaussianProcessRbf(factorization, alpha, point, scratch);
+      const delta = maximize
+        ? prediction.mean - bestNormalized
+        : bestNormalized - prediction.mean;
+      const z = delta / prediction.standardDeviation;
+      const expectedImprovement = Math.max(
+        0,
+        delta * normalCdf(z) + prediction.standardDeviation * normalPdf(z),
+      );
+
+      if (suggestions.length < TOP_SUGGESTIONS || expectedImprovement > suggestions[suggestions.length - 1].ei) {
+        const params: Record<string, number> = {};
+        for (let dimension = 0; dimension < dimensions; dimension++) {
+          const range = maxima[dimension] - minima[dimension];
+          params[features[dimension]] = range === 0
+            ? minima[dimension]
+            : point[dimension] * range + minima[dimension];
+        }
+        retainTopSuggestion(suggestions, {
+          params,
+          mean: prediction.mean * outputStd + outputMean,
+          std: prediction.standardDeviation * outputStd,
+          ei: expectedImprovement,
         });
+      }
 
-    } catch (error) {
-        self.postMessage({
-            type: 'ERROR',
-            error: error instanceof Error ? error.message : String(error)
-        });
+      const completed = iteration + 1;
+      if (completed % progressInterval === 0 || completed === iterations) {
+        self.postMessage(createWorkerProgressMessage({
+          ratio: (completed / iterations) * 0.85,
+          completed,
+          total: iterations,
+          phase: 'candidate-evaluation',
+        }));
+      }
     }
+
+    const historical: { index: number; y: number; y_pred: number; y_std: number }[] = [];
+    for (let sample = 0; sample < sampleCount; sample++) {
+      for (let dimension = 0; dimension < dimensions; dimension++) {
+        point[dimension] = normalizedInputs[sample][dimension];
+      }
+      const prediction = predictGaussianProcessRbf(factorization, alpha, point, scratch);
+      historical.push({
+        index: sample + 1,
+        y: outputs[sample],
+        y_pred: prediction.mean * outputStd + outputMean,
+        y_std: prediction.standardDeviation * outputStd,
+      });
+    }
+    historical.sort((left, right) => left.y - right.y);
+
+    const convergence: { index: number; currentBest: number }[] = [];
+    let currentBest = outputs[0];
+    for (let index = 0; index < outputs.length; index++) {
+      currentBest = maximize
+        ? Math.max(currentBest, outputs[index])
+        : Math.min(currentBest, outputs[index]);
+      convergence.push({ index: index + 1, currentBest });
+    }
+    self.postMessage(createWorkerProgressMessage({ ratio: 1, phase: 'complete' }));
+
+    self.postMessage({
+      type: 'BAYES_RESULT',
+      payload: {
+        historical,
+        suggestions,
+        convergence,
+        targetName: target,
+        maximize,
+        reproducibility: {
+          seed: random.seed,
+          seedSource: seed === undefined ? 'derived' : 'user',
+          randomAlgorithm: random.algorithm,
+          randomAlgorithmVersion: random.algorithmVersion,
+          modelVersion: BAYES_MODEL_VERSION,
+        },
+        performance: {
+          candidatesEvaluated: iterations,
+          candidatesRetained: suggestions.length,
+          candidateStorage: 'streaming-top-k',
+          kernelFactorizations: 1,
+          factorizationJitter: factorization.jitter,
+        },
+      },
+    } satisfies BayesResponse);
+  } catch (error) {
+    self.postMessage({
+      type: 'ERROR',
+      error: error instanceof Error ? error.message : String(error),
+    } satisfies BayesResponse);
+  }
 };
