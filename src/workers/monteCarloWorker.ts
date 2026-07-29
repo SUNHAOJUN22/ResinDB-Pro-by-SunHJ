@@ -1,6 +1,17 @@
 import { createWorkerProgressMessage } from '@/compute/workerProtocol';
-import { FormulaConfig, Product, PropertyValue } from '@/types/index';
+import {
+  createSeededRandom,
+  deriveRandomSeed,
+  type RandomSeed,
+  SEEDED_RANDOM_ALGORITHM,
+  SEEDED_RANDOM_ALGORITHM_VERSION,
+} from '@/compute/random';
+import type { FormulaConfig, Product, PropertyValue } from '@/types/index';
 import { formulaEngine } from '@/lib/formulaParser';
+
+const MONTE_CARLO_MODEL_VERSION = 'monte-carlo-formula-1.0.0';
+const NORMAL_TRANSFORM_VERSION = 'box-muller-1.0.0';
+const MAX_ITERATIONS = 1_000_000;
 
 export interface MonteCarloMessage {
   type: 'RUN_SIMULATION';
@@ -10,7 +21,19 @@ export interface MonteCarloMessage {
     product: Product;
     variances: Record<string, number>;
     iterations?: number;
+    seed?: RandomSeed;
   };
+}
+
+export interface MonteCarloReproducibility {
+  seed: string;
+  seedSource: 'user' | 'derived';
+  randomAlgorithm: typeof SEEDED_RANDOM_ALGORITHM;
+  randomAlgorithmVersion: typeof SEEDED_RANDOM_ALGORITHM_VERSION;
+  normalTransformVersion: typeof NORMAL_TRANSFORM_VERSION;
+  modelVersion: typeof MONTE_CARLO_MODEL_VERSION;
+  requestedIterations: number;
+  acceptedSamples: number;
 }
 
 export interface MonteCarloResponse {
@@ -24,52 +47,72 @@ export interface MonteCarloResponse {
       p95: number;
       kde: {x: number, y: number}[];
     };
+    reproducibility: MonteCarloReproducibility;
   };
   error?: string;
 }
 
-function randomNormal(mean: number, stdDev: number): number {
-  let u = 0, v = 0;
-  while(u === 0) u = Math.random();
-  while(v === 0) v = Math.random();
-  const num = Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
-  return num * stdDev + mean;
+function validateIterations(iterations: number): number {
+  if (!Number.isInteger(iterations) || iterations < 1 || iterations > MAX_ITERATIONS) {
+    throw new RangeError(`Monte Carlo iterations must be an integer between 1 and ${MAX_ITERATIONS}`);
+  }
+  return iterations;
+}
+
+function validateVariancePercent(value: number, key: string): number {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new RangeError(`Variance for ${key} must be a non-negative finite percentage`);
+  }
+  return value;
 }
 
 function calculateKDE(data: number[], bandwidth: number, steps: number = 100): {x: number, y: number}[] {
-    if (data.length === 0) return [];
-
-    let min = data[0], max = data[0];
-    for (const d of data) {
-        if (d < min) min = d;
-        if (d > max) max = d;
+  if (data.length === 0) return [];
+  const safeSteps = Number.isInteger(steps) && steps > 0 ? steps : 100;
+  let min = data[0];
+  let max = data[0];
+  for (const value of data) {
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
+  const fallbackScale = Math.max(Math.abs(min), Math.abs(max), 1) * 1e-6;
+  const safeBandwidth = Math.abs(bandwidth) > 1e-15 ? Math.abs(bandwidth) : fallbackScale;
+  const margin = (max - min) * 0.1 || safeBandwidth * 3;
+  min -= margin;
+  max += margin;
+  const span = max - min;
+  const kde: {x: number, y: number}[] = [];
+  for (let index = 0; index <= safeSteps; index++) {
+    const x = min + (index / safeSteps) * span;
+    let sum = 0;
+    for (const value of data) {
+      const standardized = (x - value) / safeBandwidth;
+      sum += Math.exp(-0.5 * standardized * standardized) / Math.sqrt(2 * Math.PI);
     }
-
-    const margin = (max - min) * 0.1 || bandwidth * 3;
-    min -= margin;
-    max += margin;
-
-    const safeSteps = steps > 0 ? steps : 100;
-    const step = (max - min) / safeSteps;
-    const kde = [];
-
-    for (let x = min; x <= max; x += step) {
-        let sum = 0;
-        for (const d of data) {
-            const safeBW = Math.abs(bandwidth) > 1e-15 ? bandwidth : 1e-15;
-            const u = (x - d) / safeBW;
-            sum += Math.exp(-0.5 * u * u) / (Math.sqrt(2 * Math.PI));
-        }
-        const denom = data.length * (Math.abs(bandwidth) > 1e-15 ? bandwidth : 1e-15);
-        kde.push({ x, y: sum / denom });
-    }
-    return kde;
+    kde.push({ x, y: sum / (data.length * safeBandwidth) });
+  }
+  return kde;
 }
 
-self.onmessage = (e: MessageEvent<MonteCarloMessage>) => {
+self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
   try {
-    const { targetFormulaId, formulas, product, variances, iterations = 5000 } = e.data.payload;
-
+    const {
+      targetFormulaId,
+      formulas,
+      product,
+      variances,
+      iterations: requestedIterations = 5000,
+      seed,
+    } = event.data.payload;
+    const iterations = validateIterations(requestedIterations);
+    const actualSeed = seed ?? deriveRandomSeed('monte-carlo-formula-v1', {
+      targetFormulaId,
+      formulas,
+      product,
+      variances,
+      iterations,
+    });
+    const random = createSeededRandom(actualSeed);
     const evaluator = formulaEngine.compileGraph(formulas);
     const results: number[] = [];
     const baseProperties = product.properties;
@@ -82,54 +125,49 @@ self.onmessage = (e: MessageEvent<MonteCarloMessage>) => {
       phase: 'sampling',
     }));
 
-    for (let i = 0; i < iterations; i++) {
-        const perturbedProps: Record<string, PropertyValue> = {};
-
-        for (const [key, val] of Object.entries(baseProperties)) {
-            const numVal = parseFloat(String(val.value));
-            if (!isNaN(numVal) && variances[key]) {
-                const stdDev = numVal * (variances[key] / 100);
-                perturbedProps[key] = { ...val, value: randomNormal(numVal, stdDev) };
-            } else {
-                perturbedProps[key] = val;
-            }
+    for (let iteration = 0; iteration < iterations; iteration++) {
+      const perturbedProperties: Record<string, PropertyValue> = {};
+      for (const [key, property] of Object.entries(baseProperties)) {
+        const numericValue = Number(property.value);
+        const variancePercent = variances[key];
+        if (Number.isFinite(numericValue) && variancePercent !== undefined && variancePercent !== 0) {
+          const validatedVariance = validateVariancePercent(variancePercent, key);
+          const standardDeviation = Math.abs(numericValue) * (validatedVariance / 100);
+          perturbedProperties[key] = {
+            ...property,
+            value: random.normal(numericValue, standardDeviation),
+          };
+        } else {
+          perturbedProperties[key] = property;
         }
+      }
 
-        const testProduct = { ...product, properties: perturbedProps } as Product;
-        const computed = evaluator(testProduct);
-        const result = computed[targetFormulaId];
+      const testProduct = { ...product, properties: perturbedProperties } as Product;
+      const result = evaluator(testProduct)[targetFormulaId];
+      if (Number.isFinite(result)) results.push(result);
 
-        if (result !== undefined && !isNaN(result)) {
-            results.push(result);
-        }
-
-        const completed = i + 1;
-        if (completed % progressInterval === 0 || completed === iterations) {
-          self.postMessage(createWorkerProgressMessage({
-            ratio: (completed / iterations) * 0.85,
-            completed,
-            total: iterations,
-            phase: 'sampling',
-          }));
-        }
+      const completed = iteration + 1;
+      if (completed % progressInterval === 0 || completed === iterations) {
+        self.postMessage(createWorkerProgressMessage({
+          ratio: (completed / iterations) * 0.85,
+          completed,
+          total: iterations,
+          phase: 'sampling',
+        }));
+      }
     }
 
     if (results.length === 0) {
-        throw new Error("Simulation yielded no valid numeric results.");
+      throw new Error('Simulation yielded no valid finite numeric results.');
     }
 
     self.postMessage(createWorkerProgressMessage({ ratio: 0.9, phase: 'statistics' }));
-    results.sort((a, b) => a - b);
-
-    const sum = results.reduce((a, b) => a + b, 0);
-    const safeLen = results.length || 1;
-    const mean = sum / safeLen;
-    const variance = results.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / safeLen;
+    results.sort((left, right) => left - right);
+    const mean = results.reduce((sum, value) => sum + value, 0) / results.length;
+    const variance = results.reduce((sum, value) => sum + (value - mean) ** 2, 0) / results.length;
     const stdDev = Math.sqrt(variance);
-
-    const p5 = results[Math.floor(results.length * 0.05)];
-    const p95 = results[Math.floor(results.length * 0.95)];
-
+    const p5 = results[Math.min(results.length - 1, Math.floor(results.length * 0.05))];
+    const p95 = results[Math.min(results.length - 1, Math.floor(results.length * 0.95))];
     const bandwidth = 1.06 * stdDev * Math.pow(results.length, -0.2);
     const kde = calculateKDE(results, bandwidth, 100);
     self.postMessage(createWorkerProgressMessage({ ratio: 1, phase: 'complete' }));
@@ -138,14 +176,23 @@ self.onmessage = (e: MessageEvent<MonteCarloMessage>) => {
       type: 'SIMULATION_COMPLETE',
       payload: {
         results,
-        stats: { mean, stdDev, p5, p95, kde }
-      }
+        stats: { mean, stdDev, p5, p95, kde },
+        reproducibility: {
+          seed: random.seed,
+          seedSource: seed === undefined ? 'derived' : 'user',
+          randomAlgorithm: random.algorithm,
+          randomAlgorithmVersion: random.algorithmVersion,
+          normalTransformVersion: NORMAL_TRANSFORM_VERSION,
+          modelVersion: MONTE_CARLO_MODEL_VERSION,
+          requestedIterations: iterations,
+          acceptedSamples: results.length,
+        },
+      },
     });
-
   } catch (error) {
     self.postMessage({
       type: 'ERROR',
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 };
