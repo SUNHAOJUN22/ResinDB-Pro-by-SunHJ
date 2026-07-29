@@ -1,4 +1,13 @@
 import { createWorkerProgressMessage } from '@/compute/workerProtocol';
+import {
+  createSeededRandom,
+  deriveRandomSeed,
+  type RandomSeed,
+  SEEDED_RANDOM_ALGORITHM,
+  SEEDED_RANDOM_ALGORITHM_VERSION,
+} from '@/compute/random';
+
+const KMEANS_MODEL_VERSION = 'kmeans-plus-plus-full-silhouette-1.0.0';
 
 export type KMeansMessage = {
   type: 'COMPUTE_KMEANS';
@@ -6,8 +15,17 @@ export type KMeansMessage = {
     data: { id: string; values: Record<string, number> }[];
     keys: string[];
     maxK?: number;
+    seed?: RandomSeed;
   };
 };
+
+export interface KMeansReproducibility {
+  seed: string;
+  seedSource: 'user' | 'derived';
+  randomAlgorithm: typeof SEEDED_RANDOM_ALGORITHM;
+  randomAlgorithmVersion: typeof SEEDED_RANDOM_ALGORITHM_VERSION;
+  modelVersion: typeof KMEANS_MODEL_VERSION;
+}
 
 export type KMeansResponse = {
   type: 'KMEANS_RESULT';
@@ -15,166 +33,191 @@ export type KMeansResponse = {
     clusters: Record<string, number>;
     k: number;
     centroids: number[][];
+    silhouetteScore: number | null;
+    reproducibility: KMeansReproducibility;
   };
 } | {
   type: 'ERROR';
   payload: { message: string };
 };
 
-function distSq(a: number[], b: number[]): number {
+function distanceSquared(left: number[], right: number[]): number {
   let sum = 0;
-  for (let i = 0; i < a.length; i++) {
-    sum += (a[i] - b[i]) ** 2;
-  }
+  for (let index = 0; index < left.length; index++) sum += (left[index] - right[index]) ** 2;
   return sum;
 }
 
-self.onmessage = (e: MessageEvent<KMeansMessage>) => {
+function validateMaxK(maxK: number): number {
+  if (!Number.isInteger(maxK) || maxK < 1 || maxK > 100) {
+    throw new RangeError('maxK must be an integer between 1 and 100');
+  }
+  return maxK;
+}
+
+self.onmessage = (event: MessageEvent<KMeansMessage>) => {
   try {
-    const { data, keys, maxK = 10 } = e.data.payload;
+    const { data, keys, maxK: requestedMaxK = 10, seed } = event.data.payload;
+    const maxK = validateMaxK(requestedMaxK);
+    const actualSeed = seed ?? deriveRandomSeed('kmeans-v1', { data, keys, maxK });
+    const random = createSeededRandom(actualSeed);
+    const reproducibility: KMeansReproducibility = {
+      seed: random.seed,
+      seedSource: seed === undefined ? 'derived' : 'user',
+      randomAlgorithm: random.algorithm,
+      randomAlgorithmVersion: random.algorithmVersion,
+      modelVersion: KMEANS_MODEL_VERSION,
+    };
+
     if (!data.length || !keys.length) {
       self.postMessage(createWorkerProgressMessage({ ratio: 1, phase: 'complete' }));
-      self.postMessage({ type: 'KMEANS_RESULT', payload: { clusters: {}, k: 0, centroids: [] } });
+      self.postMessage({
+        type: 'KMEANS_RESULT',
+        payload: { clusters: {}, k: 0, centroids: [], silhouetteScore: null, reproducibility },
+      } satisfies KMeansResponse);
       return;
     }
 
     self.postMessage(createWorkerProgressMessage({ ratio: 0, phase: 'normalization' }));
-    const m = keys.length;
-    const n = data.length;
-    const rawMatrix = data.map(d => keys.map(k => d.values[k] ?? 0));
+    const dimensions = keys.length;
+    const sampleCount = data.length;
+    const rawMatrix = data.map((item) => keys.map((key) => item.values[key] ?? 0));
+    const means = new Array<number>(dimensions).fill(0);
+    const standardDeviations = new Array<number>(dimensions).fill(0);
 
-    const means = new Array(m).fill(0);
-    const stds = new Array(m).fill(0);
-
-    for (let j = 0; j < m; j++) {
-      for (let i = 0; i < n; i++) means[j] += rawMatrix[i][j];
-      means[j] /= n;
-      for (let i = 0; i < n; i++) stds[j] += (rawMatrix[i][j] - means[j]) ** 2;
-      stds[j] = Math.sqrt(stds[j] / n) || 1;
+    for (let dimension = 0; dimension < dimensions; dimension++) {
+      for (let sample = 0; sample < sampleCount; sample++) means[dimension] += rawMatrix[sample][dimension];
+      means[dimension] /= sampleCount;
+      for (let sample = 0; sample < sampleCount; sample++) {
+        standardDeviations[dimension] += (rawMatrix[sample][dimension] - means[dimension]) ** 2;
+      }
+      standardDeviations[dimension] = Math.sqrt(standardDeviations[dimension] / sampleCount) || 1;
     }
 
-    const mat = rawMatrix.map(row => row.map((v, j) => (v - means[j]) / stds[j]));
-    const maxTestedK = Math.min(maxK, Math.floor(n / 2), 10);
+    const matrix = rawMatrix.map((row) => row.map((value, dimension) => (
+      (value - means[dimension]) / standardDeviations[dimension]
+    )));
+    const maxTestedK = Math.min(maxK, Math.floor(sampleCount / 2), 10);
     let bestK = 1;
-    let bestClusters: number[] = new Array(n).fill(0);
+    let bestAssignments = new Array<number>(sampleCount).fill(0);
     let bestScore = -1;
     let bestCentroids: number[][] = [];
 
     const runKMeans = (k: number) => {
       const centroids: number[][] = [];
-      centroids.push([...mat[Math.floor(Math.random() * n)]]);
+      centroids.push([...matrix[Math.floor(random.next() * sampleCount)]]);
 
-      for (let c = 1; c < k; c++) {
-        const dists = mat.map(row => {
-          let minDist = Infinity;
-          for (const centroid of centroids) {
-            minDist = Math.min(minDist, distSq(row, centroid));
-          }
-          return minDist;
+      for (let centroidIndex = 1; centroidIndex < k; centroidIndex++) {
+        const distances = matrix.map((row) => {
+          let minimumDistance = Infinity;
+          for (const centroid of centroids) minimumDistance = Math.min(minimumDistance, distanceSquared(row, centroid));
+          return minimumDistance;
         });
-        const sumDist = dists.reduce((a, b) => a + b, 0);
-        let target = Math.random() * sumDist;
-        let chosenIdx = 0;
-        for (let i = 0; i < n; i++) {
-          target -= dists[i];
-          if (target <= 0) {
-            chosenIdx = i;
-            break;
-          }
-        }
-        centroids.push([...mat[chosenIdx]]);
-      }
-
-      const assignments = new Array(n).fill(-1);
-      let changed = true;
-      let iters = 0;
-
-      while (changed && iters < 50) {
-        changed = false;
-        const newCentroids = new Array(k).fill(0).map(() => new Array(m).fill(0));
-        const counts = new Array(k).fill(0);
-
-        for (let i = 0; i < n; i++) {
-          let bestC = -1;
-          let minDist = Infinity;
-          for (let c = 0; c < k; c++) {
-            const d = distSq(mat[i], centroids[c]);
-            if (d < minDist) {
-              minDist = d;
-              bestC = c;
+        const distanceSum = distances.reduce((sum, value) => sum + value, 0);
+        let chosenIndex = centroidIndex % sampleCount;
+        if (distanceSum > 0) {
+          let target = random.next() * distanceSum;
+          for (let sample = 0; sample < sampleCount; sample++) {
+            target -= distances[sample];
+            if (target <= 0) {
+              chosenIndex = sample;
+              break;
             }
           }
-          if (assignments[i] !== bestC) {
-            changed = true;
-            assignments[i] = bestC;
+        }
+        centroids.push([...matrix[chosenIndex]]);
+      }
+
+      const assignments = new Array<number>(sampleCount).fill(-1);
+      let changed = true;
+      let iterations = 0;
+      while (changed && iterations < 50) {
+        changed = false;
+        const newCentroids = Array.from({ length: k }, () => new Array<number>(dimensions).fill(0));
+        const counts = new Array<number>(k).fill(0);
+
+        for (let sample = 0; sample < sampleCount; sample++) {
+          let bestCluster = -1;
+          let minimumDistance = Infinity;
+          for (let cluster = 0; cluster < k; cluster++) {
+            const distance = distanceSquared(matrix[sample], centroids[cluster]);
+            if (distance < minimumDistance) {
+              minimumDistance = distance;
+              bestCluster = cluster;
+            }
           }
-          for (let j = 0; j < m; j++) newCentroids[bestC][j] += mat[i][j];
-          counts[bestC]++;
+          if (assignments[sample] !== bestCluster) {
+            changed = true;
+            assignments[sample] = bestCluster;
+          }
+          for (let dimension = 0; dimension < dimensions; dimension++) {
+            newCentroids[bestCluster][dimension] += matrix[sample][dimension];
+          }
+          counts[bestCluster] += 1;
         }
 
-        for (let c = 0; c < k; c++) {
-          if (counts[c] > 0) {
-            for (let j = 0; j < m; j++) centroids[c][j] = newCentroids[c][j] / counts[c];
+        for (let cluster = 0; cluster < k; cluster++) {
+          if (counts[cluster] > 0) {
+            for (let dimension = 0; dimension < dimensions; dimension++) {
+              centroids[cluster][dimension] = newCentroids[cluster][dimension] / counts[cluster];
+            }
           } else {
-            centroids[c] = [...mat[Math.floor(Math.random() * n)]];
+            centroids[cluster] = [...matrix[Math.floor(random.next() * sampleCount)]];
             changed = true;
           }
         }
-        iters++;
+        iterations += 1;
       }
       return { assignments, centroids };
     };
 
-    const calcSilhouette = (assignments: number[], k: number) => {
+    const calculateSilhouette = (assignments: number[], k: number) => {
       if (k < 2) return -1;
-      let totalSil = 0;
-
-      for (let i = 0; i < n; i++) {
-        const c = assignments[i];
-        let a = 0, aCount = 0;
-        const bDists = new Array(k).fill(0);
-        const bCounts = new Array(k).fill(0);
-
-        for (let j = 0; j < n; j++) {
-          if (i === j) continue;
-          const d = Math.sqrt(distSq(mat[i], mat[j]));
-          if (assignments[j] === c) {
-            a += d;
-            aCount++;
+      let total = 0;
+      for (let sample = 0; sample < sampleCount; sample++) {
+        const ownCluster = assignments[sample];
+        let ownDistance = 0;
+        let ownCount = 0;
+        const otherDistances = new Array<number>(k).fill(0);
+        const otherCounts = new Array<number>(k).fill(0);
+        for (let other = 0; other < sampleCount; other++) {
+          if (sample === other) continue;
+          const distance = Math.sqrt(distanceSquared(matrix[sample], matrix[other]));
+          if (assignments[other] === ownCluster) {
+            ownDistance += distance;
+            ownCount += 1;
           } else {
-            bDists[assignments[j]] += d;
-            bCounts[assignments[j]]++;
+            otherDistances[assignments[other]] += distance;
+            otherCounts[assignments[other]] += 1;
           }
         }
-
-        a = aCount > 0 ? a / aCount : 0;
+        const a = ownCount > 0 ? ownDistance / ownCount : 0;
         let b = Infinity;
-        for (let otherC = 0; otherC < k; otherC++) {
-          if (otherC !== c && bCounts[otherC] > 0) {
-            b = Math.min(b, bDists[otherC] / bCounts[otherC]);
+        for (let cluster = 0; cluster < k; cluster++) {
+          if (cluster !== ownCluster && otherCounts[cluster] > 0) {
+            b = Math.min(b, otherDistances[cluster] / otherCounts[cluster]);
           }
         }
-
-        const maxAB = Math.max(a, b);
-        let s = 0;
-        if (maxAB > 0) s = (b - a) / maxAB;
-        totalSil += s;
+        const denominator = Math.max(a, b);
+        total += denominator > 0 && Number.isFinite(denominator) ? (b - a) / denominator : 0;
       }
-      return n > 0 ? totalSil / n : 0;
+      return total / sampleCount;
     };
 
     if (maxTestedK < 2) {
-      bestClusters = runKMeans(1).assignments;
+      const singleCluster = runKMeans(1);
+      bestAssignments = singleCluster.assignments;
+      bestCentroids = singleCluster.centroids;
       bestK = 1;
+      bestScore = -1;
       self.postMessage(createWorkerProgressMessage({ ratio: 0.95, phase: 'model-selection' }));
     } else {
       const candidateCount = maxTestedK - 1;
       for (let k = 2; k <= maxTestedK; k++) {
         const { assignments, centroids } = runKMeans(k);
-        const score = calcSilhouette(assignments, k);
+        const score = calculateSilhouette(assignments, k);
         if (score > bestScore) {
           bestScore = score;
-          bestClusters = assignments;
+          bestAssignments = assignments;
           bestK = k;
           bestCentroids = centroids;
         }
@@ -187,14 +230,23 @@ self.onmessage = (e: MessageEvent<KMeansMessage>) => {
       }
     }
 
-    const clustersRecord: Record<string, number> = {};
-    for (let i = 0; i < n; i++) {
-      clustersRecord[data[i].id] = bestClusters[i];
-    }
-
+    const clusters: Record<string, number> = {};
+    for (let sample = 0; sample < sampleCount; sample++) clusters[data[sample].id] = bestAssignments[sample];
     self.postMessage(createWorkerProgressMessage({ ratio: 1, phase: 'complete' }));
-    self.postMessage({ type: 'KMEANS_RESULT', payload: { clusters: clustersRecord, k: bestK, centroids: bestCentroids } } as KMeansResponse);
+    self.postMessage({
+      type: 'KMEANS_RESULT',
+      payload: {
+        clusters,
+        k: bestK,
+        centroids: bestCentroids,
+        silhouetteScore: bestScore >= 0 ? bestScore : null,
+        reproducibility,
+      },
+    } satisfies KMeansResponse);
   } catch (error) {
-    self.postMessage({ type: 'ERROR', payload: { message: error instanceof Error ? error.message : 'Unknown error' } } as KMeansResponse);
+    self.postMessage({
+      type: 'ERROR',
+      payload: { message: error instanceof Error ? error.message : 'Unknown error' },
+    } satisfies KMeansResponse);
   }
 };
