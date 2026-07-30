@@ -85,6 +85,22 @@ function validateBuffers(
   }
 }
 
+function accumulateKdeSeparableRowTypeScriptUnchecked(
+  xKernel: Float64Array,
+  observations: number,
+  gridSize: number,
+  yWeights: Float64Array,
+  output: Float64Array,
+): void {
+  for (let column = 0; column < gridSize; column++) {
+    let sum = 0;
+    for (let observation = 0; observation < observations; observation++) {
+      sum += xKernel[observation * gridSize + column] * yWeights[observation];
+    }
+    output[column] = sum;
+  }
+}
+
 export function accumulateKdeSeparableRowTypeScript(
   xKernel: Float64Array,
   observations: number,
@@ -97,13 +113,13 @@ export function accumulateKdeSeparableRowTypeScript(
   validateBuffers(xKernel, observationCount, columns, yWeights, output);
   validateFinite(xKernel, 'xKernel');
   validateFinite(yWeights, 'yWeights');
-  for (let column = 0; column < columns; column++) {
-    let sum = 0;
-    for (let observation = 0; observation < observationCount; observation++) {
-      sum += xKernel[observation * columns + column] * yWeights[observation];
-    }
-    output[column] = sum;
-  }
+  accumulateKdeSeparableRowTypeScriptUnchecked(
+    xKernel,
+    observationCount,
+    columns,
+    yWeights,
+    output,
+  );
 }
 
 function errorMessage(error: unknown): string {
@@ -178,7 +194,7 @@ export function createKdeSeparableRowSession(
           switchToTypeScript(error);
         }
       }
-      accumulateKdeSeparableRowTypeScript(
+      accumulateKdeSeparableRowTypeScriptUnchecked(
         options.xKernel,
         observations,
         gridSize,
