@@ -70,6 +70,9 @@ jobs:
       - name: TypeScript
         run: npm run typecheck
 
+      - name: Deterministic K-Means backend benchmark smoke
+        run: npm run benchmark:kmeans:smoke
+
       - name: Complete regression tests
         run: npm test
 
@@ -158,9 +161,10 @@ jobs:
             status: 'PASS',
             gates: [
               'docs', 'source-hygiene', 'governed-data', 'lint', 'typescript',
-              'regression', 'isolated-unit', 'isolated-science-workers',
-              'whole-source-coverage', 'build', 'http-smoke', 'chromium-ui',
-              'production-audit', 'complete-audit', 'single-main-branch',
+              'kmeans-benchmark-smoke', 'regression', 'isolated-unit',
+              'isolated-science-workers', 'whole-source-coverage', 'build',
+              'http-smoke', 'chromium-ui', 'production-audit', 'complete-audit',
+              'single-main-branch',
             ],
           }, null, 2)}\n`)
           NODE
