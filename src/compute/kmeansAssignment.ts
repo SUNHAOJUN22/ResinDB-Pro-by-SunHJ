@@ -59,6 +59,14 @@ function validatePositiveInteger(value: number, name: string): number {
   return value;
 }
 
+function validateFiniteValues(values: ArrayLike<number>, name: string): void {
+  for (let index = 0; index < values.length; index++) {
+    if (!Number.isFinite(values[index])) {
+      throw new TypeError(`${name} must contain only finite values`);
+    }
+  }
+}
+
 function validateAssignmentBuffers(
   matrix: Float64Array,
   sampleCount: number,
@@ -89,7 +97,7 @@ function validateAssignmentBuffers(
   }
 }
 
-export function assignAndAccumulateTypeScript(
+function assignAndAccumulateTypeScriptUnchecked(
   matrix: Float64Array,
   sampleCount: number,
   dimensions: number,
@@ -99,16 +107,6 @@ export function assignAndAccumulateTypeScript(
   sums: Float64Array,
   counts: Uint32Array,
 ): number {
-  validateAssignmentBuffers(
-    matrix,
-    sampleCount,
-    dimensions,
-    centroids,
-    clusterCount,
-    assignments,
-    sums,
-    counts,
-  );
   sums.fill(0);
   counts.fill(0);
   let changed = 0;
@@ -147,6 +145,40 @@ export function assignAndAccumulateTypeScript(
   return changed;
 }
 
+export function assignAndAccumulateTypeScript(
+  matrix: Float64Array,
+  sampleCount: number,
+  dimensions: number,
+  centroids: Float64Array,
+  clusterCount: number,
+  assignments: Int32Array,
+  sums: Float64Array,
+  counts: Uint32Array,
+): number {
+  validateAssignmentBuffers(
+    matrix,
+    sampleCount,
+    dimensions,
+    centroids,
+    clusterCount,
+    assignments,
+    sums,
+    counts,
+  );
+  validateFiniteValues(matrix, 'matrix');
+  validateFiniteValues(centroids, 'centroids');
+  return assignAndAccumulateTypeScriptUnchecked(
+    matrix,
+    sampleCount,
+    dimensions,
+    centroids,
+    clusterCount,
+    assignments,
+    sums,
+    counts,
+  );
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -160,6 +192,7 @@ export function createKMeansAssignmentSession(
   if (options.matrix.length !== samples * dimensions) {
     throw new RangeError('matrix length must equal sampleCount times dimensions');
   }
+  validateFiniteValues(options.matrix, 'matrix');
   const preference = options.preference ?? 'auto';
   if (preference !== 'auto' && preference !== 'typescript' && preference !== 'wasm') {
     throw new TypeError('K-Means assignment backend must be auto, typescript, or wasm');
@@ -207,6 +240,17 @@ export function createKMeansAssignmentSession(
       if (clusterCount > maxClusters) {
         throw new RangeError('clusterCount exceeds session capacity');
       }
+      validateAssignmentBuffers(
+        options.matrix,
+        samples,
+        dimensions,
+        centroids,
+        clusterCount,
+        assignments,
+        sums,
+        counts,
+      );
+      validateFiniteValues(centroids, 'centroids');
       calls += 1;
       if (backend === 'wasm' && wasmSession) {
         try {
@@ -221,7 +265,7 @@ export function createKMeansAssignmentSession(
           switchToTypeScript(error);
         }
       }
-      return assignAndAccumulateTypeScript(
+      return assignAndAccumulateTypeScriptUnchecked(
         options.matrix,
         samples,
         dimensions,
