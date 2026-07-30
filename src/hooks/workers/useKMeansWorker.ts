@@ -1,9 +1,13 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { KMeansAssignmentBackendPreference } from '@/compute/kmeansAssignment';
 import {
   kmeansBackendProfileStore,
   type KMeansBackendProfileLoadStatus,
 } from '@/compute/kmeansBackendProfileStore';
+import {
+  createKMeansDecisionHistoryEntry,
+  kmeansDecisionHistoryStore,
+} from '@/compute/kmeansDecisionHistoryStore';
 import { createRowMajorFloat64Matrix } from '@/compute/numericBuffers';
 import type { RandomSeed } from '@/compute/random';
 import {
@@ -39,6 +43,17 @@ export function useKMeansWorker() {
     ),
     'KMEANS_RESULT',
   );
+  const lastAuditedResult = useRef<typeof result>(null);
+
+  useEffect(() => {
+    if (!result || lastAuditedResult.current === result) return;
+    lastAuditedResult.current = result;
+    const evidence = result.performance.assignmentKernel;
+    if (!evidence) return;
+    void kmeansDecisionHistoryStore
+      .append(createKMeansDecisionHistoryEntry(evidence))
+      .catch(() => undefined);
+  }, [result]);
 
   const computeKMeans = useCallback(async (
     data: { id: string; values: Record<string, number> }[],
