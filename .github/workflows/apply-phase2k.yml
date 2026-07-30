@@ -37,7 +37,18 @@ jobs:
               {
                 echo "stage=$stage"
                 echo "exit_code=$code"
-                for part in .phase2k/final-*.b64; do
+                for part in \
+                  .phase2k/patch-00a.b64 \
+                  .phase2k/fix-00b-1.b64 \
+                  .phase2k/fix-00b-2.b64 \
+                  .phase2k/patch-01.b64 \
+                  .phase2k/patch-02.b64 \
+                  .phase2k/patch-03.b64 \
+                  .phase2k/fix-04a-1.b64 \
+                  .phase2k/fix-04a-2.b64 \
+                  .phase2k/fix-04b-1.b64 \
+                  .phase2k/fix-04b-2.b64 \
+                  .phase2k/patch-05.b64; do
                   [ -f "$part" ] || continue
                   printf '%s bytes=' "$part"
                   wc -c < "$part" | tr -d ' '
@@ -59,38 +70,47 @@ jobs:
           trap record_failure EXIT
 
           stage=parts-present
-          for index in 00 01 02 03 04 05 06 07 08 09 10 11; do
-            test -f ".phase2k/final-${index}.b64"
+          for part in \
+            .phase2k/patch-00a.b64 \
+            .phase2k/fix-00b-1.b64 \
+            .phase2k/fix-00b-2.b64 \
+            .phase2k/patch-01.b64 \
+            .phase2k/patch-02.b64 \
+            .phase2k/patch-03.b64 \
+            .phase2k/fix-04a-1.b64 \
+            .phase2k/fix-04a-2.b64 \
+            .phase2k/fix-04b-1.b64 \
+            .phase2k/fix-04b-2.b64 \
+            .phase2k/patch-05.b64; do
+            test -f "$part"
           done
 
           stage=part-hashes
-          echo "052090d81e221376613edc13a66824a3b24855abb53a0178418abb3cfe262f2e  .phase2k/final-00.b64" | sha256sum -c -
-          echo "f39d42c9d5a95451764cf4d76cd3702c2191ecee6276a97edd57b67153611bcd  .phase2k/final-01.b64" | sha256sum -c -
-          echo "c0dd6350f0cc4e50f22d45b9a666f092585a8aa409afc5943613110ae936ceaa  .phase2k/final-02.b64" | sha256sum -c -
-          echo "4521db9d122b23b74a3e136adb71158016b3a67ccd0d3c414f19c5d9398bc7f4  .phase2k/final-03.b64" | sha256sum -c -
-          echo "067c7ff32ba9a76c39c65eb703756590f8888324af6b55c72eb9709b3874c904  .phase2k/final-04.b64" | sha256sum -c -
-          echo "e1ec58aab99f9545b5612c1ce4182f2542656215733d7dd43921670db85c6f14  .phase2k/final-05.b64" | sha256sum -c -
-          echo "93c714e062668ac44f6266fd97c3f10393d876b3f6b7bc33646351e2e88e7043  .phase2k/final-06.b64" | sha256sum -c -
-          echo "3db2cc333adb2b8bce358f7d56f9ba71cb326827dcbe899cc92da870aec9c664  .phase2k/final-07.b64" | sha256sum -c -
-          echo "bab65058f8f9abcba0e32f63d003f90575c5bca86ee71877e7565a3f7ba5d2f2  .phase2k/final-08.b64" | sha256sum -c -
-          echo "bc870b23edac3cacccdad60a920c12b44254724a59c517edb3225b242052b3b8  .phase2k/final-09.b64" | sha256sum -c -
-          echo "ed9d685538538fc2039e53837cecf4d6799d6e43cbe1ef56a3989af656683960  .phase2k/final-10.b64" | sha256sum -c -
-          echo "a2e6e659c6cb17fe59c0af97432fb63e08bc8441c4787bc8947e2ffa2c741125  .phase2k/final-11.b64" | sha256sum -c -
+          echo "052090d81e221376613edc13a66824a3b24855abb53a0178418abb3cfe262f2e  .phase2k/patch-00a.b64" | sha256sum -c -
+          echo "a3939210d8b245fe3d8b7603fc9f2c1db90ec4d60a73d4ab3f8d27b0303a853f  .phase2k/fix-00b-1.b64" | sha256sum -c -
+          echo "aea3e89d02dcc01cde205dbd781d5c8585e48c1ed713dfe1eaeafced9dfc68c2  .phase2k/fix-00b-2.b64" | sha256sum -c -
+          echo "af6f2ecf3ed20e2a29608eaddb70044cd15911fcbe1e5f5307d1fedc3e0d321c  .phase2k/patch-01.b64" | sha256sum -c -
+          echo "b9729c9c244ecddb5d3e73f9e7fb4745023d2be4256171af0cee58aca19e78fd  .phase2k/patch-02.b64" | sha256sum -c -
+          echo "ead895af7b47fde481a59d2d4eee3095337b496bf1fab8c87b48f2e6aa6c7435  .phase2k/patch-03.b64" | sha256sum -c -
+          echo "d98a62f6abd5ce109f1c0164a9bc91c6d312b2637eefa4eb7b889b6dd1468be1  .phase2k/fix-04a-1.b64" | sha256sum -c -
+          echo "7a9e5d244bb743d57226bbe587535d0cc3d86891586e8085680bc64a6757d546  .phase2k/fix-04a-2.b64" | sha256sum -c -
+          echo "4fdfb13513b797600b8cf809b7f78e4d0894cebffd0fd4e6b1ff40e10e240b43  .phase2k/fix-04b-1.b64" | sha256sum -c -
+          echo "62153160d00f4ca660b4f5790f43faac2903a71b510654a8ecf838699add9332  .phase2k/fix-04b-2.b64" | sha256sum -c -
+          echo "b16089f7d25a8dd6618f674e58651d32934e76367b3dfcdcced6ed05ed4c6b3b  .phase2k/patch-05.b64" | sha256sum -c -
 
           stage=compressed-reconstruction
           cat \
-            .phase2k/final-00.b64 \
-            .phase2k/final-01.b64 \
-            .phase2k/final-02.b64 \
-            .phase2k/final-03.b64 \
-            .phase2k/final-04.b64 \
-            .phase2k/final-05.b64 \
-            .phase2k/final-06.b64 \
-            .phase2k/final-07.b64 \
-            .phase2k/final-08.b64 \
-            .phase2k/final-09.b64 \
-            .phase2k/final-10.b64 \
-            .phase2k/final-11.b64 \
+            .phase2k/patch-00a.b64 \
+            .phase2k/fix-00b-1.b64 \
+            .phase2k/fix-00b-2.b64 \
+            .phase2k/patch-01.b64 \
+            .phase2k/patch-02.b64 \
+            .phase2k/patch-03.b64 \
+            .phase2k/fix-04a-1.b64 \
+            .phase2k/fix-04a-2.b64 \
+            .phase2k/fix-04b-1.b64 \
+            .phase2k/fix-04b-2.b64 \
+            .phase2k/patch-05.b64 \
             | base64 -d > /tmp/phase2k.patch.xz
           echo "f23ae7dc6e5ac689a9ee9d7718439ddc4f1eb907a5d16bdbf7ed117464d04426  /tmp/phase2k.patch.xz" | sha256sum -c -
 
