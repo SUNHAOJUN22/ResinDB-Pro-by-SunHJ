@@ -1,12 +1,19 @@
+import {
+  createKdeSeparableRowSession,
+  type KdeSeparableRowBackendPreference,
+  type KdeSeparableRowEvidence,
+} from '@/compute/kdeSeparableRow';
 import { createWorkerProgressMessage } from '@/compute/workerProtocol';
 
-const KDE_MODEL_VERSION = 'bivariate-gaussian-kde-separable-3.0.0';
+const KDE_MODEL_VERSION = 'bivariate-gaussian-kde-separable-f64-wasm-4.0.0';
 
 export interface KdeMessage {
   type: 'CALCULATE_KDE';
   payload: {
     points: {x: number; y: number}[];
     gridSize?: number;
+    backend?: KdeSeparableRowBackendPreference;
+    allowFallback?: boolean;
   };
 }
 
@@ -29,6 +36,7 @@ export interface KdeResponse {
       exponentEvaluations: number;
       naiveExponentEvaluations: number;
       xKernelValues: number;
+      accumulationKernel: KdeSeparableRowEvidence;
     };
   };
   error?: string;
@@ -46,7 +54,12 @@ function sampleStandardDeviation(values: Float64Array): number {
 
 self.onmessage = (event: MessageEvent<KdeMessage>) => {
   try {
-    const { points, gridSize: requestedGridSize = 50 } = event.data.payload;
+    const {
+      points,
+      gridSize: requestedGridSize = 50,
+      backend = 'auto',
+      allowFallback = true,
+    } = event.data.payload;
     if (!Number.isInteger(requestedGridSize) || requestedGridSize < 5 || requestedGridSize > 300) {
       throw new RangeError('KDE gridSize must be an integer between 5 and 300.');
     }
@@ -100,7 +113,15 @@ self.onmessage = (event: MessageEvent<KdeMessage>) => {
       }
     }
 
+    const accumulationSession = createKdeSeparableRowSession({
+      xKernel,
+      observations: observationCount,
+      gridSize: requestedGridSize,
+      preference: backend,
+      allowFallback,
+    });
     const yWeights = new Float64Array(observationCount);
+    const rowKernelSums = new Float64Array(requestedGridSize);
     const grid: {x: number; y: number; z: number}[] = [];
     let minZ = Infinity;
     let maxZ = -Infinity;
@@ -110,12 +131,9 @@ self.onmessage = (event: MessageEvent<KdeMessage>) => {
         const standardized = (yValues[observation] - yGrid[row]) * inverseBandwidthY;
         yWeights[observation] = Math.exp(-0.5 * standardized * standardized);
       }
+      accumulationSession.accumulate(yWeights, rowKernelSums);
       for (let column = 0; column < requestedGridSize; column++) {
-        let kernelSum = 0;
-        for (let observation = 0; observation < observationCount; observation++) {
-          kernelSum += xKernel[observation * requestedGridSize + column] * yWeights[observation];
-        }
-        const z = kernelSum * normalization;
+        const z = rowKernelSums[column] * normalization;
         minZ = Math.min(minZ, z);
         maxZ = Math.max(maxZ, z);
         grid.push({ x: xGrid[column], y: yGrid[row], z });
@@ -147,6 +165,7 @@ self.onmessage = (event: MessageEvent<KdeMessage>) => {
           exponentEvaluations: 2 * observationCount * requestedGridSize,
           naiveExponentEvaluations: observationCount * requestedGridSize * requestedGridSize,
           xKernelValues: xKernel.length,
+          accumulationKernel: accumulationSession.getEvidence(),
         },
       },
     } satisfies KdeResponse);
