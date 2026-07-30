@@ -138,6 +138,35 @@ jobs:
           test "$(wc -l < artifacts/branch-proof.txt | tr -d ' ')" -eq 1
           test "$(grep -c 'refs/heads/main$' artifacts/branch-proof.txt || true)" -eq 1
 
+      - name: Bundle deterministic exact source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          tar \
+            --sort=name \
+            --mtime='UTC 1970-01-01' \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            --mode='u+rwX,go+rX,go-w' \
+            -czf artifacts/exact-source-tree.tar.gz \
+            .github \
+            native \
+            schemas \
+            scripts \
+            src \
+            tests \
+            .nvmrc \
+            eslint.config.js \
+            index.html \
+            package-lock.json \
+            package.json \
+            tsconfig.json \
+            vite.config.ts
+          sha256sum artifacts/exact-source-tree.tar.gz | tee artifacts/exact-source-tree.sha256
+          test "$(stat -c%s artifacts/exact-source-tree.tar.gz)" -gt 100000
+
       - name: Write exact-tree context and passed core gates
         shell: bash
         run: |
@@ -164,6 +193,7 @@ jobs:
               'regression', 'isolated-unit', 'isolated-science-workers',
               'whole-source-coverage', 'build', 'http-smoke', 'chromium-ui',
               'production-audit', 'complete-audit', 'single-main-branch',
+              'deterministic-exact-source-tree',
             ],
           }, null, 2)}\n`)
           NODE
