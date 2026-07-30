@@ -38,6 +38,7 @@ export interface MonteCarloReproducibility {
 
 export interface MonteCarloPerformance {
   stochasticProperties: number;
+  workObjectReused: true;
   numericPropertyDictionaryReused: true;
   formulaResultObjectReused: true;
   typedResultBuffer: true;
@@ -221,6 +222,7 @@ self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
         },
         performance: {
           stochasticProperties: stochasticProperties.length,
+          workObjectReused: true,
           numericPropertyDictionaryReused: true,
           formulaResultObjectReused: true,
           typedResultBuffer: true,
