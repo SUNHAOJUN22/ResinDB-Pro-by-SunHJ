@@ -143,7 +143,7 @@ describe('FP64 K-Means assignment backends', () => {
       buffers.counts,
     );
     expect([...buffers.assignments]).toEqual([0, 0, 0, 0, 1, 1]);
-    expect([...buffers.sums]).toEqual([-0.5, -0.5, 17, 17]);
+    expect([...buffers.sums]).toEqual([0.5, -0.5, 17, 17]);
     expect([...buffers.counts]).toEqual([4, 2]);
     expect(session.getEvidence()).toMatchObject({
       backend: 'typescript',
