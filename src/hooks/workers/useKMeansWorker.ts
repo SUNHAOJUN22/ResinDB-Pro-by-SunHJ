@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
-import { useWorkerManager } from './useWorkerManager';
+import { createRowMajorFloat64Matrix } from '@/compute/numericBuffers';
 import type { RandomSeed } from '@/compute/random';
+import { useWorkerManager } from './useWorkerManager';
 import type { KMeansMessage, KMeansResponse } from '@/workers/kmeansWorker';
 
 export function useKMeansWorker() {
@@ -15,7 +16,7 @@ export function useKMeansWorker() {
   );
 
   const computeKMeans = useCallback((
-    data: {id: string, values: Record<string, number>}[],
+    data: { id: string; values: Record<string, number> }[],
     keys: string[],
     maxK = 10,
     seed?: RandomSeed,
@@ -24,10 +25,21 @@ export function useKMeansWorker() {
       setResult(null);
       return;
     }
+    const matrix = createRowMajorFloat64Matrix(
+      data.length,
+      keys.length,
+      (row, column) => Number(data[row]?.values?.[keys[column]]),
+    );
     postMessage({
       type: 'COMPUTE_KMEANS',
-      payload: { data, keys, maxK, seed },
-    });
+      payload: {
+        ids: data.map((item) => String(item.id)),
+        matrix,
+        keys,
+        maxK,
+        seed,
+      },
+    }, { transfer: [matrix.values.buffer] });
   }, [postMessage, setResult]);
 
   return {
@@ -35,6 +47,8 @@ export function useKMeansWorker() {
     bestK: result?.k ?? 0,
     silhouetteScore: result?.silhouetteScore ?? null,
     reproducibility: result?.reproducibility ?? null,
+    modelSelection: result?.modelSelection ?? null,
+    performance: result?.performance ?? null,
     computeKMeans,
     isComputingKMeans: isComputing,
   };
