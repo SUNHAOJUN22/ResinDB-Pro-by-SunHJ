@@ -6,7 +6,8 @@ import {
 } from '@/compute/kmeansBackendProfileStore';
 import { createRowMajorFloat64Matrix } from '@/compute/numericBuffers';
 import type { RandomSeed } from '@/compute/random';
-import type { KMeansMessage, KMeansResponse } from '@/workers/kmeansWorker';
+import type { KMeansResponse } from '@/workers/kmeansWorker';
+import type { KMeansProfileAwareMessage } from '@/workers/kmeansProfileAwareWorker';
 import { useWorkerManager } from './useWorkerManager';
 
 export interface KMeansExecutionOptions {
@@ -21,8 +22,17 @@ export function useKMeansWorker() {
     result,
     setResult,
     postMessage,
-  } = useWorkerManager<KMeansMessage, Extract<KMeansResponse, { type: 'KMEANS_RESULT' }>['payload']>(
-    useCallback(() => new Worker(new URL('../../workers/kmeansWorker.ts', import.meta.url), { type: 'module' }), []),
+  } = useWorkerManager<
+    KMeansProfileAwareMessage,
+    Extract<KMeansResponse, { type: 'KMEANS_RESULT' }>['payload']
+  >(
+    useCallback(
+      () => new Worker(
+        new URL('../../workers/kmeansProfileAwareWorker.ts', import.meta.url),
+        { type: 'module' },
+      ),
+      [],
+    ),
     'KMEANS_RESULT',
   );
 
