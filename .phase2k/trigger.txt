@@ -1,0 +1,3 @@
+phase2k-exact-patch
+compressed-sha256=f23ae7dc6e5ac689a9ee9d7718439ddc4f1eb907a5d16bdbf7ed117464d04426
+patch-sha256=9cdbccdc453cd9376d12328a0670fcdefe0cc54b914bf3698748042d529c1a7b
