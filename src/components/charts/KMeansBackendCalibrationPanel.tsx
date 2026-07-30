@@ -30,14 +30,14 @@ function formatTimestamp(value: string | null, language: string): string {
 }
 
 export interface KMeansBackendCalibrationPanelProps {
-  sampleCount: number;
+  sampleCount?: number;
   dimensions?: number;
 }
 
 export function KMeansBackendCalibrationPanel({
-  sampleCount,
+  sampleCount = 0,
   dimensions = 2,
-}: KMeansBackendCalibrationPanelProps) {
+}: KMeansBackendCalibrationPanelProps = {}) {
   const { language } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const [auditExpanded, setAuditExpanded] = useState(false);
