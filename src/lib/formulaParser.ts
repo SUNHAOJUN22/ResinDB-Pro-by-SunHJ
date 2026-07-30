@@ -1,6 +1,21 @@
 import { logger } from '@/lib/logger';
-import { FormulaConfig, Product } from '@/types/index';
-import { compileFormulaExpression, type Evaluator, type PropertyDictionary } from '@/lib/formula/expressionParser';
+import type { FormulaConfig, Product } from '@/types/index';
+import {
+  compileFormulaExpression,
+  type Evaluator,
+  type PropertyDictionary,
+} from '@/lib/formula/expressionParser';
+
+export type PropertyGraphExecutor = (
+  properties: PropertyDictionary,
+  results?: Record<string, number>,
+) => Record<string, number>;
+
+interface CompiledFormulaPlan {
+  formulasRef: FormulaConfig[];
+  productExecutor: (product: Product) => Record<string, number>;
+  propertyExecutor: PropertyGraphExecutor;
+}
 
 export class FormulaEngine {
   private static readonly MATH_FUNCTIONS = [
@@ -17,10 +32,7 @@ export class FormulaEngine {
     'max',
   ];
 
-  private cachedPlan: {
-    formulasRef: FormulaConfig[];
-    executor: (product: Product) => Record<string, number>;
-  } | null = null;
+  private cachedPlan: CompiledFormulaPlan | null = null;
 
   public extractDependencies(expression: string): string[] {
     const dependencies = new Set<string>();
@@ -150,28 +162,38 @@ export class FormulaEngine {
     return null;
   }
 
+  public createPropertyDictionary(product: Pick<Product, 'properties'>): PropertyDictionary {
+    const properties: PropertyDictionary = {};
+    for (const [key, property] of Object.entries(product.properties)) {
+      const numericValue = typeof property.value === 'number'
+        ? property.value
+        : Number.parseFloat(String(property.value));
+      properties[key] = Number.isFinite(numericValue) ? numericValue : 0;
+    }
+    return properties;
+  }
+
   private areFormulasEqual(left: FormulaConfig[], right: FormulaConfig[]): boolean {
     return (
-      left.length === right.length &&
-      left.every(
-        (formula, index) =>
-          formula.id === right[index].id &&
-          formula.name === right[index].name &&
-          formula.expression === right[index].expression &&
-          formula.unit === right[index].unit,
-      )
+      left.length === right.length
+      && left.every((formula, index) => (
+        formula.id === right[index].id
+        && formula.name === right[index].name
+        && formula.expression === right[index].expression
+        && formula.unit === right[index].unit
+      ))
     );
   }
 
-  public compileGraph(
-    formulas: FormulaConfig[],
-  ): (product: Product) => Record<string, number> {
+  private compilePlan(formulas: FormulaConfig[]): CompiledFormulaPlan {
     if (
-      this.cachedPlan &&
-      (this.cachedPlan.formulasRef === formulas ||
-        this.areFormulasEqual(this.cachedPlan.formulasRef, formulas))
+      this.cachedPlan
+      && (
+        this.cachedPlan.formulasRef === formulas
+        || this.areFormulasEqual(this.cachedPlan.formulasRef, formulas)
+      )
     ) {
-      return this.cachedPlan.executor;
+      return this.cachedPlan;
     }
 
     let orderedFormulas: FormulaConfig[];
@@ -179,10 +201,15 @@ export class FormulaEngine {
       orderedFormulas = this.buildTopologicalOrder(formulas);
     } catch (error) {
       logger.error('Formula graph compilation failed', error);
-      const failedExecutor = () =>
-        Object.fromEntries(formulas.map((formula) => [formula.id, 0]));
-      this.cachedPlan = { formulasRef: formulas, executor: failedExecutor };
-      return failedExecutor;
+      const propertyExecutor: PropertyGraphExecutor = (_, results = {}) => {
+        for (const formula of formulas) results[formula.id] = 0;
+        return results;
+      };
+      const productExecutor = (product: Product) => propertyExecutor(
+        this.createPropertyDictionary(product),
+      );
+      this.cachedPlan = { formulasRef: formulas, productExecutor, propertyExecutor };
+      return this.cachedPlan;
     }
 
     const compiled = orderedFormulas.map((formula) => {
@@ -200,17 +227,7 @@ export class FormulaEngine {
       };
     });
 
-    const executor = (product: Product) => {
-      const properties: PropertyDictionary = {};
-      for (const [key, property] of Object.entries(product.properties)) {
-        const numericValue =
-          typeof property.value === 'number'
-            ? property.value
-            : Number.parseFloat(String(property.value));
-        properties[key] = Number.isFinite(numericValue) ? numericValue : 0;
-      }
-
-      const results: Record<string, number> = {};
+    const propertyExecutor: PropertyGraphExecutor = (properties, results = {}) => {
       for (const step of compiled) {
         const calculated = step.evaluate(properties);
         const value = Number.isFinite(calculated) ? calculated : 0;
@@ -219,9 +236,22 @@ export class FormulaEngine {
       }
       return results;
     };
+    const productExecutor = (product: Product) => propertyExecutor(
+      this.createPropertyDictionary(product),
+    );
 
-    this.cachedPlan = { formulasRef: formulas, executor };
-    return executor;
+    this.cachedPlan = { formulasRef: formulas, productExecutor, propertyExecutor };
+    return this.cachedPlan;
+  }
+
+  public compileGraph(
+    formulas: FormulaConfig[],
+  ): (product: Product) => Record<string, number> {
+    return this.compilePlan(formulas).productExecutor;
+  }
+
+  public compilePropertyGraph(formulas: FormulaConfig[]): PropertyGraphExecutor {
+    return this.compilePlan(formulas).propertyExecutor;
   }
 
   public clearCache(): void {
