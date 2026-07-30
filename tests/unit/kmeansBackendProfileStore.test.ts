@@ -62,10 +62,12 @@ function createMemoryPersistence(): KMeansBackendProfilePersistence & {
   };
 }
 
+const currentEnvironment = () => environment;
+
 describe('K-Means backend profile IndexedDB lifecycle contract', () => {
   it('saves, loads, and clears a valid device-local profile', async () => {
     const persistence = createMemoryPersistence();
-    const store = createKMeansBackendProfileStore(persistence);
+    const store = createKMeansBackendProfileStore(persistence, currentEnvironment);
     const now = new Date('2026-07-10T00:00:00.000Z');
     const profile = createProfile();
 
@@ -76,6 +78,8 @@ describe('K-Means backend profile IndexedDB lifecycle contract', () => {
       profile,
       environment,
       reason: null,
+      migration: null,
+      migrationHistory: [],
     });
 
     await store.clear();
@@ -84,7 +88,7 @@ describe('K-Means backend profile IndexedDB lifecycle contract', () => {
 
   it('invalidates and removes an expired profile', async () => {
     const persistence = createMemoryPersistence();
-    const store = createKMeansBackendProfileStore(persistence);
+    const store = createKMeansBackendProfileStore(persistence, currentEnvironment);
     persistence.current = {
       key: 'active',
       profile: createProfile({ expiresAt: '2026-07-05T00:00:00.000Z' }),
@@ -95,6 +99,7 @@ describe('K-Means backend profile IndexedDB lifecycle contract', () => {
     const loaded = await store.load(new Date('2026-07-10T00:00:00.000Z'));
     expect(loaded.status).toBe('invalid');
     expect(loaded.reason).toContain('expired');
+    expect(loaded.migration?.requiresRecalibration).toBe(true);
     expect(persistence.removals).toBe(1);
     expect(persistence.current).toBeUndefined();
   });
@@ -106,7 +111,7 @@ describe('K-Means backend profile IndexedDB lifecycle contract', () => {
       },
       async write() {},
       async remove() {},
-    });
+    }, currentEnvironment);
 
     await expect(store.load()).resolves.toMatchObject({
       status: 'error',
@@ -127,7 +132,7 @@ describe('K-Means backend profile IndexedDB lifecycle contract', () => {
       async remove() {
         throw new Error('synthetic indexeddb clear failure');
       },
-    });
+    }, currentEnvironment);
 
     await expect(store.save(
       profile,
