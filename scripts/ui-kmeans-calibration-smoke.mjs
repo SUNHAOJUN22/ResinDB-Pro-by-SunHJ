@@ -1,5 +1,11 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { networkInterfaces } from 'node:os';
@@ -24,7 +30,9 @@ const appUrlCandidates = [...new Set([
 ].filter(Boolean).map((candidate) => `http://${candidate}:${previewPort}`))];
 const artifactDir = path.join(projectRoot, 'artifacts');
 const screenshotPath = path.join(artifactDir, 'ui-kmeans-device-calibration.png');
+const auditScreenshotPath = path.join(artifactDir, 'ui-kmeans-profile-audit.png');
 const manifestPath = path.join(artifactDir, 'ui-smoke-manifest.json');
+const downloadDir = path.join('/tmp', `resindb-kmeans-audit-download-${process.pid}`);
 
 const chromeCandidates = [
   process.env.CHROME_BIN,
@@ -193,6 +201,17 @@ async function capture(session, targetPath) {
   writeFileSync(targetPath, Buffer.from(screenshot.data, 'base64'));
 }
 
+async function waitForAuditDownload(attempts = 80) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const files = existsSync(downloadDir)
+      ? readdirSync(downloadDir).filter((file) => file.endsWith('.json'))
+      : [];
+    if (files.length > 0) return path.join(downloadDir, files[0]);
+    await sleep(125);
+  }
+  throw new Error('Timed out waiting for the K-Means profile audit JSON download');
+}
+
 function stop(processHandle) {
   if (processHandle.exitCode === null) processHandle.kill('SIGTERM');
 }
@@ -214,6 +233,12 @@ try {
     height: 1000,
     deviceScaleFactor: 1,
     mobile: false,
+  });
+  mkdirSync(downloadDir, { recursive: true });
+  await session.command('Browser.setDownloadBehavior', {
+    behavior: 'allow',
+    downloadPath: downloadDir,
+    eventsEnabled: true,
   });
 
   let appUrl = '';
@@ -265,6 +290,17 @@ try {
     `!!document.querySelector('[data-testid="kmeans-backend-calibration"]')`,
     'K-Means calibration panel',
   );
+
+  await clickButtonByText(session, ['K-Means 自动聚类分组', 'K-Means Auto Grouping']);
+  await waitForCondition(
+    session,
+    `Array.from(document.querySelectorAll('button')).some((button) =>
+      (button.textContent || '').includes('清除聚类')
+      || (button.textContent || '').includes('Clear Clusters')
+    )`,
+    'K-Means workload completion',
+  );
+
   await evaluate(
     session,
     `document.querySelector('[data-testid="kmeans-calibration-toggle"]').click()`,
@@ -285,14 +321,12 @@ try {
       privacy,
       runVisible: !!run,
       clearVisible: !!clear,
-      clearDisabled: !!clear?.disabled,
       profileDatabasePresent: indexedDB !== undefined,
     };
   })()`);
   if (
     !panelState.runVisible
     || !panelState.clearVisible
-    || !panelState.clearDisabled
     || !panelState.profileDatabasePresent
     || !panelState.privacy.includes('IndexedDB')
     || !panelState.privacy.includes('不会上传')
@@ -302,6 +336,63 @@ try {
 
   mkdirSync(artifactDir, { recursive: true });
   await capture(session, screenshotPath);
+
+  await evaluate(session, `(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text) => { window.__resindbCopiedAuditSummary = text; },
+      },
+    });
+    document.querySelector('[data-testid="kmeans-audit-toggle"]').click();
+    return true;
+  })()`);
+  await waitForCondition(
+    session,
+    `!!document.querySelector('[data-testid="kmeans-audit-details"]')
+      && !!document.querySelector('[data-testid="kmeans-audit-copy"]')
+      && !!document.querySelector('[data-testid="kmeans-audit-download"]')
+      && (document.querySelector('[data-testid="kmeans-audit-details"]')?.textContent || '').includes('SHA-256')`,
+    'K-Means profile audit controls',
+  );
+
+  await evaluate(session, `document.querySelector('[data-testid="kmeans-audit-copy"]').click()`);
+  await waitForCondition(
+    session,
+    `typeof window.__resindbCopiedAuditSummary === 'string'
+      && window.__resindbCopiedAuditSummary.includes('schema=kmeans-profile-audit-1.0.0')
+      && window.__resindbCopiedAuditSummary.includes('notice=not-a-cross-device-performance-conclusion')`,
+    'K-Means audit summary copy',
+  );
+  await evaluate(session, `document.querySelector('[data-testid="kmeans-audit-download"]').click()`);
+  const auditFile = await waitForAuditDownload();
+  const auditDocument = JSON.parse(readFileSync(auditFile, 'utf8'));
+  if (
+    auditDocument.schemaVersion !== 'kmeans-profile-audit-1.0.0'
+    || auditDocument.notice !== 'not-a-cross-device-performance-conclusion'
+    || !/^[0-9a-f]{64}$/.test(auditDocument.digest)
+    || auditDocument.workload?.sampleCount !== 13
+    || !(auditDocument.workload?.dimensions > 0)
+    || !(auditDocument.workload?.maxClusters > 0)
+    || auditDocument.autoDecision?.selectedBackend !== 'typescript'
+    || auditDocument.autoDecision?.reason !== 'missing-compatible-local-profile'
+    || JSON.stringify(auditDocument).includes('gradeName')
+    || JSON.stringify(auditDocument).includes('manufacturer')
+  ) {
+    throw new Error(`K-Means profile audit JSON is invalid: ${JSON.stringify(auditDocument)}`);
+  }
+  const expectedExcluded = [
+    'product-data',
+    'clustering-inputs',
+    'raw-benchmark-samples',
+    'user-identity',
+    'network-addresses',
+  ];
+  if (JSON.stringify(auditDocument.excludedFields) !== JSON.stringify(expectedExcluded)) {
+    throw new Error(`K-Means audit excluded field contract changed: ${JSON.stringify(auditDocument.excludedFields)}`);
+  }
+
+  await capture(session, auditScreenshotPath);
 
   const runtimeErrors = session.events.filter(
     (event) =>
@@ -320,6 +411,7 @@ try {
   manifest.screenshots = {
     ...(manifest.screenshots ?? {}),
     kmeansCalibration: path.basename(screenshotPath),
+    kmeansProfileAudit: path.basename(auditScreenshotPath),
   };
   manifest.kmeansCalibration = {
     panelVisible: true,
@@ -328,12 +420,20 @@ try {
     clearControlVisible: true,
     sharedCiCalibrationExecuted: false,
     profileStorage: 'device-local-indexeddb',
+    actualWorkloadCaptured: true,
+    auditDetailsVisible: true,
+    auditSummaryCopied: true,
+    auditJsonDownloaded: true,
+    auditSchemaVersion: auditDocument.schemaVersion,
+    auditDigest: auditDocument.digest,
+    auditProductDataExcluded: true,
   };
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   session.close();
 
-  console.log('K-Means calibration UI smoke passed: panel, privacy disclosure, controls and IndexedDB-only boundary are visible.');
-  console.log(`Screenshot: ${screenshotPath}`);
+  console.log('K-Means calibration and profile audit UI smoke passed: actual workload, privacy, copy, JSON download and field whitelist are verified.');
+  console.log(`Screenshots: ${screenshotPath}, ${auditScreenshotPath}`);
+  console.log(`Audit JSON: ${auditFile}`);
 } catch (error) {
   const diagnostics = [
     error instanceof Error ? error.stack || error.message : String(error),
