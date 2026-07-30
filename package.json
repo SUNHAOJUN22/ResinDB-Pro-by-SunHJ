@@ -17,7 +17,7 @@
     "benchmark:kmeans:smoke": "node scripts/run-kmeans-backend-benchmark.mjs --mode smoke",
     "benchmark:kmeans": "node scripts/run-kmeans-backend-benchmark.mjs --mode full",
     "validate": "npm run validate:docs && npm run validate:source && npm run validate:data && npm run lint && npm run typecheck && npm run test && npm run build && npm run smoke",
-    "test:ui": "node scripts/ui-smoke-test.mjs && node scripts/ui-kmeans-calibration-smoke.mjs",
+    "test:ui": "node scripts/run-ui-smoke-suite.mjs",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "validate:ci": "npm run validate && npm run benchmark:kmeans:smoke && npm run test:unit && npm run test:science && npm run test:coverage && npm run test:ui && npm run audit:all",
     "validate:data": "node scripts/validate-data.mjs",
