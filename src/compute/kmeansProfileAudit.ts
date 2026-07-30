@@ -5,6 +5,7 @@ import {
 } from './kmeansBackendPolicy';
 import type { KMeansBackendProfileLoadResult } from './kmeansBackendProfileStore';
 import type { KMeansProfileMigrationEvent } from './kmeansProfileMigration';
+import { getKMeansWorkloadSnapshot } from './kmeansWorkloadStore';
 
 export const KMEANS_PROFILE_AUDIT_SCHEMA_VERSION = 'kmeans-profile-audit-1.0.0';
 export const KMEANS_PROFILE_AUDIT_DIGEST_ALGORITHM = 'sha-256';
@@ -108,16 +109,31 @@ function safeProfile(loadResult: KMeansBackendProfileLoadResult): KMeansProfileA
   };
 }
 
+function resolveAuditWorkload(workload: KMeansProfileAuditWorkload): KMeansProfileAuditWorkload {
+  const explicit = {
+    sampleCount: validateWorkload(workload.sampleCount, 'sampleCount'),
+    dimensions: validateWorkload(workload.dimensions, 'dimensions'),
+    maxClusters: validateWorkload(workload.maxClusters, 'maxClusters'),
+  };
+  if (explicit.sampleCount > 0 && explicit.dimensions > 0 && explicit.maxClusters > 0) {
+    return explicit;
+  }
+  const active = getKMeansWorkloadSnapshot();
+  return active
+    ? {
+        sampleCount: active.sampleCount,
+        dimensions: active.dimensions,
+        maxClusters: active.maxClusters,
+      }
+    : explicit;
+}
+
 export async function createKMeansProfileAuditDocument(
   loadResult: KMeansBackendProfileLoadResult,
   workload: KMeansProfileAuditWorkload,
   generatedAt = new Date(),
 ): Promise<KMeansProfileAuditDocument> {
-  const validatedWorkload = {
-    sampleCount: validateWorkload(workload.sampleCount, 'sampleCount'),
-    dimensions: validateWorkload(workload.dimensions, 'dimensions'),
-    maxClusters: validateWorkload(workload.maxClusters, 'maxClusters'),
-  };
+  const validatedWorkload = resolveAuditWorkload(workload);
   const environment = loadResult.environment;
   const autoDecision = environment
     ? decideKMeansAssignmentBackend({
