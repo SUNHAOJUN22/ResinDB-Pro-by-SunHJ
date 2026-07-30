@@ -7,6 +7,8 @@ export * from './gaussianProcess';
 export * from './kernelRegistry';
 export * from './kmeansAssignment';
 export * from './kmeansBackendPolicy';
+export * from './kmeansBackendProfileStore';
+export * from './kmeansBrowserBenchmark';
 export * from './leastSquares';
 export * from './linearAlgebra';
 export * from './nonlinearLeastSquares';
