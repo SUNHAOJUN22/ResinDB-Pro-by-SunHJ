@@ -1,0 +1,54 @@
+name: Apply Phase 2K scientific UI overhaul
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase2k-exact-patch-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Verify and apply exact Phase 2K patch
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact staging tree
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct, verify and apply patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .phase2k/patch-00.b64
+          test -f .phase2k/patch-01.b64
+          test -f .phase2k/patch-02.b64
+          test -f .phase2k/patch-03.b64
+          test -f .phase2k/patch-04.b64
+          test -f .phase2k/patch-05.b64
+          cat .phase2k/patch-*.b64 | base64 -d > /tmp/phase2k.patch.xz
+          echo "f23ae7dc6e5ac689a9ee9d7718439ddc4f1eb907a5d16bdbf7ed117464d04426  /tmp/phase2k.patch.xz" | sha256sum -c -
+          xz -dc /tmp/phase2k.patch.xz > /tmp/phase2k.patch
+          echo "9cdbccdc453cd9376d12328a0670fcdefe0cc54b914bf3698748042d529c1a7b  /tmp/phase2k.patch" | sha256sum -c -
+          git apply --check /tmp/phase2k.patch
+          git apply /tmp/phase2k.patch
+          rm -rf .phase2k .github/workflows/apply-phase2k.yml
+          git diff --check
+          git status --short
+
+      - name: Commit and push exact source update
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ResinDB Phase 2K Automation"
+          git config user.email "phase2k@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: overhaul scientific UI and figure semantics"
+          git push origin HEAD:main
