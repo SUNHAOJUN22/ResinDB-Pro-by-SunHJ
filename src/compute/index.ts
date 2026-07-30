@@ -8,6 +8,7 @@ export * from './kernelRegistry';
 export * from './leastSquares';
 export * from './linearAlgebra';
 export * from './nonlinearLeastSquares';
+export * from './numericBuffers';
 export * from './pareto';
 export * from './random';
 export * from './taskProtocol';
