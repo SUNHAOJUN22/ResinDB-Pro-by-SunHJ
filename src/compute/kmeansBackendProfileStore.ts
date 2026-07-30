@@ -1,20 +1,26 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import {
+  createKMeansBenchmarkEnvironment,
   validateKMeansBackendBenchmarkProfile,
   type KMeansBackendBenchmarkProfile,
   type KMeansBenchmarkEnvironment,
 } from './kmeansBackendPolicy';
+import {
+  assessKMeansProfileMigration,
+  type KMeansProfileMigrationEvent,
+} from './kmeansProfileMigration';
 
 const PROFILE_DATABASE_NAME = 'resindb-kmeans-backend-profile-v1';
 const PROFILE_DATABASE_VERSION = 1;
 const PROFILE_STORE_NAME = 'profiles';
 const ACTIVE_PROFILE_KEY = 'active';
 
-interface KMeansBackendProfileRecord {
+export interface KMeansBackendProfileRecord {
   key: typeof ACTIVE_PROFILE_KEY;
   profile: KMeansBackendBenchmarkProfile;
   environment: KMeansBenchmarkEnvironment;
   savedAt: string;
+  migrationHistory?: KMeansProfileMigrationEvent[];
 }
 
 interface KMeansBackendProfileDatabase extends DBSchema {
@@ -43,6 +49,8 @@ export interface KMeansBackendProfileLoadResult {
   environment: KMeansBenchmarkEnvironment | null;
   reason: string | null;
   savedAt: string | null;
+  migration: KMeansProfileMigrationEvent | null;
+  migrationHistory: readonly KMeansProfileMigrationEvent[];
 }
 
 export interface KMeansBackendProfileSaveResult {
@@ -111,11 +119,14 @@ export interface KMeansBackendProfileStore {
 
 export function createKMeansBackendProfileStore(
   persistence: KMeansBackendProfilePersistence = createIndexedDbPersistence(),
+  currentEnvironment: () => KMeansBenchmarkEnvironment = createKMeansBenchmarkEnvironment,
 ): KMeansBackendProfileStore {
   return {
     async load(now = new Date()) {
       let record: KMeansBackendProfileRecord | undefined;
+      let environment: KMeansBenchmarkEnvironment;
       try {
+        environment = currentEnvironment();
         record = await persistence.read();
       } catch (error) {
         const reason = errorMessage(error);
@@ -125,23 +136,32 @@ export function createKMeansBackendProfileStore(
           environment: null,
           reason,
           savedAt: null,
+          migration: null,
+          migrationHistory: [],
         };
       }
       if (!record) {
         return {
           status: 'missing',
           profile: null,
-          environment: null,
+          environment,
           reason: 'No device-local K-Means backend profile is stored',
           savedAt: null,
+          migration: null,
+          migrationHistory: [],
         };
       }
-      const validation = validateKMeansBackendBenchmarkProfile(
+
+      const assessment = assessKMeansProfileMigration(
         record.profile,
         record.environment,
+        environment,
         now,
       );
-      if (!validation.valid) {
+      const migrationHistory = [...(record.migrationHistory ?? [])];
+
+      if (assessment.action === 'invalidate' || !assessment.profile) {
+        if (assessment.event) migrationHistory.push(assessment.event);
         try {
           await persistence.remove();
         } catch {
@@ -150,17 +170,45 @@ export function createKMeansBackendProfileStore(
         return {
           status: 'invalid',
           profile: null,
-          environment: record.environment,
-          reason: validation.reason,
+          environment,
+          reason: assessment.reason,
           savedAt: record.savedAt,
+          migration: assessment.event,
+          migrationHistory,
         };
       }
+
+      if (assessment.action === 'migrate' && assessment.event) {
+        migrationHistory.push(assessment.event);
+        const migratedRecord: KMeansBackendProfileRecord = {
+          ...record,
+          profile: assessment.profile,
+          environment,
+          migrationHistory,
+        };
+        try {
+          await persistence.write(migratedRecord);
+        } catch (error) {
+          return {
+            status: 'error',
+            profile: null,
+            environment,
+            reason: `Profile migration could not be persisted: ${errorMessage(error)}`,
+            savedAt: record.savedAt,
+            migration: assessment.event,
+            migrationHistory,
+          };
+        }
+      }
+
       return {
         status: 'valid',
-        profile: record.profile,
-        environment: record.environment,
+        profile: assessment.profile,
+        environment,
         reason: null,
         savedAt: record.savedAt,
+        migration: assessment.event,
+        migrationHistory,
       };
     },
 
@@ -175,6 +223,7 @@ export function createKMeansBackendProfileStore(
         profile,
         environment,
         savedAt,
+        migrationHistory: [],
       });
       return { profile, environment, savedAt };
     },
