@@ -13,7 +13,17 @@ async function exists(name) {
   catch { return false; }
 }
 
-const [tests, coverage, build, ui, prodAudit, fullAudit, ciGates, context] = await Promise.all([
+const [
+  tests,
+  coverage,
+  build,
+  ui,
+  prodAudit,
+  fullAudit,
+  ciGates,
+  context,
+  kmeansBenchmark,
+] = await Promise.all([
   readJson('test-results.json'),
   readJson('coverage-summary.json'),
   readJson('build-metrics.json'),
@@ -22,6 +32,7 @@ const [tests, coverage, build, ui, prodAudit, fullAudit, ciGates, context] = awa
   readJson('npm-audit-all.json'),
   readJson('ci-gates.json'),
   readJson('ci-context.json', { sha: 'local-worktree', repository: 'local' }),
+  readJson('kmeans-backend-benchmark.json'),
 ]);
 
 let branchProof = '';
@@ -38,6 +49,17 @@ function noHighAuditFindings(audit) {
   return Boolean(summary) && Number(summary.high ?? 0) === 0 && Number(summary.critical ?? 0) === 0;
 }
 
+function validKMeansBenchmark(report) {
+  return report?.schemaVersion === 'kmeans-backend-benchmark-report-1.0.0'
+    && report?.timingGate === 'informational-only'
+    && report?.equivalence?.status === 'PASS'
+    && Array.isArray(report?.cases)
+    && report.cases.length > 0
+    && report.cases.every((entry) => entry?.equivalence === 'PASS')
+    && typeof report?.reportDigest === 'string'
+    && /^[0-9a-f]{64}$/.test(report.reportDigest);
+}
+
 const checks = {
   coreGates: ciGates?.status === 'PASS',
   tests: Boolean(tests?.success) && tests?.numFailedTests === 0 && tests?.numTotalTests > 0,
@@ -47,13 +69,14 @@ const checks = {
     build.echarts.bytes <= build.budgets.echartsRawBytes,
   externalData: Number(build?.externalResinDataBytes ?? 0) > 0,
   uiEvidence: screenshotChecks.length >= 7 && screenshotChecks.every((entry) => entry.exists),
+  kmeansBenchmarkEvidence: validKMeansBenchmark(kmeansBenchmark),
   productionAudit: noHighAuditFindings(prodAudit),
   completeAudit: noHighAuditFindings(fullAudit),
   singleMainBranch: branchProof.split(/\r?\n/).filter(Boolean).length === 1 && /refs\/heads\/main$/.test(branchProof),
 };
 
 const receipt = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   generatedAt: new Date().toISOString(),
   repository: context.repository,
   sha: context.sha,
@@ -77,6 +100,16 @@ const receipt = {
     echartsBytes: build.echarts?.bytes,
     echartsBudgetBytes: build.budgets?.echartsRawBytes,
     externalResinDataBytes: build.externalResinDataBytes,
+  } : null,
+  kmeansBenchmark: kmeansBenchmark ? {
+    schemaVersion: kmeansBenchmark.schemaVersion,
+    runtime: kmeansBenchmark.benchmarkRuntime,
+    mode: kmeansBenchmark.mode,
+    timingGate: kmeansBenchmark.timingGate,
+    equivalence: kmeansBenchmark.equivalence,
+    crossoverAnalysis: kmeansBenchmark.crossoverAnalysis,
+    environmentFingerprint: kmeansBenchmark.environment?.fingerprint,
+    reportDigest: kmeansBenchmark.reportDigest,
   } : null,
   uiScenes: screenshotChecks,
   branchProof,
