@@ -125,7 +125,8 @@ describe('K-Means profile audit export', () => {
     });
     const serialized = stableKMeansAuditStringify(audit);
     expect(serialized).not.toContain('product-data-value');
-    expect(serialized).not.toContain('raw-benchmark-samples');
+    expect(serialized).not.toContain('samplesMs');
+    expect(serialized).not.toContain('networkAddress');
     expect(Object.keys(audit.profile ?? {})).not.toContain('samplesMs');
     expect(audit.excludedFields).toEqual([
       'product-data',
