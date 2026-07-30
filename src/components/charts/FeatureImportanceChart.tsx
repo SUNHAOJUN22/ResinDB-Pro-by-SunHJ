@@ -1,95 +1,72 @@
-import React, { useEffect, useRef } from "react";
-import * as echarts from "@/lib/echarts";
+import React, { useMemo } from 'react';
+import type { EChartsOption } from '@/lib/echarts';
+import { ScientificEChart } from './ScientificEChart';
+import { SCIENTIFIC_PALETTE, formatScientificNumber } from './scientificFigurePolicy';
 
 interface FeatureImportanceChartProps {
   importances: { feature: string; importance: number; positive: boolean }[];
-  theme: "light" | "dark";
+  theme: 'light' | 'dark';
 }
 
 export const FeatureImportanceChart: React.FC<FeatureImportanceChartProps> = React.memo(({ importances, theme }) => {
-  const chartRef = useRef<HTMLDivElement>(null);
-  const chartInstance = useRef<echarts.ECharts | null>(null);
-
-  useEffect(() => {
-    if (!chartRef.current) return;
-    
-    if (!chartInstance.current) {
-        chartInstance.current = echarts.getInstanceByDom(chartRef.current) || echarts.init(chartRef.current);
-    }
-    
-    // Sort ascending for bottom-up horizontal bar visualization
-    const sorted = [...importances].sort((a, b) => a.importance - b.importance);
-    
-    const categories = sorted.map(d => d.feature);
-    const dataVals = sorted.map(d => ({
-        value: d.importance * 100, // as percentage
-        itemStyle: {
-            color: d.positive ? '#10b981' : '#f43f5e' // emerald for pos, rose for neg
-        }
-    }));
-    
-    const textColor = theme === 'dark' ? '#cbd5e1' : '#475569';
-    const splitLineColor = theme === 'dark' ? '#334155' : '#e2e8f0';
-
-    const option: echarts.EChartsOption = {
+  const option = useMemo<EChartsOption>(() => {
+    const sorted = [...importances].sort((left, right) => left.importance - right.importance);
+    return {
+      title: {
+        text: 'Standardized ridge sensitivity attribution',
+        subtext: 'Absolute standardized coefficients normalized to 100%; signs show conditional association, not causality or SHAP.',
+        left: 'center',
+        top: 6,
+        textStyle: { fontSize: 14, fontWeight: 650 },
+        subtextStyle: { fontSize: 10 },
+      },
+      grid: { top: 76, bottom: 58, left: 24, right: 52, containLabel: true },
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
-        
-         
-        formatter: (params: any) => {
-           const p = params[0];
-           const dir = sorted[p.dataIndex].positive ? 'Positive' : 'Negative';
-           return `<strong>${p.name}</strong><br/>Weight: ${p.value.toFixed(2)}%<br/>Impact: ${dir}`;
-        }
-      },
-      grid: {
-         top: '5%',
-         bottom: '10%',
-         left: '10%',
-         right: '5%',
-         containLabel: true
+        formatter: (params: unknown) => {
+          const entry = Array.isArray(params) ? params[0] as { dataIndex: number; name: string; value: number } : null;
+          if (!entry) return '';
+          const source = sorted[entry.dataIndex];
+          return `<strong>${entry.name}</strong><br/>Normalized |β| share: ${formatScientificNumber(entry.value)}%<br/>Standardized coefficient direction: ${source.positive ? 'positive' : 'negative'}<br/><em>Association only; not causal effect.</em>`;
+        },
       },
       xAxis: {
         type: 'value',
-        name: 'Relative Importance (%)',
+        name: 'Normalized |standardized ridge coefficient| (%)',
         nameLocation: 'middle',
-        nameGap: 25,
-        axisLabel: { color: textColor, formatter: '{value}%' },
-        splitLine: { lineStyle: { color: splitLineColor, type: 'dashed' } }
+        nameGap: 32,
+        min: 0,
+        axisLabel: { formatter: '{value}%' },
       },
       yAxis: {
         type: 'category',
-        data: categories,
-        axisLabel: { color: textColor, width: 120, overflow: 'truncate' },
+        data: sorted.map((entry) => entry.feature),
+        axisLabel: { width: 180, overflow: 'truncate' },
         axisTick: { show: false },
-        splitLine: { show: false }
       },
-      series: [
-        {
-          name: 'Importance',
-          type: 'bar',
-          data: dataVals,
-          label: {
-              show: true,
-              position: 'right',
-              formatter: '{c}%',
-              color: textColor
-          },
-          barMaxWidth: 30,
-          itemStyle: {
-              borderRadius: [0, 4, 4, 0]
-          }
-        }
-      ]
+      series: [{
+        name: 'Ridge sensitivity attribution',
+        type: 'bar',
+        barMaxWidth: 22,
+        data: sorted.map((entry) => ({
+          value: entry.importance * 100,
+          itemStyle: { color: entry.positive ? SCIENTIFIC_PALETTE[2] : SCIENTIFIC_PALETTE[1] },
+        })),
+        label: { show: true, position: 'right', formatter: ({ value }: { value?: unknown }) => `${formatScientificNumber(Number(value))}%` },
+      }],
     };
+  }, [importances]);
 
-    chartInstance.current.setOption(option);
-    
-    const ro = new ResizeObserver(() => { if(chartInstance.current) chartInstance.current.resize(); });
-    if (chartRef.current) ro.observe(chartRef.current);
-    return () => ro.disconnect();
-  }, [importances, theme]);
-
-  return <div ref={chartRef} className="w-full h-full" />;
+  return (
+    <ScientificEChart
+      option={option}
+      theme={theme}
+      ariaLabel="Standardized ridge regression sensitivity attribution"
+      description="Bars show normalized absolute standardized ridge coefficients. Sign is association direction and does not imply causality."
+      exportName="ridge-sensitivity-attribution"
+      dataCount={importances.length}
+      empty={importances.length === 0}
+    />
+  );
 });

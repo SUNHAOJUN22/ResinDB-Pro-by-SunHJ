@@ -1,125 +1,39 @@
-import React, { useEffect, useRef, useMemo } from 'react';
-import * as echarts from '@/lib/echarts';
-import { SimilarityNode, SimilarityEdge } from '@/workers/similarityWorker';
+import React, { useMemo } from 'react';
+import type { EChartsOption } from '@/lib/echarts';
+import type { SimilarityNode, SimilarityEdge } from '@/workers/similarityWorker';
+import { ScientificEChart } from './ScientificEChart';
+import { escapeScientificHtml, formatScientificNumber } from './scientificFigurePolicy';
 
-interface SimilarityGraphProps {
-  nodes: SimilarityNode[];
-  edges: SimilarityEdge[];
-  theme: 'light' | 'dark';
-}
+interface SimilarityGraphProps { nodes: SimilarityNode[]; edges: SimilarityEdge[]; theme: 'light' | 'dark' }
 
 export const SimilarityGraph: React.FC<SimilarityGraphProps> = React.memo(({ nodes, edges, theme }) => {
-  const chartRef = useRef<HTMLDivElement>(null);
-  const chartInstance = useRef<echarts.ECharts | null>(null);
-
-  // Group nodes by category to assign colors automatically
-  const categories = useMemo(() => Array.from(new Set(nodes.map(n => n.category))).map(name => ({ name })), [nodes]);
-
-  useEffect(() => {
-    if (!chartRef.current || nodes.length === 0) return;
-
-    if (!chartInstance.current) {
-        chartInstance.current = echarts.getInstanceByDom(chartRef.current) || echarts.init(chartRef.current, theme === 'dark' ? 'dark' : undefined);
-    }
-    
-    // Convert to ECharts Graph Data Format
-    const graphNodes = nodes.map(n => ({
-        id: n.id,
-        name: n.name,
-        category: n.category,
-        symbolSize: Math.max(10, Math.min(30, n.value * 2)),
-        itemStyle: {
-            borderColor: theme === 'dark' ? '#0f172a' : '#ffffff',
-            borderWidth: 1,
+  const option = useMemo<EChartsOption>(() => {
+    const categories = Array.from(new Set(nodes.map((node) => node.category))).map((name) => ({ name }));
+    return {
+      title: { text: 'Cosine-similarity network', subtext: 'Edges encode standardized-feature cosine similarity. Network proximity is descriptive and does not imply chemical identity.', left: 'center', top: 6, textStyle: { fontSize: 14, fontWeight: 650 }, subtextStyle: { fontSize: 10 } },
+      legend: { bottom: 4, data: categories.map((entry) => entry.name) },
+      tooltip: { formatter: (params: { dataType?: string; data?: unknown; value?: unknown }) => {
+        if (params.dataType === 'node') {
+          const data = params.data as { name?: string; value?: number; category?: string } | undefined;
+          return data ? `<strong>${escapeScientificHtml(data.name)}</strong><br/>Network degree/value: ${formatScientificNumber(Number(data.value))}<br/>Category: ${escapeScientificHtml(data.category)}` : '';
         }
-    }));
-    
-    const graphEdges = edges.map(e => ({
-        source: e.source,
-        target: e.target,
-        value: e.value,
-        lineStyle: {
-            width: Math.max(0.5, (e.value - 0.5) * 5), // dynamic thickness based on similarity
-            opacity: e.value
-        }
-    }));
-
-    const option: echarts.EChartsOption = {
-      backgroundColor: 'transparent',
-      tooltip: {
-          formatter: (params: any) => {
-              if (params.dataType === 'node') {
-                  const data = params.data as Record<string, unknown>;
-                  return `<div class="font-bold text-sm mb-1">${String(data.name)}</div>
-                          <div class="text-xs text-slate-500">Degree: ${String(data.value)}</div>
-                          <div class="text-[10px] uppercase mt-2 opacity-70">${String(data.category)}</div>`;
-              } else if (params.dataType === 'edge') {
-                   return `<div class="font-bold text-xs">Similarity: ${(parseFloat(String(params.value)) * 100).toFixed(1)}%</div>`;
-              }
-              return '';
-          }
-      },
-      legend: {
-          type: 'scroll',
-          bottom: 10,
-          textStyle: {
-              color: theme === 'dark' ? '#94a3b8' : '#64748b',
-              fontSize: 10
-          }
-      },
-      series: [
-        {
-          type: 'graph',
-          layout: 'force',
-          data: graphNodes,
-          links: graphEdges,
-          categories: categories,
-          roam: true,
-          label: {
-            show: true,
-            position: 'right',
-            formatter: '{b}',
-            fontSize: 10,
-            color: theme === 'dark' ? '#cbd5e1' : '#475569',
-            distance: 5
-          },
-          force: {
-              repulsion: 150,
-              edgeLength: [30, 80],
-              gravity: 0.1
-          },
-          emphasis: {
-            focus: 'adjacency',
-            lineStyle: {
-              width: 3
-            }
-          },
-          lineStyle: {
-            color: 'source',
-            curveness: 0.1,
-            opacity: 0.6
-          }
-        }
-      ]
+        return `Cosine similarity: ${formatScientificNumber(Number(params.value) * 100)}%`;
+      } },
+      series: [{
+        name: 'Similarity network',
+        type: 'graph',
+        layout: 'force',
+        data: nodes.map((node) => ({ id: node.id, name: node.name, value: node.value, category: node.category, symbolSize: Math.max(8, Math.min(24, node.value * 1.6)), itemStyle: { borderColor: theme === 'dark' ? '#0f172a' : '#ffffff', borderWidth: 1 } })),
+        links: edges.map((edge) => ({ source: edge.source, target: edge.target, value: edge.value, lineStyle: { width: Math.max(0.4, (edge.value - 0.5) * 3), opacity: Math.max(0.15, Math.min(0.75, edge.value)) } })),
+        categories,
+        roam: true,
+        label: { show: nodes.length <= 80, position: 'right', formatter: '{b}', fontSize: 9, distance: 4 },
+        force: { repulsion: nodes.length > 200 ? 55 : 130, edgeLength: [30, 76], gravity: 0.08, layoutAnimation: false },
+        emphasis: { focus: 'adjacency', lineStyle: { width: 2.2 } },
+        lineStyle: { color: 'source', curveness: 0.08, opacity: 0.45 },
+        progressive: 1_000,
+      }],
     };
-
-    chartInstance.current.setOption(option);
-    
-    // Add Click listener for focus
-    chartInstance.current.off('click');
-    chartInstance.current.on('click', (params: echarts.ECElementEvent) => {
-       if (params.dataType === 'node') {
-            // Can be expanded to trigger other UI
-       }
-    });
-
-  }, [nodes, edges, categories, theme]);
-
-  useEffect(() => {
-    const ro = new ResizeObserver(() => { if (chartInstance.current) chartInstance.current.resize(); });
-    if (chartRef.current) ro.observe(chartRef.current);
-    return () => ro.disconnect();
-  }, []);
-
-  return <div ref={chartRef} className="w-full h-full" />;
+  }, [edges, nodes, theme]);
+  return <ScientificEChart option={option} theme={theme} ariaLabel="Cosine similarity network" description="Nodes are materials and edges are standardized-feature cosine similarities. Network geometry is descriptive, not proof of identity or causality." exportName="cosine-similarity-network" dataCount={nodes.length + edges.length} empty={nodes.length === 0} />;
 });

@@ -64,6 +64,9 @@ jobs:
       - name: Governed external data
         run: npm run validate:data
 
+      - name: Scientific UI and figure semantics
+        run: npm run validate:scientific-ui
+
       - name: ESLint
         run: npm run lint
 
@@ -189,7 +192,7 @@ jobs:
             schemaVersion: 1,
             status: 'PASS',
             gates: [
-              'docs', 'source-hygiene', 'governed-data', 'lint', 'typescript',
+              'docs', 'source-hygiene', 'governed-data', 'scientific-ui', 'lint', 'typescript',
               'regression', 'isolated-unit', 'isolated-science-workers',
               'whole-source-coverage', 'build', 'http-smoke', 'chromium-ui',
               'production-audit', 'complete-audit', 'single-main-branch',

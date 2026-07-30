@@ -1,104 +1,32 @@
-import React, { useEffect, useRef } from "react";
-import * as echarts from "@/lib/echarts";
+import React, { useMemo } from 'react';
+import type { EChartsOption } from '@/lib/echarts';
+import { ScientificEChart } from './ScientificEChart';
+import { SCIENTIFIC_PALETTE, formatScientificNumber } from './scientificFigurePolicy';
 
 interface SobolChartProps {
   firstOrder: { name: string; value: number }[];
   totalEffect: { name: string; value: number }[];
   interactions: { name: string; value: number }[];
-  theme: "light" | "dark";
+  theme: 'light' | 'dark';
 }
 
 export const SobolChart: React.FC<SobolChartProps> = React.memo(({ firstOrder, totalEffect, interactions, theme }) => {
-  const chartRef = useRef<HTMLDivElement>(null);
-  const chartInstance = useRef<echarts.ECharts | null>(null);
-
-  useEffect(() => {
-    if (!chartRef.current) return;
-    
-    if (!chartInstance.current) {
-        chartInstance.current = echarts.getInstanceByDom(chartRef.current) || echarts.init(chartRef.current);
-    }
-    
-    const textColor = theme === 'dark' ? '#cbd5e1' : '#475569';
-    const splitLineColor = theme === 'dark' ? '#334155' : '#e2e8f0';
-
-    const names = totalEffect.map(item => item.name);
-    // Reverse arrays for horizontal bar chart (so top item is at the top)
-    names.reverse();
-    const firstOrderData = firstOrder.map(item => item.value).reverse();
-    const interactionsData = interactions.map(item => item.value).reverse();
-
-    const option: echarts.EChartsOption = {
-      title: {
-         text: 'Sobol Sensitivity Indices',
-         left: 'center',
-         textStyle: { color: textColor, fontSize: 13 }
-      },
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' },
-      formatter: (params: any) => {
-            const name = params[0].name;
-            const first = params.find((p: any) => p.seriesName === 'First-Order (Main Effect)')?.value || 0;
-            const inter = params.find((p: any) => p.seriesName === 'Interactions (Coupling)')?.value || 0;
-            const total = first + inter;
-            return `<strong>${name}</strong><br/>
-                    Total Effect (S_T): ${total.toFixed(4)}<br/>
-                    First-Order (S_A): ${first.toFixed(4)}<br/>
-                    Interactions (S_i - S_A): ${inter.toFixed(4)}`;
-        }
-      },
-      legend: {
-        bottom: '0%',
-        textStyle: { color: textColor }
-      },
-      grid: { top: '15%', bottom: '15%', left: '3%', right: '8%', containLabel: true },
-      xAxis: {
-        type: 'value',
-        name: 'Sensitivity Index',
-        nameLocation: 'middle',
-        nameGap: 30,
-        axisLabel: { color: textColor },
-        splitLine: { lineStyle: { color: splitLineColor, type: 'dashed' } }
-      },
-      yAxis: {
-        type: 'category',
-        data: names,
-        axisLabel: { color: textColor, width: 120, overflow: 'break' },
-        axisTick: { show: false }
-      },
+  const option = useMemo<EChartsOption>(() => {
+    const firstByName = new Map(firstOrder.map((entry) => [entry.name, entry.value]));
+    const interactionByName = new Map(interactions.map((entry) => [entry.name, entry.value]));
+    const ordered = [...totalEffect].reverse();
+    return {
+      title: { text: 'Jansen variance-based sensitivity indices', subtext: 'Sampling uses independent pseudo-random normal Saltelli A/B matrices. ST−S1 is aggregate higher-order contribution, not pairwise interaction.', left: 'center', top: 6, textStyle: { fontSize: 14, fontWeight: 650 }, subtextStyle: { fontSize: 10 } },
+      legend: { bottom: 4, data: ['First order S1', 'Aggregate ST−S1'] },
+      grid: { top: 76, bottom: 70, left: 28, right: 40, containLabel: true },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (params: unknown) => { const entries = Array.isArray(params) ? params as Array<{ name: string; seriesName: string; value: number }> : []; if (!entries.length) return ''; const name = entries[0].name; const first = Number(firstByName.get(name) ?? 0); const aggregate = Number(interactionByName.get(name) ?? 0); const total = Number(totalEffect.find((entry) => entry.name === name)?.value ?? first + aggregate); return `<strong>${name}</strong><br/>Total effect ST: ${formatScientificNumber(total)}<br/>First order S1: ${formatScientificNumber(first)}<br/>Aggregate ST−S1: ${formatScientificNumber(aggregate)}<br/><em>Not a pairwise interaction estimate.</em>`; } },
+      xAxis: { type: 'value', name: 'Sensitivity index', nameLocation: 'middle', nameGap: 34, min: 0 },
+      yAxis: { type: 'category', data: ordered.map((entry) => entry.name), axisLabel: { width: 160, overflow: 'truncate' }, axisTick: { show: false } },
       series: [
-        {
-          name: 'First-Order (Main Effect)',
-          type: 'bar',
-          stack: 'total',
-          data: firstOrderData,
-          itemStyle: { color: '#3b82f6' }, // blue-500
-          barMaxWidth: 30
-        },
-        {
-          name: 'Interactions (Coupling)',
-          type: 'bar',
-          stack: 'total',
-          data: interactionsData,
-          itemStyle: { color: '#f59e0b' }, // amber-500
-          barMaxWidth: 30
-        }
-      ]
+        { name: 'First order S1', type: 'bar', stack: 'total', data: ordered.map((entry) => firstByName.get(entry.name) ?? 0), barMaxWidth: 22, itemStyle: { color: SCIENTIFIC_PALETTE[0] } },
+        { name: 'Aggregate ST−S1', type: 'bar', stack: 'total', data: ordered.map((entry) => interactionByName.get(entry.name) ?? 0), barMaxWidth: 22, itemStyle: { color: SCIENTIFIC_PALETTE[4] } },
+      ],
     };
-
-    chartInstance.current.setOption(option);
-    
-    const ro = new ResizeObserver(() => {
-      if (chartInstance.current) {
-        requestAnimationFrame(() => {
-          chartInstance.current?.resize();
-        });
-      }
-    });
-    if (chartRef.current) ro.observe(chartRef.current);
-    return () => ro.disconnect();
-  }, [firstOrder, interactions, totalEffect, theme]);
-
-  return <div ref={chartRef} className="w-full h-full" />;
+  }, [firstOrder, interactions, totalEffect]);
+  return <ScientificEChart option={option} theme={theme} ariaLabel="Jansen variance based sensitivity indices" description="First-order and total-effect sensitivity are displayed, with total-minus-first-order labelled as aggregate higher-order contribution rather than pairwise interaction." exportName="jansen-sensitivity-indices" dataCount={totalEffect.length * 2} empty={totalEffect.length === 0} />;
 });

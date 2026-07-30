@@ -1,157 +1,113 @@
-import React, { useEffect, useRef } from "react";
-import * as echarts from "@/lib/echarts";
+import React, { useMemo } from 'react';
+import type { EChartsOption } from '@/lib/echarts';
+import { ScientificEChart } from './ScientificEChart';
+import { SCIENTIFIC_PALETTE, SCIENTIFIC_SEQUENTIAL, formatScientificNumber } from './scientificFigurePolicy';
 
 interface RsmHeatmapChartProps {
-  grid: {x1: number, x2: number, y: number}[][];
-  stationaryPoint?: {x1: number, x2: number, y: number} | null;
+  grid: { x1: number; x2: number; y: number }[][];
+  stationaryPoint?: { x1: number; x2: number; y: number } | null;
   minX1: number;
   maxX1: number;
   minX2: number;
   maxX2: number;
-  dataPoints: {x1: number, x2: number, y: number}[];
+  dataPoints: { x1: number; x2: number; y: number }[];
   x1Label: string;
   x2Label: string;
   yLabel: string;
-  theme: "light" | "dark";
+  theme: 'light' | 'dark';
 }
 
-export const RsmHeatmapChart: React.FC<RsmHeatmapChartProps> = React.memo(({ 
-  grid, stationaryPoint, minX1: _minX1, maxX1: _maxX1, minX2: _minX2, maxX2: _maxX2, dataPoints, x1Label, x2Label, yLabel, theme 
-}) => {
-  const chartRef = useRef<HTMLDivElement>(null);
-  const chartInstance = useRef<echarts.ECharts | null>(null);
-
-  useEffect(() => {
-    if (!chartRef.current) return;
-    
-    if (!chartInstance.current) {
-        chartInstance.current = echarts.getInstanceByDom(chartRef.current) || echarts.init(chartRef.current);
+export const RsmHeatmapChart: React.FC<RsmHeatmapChartProps> = React.memo((props) => {
+  const { grid, stationaryPoint, minX1, maxX1, minX2, maxX2, dataPoints, x1Label, x2Label, yLabel, theme } = props;
+  const option = useMemo<EChartsOption>(() => {
+    const heatmapData = grid.flatMap((row) => row.map((cell) => [cell.x1, cell.x2, cell.y] as [number, number, number]));
+    let minimum = Infinity;
+    let maximum = -Infinity;
+    for (const point of heatmapData) {
+      minimum = Math.min(minimum, point[2]);
+      maximum = Math.max(maximum, point[2]);
     }
-    
-    // Transform grid into [x1, x2, y] array for heatmap/contour
-    const heatmapData: [number, number, number][] = [];
-    grid.forEach(row => {
-      row.forEach(cell => {
-        heatmapData.push([cell.x1, cell.x2, cell.y]);
+    const series: EChartsOption['series'] = [
+      {
+        name: 'Quadratic response surface (model)',
+        type: 'heatmap',
+        data: heatmapData,
+        emphasis: { disabled: true },
+        tooltip: {
+          formatter: (params: { data?: unknown }) => {
+            const value = params.data as [number, number, number] | undefined;
+            return value
+              ? `${x1Label}: ${formatScientificNumber(value[0])}<br/>${x2Label}: ${formatScientificNumber(value[1])}<br/>Fitted ${yLabel}: ${formatScientificNumber(value[2])}`
+              : '';
+          },
+        },
+      },
+      {
+        name: 'Observed data',
+        type: 'scatter',
+        data: dataPoints.map((point) => [point.x1, point.x2, point.y]),
+        symbolSize: 7,
+        itemStyle: { color: theme === 'dark' ? '#ffffff' : '#0f172a', borderColor: SCIENTIFIC_PALETTE[0], borderWidth: 1.5 },
+        tooltip: {
+          formatter: (params: { data?: unknown }) => {
+            const value = params.data as [number, number, number] | undefined;
+            return value
+              ? `Observed data<br/>${x1Label}: ${formatScientificNumber(value[0])}<br/>${x2Label}: ${formatScientificNumber(value[1])}<br/>${yLabel}: ${formatScientificNumber(value[2])}`
+              : '';
+          },
+        },
+      },
+    ];
+    if (stationaryPoint) {
+      series.push({
+        name: 'Stationary point (classification not implied)',
+        type: 'scatter',
+        data: [[stationaryPoint.x1, stationaryPoint.x2, stationaryPoint.y]],
+        symbol: 'diamond',
+        symbolSize: 12,
+        itemStyle: { color: SCIENTIFIC_PALETTE[1], borderColor: '#ffffff', borderWidth: 1.5 },
+        tooltip: {
+          formatter: () => `Stationary point — not automatically an optimum<br/>${x1Label}: ${formatScientificNumber(stationaryPoint.x1)}<br/>${x2Label}: ${formatScientificNumber(stationaryPoint.x2)}<br/>Fitted ${yLabel}: ${formatScientificNumber(stationaryPoint.y)}`,
+        },
+        z: 4,
       });
-    });
-    
-    const scatterData = dataPoints.map(p => [p.x1, p.x2, p.y]);
-    
-    const textColor = theme === 'dark' ? '#cbd5e1' : '#475569';
-    
-
-    const option: echarts.EChartsOption = {
-      tooltip: {
-        position: 'top'
+    }
+    return {
+      title: {
+        text: 'Quadratic response-surface model',
+        subtext: 'Heatmap is fitted model output; outlined markers are observations. Stationary-point classification is not implied.',
+        left: 'center',
+        top: 6,
+        textStyle: { fontSize: 14, fontWeight: 650 },
+        subtextStyle: { fontSize: 10 },
       },
-      grid: {
-         top: '10%',
-         bottom: '15%',
-         left: '10%',
-         right: '15%'
-      },
-      xAxis: {
-        type: 'value',
-        name: x1Label,
-        nameLocation: 'middle',
-        nameGap: 30,
-        min: 'dataMin',
-        max: 'dataMax',
-        axisLabel: { color: textColor },
-        splitLine: { show: false }
-      },
-      yAxis: {
-        type: 'value',
-        name: x2Label,
-        nameLocation: 'middle',
-        nameGap: 50,
-        min: 'dataMin',
-        max: 'dataMax',
-        axisLabel: { color: textColor },
-        splitLine: { show: false }
-      },
+      grid: { top: 76, bottom: 62, left: 68, right: 86, containLabel: true },
+      xAxis: { type: 'value', name: x1Label, nameLocation: 'middle', nameGap: 34, min: minX1, max: maxX1 },
+      yAxis: { type: 'value', name: x2Label, nameLocation: 'middle', nameGap: 48, min: minX2, max: maxX2 },
       visualMap: {
-        min: Math.min(...heatmapData.map(d => d[2])),
-        max: Math.max(...heatmapData.map(d => d[2])),
+        min: Number.isFinite(minimum) ? minimum : 0,
+        max: Number.isFinite(maximum) ? maximum : 1,
         calculable: true,
         realtime: false,
-        inRange: {
-          color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#ffffbf', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026']
-        },
-        textStyle: { color: textColor },
-        right: 0,
-        top: 'middle'
+        inRange: { color: [...SCIENTIFIC_SEQUENTIAL] },
+        right: 4,
+        top: 'middle',
+        text: [yLabel, ''],
       },
-      series: [
-        {
-          name: 'Response Surface',
-          type: 'heatmap',
-          data: heatmapData,
-          emphasis: {
-            itemStyle: {
-              shadowBlur: 10,
-              shadowColor: 'rgba(0, 0, 0, 0.5)'
-            }
-          },
-          tooltip: {
-               
-         
-        formatter: (params: any) => {
-                   return `${x1Label}: ${params.data[0].toFixed(2)}<br/>${x2Label}: ${params.data[1].toFixed(2)}<br/>${yLabel}: ${params.data[2].toFixed(2)}`;
-               }
-          }
-        },
-        {
-          name: 'Original Points',
-          type: 'scatter',
-          data: scatterData,
-          itemStyle: {
-             color: '#ffffff',
-             borderColor: '#000000',
-             borderWidth: 1
-          },
-          tooltip: {
-             
-         
-        formatter: (params: any) => {
-                 return `Actual Data<br/>${x1Label}: ${params.data[0].toFixed(2)}<br/>${x2Label}: ${params.data[1].toFixed(2)}<br/>${yLabel}: ${params.data[2].toFixed(2)}`;
-             }
-          }
-        }
-      ]
+      series,
     };
-    
-    if (stationaryPoint) {
-         // Add stationary point as a distinct marker
-         (option.series as Array<Record<string, unknown>>).push({
-             name: 'Stationary Point',
-             type: 'scatter',
-             data: [[stationaryPoint.x1, stationaryPoint.x2, stationaryPoint.y]],
-             symbol: 'diamond',
-             symbolSize: 15,
-             itemStyle: {
-                 color: '#ff00ff',
-                 borderColor: '#ffffff',
-                 borderWidth: 2
-             },
-             zlevel: 10,
-             tooltip: {
-                 
-         
-        formatter: (params: any) => {
-                     return `<strong>Optimal / Stationary Point</strong><br/>${x1Label}: ${params.data[0].toFixed(2)}<br/>${x2Label}: ${params.data[1].toFixed(2)}<br/>${yLabel}: ${params.data[2].toFixed(2)}`;
-                 }
-             }
-         });
-    }
+  }, [dataPoints, grid, maxX1, maxX2, minX1, minX2, stationaryPoint, theme, x1Label, x2Label, yLabel]);
 
-    chartInstance.current.setOption(option);
-    
-    const ro = new ResizeObserver(() => { if(chartInstance.current) chartInstance.current.resize(); });
-    if (chartRef.current) ro.observe(chartRef.current);
-    return () => ro.disconnect();
-  }, [grid, stationaryPoint, dataPoints, theme, x1Label, x2Label, yLabel]);
-
-  return <div ref={chartRef} className="w-full h-full" />;
+  const dataCount = grid.reduce((sum, row) => sum + row.length, 0) + dataPoints.length + (stationaryPoint ? 1 : 0);
+  return (
+    <ScientificEChart
+      option={option}
+      theme={theme}
+      ariaLabel="Quadratic response surface with observed points"
+      description="The heatmap is fitted model output. Observations and the stationary point are drawn as separate marker layers."
+      exportName="quadratic-response-surface"
+      dataCount={dataCount}
+      empty={grid.length === 0}
+    />
+  );
 });

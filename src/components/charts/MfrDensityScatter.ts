@@ -1,131 +1,84 @@
-import * as echarts from "@/lib/echarts";
+import type { EChartsOption } from '@/lib/echarts';
+import {
+  SCIENTIFIC_PALETTE,
+  escapeScientificHtml,
+  formatScientificNumber,
+  scientificMutedColor,
+} from './scientificFigurePolicy';
 
-// Chart: MFR vs Density Scatter Plot Option Configuration - Scientific Refinement
+type ScatterSeries = { name: string; data: [number, number, string][] };
+type ScatterInput = {
+  series?: ScatterSeries[];
+  xAxis?: string;
+  yAxis?: string;
+  xBounds?: { min: number; max: number };
+  yBounds?: { min: number; max: number };
+};
+
 export const getMfrDensityChartOption = (
-  data: { series?: unknown[]; xAxis?: string; yAxis?: string } | unknown[],
-  theme: "light" | "dark",
-): echarts.EChartsOption => {
-  const isDark = theme === "dark";
-  const colorPalette = ["#0ea5e9", "#f43f5e", "#10b981", "#6366f1", "#f59e0b", "#ec4899", "#8b5cf6"];
-  const axisColor = isDark ? "#94a3b8" : "#475569";
-  const gridLineColor = isDark ? "rgba(148, 163, 184, 0.05)" : "rgba(100, 116, 139, 0.05)";
-
-  const seriesData = (
-    Array.isArray(data)
-      ? data
-      : (data as { series?: { name: string; data: unknown[] }[] }).series || []
-  ) as { name: string; data: unknown[] }[];
-
-  const typedData = data as { xAxis?: string; yAxis?: string; xBounds?: { min: number; max: number }; yBounds?: { min: number; max: number } };
-
-  const xAxisName = Array.isArray(data) ? "Density" : typedData.xAxis || "Density";
-  const yAxisName = Array.isArray(data) ? "MFR" : typedData.yAxis || "MFR";
+  data: ScatterInput | unknown[],
+  theme: 'light' | 'dark',
+  language: 'zh' | 'en' = 'zh',
+): EChartsOption => {
+  const source = Array.isArray(data) ? {} : data;
+  const seriesData = (Array.isArray(data) ? data : source.series ?? []) as ScatterSeries[];
+  const xAxisName = source.xAxis ?? (language === 'en' ? 'Density' : '密度');
+  const yAxisName = source.yAxis ?? 'MFR';
+  const pointCount = seriesData.reduce((sum, series) => sum + series.data.length, 0);
 
   return {
-    backgroundColor: "transparent",
-    color: colorPalette,
-    grid: {
-      left: "10%",
-      right: "10%",
-      bottom: "15%",
-      top: "10%",
-      containLabel: true,
+    title: {
+      text: language === 'en' ? 'Processability–structure map' : '加工性–结构映射',
+      subtext: language === 'en'
+        ? 'Observed values; MFR is displayed on a logarithmic scale.'
+        : '绘制观测值；MFR 使用对数坐标。',
+      left: 'center',
+      top: 6,
+      textStyle: { fontSize: 14, fontWeight: 650 },
+      subtextStyle: { color: scientificMutedColor(theme), fontSize: 10 },
     },
-    tooltip: {
-      trigger: "item",
-      padding: 12,
-      backgroundColor: isDark ? "rgba(15, 23, 42, 0.95)" : "rgba(255, 255, 255, 0.98)",
-      borderColor: isDark ? "#334155" : "#e2e8f0",
-      textStyle: { color: isDark ? "#f1f5f9" : "#1e293b", fontSize: 12 },
-      formatter: (params: any) => {
-        const val = params.value;
-        return `
-          <div style="font-weight: 800; margin-bottom: 6px;">${val[2]}</div>
-          <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px;">
-            <div style="display: flex; justify-content: space-between; gap: 20px;">
-              <span style="color: #94a3b8;">${xAxisName}:</span>
-              <span style="font-weight: 700; color: ${params.color}">${val[0]}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; gap: 20px;">
-              <span style="color: #94a3b8;">${yAxisName}:</span>
-              <span style="font-weight: 700; color: ${params.color}">${val[1]}</span>
-            </div>
-          </div>
-        `;
-      },
-      extraCssText: "box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); border-radius: 12px;",
-    },
-    legend: {
-      bottom: 0,
-      itemWidth: 8,
-      itemHeight: 8,
-      textStyle: { color: axisColor, fontSize: 10, fontWeight: 600 },
-      type: "scroll",
-    },
-    toolbox: {
-      feature: {
-        dataZoom: { yAxisIndex: "none" },
-        restore: {},
-        saveAsImage: { name: 'density_scatter', pixelRatio: 2 }
-      },
-      iconStyle: { borderColor: isDark ? '#94a3b8' : '#475569' }
-    },
+    grid: { left: 70, right: 36, bottom: 70, top: 72, containLabel: true },
+    legend: { bottom: 4 },
     dataZoom: [
       { type: 'inside', xAxisIndex: 0, filterMode: 'filter' },
       { type: 'inside', yAxisIndex: 0, filterMode: 'filter' },
     ],
-    xAxis: {
-      type: "value",
-      name: xAxisName,
-      nameLocation: "middle",
-      nameGap: 30,
-      scale: true,
-      min: typedData.xBounds?.min,
-      max: typedData.xBounds?.max,
-      nameTextStyle: { color: axisColor, fontWeight: 700, fontSize: 12 },
-      splitLine: { lineStyle: { color: gridLineColor } },
-      axisLabel: { 
-        color: axisColor, 
-        fontSize: 10, 
-        fontFamily: "'JetBrains Mono', monospace",
-        formatter: (value: number) => value.toString()
+    tooltip: {
+      trigger: 'item',
+      formatter: (params: { value?: unknown }) => {
+        const value = params.value as [number, number, string] | undefined;
+        if (!value) return '';
+        return `<strong>${escapeScientificHtml(value[2])}</strong><br/>${escapeScientificHtml(xAxisName)}: ${formatScientificNumber(Number(value[0]))}<br/>${escapeScientificHtml(yAxisName)}: ${formatScientificNumber(Number(value[1]))}`;
       },
-      axisLine: { lineStyle: { color: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)" } },
+    },
+    xAxis: {
+      type: 'value',
+      name: xAxisName,
+      nameLocation: 'middle',
+      nameGap: 34,
+      scale: true,
+      min: source.xBounds?.min,
+      max: source.xBounds?.max,
     },
     yAxis: {
-      type: "log",
+      type: 'log',
       name: yAxisName,
-      nameLocation: "middle",
-      nameGap: 40,
-      min: typedData.yBounds?.min,
-      max: typedData.yBounds?.max,
-      nameTextStyle: { color: axisColor, fontWeight: 700, fontSize: 12 },
-      splitLine: { lineStyle: { color: gridLineColor } },
-      axisLabel: { 
-        color: axisColor, 
-        fontSize: 10, 
-        fontFamily: "'JetBrains Mono', monospace",
-        formatter: (value: number) => value < 1 ? value.toString() : Math.round(value).toString()
-      },
-      axisLine: { lineStyle: { color: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)" } },
+      nameLocation: 'middle',
+      nameGap: 48,
+      min: source.yBounds?.min,
+      max: source.yBounds?.max,
     },
-    series: seriesData.map((s) => ({
-      name: s.name,
-      type: "scatter" as const,
-      symbolSize: 12,
-      itemStyle: {
-        opacity: 0.65,
-        borderColor: "#fff",
-        borderWidth: 1.5,
-        shadowBlur: 5,
-        shadowColor: "rgba(0,0,0,0.1)",
-      },
-      emphasis: {
-        itemStyle: { opacity: 1, borderWidth: 2, scale: 1.3 }
-      },
-      data: (s.data as [number, number, string][]).filter((d) => Number(d[0]) > 0 && Number(d[1]) > 0),
+    series: seriesData.map((series, index) => ({
+      name: series.name,
+      type: 'scatter' as const,
+      symbolSize: pointCount > 3_000 ? 4 : 7,
+      progressive: 2_000,
+      progressiveThreshold: 3_000,
+      large: pointCount > 8_000,
+      largeThreshold: 8_000,
+      itemStyle: { opacity: 0.72, color: SCIENTIFIC_PALETTE[index % SCIENTIFIC_PALETTE.length] },
+      emphasis: { scale: 1.1, itemStyle: { opacity: 1, borderWidth: 1 } },
+      data: series.data.filter((point) => Number.isFinite(Number(point[0])) && Number(point[1]) > 0),
     })),
-    animationDuration: 1200,
-    animationEasing: "cubicOut",
   };
 };

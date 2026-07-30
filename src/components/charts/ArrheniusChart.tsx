@@ -1,109 +1,78 @@
-import React, { useEffect, useRef } from "react";
-import * as echarts from "@/lib/echarts";
+import React, { useMemo } from 'react';
+import type { EChartsOption } from '@/lib/echarts';
+import { ScientificEChart } from './ScientificEChart';
+import { SCIENTIFIC_PALETTE, formatScientificNumber } from './scientificFigurePolicy';
 
 interface ArrheniusChartProps {
   points: { tempC: number; time: number; x: number; y: number }[];
   equation: { m: number; b: number };
   rSquared: number;
-  theme: "light" | "dark";
+  theme: 'light' | 'dark';
 }
 
 export const ArrheniusChart: React.FC<ArrheniusChartProps> = React.memo(({ points, equation, rSquared, theme }) => {
-  const chartRef = useRef<HTMLDivElement>(null);
-  const chartInstance = useRef<echarts.ECharts | null>(null);
-
-  useEffect(() => {
-    if (!chartRef.current) return;
-    
-    if (!chartInstance.current) {
-        chartInstance.current = echarts.getInstanceByDom(chartRef.current) || echarts.init(chartRef.current);
-    }
-    
-    const textColor = theme === 'dark' ? '#cbd5e1' : '#475569';
-    const splitLineColor = theme === 'dark' ? '#334155' : '#e2e8f0';
-
-    // X-axis plotted as 1000/T for readability, standard in Arrhenius plots
-    const scatterData = points.map(pt => [pt.x * 1000, pt.y, pt.tempC, pt.time]);
-    
-    const minX = Math.min(...points.map(pt => pt.x));
-    const maxX = Math.max(...points.map(pt => pt.x));
-    
-    const range = maxX - minX;
-    // Add margin for visual fit line
-    const lineStartX = minX - (range || 0.001) * 0.1;
-    const lineEndX = maxX + (range || 0.001) * 0.1;
-
-    const lineData = [
-       [lineStartX * 1000, equation.m * lineStartX + equation.b],
-       [lineEndX * 1000, equation.m * lineEndX + equation.b]
-    ];
-
-    const option: echarts.EChartsOption = {
+  const option = useMemo<EChartsOption>(() => {
+    const inverseTemperatures = points.map((point) => point.x);
+    const minX = inverseTemperatures.length ? Math.min(...inverseTemperatures) : 0;
+    const maxX = inverseTemperatures.length ? Math.max(...inverseTemperatures) : 0;
+    const span = Math.max(maxX - minX, 1e-6);
+    const lineStart = minX - span * 0.08;
+    const lineEnd = maxX + span * 0.08;
+    return {
       title: {
-         text: 'Arrhenius Plot',
-         left: 'center',
-         textStyle: { color: textColor, fontSize: 13 }
+        text: 'Arrhenius lifetime linearization',
+        subtext: `OLS in ln(t / h) versus 1/T; R²=${rSquared.toFixed(4)}. Extrapolation assumes one dominant apparent activation process.`,
+        left: 'center',
+        top: 6,
+        textStyle: { fontSize: 14, fontWeight: 650 },
+        subtextStyle: { fontSize: 10 },
       },
+      legend: { bottom: 4, data: ['Observed lifetime', 'Linear fit (model)'] },
+      grid: { top: 76, bottom: 70, left: 70, right: 36, containLabel: true },
       tooltip: {
-        
-         
-        formatter: (params: any) => {
-           if (params.seriesType === 'scatter') {
-               return `<strong>${params.data[2]} °C</strong><br/>1000/T: ${params.data[0].toFixed(3)} K⁻¹<br/>ln(time): ${params.data[1].toFixed(3)}<br/>Time: ${params.data[3].toFixed(1)} hrs`;
-           }
-           return `Linear Fit<br/>R² = ${rSquared.toFixed(4)}`;
-        }
+        trigger: 'item',
+        formatter: (params: { seriesType?: string; data?: unknown }) => {
+          if (params.seriesType === 'line') return `Linear fit (model)<br/>R²=${rSquared.toFixed(4)}`;
+          const value = params.data as [number, number, number, number] | undefined;
+          return value
+            ? `Observed lifetime<br/>T: ${formatScientificNumber(value[2])} °C<br/>1000/T: ${formatScientificNumber(value[0])} K⁻¹<br/>ln(t / h): ${formatScientificNumber(value[1])}<br/>t: ${formatScientificNumber(value[3])} h`
+            : '';
+        },
       },
-      grid: { top: '15%', bottom: '15%', left: '12%', right: '10%' },
-      xAxis: {
-        type: 'value',
-        name: '1000 / T (K⁻¹)',
-        nameLocation: 'middle',
-        nameGap: 25,
-        scale: true,
-        axisLabel: { color: textColor },
-        splitLine: { show: false }
-      },
-      yAxis: {
-        type: 'value',
-        name: 'ln(time)',
-        nameLocation: 'middle',
-        nameGap: 35,
-        scale: true,
-        axisLabel: { color: textColor },
-        splitLine: { lineStyle: { color: splitLineColor, type: 'dashed' } }
-      },
+      xAxis: { type: 'value', name: '1000/T (K⁻¹)', nameLocation: 'middle', nameGap: 34, scale: true },
+      yAxis: { type: 'value', name: 'ln(t / h)', nameLocation: 'middle', nameGap: 48, scale: true },
       series: [
         {
-          name: 'Experimental Data',
+          name: 'Observed lifetime',
           type: 'scatter',
-          data: scatterData,
-          itemStyle: { color: '#ea580c' }, // orange-600
-          symbolSize: 8
+          data: points.map((point) => [point.x * 1_000, point.y, point.tempC, point.time]),
+          symbolSize: 7,
+          itemStyle: { color: SCIENTIFIC_PALETTE[1] },
         },
         {
-          name: 'Fit Line',
+          name: 'Linear fit (model)',
           type: 'line',
-          data: lineData,
-          itemStyle: { color: '#ef4444' }, // red border
-          lineStyle: { width: 2, type: 'dashed' },
-          symbol: 'none'
-        }
-      ]
+          data: [
+            [lineStart * 1_000, equation.m * lineStart + equation.b],
+            [lineEnd * 1_000, equation.m * lineEnd + equation.b],
+          ],
+          symbol: 'none',
+          lineStyle: { color: SCIENTIFIC_PALETTE[0], width: 1.6, type: 'dashed' },
+          silent: true,
+        },
+      ],
     };
+  }, [equation.b, equation.m, points, rSquared]);
 
-    chartInstance.current.setOption(option);
-    
-    const ro = new ResizeObserver(() => {
-      if (chartInstance.current) {
-        requestAnimationFrame(() => {
-          chartInstance.current?.resize();
-        });
-      }
-    });
-    if (chartRef.current) ro.observe(chartRef.current);
-    return () => ro.disconnect();
-  }, [points, equation, rSquared, theme]);
-
-  return <div ref={chartRef} className="w-full h-full" />;
+  return (
+    <ScientificEChart
+      option={option}
+      theme={theme}
+      ariaLabel="Arrhenius lifetime linearization"
+      description="Observed lifetime points and an ordinary least-squares Arrhenius fit are shown separately."
+      exportName="arrhenius-lifetime-linearization"
+      dataCount={points.length + 2}
+      empty={points.length < 2}
+    />
+  );
 });

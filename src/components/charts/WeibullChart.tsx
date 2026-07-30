@@ -1,5 +1,7 @@
-import React, { useEffect, useRef } from "react";
-import * as echarts from "@/lib/echarts";
+import React, { useMemo } from 'react';
+import type { EChartsOption } from '@/lib/echarts';
+import { ScientificEChart } from './ScientificEChart';
+import { SCIENTIFIC_PALETTE, formatScientificNumber } from './scientificFigurePolicy';
 
 interface WeibullChartProps {
   points: { value: number; x: number; y: number; p: number }[];
@@ -8,118 +10,74 @@ interface WeibullChartProps {
   rSquared: number;
   safeValue95: number;
   targetKey: string;
-  theme: "light" | "dark";
+  theme: 'light' | 'dark';
 }
 
-export const WeibullChart: React.FC<WeibullChartProps> = React.memo(({ points, m, eta, rSquared, safeValue95, targetKey, theme }) => {
-  const chartRef = useRef<HTMLDivElement>(null);
-  const chartInstance = useRef<echarts.ECharts | null>(null);
-
-  useEffect(() => {
-    if (!chartRef.current) return;
-    
-    if (!chartInstance.current) {
-        chartInstance.current = echarts.getInstanceByDom(chartRef.current) || echarts.init(chartRef.current);
-    }
-    
-    const textColor = theme === 'dark' ? '#cbd5e1' : '#475569';
-    const splitLineColor = theme === 'dark' ? '#334155' : '#e2e8f0';
-
-    const scatterData = points.map(pt => [pt.x, pt.y, pt.value, pt.p]);
-    
-    // Fit line points
-    const minX = Math.min(...points.map(pt => pt.x));
-    const maxX = Math.max(...points.map(pt => pt.x));
-    
-    // Y = m*X - m*ln(eta) => Y = m * (X - ln(eta))
-    const lineY1 = m * (minX - Math.log(eta));
-    const lineY2 = m * (maxX - Math.log(eta));
-
-    const lineData = [
-       [minX, lineY1],
-       [maxX, lineY2]
-    ];
-
-    const option: echarts.EChartsOption = {
+export const WeibullChart: React.FC<WeibullChartProps> = React.memo((props) => {
+  const { points, m, eta, rSquared, safeValue95, targetKey, theme } = props;
+  const option = useMemo<EChartsOption>(() => {
+    const minX = points.length ? Math.min(...points.map((point) => point.x)) : 0;
+    const maxX = points.length ? Math.max(...points.map((point) => point.x)) : 0;
+    const b5Log = safeValue95 > 0 ? Math.log(safeValue95) : null;
+    return {
       title: {
-         text: 'Weibull Probability Plot',
-         left: 'center',
-         textStyle: { color: textColor, fontSize: 14 }
+        text: 'Two-parameter Weibull probability plot',
+        subtext: `Bernard median-rank OLS (not MLE); m=${formatScientificNumber(m)}, η=${formatScientificNumber(eta)}, R²=${rSquared.toFixed(4)}.`,
+        left: 'center',
+        top: 6,
+        textStyle: { fontSize: 14, fontWeight: 650 },
+        subtextStyle: { fontSize: 10 },
       },
+      legend: { bottom: 4, data: ['Median-rank observations', 'OLS fit (model)'] },
+      grid: { top: 76, bottom: 70, left: 72, right: 36, containLabel: true },
       tooltip: {
-        
-         
-        formatter: (params: any) => {
-           if (params.seriesType === 'scatter') {
-               const val = params.data[2];
-               const failProbability = (params.data[3] * 100).toFixed(2);
-               return `<strong>Failure Point</strong><br/>Value (${targetKey}): ${val.toFixed(2)}<br/>Cumulative Failure: ${failProbability}%`;
-           }
-           return `Linear Fit Line`;
-        }
+        trigger: 'item',
+        formatter: (params: { seriesType?: string; data?: unknown }) => {
+          if (params.seriesType === 'line') return 'Bernard median-rank OLS fit (not maximum likelihood).';
+          const value = params.data as [number, number, number, number] | undefined;
+          return value
+            ? `Median-rank observation<br/>${targetKey}: ${formatScientificNumber(value[2])}<br/>Cumulative failure: ${formatScientificNumber(value[3] * 100)}%`
+            : '';
+        },
       },
-      grid: {
-         top: '15%',
-         bottom: '15%',
-         left: '10%',
-         right: '10%',
-         containLabel: true
-      },
-      toolbox: {
-         feature: {
-            dataZoom: { yAxisIndex: "none" },
-            restore: {},
-            saveAsImage: { name: 'weibull_chart', pixelRatio: 2 }
-         },
-         iconStyle: { borderColor: textColor }
-      },
-      dataZoom: [
-         { type: 'inside', xAxisIndex: 0, filterMode: 'filter' },
-         { type: 'inside', yAxisIndex: 0, filterMode: 'filter' },
-      ],
-      xAxis: {
-        type: 'value',
-        name: `ln(${targetKey})`,
-        nameLocation: 'middle',
-        nameGap: 25,
-        scale: true,
-        axisLabel: { color: textColor },
-        splitLine: { lineStyle: { color: splitLineColor, type: 'dashed' } }
-      },
-      yAxis: {
-        type: 'value',
-        name: 'ln(-ln(1 - P))',
-        nameLocation: 'middle',
-        nameGap: 35,
-        scale: true,
-        axisLabel: { color: textColor },
-        splitLine: { lineStyle: { color: splitLineColor, type: 'dashed' } }
-      },
+      xAxis: { type: 'value', name: `ln(${targetKey})`, nameLocation: 'middle', nameGap: 34, scale: true },
+      yAxis: { type: 'value', name: 'ln[-ln(1 − P)]', nameLocation: 'middle', nameGap: 50, scale: true },
       series: [
         {
-          name: 'Data Points',
+          name: 'Median-rank observations',
           type: 'scatter',
-          data: scatterData,
-          itemStyle: { color: '#0ea5e9' },
-          symbolSize: 8
+          data: points.map((point) => [point.x, point.y, point.value, point.p]),
+          symbolSize: 7,
+          itemStyle: { color: SCIENTIFIC_PALETTE[0] },
+          markLine: b5Log === null ? undefined : {
+            symbol: ['none', 'none'],
+            silent: true,
+            lineStyle: { color: SCIENTIFIC_PALETTE[2], type: 'dotted', width: 1.4 },
+            label: { formatter: `B5 / 95% survival = ${formatScientificNumber(safeValue95)}` },
+            data: [{ xAxis: b5Log }],
+          },
         },
         {
-          name: 'Fit Line',
+          name: 'OLS fit (model)',
           type: 'line',
-          data: lineData,
-          itemStyle: { color: '#ef4444' }, // red line
-          lineStyle: { width: 2, type: 'dashed' },
-          symbol: 'none'
-        }
-      ]
+          data: [[minX, m * (minX - Math.log(eta))], [maxX, m * (maxX - Math.log(eta))]],
+          symbol: 'none',
+          lineStyle: { color: SCIENTIFIC_PALETTE[1], width: 1.6, type: 'dashed' },
+          silent: true,
+        },
+      ],
     };
+  }, [eta, m, points, rSquared, safeValue95, targetKey]);
 
-    chartInstance.current.setOption(option);
-    
-    const ro = new ResizeObserver(() => { if(chartInstance.current) chartInstance.current.resize(); });
-    if (chartRef.current) ro.observe(chartRef.current);
-    return () => ro.disconnect();
-  }, [points, m, eta, rSquared, safeValue95, targetKey, theme]);
-
-  return <div ref={chartRef} className="w-full h-full" />;
+  return (
+    <ScientificEChart
+      option={option}
+      theme={theme}
+      ariaLabel="Weibull median-rank probability plot"
+      description="The figure uses Bernard median ranks and ordinary least-squares linearization, not maximum-likelihood estimation."
+      exportName="weibull-median-rank-ols"
+      dataCount={points.length + 2}
+      empty={points.length < 3}
+    />
+  );
 });
