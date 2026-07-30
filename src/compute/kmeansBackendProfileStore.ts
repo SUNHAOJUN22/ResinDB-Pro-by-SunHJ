@@ -9,6 +9,7 @@ import {
   assessKMeansProfileMigration,
   type KMeansProfileMigrationEvent,
 } from './kmeansProfileMigration';
+import { createKMeansWorkerBenchmarkEnvironment } from './kmeansWorkerEnvironment';
 
 const PROFILE_DATABASE_NAME = 'resindb-kmeans-backend-profile-v1';
 const PROFILE_DATABASE_VERSION = 1;
@@ -234,4 +235,7 @@ export function createKMeansBackendProfileStore(
   };
 }
 
-export const kmeansBackendProfileStore = createKMeansBackendProfileStore();
+export const kmeansBackendProfileStore = createKMeansBackendProfileStore(
+  createIndexedDbPersistence(),
+  createKMeansWorkerBenchmarkEnvironment,
+);
