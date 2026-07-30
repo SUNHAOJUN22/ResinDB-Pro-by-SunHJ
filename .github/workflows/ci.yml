@@ -27,7 +27,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        uses: actions/setup-node@49933ea5288ca8642d1e84afbd3f7d6820020
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -37,15 +37,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in 1 2 3; do
-            if npm ci > /tmp/npm-ci.log 2>&1; then
-              cat /tmp/npm-ci.log
-              exit 0
-            fi
-            tail -n 200 /tmp/npm-ci.log
-            [ "$attempt" -eq 3 ] && exit 1
-            sleep $((attempt * 15))
+          : > /tmp/npm-ci.log
+          registries=(
+            "https://registry.npmjs.org"
+            "https://registry.npmmirror.com"
+          )
+          for registry in "${registries[@]}"; do
+            for attempt in 1 2 3; do
+              printf '\nregistry=%s attempt=%s\n' "$registry" "$attempt" | tee -a /tmp/npm-ci.log
+              if npm ci --registry="$registry" >> /tmp/npm-ci.log 2>&1; then
+                cat /tmp/npm-ci.log
+                exit 0
+              fi
+              tail -n 200 /tmp/npm-ci.log
+              sleep $((attempt * 10))
+            done
           done
+          exit 1
 
       - name: Upload npm diagnostics
         if: failure() && steps.npm-ci.outcome == 'failure'
