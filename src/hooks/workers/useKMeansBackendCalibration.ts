@@ -19,6 +19,8 @@ const EMPTY_PROFILE_STATE: KMeansBackendProfileLoadResult = {
   environment: null,
   reason: 'Profile has not been loaded yet',
   savedAt: null,
+  migration: null,
+  migrationHistory: [],
 };
 
 export function useKMeansBackendCalibration() {
