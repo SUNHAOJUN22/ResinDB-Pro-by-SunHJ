@@ -2,6 +2,8 @@ stage=parts-present
 exit_code=1
 .phase2k/patch-00.b64 bytes=10000
 886b3c1cb637adbc037916f0c5fd258c843e7313cd5c9c8281b312f3b4f6b5ce  .phase2k/patch-00.b64
+.phase2k/patch-00a.b64 bytes=8000
+052090d81e221376613edc13a66824a3b24855abb53a0178418abb3cfe262f2e  .phase2k/patch-00a.b64
 .phase2k/patch-01.b64 bytes=15046
 af6f2ecf3ed20e2a29608eaddb70044cd15911fcbe1e5f5307d1fedc3e0d321c  .phase2k/patch-01.b64
 .phase2k/patch-02.b64 bytes=15046
