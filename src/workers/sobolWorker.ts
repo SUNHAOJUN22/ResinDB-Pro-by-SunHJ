@@ -48,6 +48,7 @@ export interface SobolAnalysisMetadata {
 
 export interface SobolPerformanceMetadata {
   matrixStorage: 'flat-float64';
+  workObjectReused: true;
   numericPropertyDictionaryReused: true;
   formulaResultObjectReused: true;
   hybridOutputStreaming: true;
@@ -268,6 +269,7 @@ self.onmessage = (event: MessageEvent<SobolMessage>) => {
         },
         performance: {
           matrixStorage: 'flat-float64',
+          workObjectReused: true,
           numericPropertyDictionaryReused: true,
           formulaResultObjectReused: true,
           hybridOutputStreaming: true,
