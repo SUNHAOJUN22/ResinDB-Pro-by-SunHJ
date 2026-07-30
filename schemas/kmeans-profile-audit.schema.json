@@ -9,11 +9,13 @@
     "generatedAt",
     "scope",
     "notice",
+    "importPolicy",
     "profileLoad",
     "profile",
     "environment",
     "workload",
     "autoDecision",
+    "decisionHistory",
     "migration",
     "migrationHistory",
     "excludedFields",
@@ -25,6 +27,7 @@
     "generatedAt": { "type": "string", "format": "date-time" },
     "scope": { "const": "device-local-non-product-metadata" },
     "notice": { "const": "not-a-cross-device-performance-conclusion" },
+    "importPolicy": { "const": "audit-import-never-activates-runtime-profile" },
     "profileLoad": {
       "type": "object",
       "additionalProperties": false,
@@ -84,23 +87,9 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "runtime",
-            "runtimeVersion",
-            "platform",
-            "architecture",
-            "logicalCores",
-            "wasm",
-            "wasmSimd",
-            "wasmThreads",
-            "fingerprint"
-          ],
+          "required": ["runtime", "wasm", "wasmSimd", "wasmThreads", "fingerprint"],
           "properties": {
             "runtime": { "enum": ["node", "browser-window", "browser-worker", "unknown"] },
-            "runtimeVersion": { "type": "string" },
-            "platform": { "type": "string" },
-            "architecture": { "type": "string" },
-            "logicalCores": { "type": "integer", "minimum": 1 },
             "wasm": { "type": "boolean" },
             "wasmSimd": { "type": "boolean" },
             "wasmThreads": { "type": "boolean" },
@@ -120,6 +109,42 @@
       }
     },
     "autoDecision": { "type": ["object", "null"] },
+    "decisionHistory": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "timestamp",
+          "requestedBackend",
+          "selectedBackend",
+          "actualBackend",
+          "reason",
+          "profileAccepted",
+          "profileRejectionReason",
+          "fallbackUsed",
+          "fallbackReason",
+          "workloadOperations",
+          "environmentFingerprint"
+        ],
+        "properties": {
+          "schemaVersion": { "const": "kmeans-decision-history-1.0.0" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "requestedBackend": { "enum": ["auto", "typescript", "wasm"] },
+          "selectedBackend": { "enum": ["typescript", "wasm"] },
+          "actualBackend": { "enum": ["typescript", "wasm"] },
+          "reason": { "type": "string" },
+          "profileAccepted": { "type": "boolean" },
+          "profileRejectionReason": { "type": ["string", "null"] },
+          "fallbackUsed": { "type": "boolean" },
+          "fallbackReason": { "type": ["string", "null"] },
+          "workloadOperations": { "type": "integer", "minimum": 0 },
+          "environmentFingerprint": { "type": "string" }
+        }
+      }
+    },
     "migration": { "type": ["object", "null"] },
     "migrationHistory": { "type": "array", "items": { "type": "object" } },
     "excludedFields": {
