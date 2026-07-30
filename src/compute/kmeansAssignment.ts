@@ -1,4 +1,11 @@
 import { probeComputeCapabilities, type ComputeProbeEnvironment } from './capabilityProbe';
+import {
+  createKMeansBenchmarkEnvironment,
+  decideKMeansAssignmentBackend,
+  type KMeansBackendBenchmarkProfile,
+  type KMeansBackendDecisionEvidence,
+  type KMeansBenchmarkEnvironment,
+} from './kmeansBackendPolicy';
 import { ROW_MAJOR_FLOAT64_PROTOCOL_VERSION } from './numericBuffers';
 import {
   createKMeansAssignmentWasmSession,
@@ -28,6 +35,7 @@ export interface KMeansAssignmentSessionEvidence {
   wasmThreadsAvailable: boolean;
   wasmSimdUsed: false;
   wasmThreadsUsed: false;
+  backendDecision: KMeansBackendDecisionEvidence;
 }
 
 export interface KMeansAssignmentSession {
@@ -48,6 +56,8 @@ export interface CreateKMeansAssignmentSessionOptions {
   maxClusters: number;
   preference?: KMeansAssignmentBackendPreference;
   allowFallback?: boolean;
+  benchmarkProfile?: KMeansBackendBenchmarkProfile;
+  benchmarkEnvironment?: KMeansBenchmarkEnvironment;
   probeEnvironment?: ComputeProbeEnvironment;
   createWasmSession?: typeof createKMeansAssignmentWasmSession;
 }
@@ -193,12 +203,27 @@ export function createKMeansAssignmentSession(
     throw new RangeError('matrix length must equal sampleCount times dimensions');
   }
   validateFiniteValues(options.matrix, 'matrix');
-  const preference = options.preference ?? 'auto';
-  if (preference !== 'auto' && preference !== 'typescript' && preference !== 'wasm') {
+  const requestedPreference = options.preference ?? 'auto';
+  if (
+    requestedPreference !== 'auto'
+    && requestedPreference !== 'typescript'
+    && requestedPreference !== 'wasm'
+  ) {
     throw new TypeError('K-Means assignment backend must be auto, typescript, or wasm');
   }
   const allowFallback = options.allowFallback ?? true;
   const capabilities = probeComputeCapabilities(options.probeEnvironment);
+  const benchmarkEnvironment = options.benchmarkEnvironment
+    ?? createKMeansBenchmarkEnvironment(options.probeEnvironment);
+  const backendDecision = decideKMeansAssignmentBackend({
+    requestedBackend: requestedPreference,
+    sampleCount: samples,
+    dimensions,
+    maxClusters,
+    profile: options.benchmarkProfile,
+    environment: benchmarkEnvironment,
+  });
+  const preference = backendDecision.selectedBackend;
   const wasmFactory = options.createWasmSession ?? createKMeansAssignmentWasmSession;
   let backend: KMeansAssignmentBackend = 'typescript';
   let wasmSession: KMeansAssignmentWasmSession | null = null;
@@ -206,15 +231,13 @@ export function createKMeansAssignmentSession(
   let fallbackReason: string | null = null;
   let calls = 0;
 
-  if (preference !== 'typescript') {
+  if (preference === 'wasm') {
     if (!capabilities.wasm) {
-      if (preference === 'wasm' && !allowFallback) {
+      if (!allowFallback) {
         throw new Error('WebAssembly was requested but is unavailable');
       }
-      if (preference === 'wasm') {
-        fallbackUsed = true;
-        fallbackReason = 'WebAssembly capability is unavailable';
-      }
+      fallbackUsed = true;
+      fallbackReason = 'WebAssembly capability is unavailable';
     } else {
       try {
         wasmSession = wasmFactory(options.matrix, samples, dimensions, maxClusters);
@@ -283,7 +306,7 @@ export function createKMeansAssignmentSession(
         wasmBinaryVersion: KMEANS_ASSIGNMENT_WASM_BINARY_VERSION,
         protocolVersion: ROW_MAJOR_FLOAT64_PROTOCOL_VERSION,
         precision: 'f64',
-        requestedBackend: preference,
+        requestedBackend: requestedPreference,
         backend,
         fallbackUsed,
         fallbackReason,
@@ -293,6 +316,7 @@ export function createKMeansAssignmentSession(
         wasmThreadsAvailable: capabilities.wasmThreads,
         wasmSimdUsed: false,
         wasmThreadsUsed: false,
+        backendDecision,
       } satisfies KMeansAssignmentSessionEvidence;
     },
   };
