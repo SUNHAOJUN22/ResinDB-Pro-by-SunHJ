@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -11,11 +11,15 @@ import {
   Play,
   Square,
   Trash2,
+  Upload,
 } from 'lucide-react';
 import {
   createKMeansProfileAuditDocument,
+  validateKMeansProfileAuditImport,
   type KMeansProfileAuditDocument,
+  type KMeansProfileAuditImportValidation,
 } from '@/compute/kmeansProfileAudit';
+import { createKMeansWorkerBenchmarkEnvironment } from '@/compute/kmeansWorkerEnvironment';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useKMeansBackendCalibration } from '@/hooks/workers/useKMeansBackendCalibration';
 
@@ -43,8 +47,10 @@ export function KMeansBackendCalibrationPanel({
   const [auditExpanded, setAuditExpanded] = useState(false);
   const [audit, setAudit] = useState<KMeansProfileAuditDocument | null>(null);
   const [auditError, setAuditError] = useState<string | null>(null);
+  const [auditImportValidation, setAuditImportValidation] = useState<KMeansProfileAuditImportValidation | null>(null);
   const [isAuditLoading, setIsAuditLoading] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const auditFileInputRef = useRef<HTMLInputElement>(null);
   const {
     profileState,
     isLoadingProfile,
@@ -99,6 +105,7 @@ export function KMeansBackendCalibrationPanel({
   useEffect(() => {
     setAudit(null);
     setCopyStatus(null);
+    setAuditImportValidation(null);
     if (auditExpanded) void generateAudit();
   }, [auditExpanded, generateAudit]);
 
@@ -128,6 +135,7 @@ export function KMeansBackendCalibrationPanel({
       `environment=${document.environment?.fingerprint ?? 'unavailable'}`,
       `decision=${decision}`,
       `notice=${document.notice}`,
+      `importPolicy=${document.importPolicy}`,
     ].join('\n');
     try {
       if (!navigator.clipboard?.writeText) {
@@ -139,6 +147,22 @@ export function KMeansBackendCalibrationPanel({
       setAuditError(error instanceof Error ? error.message : String(error));
     }
   }, [audit, english, generateAudit]);
+
+  const importAudit = useCallback(async (file: File) => {
+    setAuditError(null);
+    setAuditImportValidation(null);
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown;
+      const validation = await validateKMeansProfileAuditImport(
+        parsed,
+        createKMeansWorkerBenchmarkEnvironment(),
+      );
+      setAuditImportValidation(validation);
+      if (validation.valid && validation.document) setAudit(validation.document);
+    } catch (error) {
+      setAuditError(error instanceof Error ? error.message : String(error));
+    }
+  }, []);
 
   return (
     <div
@@ -288,33 +312,77 @@ export function KMeansBackendCalibrationPanel({
                 <div className="flex items-center gap-2"><Loader2 size={12} className="animate-spin" />{english ? 'Generating audit…' : '正在生成审计…'}</div>
               ) : audit ? (
                 <>
+                  <div>{english ? 'Validation state' : '校验状态'}: <strong>{audit.profileLoad.status}</strong></div>
+                  <div>{english ? 'Profile schema' : '配置 Schema'}: {audit.profile?.schemaVersion ?? '—'}</div>
+                  <div>{english ? 'Kernel' : '内核'}: {audit.profile ? `${audit.profile.kernel}@${audit.profile.kernelVersion}` : '—'}</div>
+                  <div>{english ? 'Protocol' : '协议'}: {audit.profile?.protocolVersion ?? '—'}</div>
+                  <div>{english ? 'Generated' : '生成时间'}: {formatTimestamp(audit.profile?.generatedAt ?? null, language)}</div>
+                  <div>{english ? 'Expires' : '失效时间'}: {formatTimestamp(audit.profile?.expiresAt ?? null, language)}</div>
+                  <div className="break-all">{english ? 'Environment fingerprint' : '环境指纹'}: {audit.environment?.fingerprint ?? '—'}</div>
+                  <div className="break-all">{english ? 'Benchmark digest' : 'Benchmark 摘要'}: {audit.profile?.benchmarkReportDigest ?? '—'}</div>
+                  <div>{english ? 'Decision status' : '决策状态'}: {audit.profile?.status ?? '—'}</div>
+                  <div>{english ? 'Crossover workload' : '交叉点工作量'}: {audit.profile?.crossoverWorkloadOperations?.toLocaleString() ?? '—'}</div>
+                  <div>{english ? 'Decision history entries' : '决策历史条数'}: {audit.decisionHistory.length}</div>
                   <div>{english ? 'Auto decision' : '当前自动决策'}: <strong>{audit.autoDecision?.selectedBackend ?? '—'}</strong></div>
                   <div>{english ? 'Reason' : '决策原因'}: {audit.autoDecision?.reason ?? '—'}</div>
-                  <div className="break-all">SHA-256: {audit.digest}</div>
+                  <div className="break-all">Audit SHA-256: {audit.digest}</div>
                   <p className="rounded-lg bg-amber-50 px-2 py-1.5 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
                     {english
-                      ? 'Device-local audit metadata only; not a cross-device performance conclusion.'
-                      : '仅为本机审计元数据，不代表跨设备性能结论。'}
+                      ? 'Device-local audit metadata only. Imported files are revalidated for read-only inspection and can never activate a runtime profile.'
+                      : '仅为本机审计元数据。导入文件会重新校验，但只可查看，永远不能激活运行时配置。'}
                   </p>
+                  {auditImportValidation && (
+                    <div
+                      data-testid="kmeans-audit-import-status"
+                      className={auditImportValidation.valid
+                        ? 'text-emerald-600 dark:text-emerald-300'
+                        : 'text-amber-600 dark:text-amber-300'}
+                    >
+                      {auditImportValidation.valid
+                        ? (english ? 'Imported audit verified: read-only only.' : '导入审计已验证：仅可只读查看。')
+                        : auditImportValidation.reason}
+                    </div>
+                  )}
                   {copyStatus && <div className="text-emerald-600 dark:text-emerald-300">{copyStatus}</div>}
-                  <div className="grid grid-cols-2 gap-2">
+                  <input
+                    ref={auditFileInputRef}
+                    data-testid="kmeans-audit-import-input"
+                    type="file"
+                    accept="application/json,.json"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = '';
+                      if (file) void importAudit(file);
+                    }}
+                  />
+                  <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
                       data-testid="kmeans-audit-copy"
                       onClick={() => void copyAuditSummary()}
-                      className="flex items-center justify-center gap-1.5 rounded-lg bg-slate-100 px-2 py-1.5 font-bold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
+                      className="flex items-center justify-center gap-1 rounded-lg bg-slate-100 px-1 py-1.5 font-bold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
                     >
                       <Copy size={11} />
-                      {english ? 'Copy summary' : '复制摘要'}
+                      {english ? 'Copy' : '复制'}
                     </button>
                     <button
                       type="button"
                       data-testid="kmeans-audit-download"
                       onClick={() => void downloadAudit()}
-                      className="flex items-center justify-center gap-1.5 rounded-lg bg-slate-100 px-2 py-1.5 font-bold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
+                      className="flex items-center justify-center gap-1 rounded-lg bg-slate-100 px-1 py-1.5 font-bold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
                     >
                       <Download size={11} />
-                      {english ? 'Export JSON' : '导出 JSON'}
+                      {english ? 'Export' : '导出'}
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="kmeans-audit-import"
+                      onClick={() => auditFileInputRef.current?.click()}
+                      className="flex items-center justify-center gap-1 rounded-lg bg-slate-100 px-1 py-1.5 font-bold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
+                    >
+                      <Upload size={11} />
+                      {english ? 'Import' : '导入'}
                     </button>
                   </div>
                 </>
