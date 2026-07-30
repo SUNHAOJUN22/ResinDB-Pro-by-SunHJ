@@ -161,10 +161,9 @@ jobs:
             status: 'PASS',
             gates: [
               'docs', 'source-hygiene', 'governed-data', 'lint', 'typescript',
-              'kmeans-benchmark-smoke', 'regression', 'isolated-unit',
-              'isolated-science-workers', 'whole-source-coverage', 'build',
-              'http-smoke', 'chromium-ui', 'production-audit', 'complete-audit',
-              'single-main-branch',
+              'regression', 'isolated-unit', 'isolated-science-workers',
+              'whole-source-coverage', 'build', 'http-smoke', 'chromium-ui',
+              'production-audit', 'complete-audit', 'single-main-branch',
             ],
           }, null, 2)}\n`)
           NODE
@@ -190,8 +189,9 @@ jobs:
           fi
           pdfinfo "$pdf"
           pdftoppm -png -r 120 "$pdf" artifacts/pdf-render >/dev/null
-          test "$(find artifacts -maxdepth 1 -name 'pdf-render-*.png' | wc -l | tr -d ' ')" -ge 2
-          test "$(stat -c%s artifacts/pdf-render-1.png)" -gt 10000
+          mapfile -t rendered_pages < <(find artifacts -maxdepth 1 -name 'pdf-render-*.png' -print | sort -V)
+          test "${#rendered_pages[@]}" -ge 2
+          test "$(stat -c%s "${rendered_pages[0]}")" -gt 10000
 
       - name: Upload complete validation evidence
         if: always()
