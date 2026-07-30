@@ -38,6 +38,14 @@ jobs:
         run: |
           set -euo pipefail
           : > /tmp/npm-ci.log
+          cp package.json /tmp/resindb-package-exact.json
+          cp package-lock.json /tmp/resindb-package-lock-exact.json
+          restore_manifests() {
+            cp /tmp/resindb-package-exact.json package.json
+            cp /tmp/resindb-package-lock-exact.json package-lock.json
+          }
+          trap restore_manifests EXIT
+          node scripts/prepare-ci-manifest.mjs | tee /tmp/ci-manifest-normalization.json
           registries=(
             "https://registry.npmjs.org"
             "https://registry.npmmirror.com"
@@ -46,6 +54,9 @@ jobs:
             for attempt in 1 2 3; do
               printf '\nregistry=%s attempt=%s\n' "$registry" "$attempt" | tee -a /tmp/npm-ci.log
               if npm ci --registry="$registry" >> /tmp/npm-ci.log 2>&1; then
+                restore_manifests
+                trap - EXIT
+                cat /tmp/ci-manifest-normalization.json
                 cat /tmp/npm-ci.log
                 exit 0
               fi
@@ -60,7 +71,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: npm-ci-diagnostics-${{ github.sha }}
-          path: /tmp/npm-ci.log
+          path: |
+            /tmp/npm-ci.log
+            /tmp/ci-manifest-normalization.json
           retention-days: 5
 
       - name: Documentation and deterministic scientific visuals
@@ -168,6 +181,7 @@ jobs:
             scripts \
             src \
             tests \
+            .npmrc \
             .nvmrc \
             eslint.config.js \
             index.html \
