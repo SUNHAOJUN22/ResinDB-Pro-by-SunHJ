@@ -5,6 +5,7 @@ import {
   type KMeansBackendDecisionEvidence,
 } from '@/compute/kmeansBackendPolicy';
 import type { KMeansMessage, KMeansResponse } from './kmeansWorker';
+import './kmeansWorker';
 
 export type KMeansProfileAwareMessage = {
   type: 'COMPUTE_KMEANS';
@@ -19,6 +20,9 @@ type WorkerScope = {
 };
 
 const scope = self as unknown as WorkerScope;
+const baseHandler = scope.onmessage;
+if (!baseHandler) throw new Error('K-Means worker handler was not initialized');
+
 const nativePostMessage = scope.postMessage.bind(scope);
 let activeDecision: KMeansBackendDecisionEvidence | null = null;
 let activeRequestedBackend: 'auto' | 'typescript' | 'wasm' = 'auto';
@@ -46,11 +50,6 @@ scope.postMessage = (message: unknown, transfer: Transferable[] = []) => {
   }
   nativePostMessage(message, transfer);
 };
-
-await import('./kmeansWorker');
-
-const baseHandler = scope.onmessage;
-if (!baseHandler) throw new Error('K-Means worker handler was not initialized');
 
 scope.onmessage = (event: MessageEvent<KMeansMessage>) => {
   const message = event.data as KMeansProfileAwareMessage;
