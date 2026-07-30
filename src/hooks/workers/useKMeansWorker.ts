@@ -1,8 +1,14 @@
 import { useCallback } from 'react';
+import type { KMeansAssignmentBackendPreference } from '@/compute/kmeansAssignment';
 import { createRowMajorFloat64Matrix } from '@/compute/numericBuffers';
 import type { RandomSeed } from '@/compute/random';
-import { useWorkerManager } from './useWorkerManager';
 import type { KMeansMessage, KMeansResponse } from '@/workers/kmeansWorker';
+import { useWorkerManager } from './useWorkerManager';
+
+export interface KMeansExecutionOptions {
+  backend?: KMeansAssignmentBackendPreference;
+  allowFallback?: boolean;
+}
 
 export function useKMeansWorker() {
   const {
@@ -20,6 +26,7 @@ export function useKMeansWorker() {
     keys: string[],
     maxK = 10,
     seed?: RandomSeed,
+    options: KMeansExecutionOptions = {},
   ) => {
     if (keys.length === 0 || data.length === 0) {
       setResult(null);
@@ -38,6 +45,8 @@ export function useKMeansWorker() {
         keys,
         maxK,
         seed,
+        backend: options.backend,
+        allowFallback: options.allowFallback,
       },
     }, { transfer: [matrix.values.buffer] });
   }, [postMessage, setResult]);
