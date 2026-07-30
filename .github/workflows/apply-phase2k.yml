@@ -27,21 +27,66 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          stage=initial
+          record_failure() {
+            code=$?
+            trap - EXIT
+            if [ "$code" -ne 0 ]; then
+              {
+                echo "stage=$stage"
+                echo "exit_code=$code"
+                for part in .phase2k/patch-*.b64; do
+                  printf '%s bytes=' "$part"
+                  wc -c < "$part" | tr -d ' '
+                  sha256sum "$part"
+                done
+                if [ -f /tmp/phase2k.patch.xz ]; then sha256sum /tmp/phase2k.patch.xz; fi
+                if [ -f /tmp/phase2k.patch ]; then sha256sum /tmp/phase2k.patch; fi
+              } > .phase2k/diagnostic.txt
+              git config user.name "ResinDB Phase 2K Diagnostics"
+              git config user.email "phase2k@users.noreply.github.com"
+              git add .phase2k/diagnostic.txt
+              if ! git diff --cached --quiet; then
+                git commit -m "chore: record phase 2k patch diagnostics"
+                git push origin HEAD:main
+              fi
+            fi
+            exit "$code"
+          }
+          trap record_failure EXIT
+
+          stage=parts-present
           test -f .phase2k/patch-00.b64
           test -f .phase2k/patch-01.b64
           test -f .phase2k/patch-02.b64
           test -f .phase2k/patch-03.b64
           test -f .phase2k/patch-04.b64
           test -f .phase2k/patch-05.b64
+
+          stage=part-hashes
+          echo "6ca384d89a5fa715ffd8a1f668a71a67c580cdb5cca1a4c73336a95abdd8f45d  .phase2k/patch-00.b64" | sha256sum -c -
+          echo "af6f2ecf3ed20e2a29608eaddb70044cd15911fcbe1e5f5307d1fedc3e0d321c  .phase2k/patch-01.b64" | sha256sum -c -
+          echo "b9729c9c244ecddb5d3e73f9e7fb4745023d2be4256171af0cee58aca19e78fd  .phase2k/patch-02.b64" | sha256sum -c -
+          echo "ead895af7b47fde481a59d2d4eee3095337b496bf1fab8c87b48f2e6aa6c7435  .phase2k/patch-03.b64" | sha256sum -c -
+          echo "9f8e3961bb7b24e99dbc1b2ccabe258beecf4b1cd80e4caa59e513d85d01b8c9  .phase2k/patch-04.b64" | sha256sum -c -
+          echo "b16089f7d25a8dd6618f674e58651d32934e76367b3dfcdcced6ed05ed4c6b3b  .phase2k/patch-05.b64" | sha256sum -c -
+
+          stage=compressed-reconstruction
           cat .phase2k/patch-*.b64 | base64 -d > /tmp/phase2k.patch.xz
           echo "f23ae7dc6e5ac689a9ee9d7718439ddc4f1eb907a5d16bdbf7ed117464d04426  /tmp/phase2k.patch.xz" | sha256sum -c -
+
+          stage=patch-decompression
           xz -dc /tmp/phase2k.patch.xz > /tmp/phase2k.patch
           echo "9cdbccdc453cd9376d12328a0670fcdefe0cc54b914bf3698748042d529c1a7b  /tmp/phase2k.patch" | sha256sum -c -
+
+          stage=patch-applicability
           git apply --check /tmp/phase2k.patch
+          stage=patch-application
           git apply /tmp/phase2k.patch
           rm -rf .phase2k .github/workflows/apply-phase2k.yml
           git diff --check
           git status --short
+          trap - EXIT
 
       - name: Commit and push exact source update
         shell: bash
