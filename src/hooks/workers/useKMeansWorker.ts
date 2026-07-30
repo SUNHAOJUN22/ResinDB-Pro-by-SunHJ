@@ -1,5 +1,9 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import type { KMeansAssignmentBackendPreference } from '@/compute/kmeansAssignment';
+import {
+  kmeansBackendProfileStore,
+  type KMeansBackendProfileLoadStatus,
+} from '@/compute/kmeansBackendProfileStore';
 import { createRowMajorFloat64Matrix } from '@/compute/numericBuffers';
 import type { RandomSeed } from '@/compute/random';
 import type { KMeansMessage, KMeansResponse } from '@/workers/kmeansWorker';
@@ -11,6 +15,7 @@ export interface KMeansExecutionOptions {
 }
 
 export function useKMeansWorker() {
+  const [profileLoadStatus, setProfileLoadStatus] = useState<KMeansBackendProfileLoadStatus>('missing');
   const {
     isCalculating: isComputing,
     result,
@@ -21,7 +26,7 @@ export function useKMeansWorker() {
     'KMEANS_RESULT',
   );
 
-  const computeKMeans = useCallback((
+  const computeKMeans = useCallback(async (
     data: { id: string; values: Record<string, number> }[],
     keys: string[],
     maxK = 10,
@@ -32,6 +37,11 @@ export function useKMeansWorker() {
       setResult(null);
       return;
     }
+    const requestedBackend = options.backend ?? 'auto';
+    const loadedProfile = requestedBackend === 'auto'
+      ? await kmeansBackendProfileStore.load()
+      : null;
+    setProfileLoadStatus(loadedProfile?.status ?? 'missing');
     const matrix = createRowMajorFloat64Matrix(
       data.length,
       keys.length,
@@ -47,6 +57,9 @@ export function useKMeansWorker() {
         seed,
         backend: options.backend,
         allowFallback: options.allowFallback,
+        benchmarkProfile: loadedProfile?.status === 'valid'
+          ? loadedProfile.profile ?? undefined
+          : undefined,
       },
     }, { transfer: [matrix.values.buffer] });
   }, [postMessage, setResult]);
@@ -58,6 +71,7 @@ export function useKMeansWorker() {
     reproducibility: result?.reproducibility ?? null,
     modelSelection: result?.modelSelection ?? null,
     performance: result?.performance ?? null,
+    profileLoadStatus,
     computeKMeans,
     isComputingKMeans: isComputing,
   };
