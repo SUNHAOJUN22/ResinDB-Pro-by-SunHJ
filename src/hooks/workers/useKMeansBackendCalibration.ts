@@ -7,6 +7,7 @@ import type {
   KMeansBrowserBenchmarkMode,
   KMeansBrowserBenchmarkResult,
 } from '@/compute/kmeansBrowserBenchmark';
+import { kmeansDecisionHistoryStore } from '@/compute/kmeansDecisionHistoryStore';
 import type {
   KMeansBenchmarkWorkerMessage,
   KMeansBenchmarkWorkerResponse,
@@ -106,7 +107,10 @@ export function useKMeansBackendCalibration() {
     setIsPersistingProfile(true);
     setStorageError(null);
     try {
-      await kmeansBackendProfileStore.clear();
+      await Promise.all([
+        kmeansBackendProfileStore.clear(),
+        kmeansDecisionHistoryStore.clear(),
+      ]);
       persistedDigestRef.current = null;
       await refreshProfile();
     } catch (error) {
