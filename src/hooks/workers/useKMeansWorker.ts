@@ -6,6 +6,10 @@ import {
 } from '@/compute/kmeansBackendProfileStore';
 import { createRowMajorFloat64Matrix } from '@/compute/numericBuffers';
 import type { RandomSeed } from '@/compute/random';
+import {
+  clearKMeansWorkloadSnapshot,
+  updateKMeansWorkloadSnapshot,
+} from '@/compute/kmeansWorkloadStore';
 import type { KMeansResponse } from '@/workers/kmeansWorker';
 import type { KMeansProfileAwareMessage } from '@/workers/kmeansProfileAwareWorker';
 import { useWorkerManager } from './useWorkerManager';
@@ -44,6 +48,7 @@ export function useKMeansWorker() {
     options: KMeansExecutionOptions = {},
   ) => {
     if (keys.length === 0 || data.length === 0) {
+      clearKMeansWorkloadSnapshot();
       setResult(null);
       return;
     }
@@ -57,6 +62,8 @@ export function useKMeansWorker() {
       keys.length,
       (row, column) => Number(data[row]?.values?.[keys[column]]),
     );
+    const maxClusters = Math.max(1, Math.min(maxK, Math.floor(data.length / 2), 10));
+    updateKMeansWorkloadSnapshot(data.length, keys.length, maxClusters);
     postMessage({
       type: 'COMPUTE_KMEANS',
       payload: {
