@@ -1,14 +1,21 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
+  Copy,
   Cpu,
+  Download,
+  FileSearch,
   Gauge,
   Loader2,
   Play,
   Square,
   Trash2,
 } from 'lucide-react';
+import {
+  createKMeansProfileAuditDocument,
+  type KMeansProfileAuditDocument,
+} from '@/compute/kmeansProfileAudit';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useKMeansBackendCalibration } from '@/hooks/workers/useKMeansBackendCalibration';
 
@@ -22,9 +29,22 @@ function formatTimestamp(value: string | null, language: string): string {
   }).format(timestamp);
 }
 
-export function KMeansBackendCalibrationPanel() {
+export interface KMeansBackendCalibrationPanelProps {
+  sampleCount: number;
+  dimensions?: number;
+}
+
+export function KMeansBackendCalibrationPanel({
+  sampleCount,
+  dimensions = 2,
+}: KMeansBackendCalibrationPanelProps) {
   const { language } = useLanguage();
   const [expanded, setExpanded] = useState(false);
+  const [auditExpanded, setAuditExpanded] = useState(false);
+  const [audit, setAudit] = useState<KMeansProfileAuditDocument | null>(null);
+  const [auditError, setAuditError] = useState<string | null>(null);
+  const [isAuditLoading, setIsAuditLoading] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const {
     profileState,
     isLoadingProfile,
@@ -42,6 +62,10 @@ export function KMeansBackendCalibrationPanel() {
   const english = language === 'en';
   const profile = profileState.profile;
   const progress = Math.round((benchmarkProgress?.ratio ?? 0) * 100);
+  const maxClusters = useMemo(
+    () => Math.max(1, Math.min(10, Math.floor(sampleCount / 2))),
+    [sampleCount],
+  );
   const statusLabel = profileState.status === 'valid'
     ? profile?.status === 'wasm-beneficial'
       ? (english ? 'Local WASM profile ready' : '本机 WASM 配置已就绪')
@@ -52,10 +76,74 @@ export function KMeansBackendCalibrationPanel() {
       ? (english ? 'No local calibration profile' : '尚无本机校准配置')
       : (english ? 'Local profile unavailable' : '本机配置不可用');
 
+  const generateAudit = useCallback(async () => {
+    setIsAuditLoading(true);
+    setAuditError(null);
+    try {
+      const document = await createKMeansProfileAuditDocument(profileState, {
+        sampleCount,
+        dimensions,
+        maxClusters,
+      });
+      setAudit(document);
+      return document;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setAuditError(message);
+      return null;
+    } finally {
+      setIsAuditLoading(false);
+    }
+  }, [dimensions, maxClusters, profileState, sampleCount]);
+
+  useEffect(() => {
+    setAudit(null);
+    setCopyStatus(null);
+    if (auditExpanded) void generateAudit();
+  }, [auditExpanded, generateAudit]);
+
+  const downloadAudit = useCallback(async () => {
+    const document = audit ?? await generateAudit();
+    if (!document) return;
+    const blob = new Blob([`${JSON.stringify(document, null, 2)}\n`], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = window.document.createElement('a');
+    anchor.href = url;
+    anchor.download = `resindb-kmeans-profile-audit-${document.digest.slice(0, 12)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }, [audit, generateAudit]);
+
+  const copyAuditSummary = useCallback(async () => {
+    const document = audit ?? await generateAudit();
+    if (!document) return;
+    const decision = document.autoDecision
+      ? `${document.autoDecision.selectedBackend}:${document.autoDecision.reason}`
+      : 'unavailable';
+    const summary = [
+      `schema=${document.schemaVersion}`,
+      `digest=${document.digest}`,
+      `environment=${document.environment?.fingerprint ?? 'unavailable'}`,
+      `decision=${decision}`,
+      `notice=${document.notice}`,
+    ].join('\n');
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard API is unavailable');
+      }
+      await navigator.clipboard.writeText(summary);
+      setCopyStatus(english ? 'Audit summary copied' : '审计摘要已复制');
+    } catch (error) {
+      setAuditError(error instanceof Error ? error.message : String(error));
+    }
+  }, [audit, english, generateAudit]);
+
   return (
     <div
       data-testid="kmeans-backend-calibration"
-      className="absolute right-3 top-3 z-20 w-[min(22rem,calc(100%-1.5rem))] rounded-2xl border border-slate-200/90 bg-white/95 shadow-xl backdrop-blur dark:border-slate-700 dark:bg-slate-950/95"
+      className="absolute right-3 top-3 z-20 w-[min(24rem,calc(100%-1.5rem))] rounded-2xl border border-slate-200/90 bg-white/95 shadow-xl backdrop-blur dark:border-slate-700 dark:bg-slate-950/95"
     >
       <button
         type="button"
@@ -92,6 +180,20 @@ export function KMeansBackendCalibrationPanel() {
                     {english ? 'Crossover workload' : '交叉点工作量'}: {' '}
                     {profile.crossoverWorkloadOperations?.toLocaleString() ?? '—'}
                   </div>
+                  <div className="truncate" title={profileState.environment?.fingerprint ?? ''}>
+                    {english ? 'Environment' : '环境指纹'}: {profileState.environment?.fingerprint ?? '—'}
+                  </div>
+                </div>
+              )}
+              {profileState.migration && (
+                <div
+                  data-testid="kmeans-profile-migration-status"
+                  className="mt-1 text-amber-600 dark:text-amber-300"
+                >
+                  {english ? 'Migration' : '迁移状态'}: {profileState.migration.reason}
+                  {profileState.migration.requiresRecalibration
+                    ? (english ? ' — recalibration required' : ' — 需要重新校准')
+                    : (english ? ' — compatible re-key' : ' — 兼容重编码')}
                 </div>
               )}
             </div>
@@ -118,10 +220,10 @@ export function KMeansBackendCalibrationPanel() {
             </div>
           )}
 
-          {(benchmarkError || storageError) && (
+          {(benchmarkError || storageError || auditError) && (
             <div className="flex items-start gap-2 rounded-xl bg-amber-50 px-2.5 py-2 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
               <AlertTriangle size={13} className="mt-0.5 shrink-0" />
-              <span>{benchmarkError ?? storageError}</span>
+              <span>{benchmarkError ?? storageError ?? auditError}</span>
             </div>
           )}
 
@@ -164,6 +266,63 @@ export function KMeansBackendCalibrationPanel() {
               {english ? 'Clear' : '清除配置'}
             </button>
           </div>
+
+          <button
+            type="button"
+            data-testid="kmeans-audit-toggle"
+            onClick={() => setAuditExpanded((value) => !value)}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-2 py-2 font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+          >
+            <FileSearch size={12} />
+            {auditExpanded
+              ? (english ? 'Hide audit details' : '收起审计详情')
+              : (english ? 'Profile audit details' : '配置审计详情')}
+          </button>
+
+          {auditExpanded && (
+            <div
+              data-testid="kmeans-audit-details"
+              className="space-y-2 rounded-xl border border-slate-200 p-2.5 text-slate-500 dark:border-slate-700 dark:text-slate-400"
+            >
+              {isAuditLoading ? (
+                <div className="flex items-center gap-2"><Loader2 size={12} className="animate-spin" />{english ? 'Generating audit…' : '正在生成审计…'}</div>
+              ) : audit ? (
+                <>
+                  <div>{english ? 'Auto decision' : '当前自动决策'}: <strong>{audit.autoDecision?.selectedBackend ?? '—'}</strong></div>
+                  <div>{english ? 'Reason' : '决策原因'}: {audit.autoDecision?.reason ?? '—'}</div>
+                  <div className="break-all">SHA-256: {audit.digest}</div>
+                  <p className="rounded-lg bg-amber-50 px-2 py-1.5 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                    {english
+                      ? 'Device-local audit metadata only; not a cross-device performance conclusion.'
+                      : '仅为本机审计元数据，不代表跨设备性能结论。'}
+                  </p>
+                  {copyStatus && <div className="text-emerald-600 dark:text-emerald-300">{copyStatus}</div>}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      data-testid="kmeans-audit-copy"
+                      onClick={() => void copyAuditSummary()}
+                      className="flex items-center justify-center gap-1.5 rounded-lg bg-slate-100 px-2 py-1.5 font-bold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
+                    >
+                      <Copy size={11} />
+                      {english ? 'Copy summary' : '复制摘要'}
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="kmeans-audit-download"
+                      onClick={() => void downloadAudit()}
+                      className="flex items-center justify-center gap-1.5 rounded-lg bg-slate-100 px-2 py-1.5 font-bold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300"
+                    >
+                      <Download size={11} />
+                      {english ? 'Export JSON' : '导出 JSON'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div>{english ? 'Audit metadata is unavailable.' : '审计元数据不可用。'}</div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
