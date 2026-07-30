@@ -6,10 +6,10 @@ import {
   SEEDED_RANDOM_ALGORITHM,
   SEEDED_RANDOM_ALGORITHM_VERSION,
 } from '@/compute/random';
-import type { FormulaConfig, Product, PropertyValue } from '@/types/index';
+import type { FormulaConfig, Product } from '@/types/index';
 import { formulaEngine } from '@/lib/formulaParser';
 
-const MONTE_CARLO_MODEL_VERSION = 'monte-carlo-formula-2.0.0';
+const MONTE_CARLO_MODEL_VERSION = 'monte-carlo-formula-numeric-dictionary-3.0.0';
 const NORMAL_TRANSFORM_VERSION = 'box-muller-1.0.0';
 const MAX_ITERATIONS = 1_000_000;
 
@@ -38,7 +38,8 @@ export interface MonteCarloReproducibility {
 
 export interface MonteCarloPerformance {
   stochasticProperties: number;
-  workObjectReused: true;
+  numericPropertyDictionaryReused: true;
+  formulaResultObjectReused: true;
   typedResultBuffer: true;
 }
 
@@ -51,7 +52,7 @@ export interface MonteCarloResponse {
       stdDev: number;
       p5: number;
       p95: number;
-      kde: {x: number; y: number}[];
+      kde: { x: number; y: number }[];
     };
     reproducibility: MonteCarloReproducibility;
     performance: MonteCarloPerformance;
@@ -77,7 +78,7 @@ function calculateKDE(
   data: ArrayLike<number>,
   bandwidth: number,
   steps = 100,
-): {x: number; y: number}[] {
+): { x: number; y: number }[] {
   if (data.length === 0) return [];
   const safeSteps = Number.isInteger(steps) && steps > 0 ? steps : 100;
   let min = data[0];
@@ -95,7 +96,7 @@ function calculateKDE(
   const span = max - min;
   const normalization = data.length * safeBandwidth;
   const gaussianNormalization = Math.sqrt(2 * Math.PI);
-  const kde: {x: number; y: number}[] = [];
+  const kde: { x: number; y: number }[] = [];
   for (let step = 0; step <= safeSteps; step++) {
     const x = min + (step / safeSteps) * span;
     let sum = 0;
@@ -119,8 +120,10 @@ self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
       seed,
     } = event.data.payload;
     const iterations = validateIterations(requestedIterations);
-    for (const [key, variance] of Object.entries(variances)) validateVariancePercent(variance, key);
-    const actualSeed = seed ?? deriveRandomSeed('monte-carlo-formula-v2', {
+    for (const [key, variance] of Object.entries(variances)) {
+      validateVariancePercent(variance, key);
+    }
+    const actualSeed = seed ?? deriveRandomSeed('monte-carlo-formula-v3', {
       targetFormulaId,
       formulas,
       product,
@@ -128,14 +131,15 @@ self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
       iterations,
     });
     const random = createSeededRandom(actualSeed);
-    const evaluator = formulaEngine.compileGraph(formulas);
-    const workingProperties = Object.fromEntries(
-      Object.entries(product.properties).map(([key, property]) => [key, { ...property }]),
-    ) as Record<string, PropertyValue>;
-    const workingProduct = { ...product, properties: workingProperties } as Product;
+    const evaluator = formulaEngine.compilePropertyGraph(formulas);
+    const baseProperties = formulaEngine.createPropertyDictionary(product);
+    const workingProperties = { ...baseProperties };
+    const formulaResults: Record<string, number> = {};
+    const collidingFormulaNames = formulas
+      .map((formula) => formula.name)
+      .filter((name) => Object.hasOwn(baseProperties, name));
     const stochasticProperties: { key: string; mean: number; standardDeviation: number }[] = [];
-    for (const [key, property] of Object.entries(workingProperties)) {
-      const mean = Number(property.value);
+    for (const [key, mean] of Object.entries(baseProperties)) {
       const variancePercent = variances[key] ?? 0;
       if (Number.isFinite(mean) && variancePercent > 0) {
         stochasticProperties.push({
@@ -157,13 +161,14 @@ self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
     }));
 
     for (let iteration = 0; iteration < iterations; iteration++) {
+      for (const name of collidingFormulaNames) workingProperties[name] = baseProperties[name];
       for (const stochastic of stochasticProperties) {
-        workingProperties[stochastic.key].value = random.normal(
+        workingProperties[stochastic.key] = random.normal(
           stochastic.mean,
           stochastic.standardDeviation,
         );
       }
-      const result = evaluator(workingProduct)[targetFormulaId];
+      const result = evaluator(workingProperties, formulaResults)[targetFormulaId];
       if (Number.isFinite(result)) {
         resultBuffer[acceptedSamples] = result;
         acceptedSamples += 1;
@@ -216,7 +221,8 @@ self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
         },
         performance: {
           stochasticProperties: stochasticProperties.length,
-          workObjectReused: true,
+          numericPropertyDictionaryReused: true,
+          formulaResultObjectReused: true,
           typedResultBuffer: true,
         },
       },
