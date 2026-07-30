@@ -26,6 +26,13 @@ async function runKde(points: { x: number; y: number }[], gridSize: number) {
       exponentEvaluations: number;
       naiveExponentEvaluations: number;
       kernelStrategy: string;
+      xKernelValues: number;
+      accumulationKernel: {
+        requestedBackend: string;
+        backend: string;
+        selectionReason: string;
+        calls: number;
+      };
     };
   } };
   return response.payload;
@@ -56,11 +63,17 @@ describe('separable KDE acceleration', () => {
       }
       expect(gridPoint.z).toBeCloseTo(kernelSum * normalization, 13);
     }
-    expect(result.performance).toEqual({
+    expect(result.performance).toMatchObject({
       kernelStrategy: 'separable-precomputed-x',
       exponentEvaluations: 2 * points.length * gridSize,
       naiveExponentEvaluations: points.length * gridSize * gridSize,
       xKernelValues: points.length * gridSize,
+      accumulationKernel: {
+        requestedBackend: 'auto',
+        backend: 'typescript',
+        selectionReason: 'auto-conservative-typescript',
+        calls: gridSize,
+      },
     });
   });
 });
