@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Product } from '@/types/index';
+import { KMeansBackendCalibrationPanel } from './KMeansBackendCalibrationPanel';
 
 interface Point {
     x: number;
@@ -315,6 +316,7 @@ export const CanvasScatterGraph: React.FC<CanvasScatterGraphProps> = ({
 
     return (
         <div ref={containerRef} className="w-full h-full relative" onMouseLeave={() => setHoveredPoint(null)}>
+            <KMeansBackendCalibrationPanel />
             <canvas 
                 ref={canvasRef} 
                 onMouseMove={handleMouseMove}
