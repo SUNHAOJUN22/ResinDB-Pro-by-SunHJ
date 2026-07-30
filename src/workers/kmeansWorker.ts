@@ -1,9 +1,13 @@
 import {
+  createKMeansAssignmentSession,
+  type KMeansAssignmentBackendPreference,
+  type KMeansAssignmentSessionEvidence,
+} from '@/compute/kmeansAssignment';
+import {
   createRowMajorFloat64Matrix,
   validateRowMajorFloat64Matrix,
   type RowMajorFloat64Matrix,
 } from '@/compute/numericBuffers';
-import { createWorkerProgressMessage } from '@/compute/workerProtocol';
 import {
   createSeededRandom,
   deriveRandomSeed,
@@ -12,8 +16,9 @@ import {
   SEEDED_RANDOM_ALGORITHM,
   SEEDED_RANDOM_ALGORITHM_VERSION,
 } from '@/compute/random';
+import { createWorkerProgressMessage } from '@/compute/workerProtocol';
 
-const KMEANS_MODEL_VERSION = 'kmeans-plus-plus-adaptive-silhouette-f64-3.0.0';
+const KMEANS_MODEL_VERSION = 'kmeans-plus-plus-adaptive-silhouette-f64-wasm-4.0.0';
 const FULL_SILHOUETTE_LIMIT = 1_500;
 const DEFAULT_MAX_SILHOUETTE_SAMPLE = 1_000;
 const MAX_LLOYD_ITERATIONS = 50;
@@ -26,6 +31,8 @@ interface KMeansCommonPayload {
   seed?: RandomSeed;
   selectionMode?: KMeansSelectionMode;
   silhouetteSampleSize?: number;
+  backend?: KMeansAssignmentBackendPreference;
+  allowFallback?: boolean;
 }
 
 export interface KMeansObjectPayload extends KMeansCommonPayload {
@@ -65,6 +72,7 @@ export interface KMeansPerformance {
   assignmentStorage: 'int32';
   lloydIterations: number;
   distanceEvaluations: number;
+  assignmentKernel: KMeansAssignmentSessionEvidence | null;
 }
 
 export type KMeansResponse = {
@@ -266,6 +274,7 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
             assignmentStorage: 'int32',
             lloydIterations: 0,
             distanceEvaluations: 0,
+            assignmentKernel: null,
           },
         },
       } satisfies KMeansResponse);
@@ -328,6 +337,14 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
       normalizedSeed,
     );
     const maxTestedK = Math.min(maxK, Math.floor(sampleCount / 2), 10);
+    const assignmentSession = createKMeansAssignmentSession({
+      matrix: values,
+      sampleCount,
+      dimensions,
+      maxClusters: Math.max(1, maxTestedK),
+      preference: payload.backend ?? 'auto',
+      allowFallback: payload.allowFallback ?? true,
+    });
     let bestK = 1;
     let bestAssignments = new Int32Array(sampleCount);
     let bestCentroids = new Float64Array(dimensions);
@@ -389,37 +406,15 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
       let changed = true;
       let iterations = 0;
       while (changed && iterations < MAX_LLOYD_ITERATIONS) {
-        changed = false;
-        nextCentroids.fill(0);
-        counts.fill(0);
-        for (let sample = 0; sample < sampleCount; sample++) {
-          let bestCluster = 0;
-          let minimumDistance = Infinity;
-          for (let cluster = 0; cluster < k; cluster++) {
-            const distance = squaredDistanceToCentroid(
-              values,
-              sample,
-              centroids,
-              cluster,
-              dimensions,
-            );
-            distanceEvaluations += 1;
-            if (distance < minimumDistance) {
-              minimumDistance = distance;
-              bestCluster = cluster;
-            }
-          }
-          if (assignments[sample] !== bestCluster) {
-            changed = true;
-            assignments[sample] = bestCluster;
-          }
-          const sourceOffset = sample * dimensions;
-          const targetOffset = bestCluster * dimensions;
-          for (let dimension = 0; dimension < dimensions; dimension++) {
-            nextCentroids[targetOffset + dimension] += values[sourceOffset + dimension];
-          }
-          counts[bestCluster] += 1;
-        }
+        const changedAssignments = assignmentSession.assignAndAccumulate(
+          centroids,
+          k,
+          assignments,
+          nextCentroids,
+          counts,
+        );
+        distanceEvaluations += sampleCount * k;
+        changed = changedAssignments > 0;
         for (let cluster = 0; cluster < k; cluster++) {
           const centroidOffset = cluster * dimensions;
           if (counts[cluster] > 0) {
@@ -552,6 +547,7 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
           assignmentStorage: 'int32',
           lloydIterations: totalLloydIterations,
           distanceEvaluations,
+          assignmentKernel: assignmentSession.getEvidence(),
         },
       },
     } satisfies KMeansResponse);
