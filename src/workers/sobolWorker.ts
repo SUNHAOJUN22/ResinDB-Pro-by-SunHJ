@@ -8,10 +8,10 @@ import {
   SEEDED_RANDOM_ALGORITHM,
   SEEDED_RANDOM_ALGORITHM_VERSION,
 } from '@/compute/random';
-import type { FormulaConfig, Product, PropertyValue } from '@/types/index';
+import type { FormulaConfig, Product } from '@/types/index';
 import { formulaEngine } from '@/lib/formulaParser';
 
-const SENSITIVITY_MODEL_VERSION = 'saltelli-jansen-normal-2.0.0';
+const SENSITIVITY_MODEL_VERSION = 'saltelli-jansen-normal-numeric-dictionary-3.0.0';
 const MAX_BASE_SAMPLE_SIZE = 250_000;
 
 export interface SobolMessage {
@@ -48,7 +48,8 @@ export interface SobolAnalysisMetadata {
 
 export interface SobolPerformanceMetadata {
   matrixStorage: 'flat-float64';
-  workObjectReused: true;
+  numericPropertyDictionaryReused: true;
+  formulaResultObjectReused: true;
   hybridOutputStreaming: true;
   allocatedMatrixValues: number;
 }
@@ -91,8 +92,10 @@ self.onmessage = (event: MessageEvent<SobolMessage>) => {
       bounds,
     } = event.data.payload;
     const baseSampleSize = validateBaseSampleSize(requestedIterations);
-    for (const [key, variance] of Object.entries(variances)) validateVariancePercent(variance, key);
-    const actualSeed = seed ?? deriveRandomSeed('saltelli-jansen-normal-v2', {
+    for (const [key, variance] of Object.entries(variances)) {
+      validateVariancePercent(variance, key);
+    }
+    const actualSeed = seed ?? deriveRandomSeed('saltelli-jansen-normal-v3', {
       targetFormulaId,
       formulas,
       product,
@@ -101,15 +104,19 @@ self.onmessage = (event: MessageEvent<SobolMessage>) => {
       baseSampleSize,
     });
     const random = createSeededRandom(actualSeed);
-    const evaluator = formulaEngine.compileGraph(formulas);
-    const baseProperties = product.properties;
+    const evaluator = formulaEngine.compilePropertyGraph(formulas);
+    const baseProperties = formulaEngine.createPropertyDictionary(product);
+    const workingProperties = { ...baseProperties };
+    const formulaResults: Record<string, number> = {};
+    const collidingFormulaNames = formulas
+      .map((formula) => formula.name)
+      .filter((name) => Object.hasOwn(baseProperties, name));
     const inputKeys: string[] = [];
     const inputMeans: number[] = [];
     const inputStandardDeviations: number[] = [];
     const inputBounds: (NumericBounds | undefined)[] = [];
 
-    for (const [key, property] of Object.entries(baseProperties)) {
-      const numericValue = Number(property.value);
+    for (const [key, numericValue] of Object.entries(baseProperties)) {
       const variancePercent = variances[key];
       if (Number.isFinite(numericValue) && variancePercent !== undefined && variancePercent > 0) {
         inputKeys.push(key);
@@ -156,25 +163,22 @@ self.onmessage = (event: MessageEvent<SobolMessage>) => {
       }
     }
 
-    const workingProperties = Object.fromEntries(
-      Object.entries(baseProperties).map(([key, property]) => [key, { ...property }]),
-    ) as Record<string, PropertyValue>;
-    const workingProduct = { ...product, properties: workingProperties } as Product;
     const evaluate = (
       primary: Float64Array,
       sample: number,
       secondary?: Float64Array,
       swappedDimension = -1,
     ): number => {
+      for (const name of collidingFormulaNames) workingProperties[name] = baseProperties[name];
       const offset = sample * dimensions;
       for (let dimension = 0; dimension < dimensions; dimension++) {
-        workingProperties[inputKeys[dimension]].value = (
+        workingProperties[inputKeys[dimension]] = (
           secondary && dimension === swappedDimension
             ? secondary[offset + dimension]
             : primary[offset + dimension]
         );
       }
-      const result = evaluator(workingProduct)[targetFormulaId];
+      const result = evaluator(workingProperties, formulaResults)[targetFormulaId];
       if (!Number.isFinite(result)) {
         throw new Error(`Sensitivity model produced a non-finite value for formula ${targetFormulaId}`);
       }
@@ -210,9 +214,9 @@ self.onmessage = (event: MessageEvent<SobolMessage>) => {
       throw new Error('Output variance is numerically zero; sensitivity indices cannot be estimated.');
     }
 
-    const firstOrder: {name: string; value: number}[] = [];
-    const totalEffect: {name: string; value: number}[] = [];
-    const interactions: {name: string; value: number}[] = [];
+    const firstOrder: { name: string; value: number }[] = [];
+    const totalEffect: { name: string; value: number }[] = [];
+    const interactions: { name: string; value: number }[] = [];
     for (let dimension = 0; dimension < dimensions; dimension++) {
       let totalContribution = 0;
       let firstContributionComplement = 0;
@@ -264,7 +268,8 @@ self.onmessage = (event: MessageEvent<SobolMessage>) => {
         },
         performance: {
           matrixStorage: 'flat-float64',
-          workObjectReused: true,
+          numericPropertyDictionaryReused: true,
+          formulaResultObjectReused: true,
           hybridOutputStreaming: true,
           allocatedMatrixValues: matrixA.length + matrixB.length + outputA.length + outputB.length,
         },
