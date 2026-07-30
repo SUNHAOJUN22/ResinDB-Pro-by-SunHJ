@@ -158,7 +158,10 @@ function quantile(sorted: readonly number[], probability: number): number {
   return sorted[lower] * (1 - weight) + sorted[upper] * weight;
 }
 
-function statistics(samples: readonly number[], iterationsPerRepeat: number): KMeansBrowserBenchmarkStatistics {
+function statistics(
+  samples: readonly number[],
+  iterationsPerRepeat: number,
+): KMeansBrowserBenchmarkStatistics {
   const sorted = [...samples].sort((left, right) => left - right);
   const medianMs = quantile(sorted, 0.5);
   const q1Ms = quantile(sorted, 0.25);
@@ -193,7 +196,9 @@ function createCaseData(config: KMeansBrowserBenchmarkCaseConfig): {
   matrix: Float64Array;
   centroids: Float64Array;
 } {
-  const random = createSeededRandom(deriveRandomSeed('kmeans-browser-benchmark-case-v1', config));
+  const random = createSeededRandom(
+    deriveRandomSeed('kmeans-browser-benchmark-case-v1', config),
+  );
   const matrix = new Float64Array(config.sampleCount * config.dimensions);
   for (let sample = 0; sample < config.sampleCount; sample++) {
     const cluster = sample % config.clusters;
@@ -209,10 +214,9 @@ function createCaseData(config: KMeansBrowserBenchmarkCaseConfig): {
   const centroids = new Float64Array(config.clusters * config.dimensions);
   for (let cluster = 0; cluster < config.clusters; cluster++) {
     const sourceOffset = cluster * config.dimensions;
-    const targetOffset = cluster * config.dimensions;
     centroids.set(
       matrix.subarray(sourceOffset, sourceOffset + config.dimensions),
-      targetOffset,
+      sourceOffset,
     );
   }
   return { matrix, centroids };
@@ -285,7 +289,7 @@ function timedRun(
 }
 
 function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
   const record = value as Record<string, unknown>;
   return `{${Object.keys(record).sort().map((key) => (
@@ -299,7 +303,10 @@ async function sha256(value: string): Promise<string> {
   }
   const bytes = new TextEncoder().encode(value);
   const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return Array.from(
+    new Uint8Array(digest),
+    (byte) => byte.toString(16).padStart(2, '0'),
+  ).join('');
 }
 
 function analyzeCases(cases: readonly KMeansBrowserBenchmarkCaseResult[]): {
@@ -401,9 +408,11 @@ export async function runKMeansBrowserBenchmark(
         wasmSamples.push(timedRun(wasmSession, centroids, config, now));
         typescriptSamples.push(timedRun(typescriptSession, centroids, config, now));
       }
-      const afterTypeScript = executeOnce(typescriptSession, centroids, config);
-      const afterWasm = executeOnce(wasmSession, centroids, config);
-      assertEquivalent(afterTypeScript, afterWasm, config.id);
+      assertEquivalent(
+        executeOnce(typescriptSession, centroids, config),
+        executeOnce(wasmSession, centroids, config),
+        config.id,
+      );
     }
     const typescript = statistics(typescriptSamples, config.iterationsPerRepeat);
     const wasm = statistics(wasmSamples, config.iterationsPerRepeat);
@@ -449,7 +458,7 @@ export async function runKMeansBrowserBenchmark(
     kernel: KMEANS_BACKEND_POLICY_KERNEL,
     kernelVersion: KMEANS_BACKEND_POLICY_KERNEL_VERSION,
     protocolVersion: KMEANS_BACKEND_POLICY_PROTOCOL_VERSION,
-    runtime: 'browser-worker' as const,
+    runtime: 'browser-worker',
     mode,
     generatedAt,
     environment,
@@ -460,12 +469,13 @@ export async function runKMeansBrowserBenchmark(
       maximumRelativeIqr: Number(policyConfig.maximumRelativeIqr),
       requiredConsecutiveWins: Number(policyConfig.requiredConsecutiveWins),
     },
-    digestAlgorithm: 'sha-256' as const,
-  };
+    digestAlgorithm: 'sha-256',
+  } as const satisfies Omit<KMeansBrowserBenchmarkReport, 'digest'>;
   const digest = await sha256(stableStringify(reportCore));
   const report: KMeansBrowserBenchmarkReport = { ...reportCore, digest };
   const expiresAt = new Date(
-    generatedAtDate.getTime() + Number(policyConfig.profileMaxAgeDays) * 24 * 60 * 60 * 1_000,
+    generatedAtDate.getTime()
+      + Number(policyConfig.profileMaxAgeDays) * 24 * 60 * 60 * 1_000,
   ).toISOString();
   const profile: KMeansBackendBenchmarkProfile = {
     schemaVersion: KMEANS_BACKEND_PROFILE_SCHEMA_VERSION,
