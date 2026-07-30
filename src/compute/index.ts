@@ -13,6 +13,7 @@ export * from './kmeansBrowserBenchmark';
 export * from './kmeansProfileAudit';
 export * from './kmeansProfileMigration';
 export * from './kmeansWorkerEnvironment';
+export * from './kmeansWorkloadStore';
 export * from './leastSquares';
 export * from './linearAlgebra';
 export * from './nonlinearLeastSquares';
