@@ -9,6 +9,7 @@ export * from './kmeansAssignment';
 export * from './kmeansBackendPolicy';
 export * from './kmeansBackendProfileStore';
 export * from './kmeansBrowserBenchmark';
+export * from './kmeansDecisionHistoryStore';
 export * from './kmeansProfileAudit';
 export * from './kmeansProfileMigration';
 export * from './kmeansWorkerEnvironment';
