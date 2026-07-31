@@ -6,6 +6,10 @@ export const SCIENTIFIC_PALETTE = ['#0072B2','#D55E00','#009E73','#CC79A7','#E69
 export const SCIENTIFIC_SEQUENTIAL = ['#f7fbff','#deebf7','#c6dbef','#9ecae1','#6baed6','#4292c6','#2171b5','#08519c','#08306b'] as const;
 
 export interface ScientificFigureContext { theme: ScientificFigureTheme; title?: string; description?: string; exportName?: string; dataCount?: number; reducedMotion?: boolean }
+export function scientificTooltipItem(params: unknown): Record<string, unknown> | null {
+  const candidate = Array.isArray(params) ? params[0] : params;
+  return candidate && typeof candidate === 'object' ? candidate as Record<string, unknown> : null;
+}
 export function escapeScientificHtml(value: unknown): string { return String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;'); }
 export function formatScientificNumber(value: number, significantDigits = 4): string { if (!Number.isFinite(value)) return '—'; if (value === 0) return '0'; const magnitude=Math.abs(value); if (magnitude>=1e4||magnitude<1e-3) return value.toExponential(Math.max(1,significantDigits-1)); return Number(value.toPrecision(significantDigits)).toString(); }
 export const scientificTextColor=(theme:ScientificFigureTheme)=>theme==='dark'?'#e2e8f0':'#0f172a';
