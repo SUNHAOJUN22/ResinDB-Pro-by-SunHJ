@@ -4,6 +4,7 @@ import {
   escapeScientificHtml,
   formatScientificNumber,
   scientificMutedColor,
+  scientificTooltipItem,
 } from './scientificFigurePolicy';
 
 type ScatterSeries = { name: string; data: [number, number, string][] };
@@ -45,8 +46,9 @@ export const getMfrDensityChartOption = (
     ],
     tooltip: {
       trigger: 'item',
-      formatter: (params: { value?: unknown }) => {
-        const value = params.value as [number, number, string] | undefined;
+      formatter: (params: unknown) => {
+        const item = scientificTooltipItem(params);
+        const value = item?.value as [number, number, string] | undefined;
         if (!value) return '';
         return `<strong>${escapeScientificHtml(value[2])}</strong><br/>${escapeScientificHtml(xAxisName)}: ${formatScientificNumber(Number(value[0]))}<br/>${escapeScientificHtml(yAxisName)}: ${formatScientificNumber(Number(value[1]))}`;
       },
