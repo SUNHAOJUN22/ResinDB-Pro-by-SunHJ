@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { EChartsOption } from '@/lib/echarts';
 import { ScientificEChart } from './ScientificEChart';
-import { SCIENTIFIC_PALETTE, formatScientificNumber } from './scientificFigurePolicy';
+import { SCIENTIFIC_PALETTE, formatScientificNumber, scientificTooltipItem } from './scientificFigurePolicy';
 
 interface ArrheniusChartProps {
   points: { tempC: number; time: number; x: number; y: number }[];
@@ -31,9 +31,10 @@ export const ArrheniusChart: React.FC<ArrheniusChartProps> = React.memo(({ point
       grid: { top: 76, bottom: 70, left: 70, right: 36, containLabel: true },
       tooltip: {
         trigger: 'item',
-        formatter: (params: { seriesType?: string; data?: unknown }) => {
-          if (params.seriesType === 'line') return `Linear fit (model)<br/>R²=${rSquared.toFixed(4)}`;
-          const value = params.data as [number, number, number, number] | undefined;
+        formatter: (params: unknown) => {
+          const item = scientificTooltipItem(params);
+          if (item?.seriesType === 'line') return `Linear fit (model)<br/>R²=${rSquared.toFixed(4)}`;
+          const value = item?.data as [number, number, number, number] | undefined;
           return value
             ? `Observed lifetime<br/>T: ${formatScientificNumber(value[2])} °C<br/>1000/T: ${formatScientificNumber(value[0])} K⁻¹<br/>ln(t / h): ${formatScientificNumber(value[1])}<br/>t: ${formatScientificNumber(value[3])} h`
             : '';
