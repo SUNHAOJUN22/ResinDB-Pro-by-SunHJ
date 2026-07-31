@@ -1,104 +1,26 @@
-import React, { useEffect, useRef } from "react";
-import * as echarts from "@/lib/echarts";
+import React, { useMemo } from 'react';
+import type { EChartsOption } from '@/lib/echarts';
+import { ScientificEChart } from './ScientificEChart';
+import { SCIENTIFIC_SEQUENTIAL, formatScientificNumber, scientificTooltipItem } from './scientificFigurePolicy';
 
-interface KdeTopologyChartProps {
-  grid: {x: number, y: number, z: number}[];
-  dataPoints: {x: number, y: number}[];
-  xLabel: string;
-  yLabel: string;
-  theme: "light" | "dark";
-}
+interface KdeTopologyChartProps { grid: { x: number; y: number; z: number }[]; dataPoints: { x: number; y: number }[]; xLabel: string; yLabel: string; theme: 'light' | 'dark' }
 
 export const KdeTopologyChart: React.FC<KdeTopologyChartProps> = React.memo(({ grid, dataPoints, xLabel, yLabel, theme }) => {
-  const chartRef = useRef<HTMLDivElement>(null);
-  const chartInstance = useRef<echarts.ECharts | null>(null);
-
-  useEffect(() => {
-    if (!chartRef.current) return;
-    
-    if (!chartInstance.current) {
-        chartInstance.current = echarts.getInstanceByDom(chartRef.current) || echarts.init(chartRef.current);
-    }
-    
-    const heatmapData = grid.map(p => [p.x, p.y, p.z]);
-    const maxZ = Math.max(...grid.map(p => p.z), Number.MIN_VALUE);
-
-    const textColor = theme === 'dark' ? '#cbd5e1' : '#475569';
-
-    const option: echarts.EChartsOption = {
-      tooltip: {
-        position: 'top',
-        
-         
-        formatter: (params: any) => {
-           if (params.seriesType === 'scatter') return `Datapoint<br/>${xLabel}: ${params.data[0].toFixed(2)}<br/>${yLabel}: ${params.data[1].toFixed(2)}`;
-           return `Density: ${(params.data[2] / maxZ * 100).toFixed(1)}%`;
-        }
-      },
-      grid: {
-         top: '10%',
-         bottom: '15%',
-         left: '10%',
-         right: '15%'
-      },
-      xAxis: {
-        type: 'value',
-        name: xLabel,
-        nameLocation: 'middle',
-        nameGap: 30,
-        axisLabel: { color: textColor },
-        splitLine: { show: false }
-      },
-      yAxis: {
-        type: 'value',
-        name: yLabel,
-        nameLocation: 'middle',
-        nameGap: 40,
-        axisLabel: { color: textColor },
-        splitLine: { show: false }
-      },
-      visualMap: {
-        min: 0,
-        max: maxZ,
-        calculable: true,
-        inRange: {
-          color: ['#f8fafc', '#bae6fd', '#38bdf8', '#3b82f6', '#8b5cf6', '#d946ef', '#f43f5e']
-        },
-        textStyle: { color: textColor },
-        show: true
-      },
+  const option = useMemo<EChartsOption>(() => {
+    let maxDensity = 0;
+    for (const point of grid) maxDensity = Math.max(maxDensity, point.z);
+    return {
+      title: { text: 'Bivariate Gaussian kernel-density estimate', subtext: 'Heatmap is the normalized fitted density; outlined markers are the finite observations.', left: 'center', top: 6, textStyle: { fontSize: 14, fontWeight: 650 }, subtextStyle: { fontSize: 10 } },
+      grid: { top: 76, bottom: 62, left: 68, right: 84, containLabel: true },
+      tooltip: { formatter: (params: unknown) => { const item = scientificTooltipItem(params); const value = item?.data as number[] | undefined; if (!value) return ''; return item?.seriesType === 'scatter' ? `Observed point<br/>${xLabel}: ${formatScientificNumber(value[0])}<br/>${yLabel}: ${formatScientificNumber(value[1])}` : `Fitted density: ${formatScientificNumber(value[2])}<br/>Relative to grid maximum: ${formatScientificNumber((value[2] / Math.max(maxDensity, Number.EPSILON)) * 100)}%`; } },
+      xAxis: { type: 'value', name: xLabel, nameLocation: 'middle', nameGap: 34, scale: true },
+      yAxis: { type: 'value', name: yLabel, nameLocation: 'middle', nameGap: 46, scale: true },
+      visualMap: { min: 0, max: maxDensity || 1, calculable: true, realtime: false, right: 4, top: 'middle', inRange: { color: [...SCIENTIFIC_SEQUENTIAL] } },
       series: [
-        {
-          name: 'Density Kernel',
-          type: 'heatmap',
-          data: heatmapData,
-          emphasis: {
-            itemStyle: {
-              shadowBlur: 10,
-              shadowColor: 'rgba(0, 0, 0, 0.5)'
-            }
-          }
-        },
-        {
-          name: 'Original Points',
-          type: 'scatter',
-          data: dataPoints.map(p => [p.x, p.y]),
-          symbolSize: 3,
-          itemStyle: {
-             color: '#ffffff',
-             borderWidth: 0,
-             opacity: 0.5
-          }
-        }
-      ]
+        { name: 'KDE fitted density', type: 'heatmap', data: grid.map((point) => [point.x, point.y, point.z]), emphasis: { disabled: true } },
+        { name: 'Observed points', type: 'scatter', data: dataPoints.filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y)).map((point) => [point.x, point.y]), symbolSize: dataPoints.length > 2_000 ? 2 : 4, progressive: 1_000, itemStyle: { color: theme === 'dark' ? '#ffffff' : '#0f172a', opacity: 0.55 } },
+      ],
     };
-
-    chartInstance.current.setOption(option);
-    
-    const ro = new ResizeObserver(() => { if(chartInstance.current) chartInstance.current.resize(); });
-    if (chartRef.current) ro.observe(chartRef.current);
-    return () => ro.disconnect();
-  }, [grid, dataPoints, theme, xLabel, yLabel]);
-
-  return <div ref={chartRef} className="w-full h-full" />;
+  }, [dataPoints, grid, theme, xLabel, yLabel]);
+  return <ScientificEChart option={option} theme={theme} ariaLabel="Bivariate Gaussian kernel density estimate" description="A fitted KDE heatmap is overlaid with finite observed points." exportName="bivariate-kde" dataCount={grid.length + dataPoints.length} empty={grid.length === 0} />;
 });
