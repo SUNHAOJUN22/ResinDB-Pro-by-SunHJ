@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import type { EChartsOption } from '@/lib/echarts';
 import type { SimilarityNode, SimilarityEdge } from '@/workers/similarityWorker';
 import { ScientificEChart } from './ScientificEChart';
-import { escapeScientificHtml, formatScientificNumber } from './scientificFigurePolicy';
+import { escapeScientificHtml, formatScientificNumber, scientificTooltipItem } from './scientificFigurePolicy';
 
 interface SimilarityGraphProps { nodes: SimilarityNode[]; edges: SimilarityEdge[]; theme: 'light' | 'dark' }
 
@@ -12,12 +12,13 @@ export const SimilarityGraph: React.FC<SimilarityGraphProps> = React.memo(({ nod
     return {
       title: { text: 'Cosine-similarity network', subtext: 'Edges encode standardized-feature cosine similarity. Network proximity is descriptive and does not imply chemical identity.', left: 'center', top: 6, textStyle: { fontSize: 14, fontWeight: 650 }, subtextStyle: { fontSize: 10 } },
       legend: { bottom: 4, data: categories.map((entry) => entry.name) },
-      tooltip: { formatter: (params: { dataType?: string; data?: unknown; value?: unknown }) => {
-        if (params.dataType === 'node') {
-          const data = params.data as { name?: string; value?: number; category?: string } | undefined;
+      tooltip: { formatter: (params: unknown) => {
+        const item = scientificTooltipItem(params);
+        if (item?.dataType === 'node') {
+          const data = item.data as { name?: string; value?: number; category?: string } | undefined;
           return data ? `<strong>${escapeScientificHtml(data.name)}</strong><br/>Network degree/value: ${formatScientificNumber(Number(data.value))}<br/>Category: ${escapeScientificHtml(data.category)}` : '';
         }
-        return `Cosine similarity: ${formatScientificNumber(Number(params.value) * 100)}%`;
+        return `Cosine similarity: ${formatScientificNumber(Number(item?.value) * 100)}%`;
       } },
       series: [{
         name: 'Similarity network',
