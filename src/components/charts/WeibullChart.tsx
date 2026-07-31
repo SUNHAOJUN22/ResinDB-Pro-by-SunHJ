@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { EChartsOption } from '@/lib/echarts';
 import { ScientificEChart } from './ScientificEChart';
-import { SCIENTIFIC_PALETTE, formatScientificNumber } from './scientificFigurePolicy';
+import { SCIENTIFIC_PALETTE, formatScientificNumber, scientificTooltipItem } from './scientificFigurePolicy';
 
 interface WeibullChartProps {
   points: { value: number; x: number; y: number; p: number }[];
@@ -32,9 +32,10 @@ export const WeibullChart: React.FC<WeibullChartProps> = React.memo((props) => {
       grid: { top: 76, bottom: 70, left: 72, right: 36, containLabel: true },
       tooltip: {
         trigger: 'item',
-        formatter: (params: { seriesType?: string; data?: unknown }) => {
-          if (params.seriesType === 'line') return 'Bernard median-rank OLS fit (not maximum likelihood).';
-          const value = params.data as [number, number, number, number] | undefined;
+        formatter: (params: unknown) => {
+          const item = scientificTooltipItem(params);
+          if (item?.seriesType === 'line') return 'Bernard median-rank OLS fit (not maximum likelihood).';
+          const value = item?.data as [number, number, number, number] | undefined;
           return value
             ? `Median-rank observation<br/>${targetKey}: ${formatScientificNumber(value[2])}<br/>Cumulative failure: ${formatScientificNumber(value[3] * 100)}%`
             : '';
