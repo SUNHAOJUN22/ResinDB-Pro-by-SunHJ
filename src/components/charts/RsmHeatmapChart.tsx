@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { EChartsOption } from '@/lib/echarts';
 import { ScientificEChart } from './ScientificEChart';
-import { SCIENTIFIC_PALETTE, SCIENTIFIC_SEQUENTIAL, formatScientificNumber } from './scientificFigurePolicy';
+import { SCIENTIFIC_PALETTE, SCIENTIFIC_SEQUENTIAL, formatScientificNumber, scientificTooltipItem } from './scientificFigurePolicy';
 
 interface RsmHeatmapChartProps {
   grid: { x1: number; x2: number; y: number }[][];
@@ -34,8 +34,9 @@ export const RsmHeatmapChart: React.FC<RsmHeatmapChartProps> = React.memo((props
         data: heatmapData,
         emphasis: { disabled: true },
         tooltip: {
-          formatter: (params: { data?: unknown }) => {
-            const value = params.data as [number, number, number] | undefined;
+          formatter: (params: unknown) => {
+            const item = scientificTooltipItem(params);
+            const value = item?.data as [number, number, number] | undefined;
             return value
               ? `${x1Label}: ${formatScientificNumber(value[0])}<br/>${x2Label}: ${formatScientificNumber(value[1])}<br/>Fitted ${yLabel}: ${formatScientificNumber(value[2])}`
               : '';
@@ -49,8 +50,9 @@ export const RsmHeatmapChart: React.FC<RsmHeatmapChartProps> = React.memo((props
         symbolSize: 7,
         itemStyle: { color: theme === 'dark' ? '#ffffff' : '#0f172a', borderColor: SCIENTIFIC_PALETTE[0], borderWidth: 1.5 },
         tooltip: {
-          formatter: (params: { data?: unknown }) => {
-            const value = params.data as [number, number, number] | undefined;
+          formatter: (params: unknown) => {
+            const item = scientificTooltipItem(params);
+            const value = item?.data as [number, number, number] | undefined;
             return value
               ? `Observed data<br/>${x1Label}: ${formatScientificNumber(value[0])}<br/>${x2Label}: ${formatScientificNumber(value[1])}<br/>${yLabel}: ${formatScientificNumber(value[2])}`
               : '';
