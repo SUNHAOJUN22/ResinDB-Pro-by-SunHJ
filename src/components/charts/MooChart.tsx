@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { EChartsOption } from '@/lib/echarts';
 import { ScientificEChart } from './ScientificEChart';
-import { SCIENTIFIC_PALETTE, escapeScientificHtml, formatScientificNumber } from './scientificFigurePolicy';
+import { SCIENTIFIC_PALETTE, escapeScientificHtml, formatScientificNumber, scientificTooltipItem } from './scientificFigurePolicy';
 
 interface MooChartProps {
   evaluatedCandidates: { params: Record<string, number>; means: Record<string, number> }[];
@@ -20,15 +20,17 @@ export const MooChart: React.FC<MooChartProps> = React.memo(({ evaluatedCandidat
       title: { text: 'Two-objective Pareto exploration', subtext: 'Candidate and Pareto coordinates are Gaussian-process mean predictions; historical markers are observed records.', left: 'center', top: 6, textStyle: { fontSize: 14, fontWeight: 650 }, subtextStyle: { fontSize: 10 } },
       legend: { bottom: 4, data: ['Historical observations', 'Evaluated model pool', 'Predicted Pareto front'] },
       grid: { top: 76, bottom: 70, left: 70, right: 36, containLabel: true },
-      tooltip: { trigger: 'item', formatter: (params: { seriesName?: string; dataIndex?: number; value?: unknown }) => {
-        const value = params.value as [number, number] | undefined;
+      tooltip: { trigger: 'item', formatter: (params: unknown) => {
+        const item = scientificTooltipItem(params);
+        const value = item?.value as [number, number] | undefined;
         if (!value) return '';
-        if (params.seriesName === 'Predicted Pareto front') {
-          const point = sortedPareto[params.dataIndex ?? -1];
+        if (item?.seriesName === 'Predicted Pareto front') {
+          const dataIndex = typeof item.dataIndex === 'number' ? item.dataIndex : -1;
+          const point = sortedPareto[dataIndex];
           const parameters = point ? Object.entries(point.params).map(([name, parameter]) => `${escapeScientificHtml(name)}: ${formatScientificNumber(parameter)}`).join('<br/>') : '';
           return `Predicted non-dominated candidate<br/>${escapeScientificHtml(xTarget.name)}: ${formatScientificNumber(value[0])}<br/>${escapeScientificHtml(yTarget.name)}: ${formatScientificNumber(value[1])}${parameters ? `<br/><hr/>${parameters}` : ''}`;
         }
-        return `${params.seriesName}<br/>${escapeScientificHtml(xTarget.name)}: ${formatScientificNumber(value[0])}<br/>${escapeScientificHtml(yTarget.name)}: ${formatScientificNumber(value[1])}`;
+        return `${String(item?.seriesName ?? '')}<br/>${escapeScientificHtml(xTarget.name)}: ${formatScientificNumber(value[0])}<br/>${escapeScientificHtml(yTarget.name)}: ${formatScientificNumber(value[1])}`;
       } },
       xAxis: { type: 'value', name: `${xTarget.name} (${xTarget.maximize ? 'maximize' : 'minimize'})`, nameLocation: 'middle', nameGap: 34, scale: true },
       yAxis: { type: 'value', name: `${yTarget.name} (${yTarget.maximize ? 'maximize' : 'minimize'})`, nameLocation: 'middle', nameGap: 48, scale: true },
