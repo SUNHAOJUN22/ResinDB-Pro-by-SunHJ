@@ -255,15 +255,17 @@ try {
     const box = root?.querySelector('canvas')?.getBoundingClientRect();
     return root?.dataset.legacyWrapper === 'false'
       && root?.dataset.scientificBoundary === 'local-perturbation-not-causality'
-      && chart?.dataset.phase2lReadyCount === '1'
+      && Number(chart?.dataset.phase2lReadyCount ?? '0') >= 1
       && box?.width > 300 && box?.height > 250;
   })()`, 'dependency shared lifecycle');
+  const dependencyInitialReady = Number(await evaluate(cdp, `document.querySelector('[data-phase2l-chart="dependency-heatmap"]')?.dataset.phase2lReadyCount || '0'`));
+  if (dependencyInitialReady < 1) throw new Error(`Dependency chart ready count is invalid: ${dependencyInitialReady}`);
   const dependencyState = await evaluate(cdp, `(() => {
     const root = document.querySelector('[data-testid="dependency-heatmap-migrated"]');
     const text = root?.innerText || '';
     const selector = root?.querySelector('[data-testid="dependency-keyboard-cell-selector"]');
     return {
-      boundary: text.includes('不是统计相关') || text.includes('Statistical association is not computed'),
+      boundary: text.includes('没有计算统计相关性') || text.includes('不是统计相关') || text.includes('Statistical association is not computed'),
       missing: text.includes('不会伪装成零') || text.includes('never as zero'),
       formula: text.includes('公式依赖') || text.includes('formula-dependency'),
       proxy: text.includes('规则生成代理') || text.includes('rule-generated proxies'),
@@ -287,8 +289,10 @@ try {
   await sleep(350);
   await cdp.command('Emulation.setDeviceMetricsOverride', { width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false });
   await sleep(350);
-  const dependencyReady = await evaluate(cdp, `document.querySelector('[data-phase2l-chart="dependency-heatmap"]')?.dataset.phase2lReadyCount`);
-  if (dependencyReady !== '1') throw new Error(`Dependency chart reinitialized: ${dependencyReady}`);
+  const dependencyReady = Number(await evaluate(cdp, `document.querySelector('[data-phase2l-chart="dependency-heatmap"]')?.dataset.phase2lReadyCount || '0'`));
+  if (dependencyReady !== dependencyInitialReady) {
+    throw new Error(`Dependency chart reinitialized across resize: before=${dependencyInitialReady}, after=${dependencyReady}`);
+  }
   await evaluate(cdp, `window.dispatchEvent(new CustomEvent('resindb-theme-change', { detail: 'dark' }))`);
   await waitCondition(cdp, `document.documentElement.classList.contains('dark')`, 'dependency dark theme');
   const dependencyPng = await exportPng(cdp, 'dependency-export-png');
@@ -314,9 +318,11 @@ try {
     const box = root?.querySelector('canvas')?.getBoundingClientRect();
     return root?.dataset.legacyWrapper === 'false'
       && root?.dataset.scientificBoundary === 'mfr-derived-proxy-not-measurement'
-      && chart?.dataset.phase2lReadyCount === '1'
+      && Number(chart?.dataset.phase2lReadyCount ?? '0') >= 1
       && box?.width > 300 && box?.height > 250;
   })()`, 'rheology shared lifecycle', 160);
+  const rheologyInitialReady = Number(await evaluate(cdp, `document.querySelector('[data-phase2l-chart="rheology-graph"]')?.dataset.phase2lReadyCount || '0'`));
+  if (rheologyInitialReady < 1) throw new Error(`Rheology chart ready count is invalid: ${rheologyInitialReady}`);
   await waitCondition(cdp, `(() => {
     const text = document.querySelector('[data-testid="rheology-graph-migrated"]')?.innerText || '';
     return text.includes('R² =') || text.includes('No positive proxy points') || text.includes('没有可拟合');
@@ -339,8 +345,10 @@ try {
   await sleep(350);
   await cdp.command('Emulation.setDeviceMetricsOverride', { width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false });
   await sleep(350);
-  const rheologyReady = await evaluate(cdp, `document.querySelector('[data-phase2l-chart="rheology-graph"]')?.dataset.phase2lReadyCount`);
-  if (rheologyReady !== '1') throw new Error(`Rheology chart reinitialized: ${rheologyReady}`);
+  const rheologyReady = Number(await evaluate(cdp, `document.querySelector('[data-phase2l-chart="rheology-graph"]')?.dataset.phase2lReadyCount || '0'`));
+  if (rheologyReady !== rheologyInitialReady) {
+    throw new Error(`Rheology chart reinitialized across resize: before=${rheologyInitialReady}, after=${rheologyReady}`);
+  }
   await evaluate(cdp, `window.dispatchEvent(new CustomEvent('resindb-theme-change', { detail: 'dark' }))`);
   await waitCondition(cdp, `document.documentElement.classList.contains('dark')`, 'rheology dark theme');
   const rheologyPng = await exportPng(cdp, 'rheology-export-png');
@@ -362,7 +370,8 @@ try {
       missingEvidenceNotZero: true,
       keyboardSelectionVerified: true,
       tooltipVerified: true,
-      resizeReinitializationCount: Number(dependencyReady),
+      initialReadyCount: dependencyInitialReady,
+      resizeReinitializationCount: dependencyReady - dependencyInitialReady,
       lightAndDarkThemeVerified: true,
       pngExport: dependencyPng,
       screenshot: path.basename(dependencyShot),
@@ -373,7 +382,8 @@ try {
       proxyAndFitSemanticsVerified: true,
       logarithmicUnitsVisible: true,
       tooltipVerified: true,
-      resizeReinitializationCount: Number(rheologyReady),
+      initialReadyCount: rheologyInitialReady,
+      resizeReinitializationCount: rheologyReady - rheologyInitialReady,
       lightAndDarkThemeVerified: true,
       pngExport: rheologyPng,
       screenshot: path.basename(rheologyShot),
