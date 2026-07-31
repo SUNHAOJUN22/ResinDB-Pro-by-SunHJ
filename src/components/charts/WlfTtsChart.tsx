@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { EChartsOption } from '@/lib/echarts';
 import { ScientificEChart } from './ScientificEChart';
-import { SCIENTIFIC_PALETTE, formatScientificNumber } from './scientificFigurePolicy';
+import { SCIENTIFIC_PALETTE, formatScientificNumber, scientificTooltipItem } from './scientificFigurePolicy';
 
 interface WlfDiagnostics {
   shiftSearch?: string;
@@ -42,10 +42,11 @@ export const WlfTtsChart: React.FC<WlfTtsChartProps> = React.memo(({
     grid: { top: 76, bottom: 70, left: 76, right: 36, containLabel: true },
     tooltip: {
       trigger: 'item',
-      formatter: (params: { seriesIndex?: number; data?: unknown }) => {
-        const seriesIndex = params.seriesIndex ?? -1;
+      formatter: (params: unknown) => {
+        const item = scientificTooltipItem(params);
+        const seriesIndex = typeof item?.seriesIndex === 'number' ? item.seriesIndex : -1;
         const curve = masterCurve[seriesIndex];
-        const point = params.data as [number, number] | undefined;
+        const point = item?.data as [number, number] | undefined;
         const factor = curve ? shiftFactors.find((entry) => entry.temp === curve.temp) : undefined;
         return curve && point
           ? `${curve.temp} °C<br/>Shifted rate: ${formatScientificNumber(point[0])}<br/>Shifted viscosity: ${formatScientificNumber(point[1])} Pa·s<br/>aT: ${factor ? formatScientificNumber(factor.aT) : '—'}`
