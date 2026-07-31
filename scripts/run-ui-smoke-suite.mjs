@@ -42,7 +42,7 @@ if (calibration.code !== 0) {
   throw new Error(`K-Means calibration Chromium smoke failed${calibration.signal ? ` (${calibration.signal})` : ''}`);
 }
 
-const phase2l = await runScript('scripts/ui-phase2l-scientific-smoke.mjs');
+const phase2l = await runScript('scripts/ui-phase2l-scientific-smoke-v2.mjs');
 if (phase2l.code !== 0) {
   throw new Error(`Phase 2L scientific Chromium smoke failed${phase2l.signal ? ` (${phase2l.signal})` : ''}`);
 }
