@@ -4,6 +4,7 @@ export interface GaussianProcessFactorization {
   readonly inputs: Float64Array;
   readonly lower: Float64Array;
   readonly lengthScale: number;
+  readonly inverseTwoLengthScaleSquared: number;
   readonly noise: number;
   readonly jitter: number;
 }
@@ -94,9 +95,10 @@ function factorizeCholesky(
   size: number,
   maximumJitter: number,
 ): { lower: Float64Array; jitter: number } {
+  const lower = new Float64Array(size * size);
   let jitter = 0;
   while (jitter <= maximumJitter) {
-    const lower = new Float64Array(size * size);
+    lower.fill(0);
     let valid = true;
     for (let row = 0; row < size && valid; row++) {
       for (let column = 0; column <= row; column++) {
@@ -140,10 +142,13 @@ export function factorizeGaussianProcessRbf(
   const maximumJitter = validatePositiveFinite(options.maximumJitter ?? 1, 'maximumJitter');
   const { values: inputs, sampleCount, dimensions } = flattenInputs(rows);
   const covariance = new Float64Array(sampleCount * sampleCount);
-  const denominator = 2 * lengthScale * lengthScale;
+  const inverseTwoLengthScaleSquared = 1 / (2 * lengthScale * lengthScale);
   for (let row = 0; row < sampleCount; row++) {
     for (let column = 0; column <= row; column++) {
-      const value = Math.exp(-squaredDistanceBetweenRows(inputs, row, column, dimensions) / denominator);
+      const value = Math.exp(
+        -squaredDistanceBetweenRows(inputs, row, column, dimensions)
+        * inverseTwoLengthScaleSquared,
+      );
       covariance[row * sampleCount + column] = value;
       covariance[column * sampleCount + row] = value;
     }
@@ -156,6 +161,7 @@ export function factorizeGaussianProcessRbf(
     inputs,
     lower: factorization.lower,
     lengthScale,
+    inverseTwoLengthScaleSquared,
     noise,
     jitter: factorization.jitter,
   };
@@ -171,15 +177,23 @@ export function createGaussianProcessScratch(sampleCount: number): GaussianProce
   };
 }
 
+export function createGaussianProcessPrediction(): GaussianProcessPrediction {
+  return { mean: 0, variance: 0, standardDeviation: 0 };
+}
+
 export function solveGaussianProcessAlpha(
   factorization: GaussianProcessFactorization,
   target: readonly number[],
+  forwardWorkspace?: Float64Array,
 ): Float64Array {
   const { sampleCount, lower } = factorization;
   if (target.length !== sampleCount) {
     throw new RangeError('Gaussian-process target length must match sample count');
   }
-  const forward = new Float64Array(sampleCount);
+  if (forwardWorkspace && forwardWorkspace.length !== sampleCount) {
+    throw new RangeError('Gaussian-process solve workspace size mismatch');
+  }
+  const forward = forwardWorkspace ?? new Float64Array(sampleCount);
   for (let row = 0; row < sampleCount; row++) {
     let value = target[row];
     if (!Number.isFinite(value)) throw new TypeError('Gaussian-process target must contain finite numbers');
@@ -199,14 +213,21 @@ export function solveGaussianProcessAlpha(
   return alpha;
 }
 
-export function predictGaussianProcessRbf(
+export function predictGaussianProcessRbfInto(
   factorization: GaussianProcessFactorization,
   alpha: ArrayLike<number>,
   point: ArrayLike<number>,
   scratch: GaussianProcessScratch,
+  output: GaussianProcessPrediction,
   minimumVariance = 1e-12,
 ): GaussianProcessPrediction {
-  const { sampleCount, dimensions, inputs, lower, lengthScale } = factorization;
+  const {
+    sampleCount,
+    dimensions,
+    inputs,
+    lower,
+    inverseTwoLengthScaleSquared,
+  } = factorization;
   if (alpha.length !== sampleCount) throw new RangeError('Gaussian-process alpha length must match sample count');
   if (point.length !== dimensions) throw new RangeError('Gaussian-process point dimension mismatch');
   if (scratch.kernel.length !== sampleCount || scratch.forward.length !== sampleCount) {
@@ -217,10 +238,12 @@ export function predictGaussianProcessRbf(
     if (!Number.isFinite(point[dimension])) throw new TypeError('Gaussian-process prediction point must be finite');
   }
 
-  const denominator = 2 * lengthScale * lengthScale;
   let mean = 0;
   for (let sample = 0; sample < sampleCount; sample++) {
-    const kernelValue = Math.exp(-squaredDistanceToRow(inputs, point, sample, dimensions) / denominator);
+    const kernelValue = Math.exp(
+      -squaredDistanceToRow(inputs, point, sample, dimensions)
+      * inverseTwoLengthScaleSquared,
+    );
     scratch.kernel[sample] = kernelValue;
     mean += kernelValue * alpha[sample];
   }
@@ -236,5 +259,25 @@ export function predictGaussianProcessRbf(
     forwardNormSquared += solved * solved;
   }
   const variance = Math.max(minimumVariance, 1 - forwardNormSquared);
-  return { mean, variance, standardDeviation: Math.sqrt(variance) };
+  output.mean = mean;
+  output.variance = variance;
+  output.standardDeviation = Math.sqrt(variance);
+  return output;
+}
+
+export function predictGaussianProcessRbf(
+  factorization: GaussianProcessFactorization,
+  alpha: ArrayLike<number>,
+  point: ArrayLike<number>,
+  scratch: GaussianProcessScratch,
+  minimumVariance = 1e-12,
+): GaussianProcessPrediction {
+  return predictGaussianProcessRbfInto(
+    factorization,
+    alpha,
+    point,
+    scratch,
+    createGaussianProcessPrediction(),
+    minimumVariance,
+  );
 }

@@ -87,10 +87,16 @@ describe('numerical performance contracts', () => {
     const second = await runWorker(loader, message, 'BAYES_RESULT');
     expect(second).toEqual(first);
     expect((first.suggestions as unknown[])).toHaveLength(5);
+    expect(first.reproducibility).toMatchObject({
+      modelVersion: 'bayesian-optimization-rbf-ei-2.1.0',
+    });
     expect(first.performance).toMatchObject({
       candidatesEvaluated: 120,
       candidatesRetained: 5,
       candidateStorage: 'streaming-top-k',
+      predictionStorage: 'reused-object',
+      solveWorkspace: 'shared-forward-buffer',
+      kernelExponentScaleCached: true,
       kernelFactorizations: 1,
     });
   });
@@ -122,10 +128,16 @@ describe('numerical performance contracts', () => {
     const second = await runWorker(loader, message, 'MOO_RESULT');
     expect(second).toEqual(first);
     expect((first.evaluatedCandidates as unknown[])).toHaveLength(20);
+    expect(first.reproducibility).toMatchObject({
+      modelVersion: 'multiobjective-rbf-gp-2.1.0',
+    });
     expect(first.performance).toMatchObject({
       candidatesEvaluated: 150,
       evaluatedCandidatesRetained: 20,
       paretoStrategy: 'two-objective-sort-sweep',
+      predictionStorage: 'reused-object',
+      solveWorkspace: 'shared-forward-buffer',
+      kernelExponentScaleCached: true,
       sharedKernelFactorizations: 1,
       targetModels: 2,
     });
@@ -190,14 +202,20 @@ describe('numerical performance contracts', () => {
       },
       'SIMILARITY_CALCULATED',
     );
+    expect(payload.modelVersion).toBe('zscore-cosine-flat-f64-2.1.0');
     expect((payload.edges as unknown[])).toHaveLength(10);
     expect(payload.diagnostics).toMatchObject({
       pairsEvaluated: 780,
       edgesAboveThreshold: 780,
       edgesReturned: 10,
+      edgeObjectsAllocated: 10,
       maxEdges: 10,
       truncated: true,
       matrixStorage: 'flat-float64-unit-vectors',
+      matrixAllocationPolicy: 'single-in-place-float64',
+      matrixBufferCount: 1,
+      matrixValuesAllocated: 80,
+      boundedEdgeAllocationPolicy: 'retained-only-after-heap-threshold',
     });
   });
 

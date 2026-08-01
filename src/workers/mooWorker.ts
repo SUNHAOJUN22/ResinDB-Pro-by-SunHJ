@@ -1,7 +1,8 @@
 import {
+  createGaussianProcessPrediction,
   createGaussianProcessScratch,
   factorizeGaussianProcessRbf,
-  predictGaussianProcessRbf,
+  predictGaussianProcessRbfInto,
   solveGaussianProcessAlpha,
 } from '@/compute/gaussianProcess';
 import {
@@ -13,7 +14,7 @@ import {
 } from '@/compute/random';
 import { createWorkerProgressMessage } from '@/compute/workerProtocol';
 
-const MOO_MODEL_VERSION = 'multiobjective-rbf-gp-2.0.0';
+const MOO_MODEL_VERSION = 'multiobjective-rbf-gp-2.1.0';
 const MAX_CANDIDATES = 50_000;
 const MAX_RETURNED_CANDIDATES = 1_000;
 
@@ -52,6 +53,9 @@ export interface MooPerformance {
   candidatesEvaluated: number;
   evaluatedCandidatesRetained: number;
   paretoStrategy: 'two-objective-sort-sweep' | 'incremental-nondominated-front';
+  predictionStorage: 'reused-object';
+  solveWorkspace: 'shared-forward-buffer';
+  kernelExponentScaleCached: true;
   sharedKernelFactorizations: 1;
   targetModels: number;
   factorizationJitter: number;
@@ -191,6 +195,7 @@ self.onmessage = (event: MessageEvent<MooMessage>) => {
       lengthScale: Math.sqrt(dimensions) * 0.5,
       noise: 1e-4,
     });
+    const scratch = createGaussianProcessScratch(sampleCount);
     const targetModels = targets.map((target) => {
       const values = validData.map((row) => Number(row[target.name]));
       const mean = values.reduce((sum, value) => sum + value, 0) / sampleCount;
@@ -203,7 +208,11 @@ self.onmessage = (event: MessageEvent<MooMessage>) => {
         target,
         mean,
         standardDeviation,
-        alpha: solveGaussianProcessAlpha(factorization, normalized),
+        alpha: solveGaussianProcessAlpha(
+          factorization,
+          normalized,
+          scratch.forward,
+        ),
       };
     });
 
@@ -216,7 +225,7 @@ self.onmessage = (event: MessageEvent<MooMessage>) => {
     const random = createSeededRandom(actualSeed);
     const reservoirRandom = createSeededRandom(deriveRandomSeed('moo-reservoir-v1', random.seed));
     const point = new Float64Array(dimensions);
-    const scratch = createGaussianProcessScratch(sampleCount);
+    const prediction = createGaussianProcessPrediction();
     const returnedCandidates: { params: Record<string, number>; means: Record<string, number> }[] = [];
     const allTwoObjectiveCandidates: MooCandidate[] = [];
     const incrementalFront: MooCandidate[] = [];
@@ -225,21 +234,22 @@ self.onmessage = (event: MessageEvent<MooMessage>) => {
 
     for (let iteration = 0; iteration < iterations; iteration++) {
       for (let dimension = 0; dimension < dimensions; dimension++) point[dimension] = random.next();
-      const firstPrediction = predictGaussianProcessRbf(
+      predictGaussianProcessRbfInto(
         factorization,
         targetModels[0].alpha,
         point,
         scratch,
+        prediction,
       );
       const means: Record<string, number> = {};
       const stds: Record<string, number> = {};
       for (let modelIndex = 0; modelIndex < targetModels.length; modelIndex++) {
         const model = targetModels[modelIndex];
         const normalizedMean = modelIndex === 0
-          ? firstPrediction.mean
+          ? prediction.mean
           : kernelMean(model.alpha, scratch.kernel);
         means[model.target.name] = normalizedMean * model.standardDeviation + model.mean;
-        stds[model.target.name] = firstPrediction.standardDeviation * model.standardDeviation;
+        stds[model.target.name] = prediction.standardDeviation * model.standardDeviation;
       }
       const params: Record<string, number> = {};
       for (let dimension = 0; dimension < dimensions; dimension++) {
@@ -301,6 +311,9 @@ self.onmessage = (event: MessageEvent<MooMessage>) => {
           candidatesEvaluated: iterations,
           evaluatedCandidatesRetained: returnedCandidates.length,
           paretoStrategy,
+          predictionStorage: 'reused-object',
+          solveWorkspace: 'shared-forward-buffer',
+          kernelExponentScaleCached: true,
           sharedKernelFactorizations: 1,
           targetModels: targetModels.length,
           factorizationJitter: factorization.jitter,
