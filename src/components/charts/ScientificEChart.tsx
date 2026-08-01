@@ -30,6 +30,17 @@ function useReducedMotion(): boolean {
   return reduced;
 }
 
+export function isOutsideViewport(
+  rectangle: Pick<DOMRect, 'top' | 'right' | 'bottom' | 'left'>,
+  viewportWidth: number,
+  viewportHeight: number,
+): boolean {
+  return rectangle.bottom <= 0
+    || rectangle.top >= viewportHeight
+    || rectangle.right <= 0
+    || rectangle.left >= viewportWidth;
+}
+
 export const ScientificEChart: React.FC<ScientificEChartProps> = React.memo(({
   option,
   theme,
@@ -72,6 +83,18 @@ export const ScientificEChart: React.FC<ScientificEChartProps> = React.memo(({
       chartRef.current = null;
     };
   }, [onChartReady]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return undefined;
+    const frame = requestAnimationFrame(() => {
+      const rectangle = container.getBoundingClientRect();
+      if (isOutsideViewport(rectangle, window.innerWidth, window.innerHeight)) {
+        container.scrollIntoView({ block: 'center', inline: 'nearest' });
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   useEffect(() => {
     const chart = chartRef.current;
