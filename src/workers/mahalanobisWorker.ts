@@ -32,6 +32,9 @@ export interface MahalanobisResponse {
       covarianceRegularization: number;
       choleskyJitter: number;
       choleskyAttempts: number;
+      distanceBufferStrategy: 'reused-float64-workspaces';
+      fixedDistanceVectors: 3;
+      perObservationVectorAllocations: 0;
     };
   };
   error?: string;
@@ -92,25 +95,35 @@ self.onmessage = (event: MessageEvent<MahalanobisMessage>) => {
     const factorization = choleskyFactorize(covariance, dimensions);
     const threshold = chiSquareUpperTailQuantileWilsonHilferty(dimensions, alpha);
 
-    const distances = validData.map((row, index) => {
-      const difference = new Float64Array(dimensions);
+    const difference = new Float64Array(dimensions);
+    const solved = new Float64Array(dimensions);
+    const forwardWorkspace = new Float64Array(dimensions);
+    const distances = new Array<{
+      index: number;
+      id: string;
+      name: string;
+      distance: number;
+      isOutlier: boolean;
+    }>(observations);
+    for (let index = 0; index < observations; index++) {
+      const row = validData[index];
       for (let dimension = 0; dimension < dimensions; dimension++) {
         difference[dimension] = Number(row[features[dimension]]) - mean[dimension];
       }
-      const solved = solveCholesky(factorization, difference);
+      solveCholesky(factorization, difference, solved, forwardWorkspace);
       const rawDistance = dotProduct(difference, solved);
       const distance = rawDistance < 0 && rawDistance > -1e-10 ? 0 : rawDistance;
       if (!Number.isFinite(distance) || distance < 0) {
         throw new Error('Mahalanobis distance calculation produced an invalid value.');
       }
-      return {
+      distances[index] = {
         index: index + 1,
         id: row._id,
         name: row.name,
         distance,
         isOutlier: distance > threshold,
       };
-    });
+    }
 
     const meanObject = features.reduce<Record<string, number>>((record, feature, index) => {
       record[feature] = mean[index];
@@ -133,6 +146,9 @@ self.onmessage = (event: MessageEvent<MahalanobisMessage>) => {
           covarianceRegularization,
           choleskyJitter: factorization.jitter,
           choleskyAttempts: factorization.attempts,
+          distanceBufferStrategy: 'reused-float64-workspaces',
+          fixedDistanceVectors: 3,
+          perObservationVectorAllocations: 0,
         },
       },
     } satisfies MahalanobisResponse);
