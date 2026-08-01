@@ -1,7 +1,7 @@
 import { createWorkerProgressMessage } from '@/compute/workerProtocol';
 import type { Product } from '@/types/index';
 
-const SIMILARITY_MODEL_VERSION = 'zscore-cosine-flat-f64-2.0.1';
+const SIMILARITY_MODEL_VERSION = 'zscore-cosine-flat-f64-2.1.0';
 
 export interface SimilarityMessage {
   type: 'CALCULATE_SIMILARITY';
@@ -38,10 +38,15 @@ export interface SimilarityResponse {
       pairsEvaluated: number;
       edgesAboveThreshold: number;
       edgesReturned: number;
+      edgeObjectsAllocated: number;
       maxEdges: number | null;
       truncated: boolean;
       missingValuesImputed: number;
       matrixStorage: 'flat-float64-unit-vectors';
+      matrixAllocationPolicy: 'single-in-place-float64';
+      matrixBufferCount: 1;
+      matrixValuesAllocated: number;
+      boundedEdgeAllocationPolicy: 'retained-only-after-heap-threshold';
       cosineRangePolicy: 'clamped-minus-one-to-one';
     };
   };
@@ -77,7 +82,6 @@ function retainStrongest(heap: IndexedEdge[], edge: IndexedEdge, limit: number):
     }
     return;
   }
-  if (edge.value <= heap[0].value) return;
   heap[0] = edge;
   let index = 0;
   while (true) {
@@ -109,10 +113,15 @@ function emptyResponse(
         pairsEvaluated: 0,
         edgesAboveThreshold: 0,
         edgesReturned: 0,
+        edgeObjectsAllocated: 0,
         maxEdges: maxEdges ?? null,
         truncated: false,
         missingValuesImputed: 0,
         matrixStorage: 'flat-float64-unit-vectors',
+        matrixAllocationPolicy: 'single-in-place-float64',
+        matrixBufferCount: 1,
+        matrixValuesAllocated: 0,
+        boundedEdgeAllocationPolicy: 'retained-only-after-heap-threshold',
         cosineRangePolicy: 'clamped-minus-one-to-one',
       },
     },
@@ -134,14 +143,14 @@ self.onmessage = (event: MessageEvent<SimilarityMessage>) => {
 
     const productCount = products.length;
     const featureCount = features.length;
-    const raw = new Float64Array(productCount * featureCount);
+    const normalized = new Float64Array(productCount * featureCount);
     const means = new Float64Array(featureCount);
     const finiteCounts = new Uint32Array(featureCount);
     for (let product = 0; product < productCount; product++) {
       const offset = product * featureCount;
       for (let feature = 0; feature < featureCount; feature++) {
         const value = Number(products[product].properties?.[features[feature]]?.value);
-        raw[offset + feature] = value;
+        normalized[offset + feature] = value;
         if (Number.isFinite(value)) {
           means[feature] += value;
           finiteCounts[feature] += 1;
@@ -157,10 +166,10 @@ self.onmessage = (event: MessageEvent<SimilarityMessage>) => {
     for (let product = 0; product < productCount; product++) {
       const offset = product * featureCount;
       for (let feature = 0; feature < featureCount; feature++) {
-        let value = raw[offset + feature];
+        let value = normalized[offset + feature];
         if (!Number.isFinite(value)) {
           value = means[feature];
-          raw[offset + feature] = value;
+          normalized[offset + feature] = value;
           missingValuesImputed += 1;
         }
         standardDeviations[feature] += (value - means[feature]) ** 2;
@@ -173,21 +182,21 @@ self.onmessage = (event: MessageEvent<SimilarityMessage>) => {
       ) || 1;
     }
 
-    const normalized = new Float64Array(productCount * featureCount);
     const validRows = new Uint8Array(productCount);
     for (let product = 0; product < productCount; product++) {
       const offset = product * featureCount;
       let normSquared = 0;
       for (let feature = 0; feature < featureCount; feature++) {
-        const value = (raw[offset + feature] - means[feature]) / standardDeviations[feature];
+        const value = (normalized[offset + feature] - means[feature]) / standardDeviations[feature];
         normalized[offset + feature] = value;
         normSquared += value * value;
       }
       const norm = Math.sqrt(normSquared);
       if (norm > 0) {
         validRows[product] = 1;
+        const inverseNorm = 1 / norm;
         for (let feature = 0; feature < featureCount; feature++) {
-          normalized[offset + feature] /= norm;
+          normalized[offset + feature] *= inverseNorm;
         }
       }
     }
@@ -201,6 +210,7 @@ self.onmessage = (event: MessageEvent<SimilarityMessage>) => {
     const retainedEdges: IndexedEdge[] = [];
     let pairsEvaluated = 0;
     let edgesAboveThreshold = 0;
+    let edgeObjectsAllocated = 0;
     const progressInterval = Math.max(1, Math.floor(productCount / 20));
     self.postMessage(createWorkerProgressMessage({ ratio: 0, phase: 'pairwise-similarity' }));
 
@@ -218,6 +228,13 @@ self.onmessage = (event: MessageEvent<SimilarityMessage>) => {
         const similarity = Math.max(-1, Math.min(1, rawSimilarity));
         if (similarity < threshold) continue;
         edgesAboveThreshold += 1;
+        if (
+          maxEdges !== undefined
+          && retainedEdges.length >= maxEdges
+          && similarity <= retainedEdges[0].value
+        ) {
+          continue;
+        }
         const edge: IndexedEdge = {
           source: products[left].id,
           target: products[right].id,
@@ -225,6 +242,7 @@ self.onmessage = (event: MessageEvent<SimilarityMessage>) => {
           leftIndex: left,
           rightIndex: right,
         };
+        edgeObjectsAllocated += 1;
         if (maxEdges === undefined) retainedEdges.push(edge);
         else retainStrongest(retainedEdges, edge, maxEdges);
       }
@@ -258,10 +276,15 @@ self.onmessage = (event: MessageEvent<SimilarityMessage>) => {
           pairsEvaluated,
           edgesAboveThreshold,
           edgesReturned: edges.length,
+          edgeObjectsAllocated,
           maxEdges: maxEdges ?? null,
           truncated: maxEdges !== undefined && edgesAboveThreshold > maxEdges,
           missingValuesImputed,
           matrixStorage: 'flat-float64-unit-vectors',
+          matrixAllocationPolicy: 'single-in-place-float64',
+          matrixBufferCount: 1,
+          matrixValuesAllocated: normalized.length,
+          boundedEdgeAllocationPolicy: 'retained-only-after-heap-threshold',
           cosineRangePolicy: 'clamped-minus-one-to-one',
         },
       },
