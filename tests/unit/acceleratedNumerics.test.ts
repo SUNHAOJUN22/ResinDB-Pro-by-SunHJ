@@ -10,15 +10,29 @@ import {
 import { paretoFrontIndices } from '@/compute/pareto';
 
 describe('accelerated numerical primitives', () => {
-  it('solves a symmetric positive-definite system through Cholesky', () => {
+  it('solves a symmetric positive-definite system through reusable Cholesky buffers', () => {
     const factorization = choleskyFactorize(new Float64Array([
       4, 1,
       1, 3,
     ]), 2);
-    const solution = solveCholesky(factorization, new Float64Array([1, 2]));
+    const output = new Float64Array(2);
+    const forwardWorkspace = new Float64Array(2);
+    const solution = solveCholesky(
+      factorization,
+      new Float64Array([1, 2]),
+      output,
+      forwardWorkspace,
+    );
+    expect(solution).toBe(output);
     expect(solution[0]).toBeCloseTo(1 / 11, 12);
     expect(solution[1]).toBeCloseTo(7 / 11, 12);
     expect(factorization.jitter).toBe(0);
+    expect(() => solveCholesky(
+      factorization,
+      new Float64Array([1, 2]),
+      new Float64Array(1),
+      forwardWorkspace,
+    )).toThrow(RangeError);
   });
 
   it('supports arbitrary valid alpha through a stable normal quantile approximation', () => {
