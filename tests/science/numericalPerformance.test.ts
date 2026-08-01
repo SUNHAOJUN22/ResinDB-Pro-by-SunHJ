@@ -295,7 +295,17 @@ describe('numerical performance contracts', () => {
       },
       'PRONY_RESULT',
     );
-    expect(prony).toMatchObject({ modelVersion: 'generalized-maxwell-nnls-fista-2.0.0' });
+    expect(prony).toMatchObject({
+      modelVersion: 'generalized-maxwell-nnls-fista-2.1.0',
+      optimization: {
+        memory: {
+          vectorStrategy: 'reused-float64-double-buffer',
+          fistaVectorAllocations: 3,
+          powerIterationVectorAllocations: 2,
+          perIterationVectorAllocations: 0,
+        },
+      },
+    });
     expect((prony.optimization as { iterations: number }).iterations).toBeLessThanOrEqual(10_000);
   });
 });

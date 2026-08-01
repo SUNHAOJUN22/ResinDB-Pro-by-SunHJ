@@ -1,6 +1,6 @@
 import { createWorkerProgressMessage } from '@/compute/workerProtocol';
 
-const PRONY_MODEL_VERSION = 'generalized-maxwell-nnls-fista-2.0.0';
+const PRONY_MODEL_VERSION = 'generalized-maxwell-nnls-fista-2.1.0';
 const MAX_TERMS = 50;
 const MAX_OPTIMIZATION_ITERATIONS = 10_000;
 
@@ -30,6 +30,12 @@ export interface PronyResponse {
       ridgeLambda: number;
       lipschitzConstant: number;
       tolerance: number;
+      memory: {
+        vectorStrategy: 'reused-float64-double-buffer';
+        fistaVectorAllocations: 3;
+        powerIterationVectorAllocations: 2;
+        perIterationVectorAllocations: 0;
+      };
     };
     abaqusAssumption: 'identical-shear-and-bulk-relaxation-ratios';
   };
@@ -38,10 +44,10 @@ export interface PronyResponse {
 
 function estimateLargestEigenvalue(matrix: Float64Array, size: number): number {
   const vector = new Float64Array(size);
+  const next = new Float64Array(size);
   vector.fill(1 / Math.sqrt(size));
   let eigenvalue = 0;
   for (let iteration = 0; iteration < 30; iteration++) {
-    const next = new Float64Array(size);
     let normSquared = 0;
     for (let row = 0; row < size; row++) {
       let value = 0;
@@ -147,6 +153,7 @@ self.onmessage = (event: MessageEvent<PronyMessage>) => {
     const stepSize = 1 / lipschitzConstant;
     const maximumStorage = Math.max(...validData.map((point) => point.storage));
     let coefficients = new Float64Array(coefficientCount);
+    let nextCoefficients = new Float64Array(coefficientCount);
     coefficients.fill(maximumStorage / coefficientCount);
     const accelerated = new Float64Array(coefficients);
     let momentum = 1;
@@ -156,7 +163,6 @@ self.onmessage = (event: MessageEvent<PronyMessage>) => {
     self.postMessage(createWorkerProgressMessage({ ratio: 0, phase: 'nnls-optimization' }));
 
     for (let iteration = 0; iteration < MAX_OPTIMIZATION_ITERATIONS; iteration++) {
-      const next = new Float64Array(coefficientCount);
       let differenceSquared = 0;
       let coefficientNormSquared = 0;
       for (let row = 0; row < coefficientCount; row++) {
@@ -164,22 +170,27 @@ self.onmessage = (event: MessageEvent<PronyMessage>) => {
         for (let column = 0; column < coefficientCount; column++) {
           gradient += normalMatrix[row * coefficientCount + column] * accelerated[column];
         }
-        next[row] = Math.max(0, accelerated[row] - stepSize * gradient);
-        differenceSquared += (next[row] - coefficients[row]) ** 2;
-        coefficientNormSquared += next[row] ** 2;
+        nextCoefficients[row] = Math.max(0, accelerated[row] - stepSize * gradient);
+        differenceSquared += (nextCoefficients[row] - coefficients[row]) ** 2;
+        coefficientNormSquared += nextCoefficients[row] ** 2;
       }
       iterations = iteration + 1;
       if (Math.sqrt(differenceSquared) <= tolerance * (1 + Math.sqrt(coefficientNormSquared))) {
-        coefficients = next;
+        const previousCoefficients = coefficients;
+        coefficients = nextCoefficients;
+        nextCoefficients = previousCoefficients;
         converged = true;
         break;
       }
       const nextMomentum = (1 + Math.sqrt(1 + 4 * momentum * momentum)) / 2;
       const extrapolation = (momentum - 1) / nextMomentum;
       for (let index = 0; index < coefficientCount; index++) {
-        accelerated[index] = next[index] + extrapolation * (next[index] - coefficients[index]);
+        accelerated[index] = nextCoefficients[index]
+          + extrapolation * (nextCoefficients[index] - coefficients[index]);
       }
-      coefficients = next;
+      const previousCoefficients = coefficients;
+      coefficients = nextCoefficients;
+      nextCoefficients = previousCoefficients;
       momentum = nextMomentum;
       if (iterations % 250 === 0) {
         self.postMessage(createWorkerProgressMessage({
@@ -252,6 +263,12 @@ self.onmessage = (event: MessageEvent<PronyMessage>) => {
           ridgeLambda,
           lipschitzConstant,
           tolerance,
+          memory: {
+            vectorStrategy: 'reused-float64-double-buffer',
+            fistaVectorAllocations: 3,
+            powerIterationVectorAllocations: 2,
+            perIterationVectorAllocations: 0,
+          },
         },
         abaqusAssumption: 'identical-shear-and-bulk-relaxation-ratios',
       },
