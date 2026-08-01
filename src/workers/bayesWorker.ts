@@ -1,7 +1,8 @@
 import {
+  createGaussianProcessPrediction,
   createGaussianProcessScratch,
   factorizeGaussianProcessRbf,
-  predictGaussianProcessRbf,
+  predictGaussianProcessRbfInto,
   solveGaussianProcessAlpha,
 } from '@/compute/gaussianProcess';
 import {
@@ -13,9 +14,10 @@ import {
 } from '@/compute/random';
 import { createWorkerProgressMessage } from '@/compute/workerProtocol';
 
-const BAYES_MODEL_VERSION = 'bayesian-optimization-rbf-ei-2.0.0';
+const BAYES_MODEL_VERSION = 'bayesian-optimization-rbf-ei-2.1.0';
 const MAX_CANDIDATES = 20_000;
 const TOP_SUGGESTIONS = 5;
+const INVERSE_SQRT_TWO_PI = 1 / Math.sqrt(2 * Math.PI);
 
 export interface BayesMessage {
   type: 'RUN_BAYES';
@@ -41,6 +43,9 @@ export interface BayesPerformance {
   candidatesEvaluated: number;
   candidatesRetained: number;
   candidateStorage: 'streaming-top-k';
+  predictionStorage: 'reused-object';
+  solveWorkspace: 'shared-forward-buffer';
+  kernelExponentScaleCached: true;
   kernelFactorizations: 1;
   factorizationJitter: number;
 }
@@ -78,7 +83,7 @@ function normalCdf(value: number): number {
 }
 
 function normalPdf(value: number): number {
-  return Math.exp(-0.5 * value * value) / Math.sqrt(2 * Math.PI);
+  return Math.exp(-0.5 * value * value) * INVERSE_SQRT_TWO_PI;
 }
 
 function validateCandidateCount(value: number): number {
@@ -156,8 +161,13 @@ self.onmessage = (event: MessageEvent<BayesMessage>) => {
       lengthScale,
       noise: 1e-4,
     });
-    const alpha = solveGaussianProcessAlpha(factorization, normalizedOutputs);
     const scratch = createGaussianProcessScratch(sampleCount);
+    const alpha = solveGaussianProcessAlpha(
+      factorization,
+      normalizedOutputs,
+      scratch.forward,
+    );
+    const prediction = createGaussianProcessPrediction();
     const point = new Float64Array(dimensions);
 
     let bestNormalized = normalizedOutputs[0];
@@ -182,7 +192,13 @@ self.onmessage = (event: MessageEvent<BayesMessage>) => {
 
     for (let iteration = 0; iteration < iterations; iteration++) {
       for (let dimension = 0; dimension < dimensions; dimension++) point[dimension] = random.next();
-      const prediction = predictGaussianProcessRbf(factorization, alpha, point, scratch);
+      predictGaussianProcessRbfInto(
+        factorization,
+        alpha,
+        point,
+        scratch,
+        prediction,
+      );
       const delta = maximize
         ? prediction.mean - bestNormalized
         : bestNormalized - prediction.mean;
@@ -224,7 +240,13 @@ self.onmessage = (event: MessageEvent<BayesMessage>) => {
       for (let dimension = 0; dimension < dimensions; dimension++) {
         point[dimension] = normalizedInputs[sample][dimension];
       }
-      const prediction = predictGaussianProcessRbf(factorization, alpha, point, scratch);
+      predictGaussianProcessRbfInto(
+        factorization,
+        alpha,
+        point,
+        scratch,
+        prediction,
+      );
       historical.push({
         index: sample + 1,
         y: outputs[sample],
@@ -263,6 +285,9 @@ self.onmessage = (event: MessageEvent<BayesMessage>) => {
           candidatesEvaluated: iterations,
           candidatesRetained: suggestions.length,
           candidateStorage: 'streaming-top-k',
+          predictionStorage: 'reused-object',
+          solveWorkspace: 'shared-forward-buffer',
+          kernelExponentScaleCached: true,
           kernelFactorizations: 1,
           factorizationJitter: factorization.jitter,
         },
