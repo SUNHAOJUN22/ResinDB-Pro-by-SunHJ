@@ -6,17 +6,23 @@ const payload = chunks.map((path) => readFileSync(path, 'utf8')).join('');
 const archive = '/tmp/resindb-phase2l-final-files.tar.gz';
 writeFileSync(archive, Buffer.from(payload, 'base64'));
 execFileSync('tar', ['-xzf', archive, '-C', process.cwd()], { stdio: 'inherit' });
+
+// GITHUB_TOKEN cannot push commits that modify workflow files. Keep the
+// temporary workflows unchanged for this runner-authenticated source commit;
+// the connector will restore the audited CI workflow and remove bootstrap next.
+execFileSync('git', ['restore', '--source=HEAD', '--', '.github/workflows'], { stdio: 'inherit' });
+
 for (const path of [
   ...chunks,
-  '.github/workflows/phase2l-bootstrap.yml',
   'scripts/ui-phase2l-scientific-smoke-v2.mjs',
   'scripts/phase2l-apply-final.mjs',
 ]) {
   try { unlinkSync(path); } catch (error) { if (error?.code !== 'ENOENT') throw error; }
 }
+
 execFileSync('git', ['config', 'user.name', 'ResinDB CI Closure'], { stdio: 'inherit' });
 execFileSync('git', ['config', 'user.email', 'resindb-ci-closure@users.noreply.github.com'], { stdio: 'inherit' });
 execFileSync('git', ['add', '-A'], { stdio: 'inherit' });
 execFileSync('git', ['diff', '--cached', '--check'], { stdio: 'inherit' });
-execFileSync('git', ['commit', '-m', 'fix: close phase 2l wrapper migration'], { stdio: 'inherit' });
+execFileSync('git', ['commit', '-m', 'fix: close phase 2l source migration'], { stdio: 'inherit' });
 execFileSync('git', ['push', 'origin', 'HEAD:main'], { stdio: 'inherit' });
