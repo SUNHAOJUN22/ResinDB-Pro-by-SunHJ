@@ -2,6 +2,8 @@ import { useCallback } from 'react';
 import { useWorkerManager } from '@/hooks/workers/useWorkerManager';
 import type { CarreauMessage, CarreauResponse } from '@/workers/carreauWorker';
 
+const MINIMUM_CARREAU_OBSERVATIONS = 5;
+
 export function useCarreauWorker() {
   const {
     isCalculating: isFitting,
@@ -15,7 +17,7 @@ export function useCarreauWorker() {
   );
 
   const fitCarreau = useCallback((shearRates: number[], viscosities: number[]) => {
-    if (shearRates.length >= 3) {
+    if (shearRates.length >= MINIMUM_CARREAU_OBSERVATIONS) {
       postMessage({
         type: 'FIT_CARREAU',
         payload: { shearRates, viscosities }
