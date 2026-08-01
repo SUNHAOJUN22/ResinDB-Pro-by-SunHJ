@@ -31,7 +31,7 @@ import {
   TransformComponent,
   VisualMapComponent,
 } from 'echarts/components';
-import { CanvasRenderer, SVGRenderer } from 'echarts/renderers';
+import { CanvasRenderer } from 'echarts/renderers';
 
 echarts.use([
   BarChart,
@@ -63,7 +63,6 @@ echarts.use([
   TransformComponent,
   VisualMapComponent,
   CanvasRenderer,
-  SVGRenderer,
 ]);
 
 export * from 'echarts/core';
