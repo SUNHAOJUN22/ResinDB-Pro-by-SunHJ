@@ -19,6 +19,10 @@ function validateSquareMatrix(matrix: ArrayLike<number>, size: number): void {
   }
 }
 
+function validateVectorLength(vector: ArrayLike<number>, size: number, name: string): void {
+  if (vector.length !== size) throw new RangeError(`${name} length must equal matrix size`);
+}
+
 export function choleskyFactorize(
   matrix: ArrayLike<number>,
   size: number,
@@ -86,11 +90,14 @@ export function forwardSolveLower(
   factor: ArrayLike<number>,
   size: number,
   rightHandSide: ArrayLike<number>,
+  output?: Float64Array,
 ): Float64Array {
-  if (factor.length !== size * size || rightHandSide.length !== size) {
-    throw new RangeError('Triangular solve dimensions are inconsistent');
+  if (factor.length !== size * size) {
+    throw new RangeError('Triangular factor dimensions are inconsistent');
   }
-  const solution = new Float64Array(size);
+  validateVectorLength(rightHandSide, size, 'Right-hand side');
+  const solution = output ?? new Float64Array(size);
+  validateVectorLength(solution, size, 'Forward-solve output');
   for (let row = 0; row < size; row++) {
     let value = rightHandSide[row];
     for (let column = 0; column < row; column++) {
@@ -108,10 +115,16 @@ export function forwardSolveLower(
 export function solveCholesky(
   factorization: CholeskyFactorization,
   rightHandSide: ArrayLike<number>,
+  output?: Float64Array,
+  forwardWorkspace?: Float64Array,
 ): Float64Array {
   const { factor, size } = factorization;
-  const forward = forwardSolveLower(factor, size, rightHandSide);
-  const solution = new Float64Array(size);
+  validateVectorLength(rightHandSide, size, 'Right-hand side');
+  const solution = output ?? new Float64Array(size);
+  const forward = forwardWorkspace ?? new Float64Array(size);
+  validateVectorLength(solution, size, 'Cholesky output');
+  validateVectorLength(forward, size, 'Cholesky forward workspace');
+  forwardSolveLower(factor, size, rightHandSide, forward);
   for (let row = size - 1; row >= 0; row--) {
     let value = forward[row];
     for (let column = row + 1; column < size; column++) {
