@@ -89,26 +89,38 @@ self.onmessage = (event: MessageEvent<CopulaMessage>) => {
     let rho = denominator > 0 ? covariance / denominator : 0;
     rho = Math.max(-0.999, Math.min(0.999, rho));
 
-    const grid: { u: number; v: number; z: number }[] = [];
+    const gridAxis = new Float64Array(requestedGridSize);
+    const normalScores = new Float64Array(requestedGridSize);
+    for (let index = 1; index < requestedGridSize; index++) {
+      const probability = index / requestedGridSize;
+      gridAxis[index] = probability;
+      normalScores[index] = inverseStandardNormal(probability);
+    }
+    const axisPointCount = requestedGridSize - 1;
+    const grid = new Array<{ u: number; v: number; z: number }>(axisPointCount * axisPointCount);
     const oneMinusRhoSquared = 1 - rho * rho;
+    const inverseDensityScale = 1 / Math.sqrt(oneMinusRhoSquared);
+    const inverseExponentDenominator = 1 / (2 * oneMinusRhoSquared);
+    let gridIndex = 0;
     self.postMessage(createWorkerProgressMessage({ ratio: 0, phase: 'copula-density-grid' }));
     for (let row = 1; row < requestedGridSize; row++) {
-      const u = row / requestedGridSize;
-      const scoreU = inverseStandardNormal(u);
+      const u = gridAxis[row];
+      const scoreU = normalScores[row];
+      const scoreUSquared = scoreU * scoreU;
       for (let column = 1; column < requestedGridSize; column++) {
-        const v = column / requestedGridSize;
-        const scoreV = inverseStandardNormal(v);
+        const v = gridAxis[column];
+        const scoreV = normalScores[column];
         const exponent = -(
-          rho * rho * (scoreU * scoreU + scoreV * scoreV)
+          rho * rho * (scoreUSquared + scoreV * scoreV)
           - 2 * rho * scoreU * scoreV
-        ) / (2 * oneMinusRhoSquared);
-        const density = Math.exp(exponent) / Math.sqrt(oneMinusRhoSquared);
-        grid.push({ u, v, z: density });
+        ) * inverseExponentDenominator;
+        grid[gridIndex] = { u, v, z: Math.exp(exponent) * inverseDensityScale };
+        gridIndex += 1;
       }
       self.postMessage(createWorkerProgressMessage({
-        ratio: row / (requestedGridSize - 1),
+        ratio: row / axisPointCount,
         completed: row,
-        total: requestedGridSize - 1,
+        total: axisPointCount,
         phase: 'copula-density-grid',
       }));
     }
