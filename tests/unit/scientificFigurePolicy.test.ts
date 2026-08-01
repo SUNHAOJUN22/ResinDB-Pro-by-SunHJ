@@ -9,6 +9,7 @@ import {
 describe('scientific figure policy', () => {
   it('enforces accessible export, log-axis and reduced-motion defaults', () => {
     const option = applyScientificFigurePolicy({
+      tooltip: { trigger: 'axis' },
       xAxis: { type: 'log' },
       yAxis: { type: 'value' },
       series: [{ type: 'scatter', data: [[1, 2]] }],
@@ -25,7 +26,28 @@ describe('scientific figure policy', () => {
     expect(option.toolbox).toMatchObject({
       feature: { saveAsImage: { name: 'test-figure', pixelRatio: 3 } },
     });
+    expect(option.tooltip).toMatchObject({
+      trigger: 'axis',
+      transitionDuration: 0,
+      axisPointer: { snap: true },
+    });
     expect(option.xAxis).toMatchObject({ type: 'log', logBase: 10 });
+  });
+
+  it('preserves an explicit axis-pointer snap override', () => {
+    const option = applyScientificFigurePolicy({
+      tooltip: { trigger: 'axis', axisPointer: { snap: false, type: 'cross' } },
+      xAxis: { type: 'value' },
+      yAxis: { type: 'value' },
+      series: [{ type: 'line', data: [[1, 2]] }],
+    }, {
+      theme: 'dark',
+      dataCount: 1,
+    }) as Record<string, unknown>;
+
+    expect(option.tooltip).toMatchObject({
+      axisPointer: { snap: false, type: 'cross' },
+    });
   });
 
   it('formats scientific values and escapes tooltip labels', () => {
