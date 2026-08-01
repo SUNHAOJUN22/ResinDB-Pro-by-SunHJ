@@ -162,24 +162,65 @@ async function exportPng(cdp, testId) {
 }
 
 async function triggerTooltip(cdp, rootSelector, expected) {
+  const centered = await evaluate(cdp, `(() => {
+    const canvas = document.querySelector('${rootSelector} canvas');
+    if (!canvas) return false;
+    canvas.scrollIntoView({ block: 'center', inline: 'nearest' });
+    return true;
+  })()`);
+  if (!centered) return false;
+  await sleep(300);
+
   const rect = await evaluate(cdp, `(() => {
     const canvas = document.querySelector('${rootSelector} canvas');
     if (!canvas) return null;
     const box = canvas.getBoundingClientRect();
-    return { x: box.left, y: box.top, width: box.width, height: box.height };
+    return {
+      left: box.left,
+      top: box.top,
+      right: box.right,
+      bottom: box.bottom,
+      width: box.width,
+      height: box.height,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    };
   })()`);
   if (!rect || rect.width < 200 || rect.height < 200) return false;
-  for (const [fx, fy] of [[0.3, 0.35], [0.5, 0.5], [0.7, 0.55], [0.25, 0.7]]) {
+
+  const left = Math.max(1, rect.left);
+  const top = Math.max(1, rect.top);
+  const right = Math.min(rect.viewportWidth - 2, rect.right);
+  const bottom = Math.min(rect.viewportHeight - 2, rect.bottom);
+  const visibleWidth = right - left;
+  const visibleHeight = bottom - top;
+  if (visibleWidth < 200 || visibleHeight < 200) return false;
+
+  await cdp.command('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
+  const probeRatios = [
+    [0.2, 0.2], [0.35, 0.2], [0.5, 0.2], [0.65, 0.2], [0.8, 0.2],
+    [0.2, 0.35], [0.35, 0.35], [0.5, 0.35], [0.65, 0.35], [0.8, 0.35],
+    [0.2, 0.5], [0.35, 0.5], [0.5, 0.5], [0.65, 0.5], [0.8, 0.5],
+    [0.2, 0.65], [0.35, 0.65], [0.5, 0.65], [0.65, 0.65], [0.8, 0.65],
+    [0.2, 0.8], [0.35, 0.8], [0.5, 0.8], [0.65, 0.8], [0.8, 0.8],
+  ];
+  for (const [fx, fy] of probeRatios) {
     await cdp.command('Input.dispatchMouseEvent', {
-      type: 'mouseMoved', x: rect.x + rect.width * fx, y: rect.y + rect.height * fy,
+      type: 'mouseMoved',
+      x: left + visibleWidth * fx,
+      y: top + visibleHeight * fy,
     });
-    await sleep(180);
+    await sleep(120);
     const visible = await evaluate(cdp, `Array.from(document.querySelectorAll('div')).some((node) => {
       const text = node.innerText || '';
       const style = getComputedStyle(node);
       const box = node.getBoundingClientRect();
-      return style.position === 'absolute' && style.pointerEvents === 'none'
-        && box.width > 0 && box.height > 0 && ${JSON.stringify(expected)}.some((value) => text.includes(value));
+      return (style.position === 'absolute' || style.position === 'fixed')
+        && style.pointerEvents === 'none'
+        && box.width > 0 && box.height > 0
+        && box.right > 0 && box.bottom > 0
+        && box.left < window.innerWidth && box.top < window.innerHeight
+        && ${JSON.stringify(expected)}.some((value) => text.includes(value));
     })`);
     if (visible) return true;
   }
