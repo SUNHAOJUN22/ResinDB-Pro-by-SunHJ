@@ -1,0 +1,22 @@
+name: Phase 2L Closure Bootstrap
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase2l-bootstrap
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: github.event.head_commit.message == 'ci: activate phase 2l closure'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - run: node scripts/phase2l-apply-final.mjs
