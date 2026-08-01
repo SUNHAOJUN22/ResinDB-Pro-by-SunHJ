@@ -34,6 +34,7 @@ function normalizeAxis(axis: unknown, theme: ScientificFigureTheme): unknown {
 export function applyScientificFigurePolicy(option:EChartsOption,context:ScientificFigureContext):EChartsOption{
   const source=option as Record<string,unknown>; const theme=context.theme; const dataCount=Math.max(0,context.dataCount??0); const animate=!context.reducedMotion&&dataCount<=1500;
   const tooltip=source.tooltip&&typeof source.tooltip==='object'&&!Array.isArray(source.tooltip)?source.tooltip as Record<string,unknown>:{};
+  const axisPointer=tooltip.axisPointer&&typeof tooltip.axisPointer==='object'&&!Array.isArray(tooltip.axisPointer)?tooltip.axisPointer as Record<string,unknown>:{};
   const legend=source.legend&&typeof source.legend==='object'&&!Array.isArray(source.legend)?source.legend as Record<string,unknown>:{};
   const toolbox=source.toolbox&&typeof source.toolbox==='object'&&!Array.isArray(source.toolbox)?source.toolbox as Record<string,unknown>:{};
   const feature=toolbox.feature&&typeof toolbox.feature==='object'?toolbox.feature as Record<string,unknown>:{};
@@ -41,7 +42,7 @@ export function applyScientificFigurePolicy(option:EChartsOption,context:Scienti
   return {...option,backgroundColor:'transparent',color:source.color??[...SCIENTIFIC_PALETTE],animation:animate,animationDuration:animate?260:0,animationDurationUpdate:animate?180:0,
     textStyle:{color:scientificTextColor(theme),fontFamily:'system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',...(source.textStyle as object|undefined)},
     aria:{enabled:true,description:context.description??context.title??'Scientific figure',decal:{show:false},...(source.aria as object|undefined)},
-    tooltip:{confine:true,appendToBody:true,backgroundColor:theme==='dark'?'rgba(15,23,42,.97)':'rgba(255,255,255,.98)',borderColor:theme==='dark'?'#334155':'#cbd5e1',borderWidth:1,padding:10,textStyle:{color:scientificTextColor(theme),fontSize:11},extraCssText:'box-shadow:0 10px 28px rgba(15,23,42,.16);border-radius:8px;pointer-events:none;',...tooltip},
+    tooltip:{confine:true,appendToBody:true,transitionDuration:0,backgroundColor:theme==='dark'?'rgba(15,23,42,.97)':'rgba(255,255,255,.98)',borderColor:theme==='dark'?'#334155':'#cbd5e1',borderWidth:1,padding:10,textStyle:{color:scientificTextColor(theme),fontSize:11},extraCssText:'box-shadow:0 10px 28px rgba(15,23,42,.16);border-radius:8px;pointer-events:none;',...tooltip,...(tooltip.trigger==='axis'?{axisPointer:{snap:true,...axisPointer}}:{})},
     legend:source.legend===undefined?undefined:{type:'scroll',itemWidth:14,itemHeight:8,textStyle:{color:scientificMutedColor(theme),fontSize:10},...legend},
     toolbox:source.toolbox===false?undefined:{right:8,top:6,itemSize:14,iconStyle:{borderColor:scientificMutedColor(theme)},...toolbox,feature:{...feature,saveAsImage:{name:context.exportName??'scientific-figure',pixelRatio:3,backgroundColor:theme==='dark'?'#0f172a':'#ffffff',...saveAsImage}}},
     xAxis:normalizeAxis(source.xAxis,theme) as EChartsOption['xAxis'],yAxis:normalizeAxis(source.yAxis,theme) as EChartsOption['yAxis']};
