@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   statuses: write
 
 concurrency:
@@ -25,6 +25,15 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
+
+      - name: Remove accidental transient branch
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin should-not-create >/dev/null 2>&1; then
+            git push origin --delete should-not-create
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -67,7 +76,7 @@ jobs:
           exit 1
 
       - name: Upload npm diagnostics
-        if: failure() && steps.npm-ci.outcome == 'failure'
+        if: failure() && steps.npm-ci.outcome == 'failur'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: npm-ci-diagnostics-${{ github.sha }}
@@ -184,7 +193,7 @@ jobs:
             .npmrc \
             .nvmrc \
             eslint.config.js \
-            index.html \
+             index.html \
             package-lock.json \
             package.json \
             tsconfig.json \
