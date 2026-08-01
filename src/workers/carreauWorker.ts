@@ -36,6 +36,7 @@ export interface CarreauResponse {
       termination: string;
       logRmse: number;
       gradientInfinityNorm: number;
+      jacobianMethod: 'analytic';
       jacobianRank: number | null;
       jacobianConditionNumber: number | null;
       jacobianConditionStatus: 'finite' | 'infinite' | 'unavailable';
@@ -64,22 +65,31 @@ function softplus(value: number): number {
   return Math.log1p(Math.exp(value));
 }
 
-function logCarreau(
+function sigmoid(value: number): number {
+  if (value >= 0) {
+    const exponential = Math.exp(-value);
+    return 1 / (1 + exponential);
+  }
+  const exponential = Math.exp(value);
+  return exponential / (1 + exponential);
+}
+
+function logCarreauFromLogs(
   logShearRate: number,
-  eta0: number,
-  lambda: number,
+  logEta0: number,
+  logLambda: number,
   n: number,
   a: number,
 ): number {
-  const transition = a * (Math.log(lambda) + logShearRate);
-  return Math.log(eta0) + ((n - 1) / a) * softplus(transition);
+  const transition = a * (logLambda + logShearRate);
+  return logEta0 + ((n - 1) / a) * softplus(transition);
 }
 
 function carreauValue(rate: number, parameters: CarreauParameters): number {
-  return Math.exp(logCarreau(
+  return Math.exp(logCarreauFromLogs(
     Math.log(rate),
-    parameters.eta0,
-    parameters.lambda,
+    Math.log(parameters.eta0),
+    Math.log(parameters.lambda),
     parameters.n,
     parameters.a,
   ));
@@ -90,12 +100,14 @@ function sumSquaredResiduals(
   logViscosities: Float64Array,
   parameters: CarreauParameters,
 ): number {
+  const logEta0 = Math.log(parameters.eta0);
+  const logLambda = Math.log(parameters.lambda);
   let objective = 0;
   for (let index = 0; index < logRates.length; index++) {
-    const residual = logCarreau(
+    const residual = logCarreauFromLogs(
       logRates[index],
-      parameters.eta0,
-      parameters.lambda,
+      logEta0,
+      logLambda,
       parameters.n,
       parameters.a,
     ) - logViscosities[index];
@@ -148,7 +160,10 @@ self.onmessage = (event: MessageEvent<CarreauMessage>) => {
     const logViscosities = Float64Array.from(measured, Math.log);
     const minimumRate = rates[0];
     const maximumRate = rates[rates.length - 1];
-    const maximumViscosity = Math.max(...measured);
+    let maximumViscosity = 0;
+    for (const viscosity of measured) {
+      if (viscosity > maximumViscosity) maximumViscosity = viscosity;
+    }
 
     const eta0Bounds: [number, number] = [maximumViscosity * 0.5, maximumViscosity * 1_000];
     const lambdaBounds: [number, number] = [1 / (maximumRate * 1_000), 1_000 / minimumRate];
@@ -203,14 +218,39 @@ self.onmessage = (event: MessageEvent<CarreauMessage>) => {
         observationCount: observations.length,
         maxIterations: MAX_ITERATIONS_PER_START,
         evaluateResiduals(parameters, output) {
+          const logEta0 = Math.log(parameters[0]);
+          const logLambda = Math.log(parameters[1]);
           for (let index = 0; index < observations.length; index++) {
-            output[index] = logCarreau(
+            output[index] = logCarreauFromLogs(
               logRates[index],
-              parameters[0],
-              parameters[1],
+              logEta0,
+              logLambda,
               parameters[2],
               parameters[3],
             ) - logViscosities[index];
+          }
+        },
+        evaluateJacobian(parameters, output) {
+          const eta0 = parameters[0];
+          const lambda = parameters[1];
+          const n = parameters[2];
+          const a = parameters[3];
+          const logLambda = Math.log(lambda);
+          const inverseA = 1 / a;
+          const inverseASquared = inverseA * inverseA;
+          for (let index = 0; index < observations.length; index++) {
+            const logTransitionBase = logLambda + logRates[index];
+            const transition = a * logTransitionBase;
+            const transitionSoftplus = softplus(transition);
+            const transitionSigmoid = sigmoid(transition);
+            const offset = index * 4;
+            output[offset] = 1 / eta0;
+            output[offset + 1] = ((n - 1) * transitionSigmoid) / lambda;
+            output[offset + 2] = transitionSoftplus * inverseA;
+            output[offset + 3] = (n - 1) * (
+              transitionSigmoid * logTransitionBase * inverseA
+              - transitionSoftplus * inverseASquared
+            );
           }
         },
       });
@@ -231,8 +271,21 @@ self.onmessage = (event: MessageEvent<CarreauMessage>) => {
       n: best.parameters[2],
       a: best.parameters[3],
     };
-    const predictedMeasured = Float64Array.from(rates, (rate) => carreauValue(rate, parameters));
-    const predictedLogs = Float64Array.from(predictedMeasured, Math.log);
+    const predictedMeasured = new Float64Array(rates.length);
+    const predictedLogs = new Float64Array(rates.length);
+    const logEta0 = Math.log(parameters.eta0);
+    const logLambda = Math.log(parameters.lambda);
+    for (let index = 0; index < rates.length; index++) {
+      const logPrediction = logCarreauFromLogs(
+        logRates[index],
+        logEta0,
+        logLambda,
+        parameters.n,
+        parameters.a,
+      );
+      predictedLogs[index] = logPrediction;
+      predictedMeasured[index] = Math.exp(logPrediction);
+    }
     const rSquared = coefficientOfDetermination(measured, predictedMeasured);
     const logRSquared = coefficientOfDetermination(logViscosities, predictedLogs);
 
@@ -265,6 +318,7 @@ self.onmessage = (event: MessageEvent<CarreauMessage>) => {
           termination: best.termination,
           logRmse: Math.sqrt(best.objective / observations.length),
           gradientInfinityNorm: best.gradientInfinityNorm,
+          jacobianMethod: 'analytic',
           jacobianRank: jacobianDiagnostics?.rank ?? null,
           jacobianConditionNumber: jacobianDiagnostics?.conditionNumber ?? null,
           jacobianConditionStatus: jacobianDiagnostics?.conditionNumberStatus ?? 'unavailable',
