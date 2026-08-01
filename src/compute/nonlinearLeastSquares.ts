@@ -13,10 +13,17 @@ export type NonlinearTermination =
   | 'maximum-iterations'
   | 'damping-limit';
 
+export type NonlinearJacobianMethod = 'analytic' | 'central-finite-difference';
+
 export interface BoundedNonlinearLeastSquaresOptions {
   parameters: readonly BoundedParameter[];
   observationCount: number;
   evaluateResiduals(parameters: Float64Array, residuals: Float64Array): void;
+  /**
+   * Optional row-major Jacobian of residuals with respect to the physical
+   * bounded parameters. The solver applies the bounded-transform chain rule.
+   */
+  evaluateJacobian?(parameters: Float64Array, jacobian: Float64Array): void;
   maxIterations?: number;
   initialDamping?: number;
   finiteDifferenceStep?: number;
@@ -36,6 +43,7 @@ export interface BoundedNonlinearLeastSquaresResult {
   termination: NonlinearTermination;
   damping: number;
   gradientInfinityNorm: number;
+  jacobianMethod: NonlinearJacobianMethod;
   jacobianDiagnostics: LeastSquaresDiagnostics | null;
 }
 
@@ -73,10 +81,16 @@ function toPhysical(
   unconstrained: Float64Array,
   definitions: readonly BoundedParameter[],
   output: Float64Array,
+  transformDerivatives?: Float64Array,
 ): void {
   for (let index = 0; index < unconstrained.length; index++) {
     const definition = definitions[index];
-    output[index] = definition.min + logistic(unconstrained[index]) * (definition.max - definition.min);
+    const fraction = logistic(unconstrained[index]);
+    const span = definition.max - definition.min;
+    output[index] = definition.min + fraction * span;
+    if (transformDerivatives) {
+      transformDerivatives[index] = span * fraction * (1 - fraction);
+    }
   }
 }
 
@@ -127,7 +141,23 @@ export function solveBoundedNonlinearLeastSquares(
 
   const unconstrained = Float64Array.from(options.parameters, toUnconstrained);
   const physical = new Float64Array(parameterCount);
+  const transformDerivatives = new Float64Array(parameterCount);
   const residuals = new Float64Array(observationCount);
+  const plusResiduals = new Float64Array(observationCount);
+  const minusResiduals = new Float64Array(observationCount);
+  const candidateResiduals = new Float64Array(observationCount);
+  const perturbed = new Float64Array(parameterCount);
+  const candidate = new Float64Array(parameterCount);
+  const jacobian = Array.from(
+    { length: observationCount },
+    () => new Array<number>(parameterCount).fill(0),
+  );
+  const physicalJacobian = options.evaluateJacobian
+    ? new Float64Array(observationCount * parameterCount)
+    : null;
+  const jacobianMethod: NonlinearJacobianMethod = options.evaluateJacobian
+    ? 'analytic'
+    : 'central-finite-difference';
   let evaluations = 0;
 
   const evaluate = (position: Float64Array, output: Float64Array): number => {
@@ -137,27 +167,34 @@ export function solveBoundedNonlinearLeastSquares(
     return residualObjective(output);
   };
 
-  let objective = evaluate(unconstrained, residuals);
-  let iterations = 0;
-  let converged = false;
-  let termination: NonlinearTermination = 'maximum-iterations';
-  let gradientInfinityNorm = Infinity;
-  let latestJacobian: number[][] = [];
+  const evaluateJacobian = (): void => {
+    toPhysical(unconstrained, options.parameters, physical, transformDerivatives);
+    if (options.evaluateJacobian && physicalJacobian) {
+      options.evaluateJacobian(physical, physicalJacobian);
+      for (let observation = 0; observation < observationCount; observation++) {
+        const offset = observation * parameterCount;
+        for (let parameter = 0; parameter < parameterCount; parameter++) {
+          const physicalDerivative = physicalJacobian[offset + parameter];
+          if (!Number.isFinite(physicalDerivative)) {
+            throw new Error('Analytic nonlinear Jacobian produced a non-finite value');
+          }
+          jacobian[observation][parameter] = (
+            physicalDerivative * transformDerivatives[parameter]
+          );
+        }
+      }
+      return;
+    }
 
-  for (let iteration = 0; iteration < maxIterations; iteration++) {
-    iterations = iteration + 1;
-    const jacobian = Array.from({ length: observationCount }, () => new Array<number>(parameterCount).fill(0));
-    const plusResiduals = new Float64Array(observationCount);
-    const minusResiduals = new Float64Array(observationCount);
-
+    perturbed.set(unconstrained);
     for (let parameter = 0; parameter < parameterCount; parameter++) {
-      const step = finiteDifferenceStep * (1 + Math.abs(unconstrained[parameter]));
-      const plus = new Float64Array(unconstrained);
-      const minus = new Float64Array(unconstrained);
-      plus[parameter] += step;
-      minus[parameter] -= step;
-      evaluate(plus, plusResiduals);
-      evaluate(minus, minusResiduals);
+      const base = unconstrained[parameter];
+      const step = finiteDifferenceStep * (1 + Math.abs(base));
+      perturbed[parameter] = base + step;
+      evaluate(perturbed, plusResiduals);
+      perturbed[parameter] = base - step;
+      evaluate(perturbed, minusResiduals);
+      perturbed[parameter] = base;
       const inverseSpan = 1 / (2 * step);
       for (let observation = 0; observation < observationCount; observation++) {
         jacobian[observation][parameter] = (
@@ -165,10 +202,21 @@ export function solveBoundedNonlinearLeastSquares(
         ) * inverseSpan;
       }
     }
-    latestJacobian = jacobian;
+  };
 
-    const gradient = new Float64Array(parameterCount);
-    const columnNorms = new Float64Array(parameterCount);
+  let objective = evaluate(unconstrained, residuals);
+  let iterations = 0;
+  let converged = false;
+  let termination: NonlinearTermination = 'maximum-iterations';
+  let gradientInfinityNorm = Infinity;
+  let jacobianAvailable = false;
+  const columnNorms = new Float64Array(parameterCount);
+
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
+    iterations = iteration + 1;
+    evaluateJacobian();
+    jacobianAvailable = true;
+
     gradientInfinityNorm = 0;
     for (let parameter = 0; parameter < parameterCount; parameter++) {
       let gradientValue = 0;
@@ -178,7 +226,6 @@ export function solveBoundedNonlinearLeastSquares(
         gradientValue += derivative * residuals[observation];
         squaredNorm += derivative * derivative;
       }
-      gradient[parameter] = gradientValue;
       columnNorms[parameter] = Math.sqrt(squaredNorm);
       gradientInfinityNorm = Math.max(gradientInfinityNorm, Math.abs(gradientValue));
     }
@@ -211,11 +258,9 @@ export function solveBoundedNonlinearLeastSquares(
     }
 
     const stepVector = Float64Array.from(stepValues);
-    const candidate = new Float64Array(parameterCount);
     for (let parameter = 0; parameter < parameterCount; parameter++) {
       candidate[parameter] = unconstrained[parameter] + stepVector[parameter];
     }
-    const candidateResiduals = new Float64Array(observationCount);
     const candidateObjective = evaluate(candidate, candidateResiduals);
 
     if (candidateObjective < objective) {
@@ -242,10 +287,10 @@ export function solveBoundedNonlinearLeastSquares(
 
   toPhysical(unconstrained, options.parameters, physical);
   let jacobianDiagnostics: LeastSquaresDiagnostics | null = null;
-  if (latestJacobian.length === observationCount) {
+  if (jacobianAvailable) {
     try {
       jacobianDiagnostics = solveLeastSquares(
-        latestJacobian,
+        jacobian,
         new Array<number>(observationCount).fill(0),
         { conditionLimit: 1e12 },
       ).diagnostics;
@@ -264,6 +309,7 @@ export function solveBoundedNonlinearLeastSquares(
     termination,
     damping,
     gradientInfinityNorm,
+    jacobianMethod,
     jacobianDiagnostics,
   };
 }
