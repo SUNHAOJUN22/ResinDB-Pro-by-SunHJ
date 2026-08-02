@@ -30,7 +30,7 @@
     "validate:source": "node scripts/validate-source-hygiene.mjs",
     "audit:all": "npm audit --audit-level=high",
     "report:pdf": "node scripts/generate-validation-pdf.mjs",
-    "report:receipt": "node scripts/generate-validation-receipt.mjs",
+    "report:receipt": "npm run validate:compute && node scripts/generate-validation-receipt.mjs",
     "validate:scientific-ui": "node scripts/validate-scientific-ui.mjs",
     "validate:compute": "node scripts/validate-compute-surface.mjs"
   },
@@ -66,7 +66,7 @@
     "@types/diff": "^7.0.2",
     "@types/lodash": "^4.17.24",
     "@types/node": "^22.14.0",
-    "@types/paparse": "^5.5.2",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.0",
