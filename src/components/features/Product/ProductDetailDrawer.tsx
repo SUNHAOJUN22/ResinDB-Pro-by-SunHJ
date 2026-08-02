@@ -41,7 +41,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { logger } from "@/lib/logger";
 import * as echarts from "@/lib/echarts";
 import Markdown from "react-markdown";
-import { findSimilarProducts } from "@/services/mathUtils";
+import { findSimilarProducts, parseFiniteNumericValue } from "@/services/mathUtils";
 import { SimilarProductsRadar } from '@/components/charts/SimilarProductsRadar';
 import { DegradationSimulator } from '@/components/charts/DegradationSimulator';
 
@@ -172,11 +172,11 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
     useMemo(() => {
       const defaultGroups: Record<string, [string, PropertyValue][]> = {};
       if (!displayProduct) return defaultGroups;
-      
+
       const groups: Record<string, [string, PropertyValue][]> = {
         Other: []
       };
-      
+
       // Initialize groups from PROPERTY_GROUPS
       Object.keys(PROPERTY_GROUPS).forEach(key => {
         groups[key] = [];
@@ -203,11 +203,11 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
   const similarProducts = useMemo(() => {
     if (!displayProduct || allProducts.length <= 1) return [];
 
-    return findSimilarProducts(displayProduct, allProducts, (p, key) => {
-      const raw = p.properties[key]?.value;
-      const num = typeof raw === "number" ? raw : parseFloat(String(raw));
-      return isNaN(num) ? null : num;
-    }).slice(0, 3);
+    return findSimilarProducts(
+      displayProduct,
+      allProducts,
+      (candidate, key) => parseFiniteNumericValue(candidate.properties[key]?.value),
+    ).slice(0, 3);
   }, [displayProduct, allProducts]);
 
   // Mini Radar Chart Effect
@@ -842,7 +842,12 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
                             </div>
                             <div className="grid grid-cols-1 gap-2">
                               {similarProducts.map(
-                                ({ product: p, score: similarity }) => (
+                                ({
+                                  product: p,
+                                  score: similarity,
+                                  sharedFeatureCount,
+                                  targetFeatureCount,
+                                }) => (
                                   <motion.button
                                     key={p.id}
                                     whileHover={{ scale: 1.02, x: 4 }}
@@ -875,8 +880,13 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
                                         </p>
                                       </div>
                                     </div>
-                                    <div className="text-[9px] font-mono font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800/50 uppercase tracking-widest shadow-sm">
-                                      {similarity}% Match
+                                    <div className="text-right shrink-0">
+                                      <div className="text-[9px] font-mono font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800/50 uppercase tracking-widest shadow-sm">
+                                        {similarity}% Match
+                                      </div>
+                                      <div className="mt-1 text-[8px] font-mono text-slate-400">
+                                        {sharedFeatureCount}/{targetFeatureCount} shared features
+                                      </div>
                                     </div>
                                   </motion.button>
                                 ),
@@ -1005,16 +1015,22 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
                             推荐相似牌号
                           </h4>
                         </div>
-                        
+
                         <div className="mb-6">
-                           <SimilarProductsRadar 
-                              targetProduct={displayProduct} 
-                              similarProducts={similarProducts} 
+                           <SimilarProductsRadar
+                              targetProduct={displayProduct}
+                              similarProducts={similarProducts}
+                              allProducts={allProducts}
                            />
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {similarProducts.map(({ product: p, score: similarity }) => (
+                          {similarProducts.map(({
+                            product: p,
+                            score: similarity,
+                            sharedFeatureCount,
+                            targetFeatureCount,
+                          }) => (
                             <motion.button
                               whileHover={{
                                 scale: 1.02,
@@ -1029,9 +1045,14 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
                                 <span className="text-[11px] font-mono font-bold text-slate-900 dark:text-white group-hover:text-primary-600 transition-colors tracking-tight line-clamp-2 uppercase">
                                   {p.gradeName}
                                 </span>
-                                <span className="text-[9px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800/50 px-1.5 py-0.5 rounded-md shadow-sm uppercase tracking-widest shrink-0">
-                                  {similarity}%
-                                </span>
+                                <div className="text-right shrink-0">
+                                  <span className="text-[9px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800/50 px-1.5 py-0.5 rounded-md shadow-sm uppercase tracking-widest">
+                                    {similarity}%
+                                  </span>
+                                  <p className="mt-1 text-[8px] font-mono text-slate-400">
+                                    {sharedFeatureCount}/{targetFeatureCount} dimensions
+                                  </p>
+                                </div>
                               </div>
                               <p className="text-[9px] font-mono text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5">
                                 <Factory size={10} className="text-slate-400" />
@@ -1072,7 +1093,7 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
                 </span>
               </div>
             </div>
-            
+
             <PdfReportTemplate ref={pdfTemplateRef} product={displayProduct} />
           </motion.div>
         </motion.div>

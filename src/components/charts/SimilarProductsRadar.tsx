@@ -7,114 +7,119 @@ import {
   PolarRadiusAxis,
   ResponsiveContainer,
   Tooltip,
-  Legend
+  Legend,
 } from 'recharts';
-import { Product } from '@/types/index';
-import { SimilarityResult } from '@/services/mathUtils';
+import type { Product } from '@/types/index';
+import {
+  buildNormalizedComparisonProfile,
+  parseFiniteNumericValue,
+  type SimilarityResult,
+} from '@/services/mathUtils';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface SimilarProductsRadarProps {
   targetProduct: Product;
-  similarProducts: SimilarityResult[]; // Top 3
+  similarProducts: SimilarityResult[];
+  allProducts: Product[];
+}
+
+interface RadarDatum {
+  subject: string;
+  fullKey: string;
+  minimum: number;
+  maximum: number;
+  [seriesKey: string]: string | number;
 }
 
 export const SimilarProductsRadar: React.FC<SimilarProductsRadarProps> = ({
   targetProduct,
   similarProducts,
+  allProducts,
 }) => {
   const { tProp } = useLanguage();
 
-  const data = useMemo(() => {
-    // 1. Identify the top 6 numerical properties from the target product to display
-    const propsWithValues = Object.entries(targetProduct.properties)
-      .filter(([_, val]) => {
-        const num = typeof val.value === 'number' ? val.value : parseFloat(String(val.value));
-        return !isNaN(num);
-      });
+  const profile = useMemo(() => buildNormalizedComparisonProfile(
+    targetProduct,
+    similarProducts.slice(0, 3),
+    allProducts,
+    (product, key) => parseFiniteNumericValue(product.properties[key]?.value),
+    6,
+  ), [allProducts, similarProducts, targetProduct]);
 
-    // Just take the first 6 for visual clarity on a radar chart
-    const radarKeys = propsWithValues.slice(0, 6).map(([key]) => key);
-
-    return radarKeys.map((key) => {
-      const dataPoint: Record<string, string | number> = {
-        subject: tProp(key).slice(0, 10), // Truncate for display
-        fullKey: key,
-      };
-
-      // Add target product value
-      const tVal = targetProduct.properties[key]?.value;
-      dataPoint[targetProduct.gradeName] = typeof tVal === 'number' ? tVal : parseFloat(String(tVal)) || 0;
-
-      // Add similar products values
-      similarProducts.forEach((sim) => {
-        const sVal = sim.product.properties[key]?.value;
-        dataPoint[sim.product.gradeName] = typeof sVal === 'number' ? sVal : parseFloat(String(sVal)) || 0;
-      });
-
-      return dataPoint;
-    });
-  }, [targetProduct, similarProducts, tProp]);
+  const data = useMemo<RadarDatum[]>(() => profile.points.map((point) => ({
+    subject: tProp(point.key).slice(0, 12),
+    fullKey: point.key,
+    minimum: point.minimum,
+    maximum: point.maximum,
+    ...point.normalized,
+  })), [profile.points, tProp]);
 
   const colors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6'];
 
-  if (!data || data.length === 0) {
+  if (data.length < 3) {
     return (
-      <div className="flex items-center justify-center p-8 text-slate-400 font-mono text-xs">
-        Not enough numerical data for radar chart.
+      <div className="flex items-center justify-center p-8 text-slate-400 font-mono text-xs text-center">
+        At least three finite, variable properties shared by every compared grade are required for a radar profile.
       </div>
     );
   }
 
   return (
     <div className="w-full h-80 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-inner relative mt-4">
-       <h4 className="absolute top-4 left-4 text-[10px] font-mono font-bold uppercase tracking-widest text-slate-500 z-10">
-         Multi-Dimensional Overlap
-       </h4>
-       <ResponsiveContainer width="100%" height="100%">
-        <RadarChart cx="50%" cy="55%" outerRadius="65%" data={data}>
+      <div className="absolute top-4 left-4 z-10 max-w-[75%]">
+        <h4 className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-500">
+          Normalized shared-property profile
+        </h4>
+        <p className="mt-1 text-[8px] font-mono text-slate-400 leading-tight">
+          0-100 min-max index across the governed comparison set; raw units are not mixed on one radial scale.
+        </p>
+      </div>
+      <ResponsiveContainer width="100%" height="100%">
+        <RadarChart cx="50%" cy="58%" outerRadius="62%" data={data}>
           <PolarGrid stroke="rgba(148, 163, 184, 0.2)" />
-          <PolarAngleAxis 
-            dataKey="subject" 
-            tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }} 
+          <PolarAngleAxis
+            dataKey="subject"
+            tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }}
           />
-          <PolarRadiusAxis angle={30} domain={['auto', 'auto']} tick={false} axisLine={false} />
-          
-          <Tooltip 
-            contentStyle={{ 
-              backgroundColor: 'rgba(15, 23, 42, 0.9)', 
+          <PolarRadiusAxis
+            angle={30}
+            domain={[0, 100]}
+            tick={{ fill: '#94a3b8', fontSize: 8 }}
+            tickCount={5}
+            axisLine={false}
+          />
+          <Tooltip
+            formatter={(value) => [`${Number(value).toFixed(1)} / 100`, 'Normalized index']}
+            labelFormatter={(_label, payload) => {
+              const item = payload[0]?.payload as RadarDatum | undefined;
+              return item
+                ? `${tProp(item.fullKey)} · global range ${item.minimum} to ${item.maximum}`
+                : '';
+            }}
+            contentStyle={{
+              backgroundColor: 'rgba(15, 23, 42, 0.9)',
               borderColor: 'rgba(51, 65, 85, 0.5)',
               borderRadius: '8px',
               fontSize: '12px',
               color: '#fff',
-              fontFamily: 'monospace'
-            }} 
+              fontFamily: 'monospace',
+            }}
           />
-          
-          <Radar
-            name={targetProduct.gradeName}
-            dataKey={targetProduct.gradeName}
-            stroke={colors[0]}
-            fill={colors[0]}
-            fillOpacity={0.4}
-            strokeWidth={2}
-          />
-
-          {similarProducts.map((sim, idx) => (
+          {profile.series.map((series, index) => (
             <Radar
-              key={sim.product.id}
-              name={sim.product.gradeName}
-              dataKey={sim.product.gradeName}
-              stroke={colors[idx + 1]}
-              fill={colors[idx + 1]}
-              fillOpacity={0.1}
+              key={series.productId}
+              name={series.label}
+              dataKey={series.key}
+              stroke={colors[index % colors.length]}
+              fill={colors[index % colors.length]}
+              fillOpacity={index === 0 ? 0.35 : 0.08}
               strokeWidth={2}
-              strokeDasharray="3 3"
+              strokeDasharray={index === 0 ? undefined : '3 3'}
             />
           ))}
-
-          <Legend 
-             wrapperStyle={{ fontSize: '10px', fontFamily: 'monospace', fontWeight: 'bold' }}
-             iconType="circle"
+          <Legend
+            wrapperStyle={{ fontSize: '10px', fontFamily: 'monospace', fontWeight: 'bold' }}
+            iconType="circle"
           />
         </RadarChart>
       </ResponsiveContainer>
