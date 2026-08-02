@@ -34,7 +34,29 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .github/.resindb-rebuild-payload.part* > /tmp/resindb-rebuild-payload.b64
+          cat \
+            .github/.resindb-rebuild-payload.part00 \
+            .github/.resindb-rebuild-payload.part01 \
+            .github/.resindb-rebuild-correct.020 \
+            .github/.resindb-rebuild-correct.021 \
+            .github/.resindb-rebuild-correct.022 \
+            .github/.resindb-rebuild-payload.part03 \
+            .github/.resindb-rebuild-payload.part04 \
+            .github/.resindb-rebuild-correct.050 \
+            .github/.resindb-rebuild-correct.051 \
+            .github/.resindb-rebuild-correct.052 \
+            .github/.resindb-rebuild-payload.part06 \
+            .github/.resindb-rebuild-payload.part07 \
+            .github/.resindb-rebuild-payload.part08 \
+            .github/.resindb-rebuild-payload.part09 \
+            .github/.resindb-rebuild-correct.100 \
+            .github/.resindb-rebuild-correct.101 \
+            .github/.resindb-rebuild-correct.102 \
+            .github/.resindb-rebuild-payload.part11 \
+            .github/.resindb-rebuild-correct.120 \
+            .github/.resindb-rebuild-correct.121 \
+            > /tmp/resindb-rebuild-payload.b64
+          test "$(stat -c%s /tmp/resindb-rebuild-payload.b64)" -eq 120489
           echo '903b0ebae42d388ebb432ae820cd4e2508cad729856eda744f693192631b6652  /tmp/resindb-rebuild-payload.b64' | sha256sum -c -
           base64 -d /tmp/resindb-rebuild-payload.b64 > /tmp/resindb-rebuild-payload.tar.gz
           echo '197ed80b5e7da26421092488b470a96b1b353ec7da9970c44da39e413b01ea09  /tmp/resindb-rebuild-payload.tar.gz' | sha256sum -c -
@@ -94,9 +116,11 @@ jobs:
         run: |
           set -euo pipefail
           rm -f .github/.resindb-rebuild-payload.part*
+          rm -f .github/.resindb-rebuild-correct.*
           rm -f .github/data-compute-readme-rebuild.trigger
           rm -f .github/data-compute-readme-rebuild.pr-ready
           rm -f .github/data-compute-readme-rebuild.pr-event
+          rm -f .github/workflows/diagnose-rebuild-payload.yml
           git rm -f .github/workflows/apply-data-compute-readme-rebuild.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
