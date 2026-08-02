@@ -1,0 +1,1 @@
+PR creation marker. The pull_request event executes the SHA-verified payload workflow; the workflow deletes this marker before committing the candidate source tree.
