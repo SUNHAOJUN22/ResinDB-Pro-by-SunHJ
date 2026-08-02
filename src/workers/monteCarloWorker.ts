@@ -1,3 +1,4 @@
+import { calculateGaussianKde } from '@/compute/gaussianKde';
 import { createWorkerProgressMessage } from '@/compute/workerProtocol';
 import {
   createSeededRandom,
@@ -9,9 +10,10 @@ import {
 import type { FormulaConfig, Product } from '@/types/index';
 import { formulaEngine } from '@/lib/formulaParser';
 
-const MONTE_CARLO_MODEL_VERSION = 'monte-carlo-formula-numeric-dictionary-3.0.0';
+const MONTE_CARLO_MODEL_VERSION = 'monte-carlo-formula-numeric-dictionary-3.1.0';
 const NORMAL_TRANSFORM_VERSION = 'box-muller-1.0.0';
 const MAX_ITERATIONS = 1_000_000;
+const KDE_STEPS = 100;
 
 export interface MonteCarloMessage {
   type: 'RUN_SIMULATION';
@@ -42,6 +44,10 @@ export interface MonteCarloPerformance {
   numericPropertyDictionaryReused: true;
   formulaResultObjectReused: true;
   typedResultBuffer: true;
+  kdeKernelStrategy: 'exact-direct-hoisted-invariants';
+  kdeKernelEvaluations: number;
+  kdeBandwidthDivisionHoisted: true;
+  kdeGaussianNormalizationHoisted: true;
 }
 
 export interface MonteCarloResponse {
@@ -73,41 +79,6 @@ function validateVariancePercent(value: number, key: string): number {
     throw new RangeError(`Variance for ${key} must be a non-negative finite percentage`);
   }
   return value;
-}
-
-function calculateKDE(
-  data: ArrayLike<number>,
-  bandwidth: number,
-  steps = 100,
-): { x: number; y: number }[] {
-  if (data.length === 0) return [];
-  const safeSteps = Number.isInteger(steps) && steps > 0 ? steps : 100;
-  let min = data[0];
-  let max = data[0];
-  for (let index = 1; index < data.length; index++) {
-    const value = data[index];
-    if (value < min) min = value;
-    if (value > max) max = value;
-  }
-  const fallbackScale = Math.max(Math.abs(min), Math.abs(max), 1) * 1e-6;
-  const safeBandwidth = Math.abs(bandwidth) > 1e-15 ? Math.abs(bandwidth) : fallbackScale;
-  const margin = (max - min) * 0.1 || safeBandwidth * 3;
-  min -= margin;
-  max += margin;
-  const span = max - min;
-  const normalization = data.length * safeBandwidth;
-  const gaussianNormalization = Math.sqrt(2 * Math.PI);
-  const kde: { x: number; y: number }[] = [];
-  for (let step = 0; step <= safeSteps; step++) {
-    const x = min + (step / safeSteps) * span;
-    let sum = 0;
-    for (let index = 0; index < data.length; index++) {
-      const standardized = (x - data[index]) / safeBandwidth;
-      sum += Math.exp(-0.5 * standardized * standardized) / gaussianNormalization;
-    }
-    kde.push({ x, y: sum / normalization });
-  }
-  return kde;
 }
 
 self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
@@ -201,7 +172,7 @@ self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
     const p5 = validResults[Math.min(validResults.length - 1, Math.floor(validResults.length * 0.05))];
     const p95 = validResults[Math.min(validResults.length - 1, Math.floor(validResults.length * 0.95))];
     const bandwidth = 1.06 * stdDev * Math.pow(validResults.length, -0.2);
-    const kde = calculateKDE(validResults, bandwidth, 100);
+    const kde = calculateGaussianKde(validResults, bandwidth, KDE_STEPS);
     const results = Array.from(validResults);
     self.postMessage(createWorkerProgressMessage({ ratio: 1, phase: 'complete' }));
 
@@ -226,6 +197,10 @@ self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
           numericPropertyDictionaryReused: true,
           formulaResultObjectReused: true,
           typedResultBuffer: true,
+          kdeKernelStrategy: 'exact-direct-hoisted-invariants',
+          kdeKernelEvaluations: acceptedSamples * (KDE_STEPS + 1),
+          kdeBandwidthDivisionHoisted: true,
+          kdeGaussianNormalizationHoisted: true,
         },
       },
     } satisfies MonteCarloResponse);

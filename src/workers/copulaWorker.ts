@@ -1,7 +1,8 @@
 import { inverseStandardNormal } from '@/compute/distributions';
+import { fillAverageRanks } from '@/compute/rankStatistics';
 import { createWorkerProgressMessage } from '@/compute/workerProtocol';
 
-const COPULA_MODEL_VERSION = 'gaussian-copula-normal-scores-2.0.0';
+const COPULA_MODEL_VERSION = 'gaussian-copula-normal-scores-2.1.0';
 
 export interface CopulaMessage {
   type: 'CALCULATE_COPULA';
@@ -26,23 +27,17 @@ export interface CopulaResponse {
     method: 'gaussian-copula-normal-scores';
     pseudoObservation: '(averageRank-0.5)/n';
     observations: number;
+    performance: {
+      rankStorage: 'float64';
+      rankOrdering: 'reused-index-array';
+      rankingScratchIndices: number;
+      rankValueObjectsAllocated: 0;
+      sortedValueStorage: 'float64-copy';
+      gridNormalScoresPrecomputed: true;
+      gridNormalScoreEvaluations: number;
+    };
   };
   error?: string;
-}
-
-function averageRanks(values: readonly number[]): number[] {
-  const indexed = values.map((value, index) => ({ value, index }));
-  indexed.sort((left, right) => left.value - right.value);
-  const ranks = new Array<number>(values.length);
-  let cursor = 0;
-  while (cursor < indexed.length) {
-    let end = cursor + 1;
-    while (end < indexed.length && indexed[end].value === indexed[cursor].value) end += 1;
-    const averageRank = ((cursor + 1) + end) / 2;
-    for (let index = cursor; index < end; index++) ranks[indexed[index].index] = averageRank;
-    cursor = end;
-  }
-  return ranks;
 }
 
 self.onmessage = (event: MessageEvent<CopulaMessage>) => {
@@ -57,12 +52,22 @@ self.onmessage = (event: MessageEvent<CopulaMessage>) => {
     const observations = validData.length;
     if (observations < 5) throw new Error('At least five complete finite points are required.');
 
-    const xValues = validData.map((row) => row.x);
-    const yValues = validData.map((row) => row.y);
-    const sortedX = [...xValues].sort((left, right) => left - right);
-    const sortedY = [...yValues].sort((left, right) => left - right);
-    const rankX = averageRanks(xValues);
-    const rankY = averageRanks(yValues);
+    const xValues = new Float64Array(observations);
+    const yValues = new Float64Array(observations);
+    for (let index = 0; index < observations; index++) {
+      xValues[index] = validData[index].x;
+      yValues[index] = validData[index].y;
+    }
+    const sortedXBuffer = new Float64Array(xValues);
+    const sortedYBuffer = new Float64Array(yValues);
+    sortedXBuffer.sort();
+    sortedYBuffer.sort();
+    const rankX = new Float64Array(observations);
+    const rankY = new Float64Array(observations);
+    const orderWorkspace = new Array<number>(observations);
+    fillAverageRanks(xValues, rankX, orderWorkspace);
+    fillAverageRanks(yValues, rankY, orderWorkspace);
+
     const scoresX = new Float64Array(observations);
     const scoresY = new Float64Array(observations);
     let meanX = 0;
@@ -125,6 +130,8 @@ self.onmessage = (event: MessageEvent<CopulaMessage>) => {
       }));
     }
 
+    const sortedX = Array.from(sortedXBuffer);
+    const sortedY = Array.from(sortedYBuffer);
     self.postMessage({
       type: 'COPULA_RESULT',
       payload: {
@@ -132,14 +139,23 @@ self.onmessage = (event: MessageEvent<CopulaMessage>) => {
         sortedX,
         sortedY,
         grid,
-        minX: sortedX[0],
-        maxX: sortedX[observations - 1],
-        minY: sortedY[0],
-        maxY: sortedY[observations - 1],
+        minX: sortedXBuffer[0],
+        maxX: sortedXBuffer[observations - 1],
+        minY: sortedYBuffer[0],
+        maxY: sortedYBuffer[observations - 1],
         modelVersion: COPULA_MODEL_VERSION,
         method: 'gaussian-copula-normal-scores',
         pseudoObservation: '(averageRank-0.5)/n',
         observations,
+        performance: {
+          rankStorage: 'float64',
+          rankOrdering: 'reused-index-array',
+          rankingScratchIndices: observations,
+          rankValueObjectsAllocated: 0,
+          sortedValueStorage: 'float64-copy',
+          gridNormalScoresPrecomputed: true,
+          gridNormalScoreEvaluations: axisPointCount,
+        },
       },
     } satisfies CopulaResponse);
   } catch (error) {
