@@ -151,7 +151,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = React.memo(({
         unit: val.unit || "",
         standard: val.standard || "",
         instrument: val.instrument || "",
-        temperature: val.temperature || "",
+        temperature: val.temperature === undefined ? "" : String(val.temperature),
         referenceId: val.referenceId || "",
         sourceUrl: val.sourceUrl || "",
         isExpanded: false,

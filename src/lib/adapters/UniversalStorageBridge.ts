@@ -237,7 +237,7 @@ export class UniversalStorageBridge {
         value: mfrValue,
         unit: mfr?.unit || 'g/10min',
         standard: mfr?.standard || 'ISO 1133',
-        temp: mfr?.temperature || mfr?.temp || defaultMfrTemperature,
+        temp: String(mfr?.temperature ?? mfr?.temp ?? defaultMfrTemperature),
         load: mfr?.load || '2.16kg',
       };
     }
