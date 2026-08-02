@@ -1,0 +1,1 @@
+Opening the pull request triggers the SHA-verified rebuild executor. This file is deleted by the executor before the candidate commit.
