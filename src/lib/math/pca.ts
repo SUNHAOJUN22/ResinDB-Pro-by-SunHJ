@@ -74,10 +74,11 @@ export class PCA {
 
     const rowCount = validData.length;
     const requested = requestedComponentCount(numComponents);
-    const componentLimit = Math.min(requested, columnCount, Math.max(0, rowCount - 1));
+    const outputComponentCount = Math.min(requested, columnCount);
+    const componentLimit = Math.min(outputComponentCount, Math.max(0, rowCount - 1));
     const projected = Array.from(
       { length: rowCount },
-      () => new Array<number>(componentLimit).fill(0),
+      () => new Array<number>(outputComponentCount).fill(0),
     );
     if (componentLimit === 0) return { projected, loadingVectors: [] };
 
