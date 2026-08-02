@@ -1,4 +1,6 @@
-const SPEARMAN_MODEL_VERSION = 'average-rank-pearson-complete-cases-2.0.0';
+import { fillAverageRanks } from '@/compute/rankStatistics';
+
+const SPEARMAN_MODEL_VERSION = 'average-rank-pearson-complete-cases-2.1.0';
 
 export type SpearmanMessage = {
   type: 'COMPUTE_SPEARMAN';
@@ -20,27 +22,17 @@ export type SpearmanResponse = {
       tiePolicy: 'average-ranks';
       constantCorrelationPolicy: 'zero-not-defined';
       constantKeys: string[];
+      rankStorage: 'centered-float64-by-feature';
+      rankOrdering: 'reused-index-array';
+      pairwiseCentering: 'precomputed-once';
+      centeredRankValues: number;
+      rankingScratchIndices: number;
     };
   };
 } | {
   type: 'ERROR';
   payload: { message: string };
 };
-
-function getRanks(values: readonly number[]): Float64Array {
-  const sorted = values.map((value, index) => ({ value, index }))
-    .sort((left, right) => left.value - right.value);
-  const ranks = new Float64Array(values.length);
-  let cursor = 0;
-  while (cursor < sorted.length) {
-    let end = cursor + 1;
-    while (end < sorted.length && sorted[end].value === sorted[cursor].value) end += 1;
-    const averageRank = ((cursor + 1) + end) / 2;
-    for (let index = cursor; index < end; index++) ranks[sorted[index].index] = averageRank;
-    cursor = end;
-  }
-  return ranks;
-}
 
 self.onmessage = (event: MessageEvent<SpearmanMessage>) => {
   try {
@@ -59,6 +51,11 @@ self.onmessage = (event: MessageEvent<SpearmanMessage>) => {
             tiePolicy: 'average-ranks',
             constantCorrelationPolicy: 'zero-not-defined',
             constantKeys: [],
+            rankStorage: 'centered-float64-by-feature',
+            rankOrdering: 'reused-index-array',
+            pairwiseCentering: 'precomputed-once',
+            centeredRankValues: 0,
+            rankingScratchIndices: 0,
           },
         },
       } satisfies SpearmanResponse);
@@ -75,19 +72,26 @@ self.onmessage = (event: MessageEvent<SpearmanMessage>) => {
       throw new Error('Spearman correlation requires at least two complete finite observations.');
     }
 
-    const ranksByKey = new Map<string, Float64Array>();
+    const ranksByKey = new Array<Float64Array>(keys.length);
     const centeredNormSquared = new Float64Array(keys.length);
+    const valueWorkspace = new Float64Array(observations);
+    const orderWorkspace = new Array<number>(observations);
     const rankMean = (observations + 1) / 2;
     const constantKeys: string[] = [];
     for (let keyIndex = 0; keyIndex < keys.length; keyIndex++) {
       const key = keys[keyIndex];
-      const values = validData.map((item) => item.values[key]);
-      const ranks = getRanks(values);
-      ranksByKey.set(key, ranks);
+      for (let observation = 0; observation < observations; observation++) {
+        valueWorkspace[observation] = validData[observation].values[key];
+      }
+      const centeredRanks = new Float64Array(observations);
+      fillAverageRanks(valueWorkspace, centeredRanks, orderWorkspace);
       let sumSquared = 0;
       for (let observation = 0; observation < observations; observation++) {
-        sumSquared += (ranks[observation] - rankMean) ** 2;
+        const centeredRank = centeredRanks[observation] - rankMean;
+        centeredRanks[observation] = centeredRank;
+        sumSquared += centeredRank * centeredRank;
       }
+      ranksByKey[keyIndex] = centeredRanks;
       centeredNormSquared[keyIndex] = sumSquared;
       if (!(sumSquared > 0)) constantKeys.push(key);
     }
@@ -95,15 +99,15 @@ self.onmessage = (event: MessageEvent<SpearmanMessage>) => {
     const matrix = Array.from({ length: keys.length }, () => new Array<number>(keys.length).fill(0));
     for (let left = 0; left < keys.length; left++) {
       matrix[left][left] = centeredNormSquared[left] > 0 ? 1 : 0;
-      const rankLeft = ranksByKey.get(keys[left])!;
+      const rankLeft = ranksByKey[left];
       for (let right = left + 1; right < keys.length; right++) {
         const denominator = Math.sqrt(centeredNormSquared[left] * centeredNormSquared[right]);
         let rho = 0;
         if (denominator > 0) {
-          const rankRight = ranksByKey.get(keys[right])!;
+          const rankRight = ranksByKey[right];
           let covariance = 0;
           for (let observation = 0; observation < observations; observation++) {
-            covariance += (rankLeft[observation] - rankMean) * (rankRight[observation] - rankMean);
+            covariance += rankLeft[observation] * rankRight[observation];
           }
           rho = Math.max(-1, Math.min(1, covariance / denominator));
         }
@@ -124,6 +128,11 @@ self.onmessage = (event: MessageEvent<SpearmanMessage>) => {
           tiePolicy: 'average-ranks',
           constantCorrelationPolicy: 'zero-not-defined',
           constantKeys,
+          rankStorage: 'centered-float64-by-feature',
+          rankOrdering: 'reused-index-array',
+          pairwiseCentering: 'precomputed-once',
+          centeredRankValues: observations * keys.length,
+          rankingScratchIndices: observations,
         },
       },
     } satisfies SpearmanResponse);
