@@ -95,6 +95,7 @@ jobs:
           set -euo pipefail
           rm -f .github/.resindb-rebuild-payload.part*
           rm -f .github/data-compute-readme-rebuild.trigger
+          rm -f .github/data-compute-readme-rebuild.pr-ready
           git rm -f .github/workflows/apply-data-compute-readme-rebuild.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
