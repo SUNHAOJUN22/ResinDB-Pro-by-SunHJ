@@ -405,7 +405,7 @@ $$
 | Gaussian Copula | 逆正态网格预计算、秩缓冲复用 | Copula 公式和网格 |
 | Prony / Mahalanobis | 迭代和三角求解工作区复用 | 拟合与距离定义 |
 | Gaussian Process | 预测对象、Cholesky 和 kernel scale 复用 | RBF GP 均值/方差 |
-| Similarity | 单矩阵原位标准化、延迟边对象分配 | Z-score 余弦相似度 |
+| Similarity | 观测值样本方差、缺失掩码、重叠度惩罚与延迟边对象分配 | Z-score 余弦相似度 × 共享有效特征覆盖率 |
 | Spearman | 平均秩索引复用、中心秩预计算 | 相关矩阵数值完全一致 |
 | Monte Carlo KDE | 固定核因子外提 | 精确直接 KDE |
 
@@ -502,7 +502,7 @@ npm run audit:all
 
 - 浏览器 `VITE_*` 变量不是密钥存储方案；
 - 生产密钥必须位于服务端网关；
-- 相似度不等于化学等价；
+- 相似度采用共享有效特征覆盖率惩罚，仍不等于化学等价；
 - 相关性和局部灵敏度不等于因果；
 - 规则生成代理不等于实测数据；
 - 情景带不等于置信区间；

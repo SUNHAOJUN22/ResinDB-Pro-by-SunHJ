@@ -1,6 +1,6 @@
 {
   "schemaVersion": "resindb-compute-catalog-1.0.0",
-  "updatedAt": "2026-08-02",
+  "updatedAt": "2026-08-03",
   "modules": [
     {
       "id": "arrhenius",
@@ -249,10 +249,10 @@
       "hook": null,
       "displaySurface": "src/components/charts/DataVisualizerLegacy.tsx",
       "chartId": "similarity_graph",
-      "inputContract": "At least two products and one numeric feature with explicit threshold/edge bounds.",
-      "outputContract": "Z-score normalized cosine-similarity edges with bounded allocation evidence.",
-      "mathematicalContract": "sim(x,y)=x dot y/(||x|| ||y||)",
-      "scientificBoundary": "Feature-space similarity, not chemical equivalence."
+      "inputContract": "At least two unique products and two named features; strict finite numeric parsing, explicit threshold and optional edge bounds.",
+      "outputContract": "Observed-only z-score cosine edges adjusted by shared active-feature coverage, with overlap and allocation diagnostics.",
+      "mathematicalContract": "s_adj(x,y)=clamp(cos(z_x,z_y),-1,1) * |F_x∩F_y|/|F_active|, requiring at least two shared active features.",
+      "scientificBoundary": "Feature-space similarity with explicit missingness penalty, not chemical equivalence."
     },
     {
       "id": "sobol",

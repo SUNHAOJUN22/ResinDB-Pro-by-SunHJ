@@ -202,7 +202,7 @@ describe('numerical performance contracts', () => {
       },
       'SIMILARITY_CALCULATED',
     );
-    expect(payload.modelVersion).toBe('zscore-cosine-flat-f64-2.1.0');
+    expect(payload.modelVersion).toBe('zscore-cosine-overlap-f64-3.0.0');
     expect((payload.edges as unknown[])).toHaveLength(10);
     expect(payload.diagnostics).toMatchObject({
       pairsEvaluated: 780,
@@ -211,8 +211,15 @@ describe('numerical performance contracts', () => {
       edgeObjectsAllocated: 10,
       maxEdges: 10,
       truncated: true,
+      activeFeatures: 2,
+      pairsRejectedForInsufficientOverlap: 0,
+      minimumSharedFeatures: 2,
+      overlapAdjustment: 'linear-shared-active-ratio',
+      varianceDenominatorPolicy: 'observed-count-minus-one',
+      numericParsingPolicy: 'strict-finite-full-string',
       matrixStorage: 'flat-float64-unit-vectors',
-      matrixAllocationPolicy: 'single-in-place-float64',
+      observationMaskStorage: 'flat-uint8',
+      matrixAllocationPolicy: 'single-in-place-float64-plus-mask',
       matrixBufferCount: 1,
       matrixValuesAllocated: 80,
       boundedEdgeAllocationPolicy: 'retained-only-after-heap-threshold',
