@@ -1,101 +1,211 @@
+export interface PCAResult {
+  projected: number[][];
+  loadingVectors: number[][];
+}
+
+const MAX_ITERATIONS = 100;
+const CONVERGENCE_TOLERANCE = 1e-10;
+const RESIDUAL_ENERGY_TOLERANCE = 1e-12;
+
+function requestedComponentCount(value: number): number {
+  if (!Number.isFinite(value)) return 2;
+  const integer = Math.floor(value);
+  return integer > 0 ? integer : 2;
+}
+
+function squaredNorm(values: Float64Array): number {
+  let sum = 0;
+  for (let index = 0; index < values.length; index++) {
+    sum += values[index] * values[index];
+  }
+  return sum;
+}
+
+function normalizeLoading(
+  loading: Float64Array,
+  previousLoadings: readonly Float64Array[],
+): boolean {
+  for (const previous of previousLoadings) {
+    let projection = 0;
+    for (let column = 0; column < loading.length; column++) {
+      projection += loading[column] * previous[column];
+    }
+    for (let column = 0; column < loading.length; column++) {
+      loading[column] -= projection * previous[column];
+    }
+  }
+
+  const norm = Math.sqrt(squaredNorm(loading));
+  if (!(norm > Number.EPSILON)) return false;
+  for (let column = 0; column < loading.length; column++) {
+    loading[column] /= norm;
+  }
+  return true;
+}
+
+function orientComponent(score: Float64Array, loading: Float64Array): void {
+  let pivot = 0;
+  for (let column = 1; column < loading.length; column++) {
+    if (Math.abs(loading[column]) > Math.abs(loading[pivot])) pivot = column;
+  }
+  if (loading[pivot] >= 0) return;
+  for (let column = 0; column < loading.length; column++) loading[column] = -loading[column];
+  for (let row = 0; row < score.length; row++) score[row] = -score[row];
+}
+
 export class PCA {
-  // Simple NIPALS algorithm for PCA (Non-linear Iterative Partial Least Squares)
-  // Extracts the first numComponents principal components.
-  
-  static getComponents(data: number[][], numComponents: number = 2) {
-      if (!data.length || !data[0].length) return { projected: [], loadingVectors: [] };
+  /**
+   * Deterministic NIPALS PCA over complete, finite, rectangular rows.
+   *
+   * Rows with non-finite values or a different width from the first row are
+   * excluded. Components are extracted only while meaningful residual energy
+   * remains, so rank-deficient data cannot emit duplicate numerical-noise PCs.
+   */
+  static getComponents(data: number[][], numComponents: number = 2): PCAResult {
+    if (data.length === 0 || data[0].length === 0) {
+      return { projected: [], loadingVectors: [] };
+    }
 
-      // Filter out rows that contain NaN or non-finite values
-      const validData = data.filter((row) =>
-        row.every((v) => Number.isFinite(v)),
-      );
+    const columnCount = data[0].length;
+    const validData = data.filter(
+      (row) => row.length === columnCount && row.every((value) => Number.isFinite(value)),
+    );
+    if (validData.length === 0) return { projected: [], loadingVectors: [] };
 
-      if (validData.length === 0) return { projected: [], loadingVectors: [] };
-      
-      const n = validData.length;
-      const m = validData[0].length;
-      const safeComponents = Math.max(1, Math.floor(numComponents) || 2);
-      
-      // 1. Zero-mean the data
-      const means = new Array(m).fill(0);
-      for (let i = 0; i < n; i++) {
-          for (let j = 0; j < m; j++) {
-              means[j] += validData[i][j];
-          }
+    const rowCount = validData.length;
+    const requested = requestedComponentCount(numComponents);
+    const outputComponentCount = Math.min(requested, columnCount);
+    const componentLimit = Math.min(outputComponentCount, Math.max(0, rowCount - 1));
+    const projected = Array.from(
+      { length: rowCount },
+      () => new Array<number>(outputComponentCount).fill(0),
+    );
+    if (componentLimit === 0) return { projected, loadingVectors: [] };
+
+    const means = new Float64Array(columnCount);
+    for (const row of validData) {
+      for (let column = 0; column < columnCount; column++) means[column] += row[column];
+    }
+    for (let column = 0; column < columnCount; column++) means[column] /= rowCount;
+
+    const residual = new Float64Array(rowCount * columnCount);
+    let totalCenteredEnergy = 0;
+    for (let row = 0; row < rowCount; row++) {
+      const offset = row * columnCount;
+      for (let column = 0; column < columnCount; column++) {
+        const centered = validData[row][column] - means[column];
+        residual[offset + column] = centered;
+        totalCenteredEnergy += centered * centered;
       }
-      for (let j = 0; j < m; j++) {
-          // Guard against division by zero (should be unreachable due to early return above)
-          means[j] = n > 0 ? means[j] / n : 0;
+    }
+    if (!(totalCenteredEnergy > 0)) return { projected, loadingVectors: [] };
+
+    const minimumResidualEnergy = Math.max(
+      totalCenteredEnergy * RESIDUAL_ENERGY_TOLERANCE,
+      Number.EPSILON * rowCount * columnCount,
+    );
+    const loadingVectors: number[][] = [];
+    const orthonormalLoadings: Float64Array[] = [];
+    const score = new Float64Array(rowCount);
+    const previousScore = new Float64Array(rowCount);
+    const loading = new Float64Array(columnCount);
+
+    for (let component = 0; component < componentLimit; component++) {
+      let seedColumn = -1;
+      let seedEnergy = 0;
+      for (let column = 0; column < columnCount; column++) {
+        let energy = 0;
+        for (let row = 0; row < rowCount; row++) {
+          const value = residual[row * columnCount + column];
+          energy += value * value;
+        }
+        if (energy > seedEnergy) {
+          seedEnergy = energy;
+          seedColumn = column;
+        }
       }
-      
-      const X = validData.map(row => row.map((val, j) => val - means[j]));
-      
-      const loadingVectors: number[][] = [];
-      const scores: number[][] = new Array(n).fill(0).map(() => new Array(safeComponents).fill(0));
-      
-      const residualX = X.map(row => [...row]);
-      
-      for (let k = 0; k < Math.min(safeComponents, m); k++) {
-          // Initialize score vector t as the first column of residualX
-          const t = residualX.map(row => row[0]);
-          const p = new Array(m).fill(0);
-          
-          let iter = 0;
-          let diff = 1;
-          while (iter < 100 && diff > 1e-6) {
-              const oldT = [...t];
-              
-              // p = X^T t / (t^T t)
-              let tTt = 0;
-              for (let i = 0; i < n; i++) tTt += t[i] * t[i];
-              
-              if (tTt === 0) break; // Zero variance
-              
-              for (let j = 0; j < m; j++) {
-                  let sum = 0;
-                  for (let i = 0; i < n; i++) {
-                      sum += residualX[i][j] * t[i];
-                  }
-                  p[j] = sum / tTt;
-              }
-              
-              // Normalize p: p = p / ||p||
-              let pNorm = 0;
-              for (let j = 0; j < m; j++) pNorm += p[j] * p[j];
-              pNorm = Math.sqrt(Math.max(0, pNorm));
-              if (pNorm === 0) break;
-              for (let j = 0; j < m; j++) p[j] /= pNorm;
-              
-              // t = X p / (p^T p) = X p  (since p^T p = 1)
-              for (let i = 0; i < n; i++) {
-                  let sum = 0;
-                  for (let j = 0; j < m; j++) {
-                      sum += residualX[i][j] * p[j];
-                  }
-                  t[i] = sum;
-              }
-              
-              // Check convergence
-              diff = 0;
-              for (let i = 0; i < n; i++) {
-                  diff += Math.pow(t[i] - oldT[i], 2);
-              }
-              iter++;
-          }
-          
-          loadingVectors.push([...p]);
-          for (let i = 0; i < n; i++) {
-              scores[i][k] = t[i];
-          }
-          
-          // Deflate: X = X - t p^T
-          for (let i = 0; i < n; i++) {
-              for (let j = 0; j < m; j++) {
-                  residualX[i][j] -= t[i] * p[j];
-              }
-          }
+      if (seedColumn < 0 || seedEnergy <= minimumResidualEnergy) break;
+
+      for (let row = 0; row < rowCount; row++) {
+        score[row] = residual[row * columnCount + seedColumn];
       }
-      
-      return { projected: scores, loadingVectors };
+
+      let validComponent = false;
+      for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+        previousScore.set(score);
+        const scoreEnergy = squaredNorm(previousScore);
+        if (scoreEnergy <= minimumResidualEnergy) break;
+
+        loading.fill(0);
+        for (let column = 0; column < columnCount; column++) {
+          let dot = 0;
+          for (let row = 0; row < rowCount; row++) {
+            dot += residual[row * columnCount + column] * previousScore[row];
+          }
+          loading[column] = dot / scoreEnergy;
+        }
+        if (!normalizeLoading(loading, orthonormalLoadings)) break;
+
+        let updatedEnergy = 0;
+        let differenceEnergy = 0;
+        for (let row = 0; row < rowCount; row++) {
+          const offset = row * columnCount;
+          let value = 0;
+          for (let column = 0; column < columnCount; column++) {
+            value += residual[offset + column] * loading[column];
+          }
+          score[row] = value;
+          updatedEnergy += value * value;
+          const difference = value - previousScore[row];
+          differenceEnergy += difference * difference;
+        }
+        if (updatedEnergy <= minimumResidualEnergy) break;
+
+        validComponent = true;
+        const scale = Math.max(scoreEnergy, updatedEnergy, Number.EPSILON);
+        if (differenceEnergy <= CONVERGENCE_TOLERANCE ** 2 * scale) break;
+      }
+      if (!validComponent) break;
+
+      // Re-evaluate the loading once from the final score, then project again.
+      const finalScoreEnergy = squaredNorm(score);
+      loading.fill(0);
+      for (let column = 0; column < columnCount; column++) {
+        let dot = 0;
+        for (let row = 0; row < rowCount; row++) {
+          dot += residual[row * columnCount + column] * score[row];
+        }
+        loading[column] = dot / finalScoreEnergy;
+      }
+      if (!normalizeLoading(loading, orthonormalLoadings)) break;
+
+      let componentEnergy = 0;
+      for (let row = 0; row < rowCount; row++) {
+        const offset = row * columnCount;
+        let value = 0;
+        for (let column = 0; column < columnCount; column++) {
+          value += residual[offset + column] * loading[column];
+        }
+        score[row] = value;
+        componentEnergy += value * value;
+      }
+      if (componentEnergy <= minimumResidualEnergy) break;
+
+      orientComponent(score, loading);
+      const storedLoading = Float64Array.from(loading);
+      orthonormalLoadings.push(storedLoading);
+      loadingVectors.push(Array.from(storedLoading));
+      for (let row = 0; row < rowCount; row++) projected[row][component] = score[row];
+
+      for (let row = 0; row < rowCount; row++) {
+        const offset = row * columnCount;
+        const rowScore = score[row];
+        for (let column = 0; column < columnCount; column++) {
+          residual[offset + column] -= rowScore * storedLoading[column];
+        }
+      }
+    }
+
+    return { projected, loadingVectors };
   }
 }
