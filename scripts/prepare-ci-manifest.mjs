@@ -9,8 +9,8 @@ const replacementDeclaration = 'src/types/papaparse.d.ts';
 const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
 const packageLock = JSON.parse(readFileSync(lockPath, 'utf8'));
 
-const declaredDependencyName = '@types/paparse';
-const legacyLockedDependencyName = '@types/papaparse';
+const canonicalDependencyName = '@types/papaparse';
+const legacyDeclaredDependencyName = '@types/paparse';
 const expectedDeclaredVersion = '^5.5.2';
 const expectedLockedVersion = '5.5.2';
 const rootPackage = packageLock.packages?.[''];
@@ -18,19 +18,24 @@ if (!rootPackage?.devDependencies || !packageLock.packages) {
   throw new Error('package-lock root dependency metadata is unavailable');
 }
 
-const declaredVersion = packageJson.devDependencies?.[declaredDependencyName];
-const legacyRootVersion = rootPackage.devDependencies[legacyLockedDependencyName];
-const legacyLockedPackage = packageLock.packages[`node_modules/${legacyLockedDependencyName}`];
+const canonicalDeclaredVersion = packageJson.devDependencies?.[canonicalDependencyName];
+const legacyDeclaredVersion = packageJson.devDependencies?.[legacyDeclaredDependencyName];
+const declaredVersion = canonicalDeclaredVersion ?? legacyDeclaredVersion;
+const declaredDependencyName = canonicalDeclaredVersion === undefined
+  ? legacyDeclaredDependencyName
+  : canonicalDependencyName;
+const lockedRootVersion = rootPackage.devDependencies[canonicalDependencyName];
+const lockedPackage = packageLock.packages[`node_modules/${canonicalDependencyName}`];
 if (
   declaredVersion !== expectedDeclaredVersion
-  || legacyRootVersion !== expectedDeclaredVersion
-  || legacyLockedPackage?.version !== expectedLockedVersion
+  || lockedRootVersion !== expectedDeclaredVersion
+  || lockedPackage?.version !== expectedLockedVersion
 ) {
   throw new Error(
     'Unexpected Papa Parse type contract: '
-      + `package(${declaredDependencyName})=${declaredVersion}, `
-      + `lockRoot(${legacyLockedDependencyName})=${legacyRootVersion}, `
-      + `lockPackage=${legacyLockedPackage?.version}`,
+      + `package(${canonicalDependencyName}|${legacyDeclaredDependencyName})=${declaredVersion}, `
+      + `lockRoot(${canonicalDependencyName})=${lockedRootVersion}, `
+      + `lockPackage=${lockedPackage?.version}`,
   );
 }
 if (!statSync(replacementDeclaration, { throwIfNoEntry: false })?.isFile()) {
@@ -38,9 +43,10 @@ if (!statSync(replacementDeclaration, { throwIfNoEntry: false })?.isFile()) {
 }
 
 if (!packageJson.devDependencies) throw new Error('package.json devDependencies are unavailable');
-delete packageJson.devDependencies[declaredDependencyName];
-delete rootPackage.devDependencies[legacyLockedDependencyName];
-delete packageLock.packages[`node_modules/${legacyLockedDependencyName}`];
+delete packageJson.devDependencies[canonicalDependencyName];
+delete packageJson.devDependencies[legacyDeclaredDependencyName];
+delete rootPackage.devDependencies[canonicalDependencyName];
+delete packageLock.packages[`node_modules/${canonicalDependencyName}`];
 
 const packageContent = `${JSON.stringify(packageJson, null, 2)}\n`;
 const lockContent = `${JSON.stringify(packageLock, null, 2)}\n`;
@@ -49,9 +55,9 @@ writeFileSync(lockPath, lockContent);
 
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 console.log(JSON.stringify({
-  schemaVersion: 'ci-manifest-normalization-1.0.2',
+  schemaVersion: 'ci-manifest-normalization-1.0.3',
   removedPackageDeclaration: `${declaredDependencyName}@${expectedLockedVersion}`,
-  removedLegacyLockEntry: `${legacyLockedDependencyName}@${expectedLockedVersion}`,
+  removedLockEntry: `${canonicalDependencyName}@${expectedLockedVersion}`,
   replacementDeclaration,
   replacementDeclarationBytes: statSync(replacementDeclaration).size,
   packageJsonSha256: digest(packageContent),
