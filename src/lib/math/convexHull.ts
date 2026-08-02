@@ -5,59 +5,76 @@ export interface Point2D {
   data?: unknown;
 }
 
-// CCW > 0 means counter-clockwise (left turn)
-// CCW < 0 means clockwise (right turn)
-// CCW = 0 means collinear
-function ccw(p1: Point2D, p2: Point2D, p3: Point2D): number {
-  return (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x);
+interface IndexedPoint {
+  point: Point2D;
+  index: number;
 }
 
-export function grahamScan(points: Point2D[]): Point2D[] {
-  // Deep-copy to avoid mutating the caller's array (critical when source is React state)
-  const pts = points.filter(
-    (p) => Number.isFinite(p.x) && Number.isFinite(p.y),
-  );
+function orientation(first: Point2D, second: Point2D, third: Point2D): number {
+  const ax = second.x - first.x;
+  const ay = second.y - first.y;
+  const bx = third.x - first.x;
+  const by = third.y - first.y;
+  const cross = ax * by - ay * bx;
+  const scale = Math.abs(ax * by) + Math.abs(ay * bx);
+  const tolerance = Number.EPSILON * Math.max(1, scale) * 32;
+  if (Math.abs(cross) <= tolerance) return 0;
+  return cross;
+}
 
-  // Need at least 3 valid points to form a hull
-  if (pts.length < 3) return pts;
-
-  // Find the point with the lowest y-coordinate (and leftmost if tied)
-  let lowest = pts[0];
-  let lowestIdx = 0;
-  for (let i = 1; i < pts.length; i++) {
-    if (pts[i].y < lowest.y || (pts[i].y === lowest.y && pts[i].x < lowest.x)) {
-      lowest = pts[i];
-      lowestIdx = i;
+/**
+ * Deterministic convex hull with the same public API as the former Graham scan.
+ *
+ * The implementation uses Andrew's monotone chain because lexicographic sorting
+ * makes duplicate removal, all-collinear inputs and deterministic ordering
+ * explicit. Collinear interior points are omitted; endpoints are retained.
+ */
+export function grahamScan(points: readonly Point2D[]): Point2D[] {
+  const sorted: IndexedPoint[] = [];
+  for (let index = 0; index < points.length; index++) {
+    const point = points[index];
+    if (Number.isFinite(point.x) && Number.isFinite(point.y)) {
+      sorted.push({ point, index });
     }
   }
+  sorted.sort((left, right) => (
+    left.point.x - right.point.x
+    || left.point.y - right.point.y
+    || left.index - right.index
+  ));
 
-  // Swap lowest to the first position
-  const temp = pts[0];
-  pts[0] = pts[lowestIdx];
-  pts[lowestIdx] = temp;
+  const unique: Point2D[] = [];
+  for (const entry of sorted) {
+    const previous = unique.at(-1);
+    if (previous && previous.x === entry.point.x && previous.y === entry.point.y) continue;
+    unique.push(entry.point);
+  }
+  if (unique.length <= 2) return unique;
 
-  // Sort remaining points by polar angle with respect to the lowest point
-  const sorted = pts.slice(1).sort((a, b) => {
-    const angle = ccw(lowest, a, b);
-    if (angle === 0) {
-      // collinear, closer point first
-      const distA = (a.x - lowest.x) ** 2 + (a.y - lowest.y) ** 2;
-      const distB = (b.x - lowest.x) ** 2 + (b.y - lowest.y) ** 2;
-      return distA - distB;
+  const lower: Point2D[] = [];
+  for (const point of unique) {
+    while (
+      lower.length >= 2
+      && orientation(lower[lower.length - 2], lower[lower.length - 1], point) <= 0
+    ) {
+      lower.pop();
     }
-    return angle > 0 ? -1 : 1;
-  });
-
-  const hull: Point2D[] = [lowest, sorted[0]];
-
-  for (let i = 1; i < sorted.length; i++) {
-    let top = hull.length - 1;
-    while (hull.length >= 2 && ccw(hull[top - 1], hull[top], sorted[i]) <= 0) {
-      hull.pop();
-      top--;
-    }
-    hull.push(sorted[i]);
+    lower.push(point);
   }
 
-  return hull;
+  const upper: Point2D[] = [];
+  for (let index = unique.length - 1; index >= 0; index--) {
+    const point = unique[index];
+    while (
+      upper.length >= 2
+      && orientation(upper[upper.length - 2], upper[upper.length - 1], point) <= 0
+    ) {
+      upper.pop();
+    }
+    upper.push(point);
+  }
+
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
 }
