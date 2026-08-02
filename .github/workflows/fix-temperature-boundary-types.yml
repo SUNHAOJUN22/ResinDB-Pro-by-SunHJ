@@ -1,8 +1,9 @@
 name: Fix temperature boundary types
 
 on:
-  push:
-    branches: [agent/data-compute-readme-rebuild-20260802]
+  pull_request:
+    branches: [main]
+    types: [synchronize]
 
 permissions:
   contents: write
@@ -13,7 +14,7 @@ concurrency:
 
 jobs:
   fix:
-    if: startsWith(github.event.head_commit.message, 'ci: fix temperature boundary types')
+    if: github.event.pull_request.head.ref == 'agent/data-compute-readme-rebuild-20260802'
     runs-on: ubuntu-latest
     steps:
       - name: Check out PR branch
@@ -66,11 +67,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -f .github/fix-temperature-boundary.trigger
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add \
             src/components/modals/AddProductModal.tsx \
             src/components/modals/EditProductModal.tsx \
-            src/lib/adapters/UniversalStorageBridge.ts
+            src/lib/adapters/UniversalStorageBridge.ts \
+            .github/fix-temperature-boundary.trigger
           git commit -m 'fix: normalize property temperatures at boundaries'
           git push origin HEAD:agent/data-compute-readme-rebuild-20260802
