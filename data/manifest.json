@@ -19,13 +19,13 @@
       },
       {
         "file": "schemas/resin-data-document.schema.json",
-        "bytes": 667,
-        "sha256": "9dae35f2286a423284d30dce09e5dfda2d9a2c7c028fc5f2d8f1087c6efcc00a"
+        "bytes": 805,
+        "sha256": "f8331df092da500f716f9da8d00e2ac2c56aa4c42e9c3895509446330eb24a8f"
       },
       {
         "file": "schemas/resin-product.schema.json",
-        "bytes": 1149,
-        "sha256": "f341fd1b890bfe8d05c4f914349a297f553e27720307ce81314f3333a882cfcc"
+        "bytes": 2189,
+        "sha256": "c75aa5ca6d569aea280130ea0543397de3883ad4c2b6736bdbe229da029bf34d"
       },
       {
         "file": "resins/manifest.json",

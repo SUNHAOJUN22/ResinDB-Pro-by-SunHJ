@@ -330,7 +330,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
              chartInstance.current = echarts.getInstanceByDom(chartRef.current) || echarts.init(chartRef.current);
          }
          
-         const data = simulationStats.kde.map((d: any) => [d.x, d.y]);
+         const data = simulationStats.kde.map((point) => [point.x, point.y]);
          
          chartInstance.current.setOption({
             backgroundColor: 'transparent',
@@ -338,8 +338,14 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                 trigger: 'axis',
                 
                  
-                formatter: (params: any) => {
-                    const x = params[0].value[0].toFixed(2);
+                formatter: (params: unknown) => {
+                    const first = Array.isArray(params) ? params[0] : null;
+                    const rawValue = first && typeof first === 'object' && 'value' in first
+                      ? (first as { value?: unknown }).value
+                      : null;
+                    const x = Array.isArray(rawValue) && typeof rawValue[0] === 'number'
+                      ? rawValue[0].toFixed(2)
+                      : '—';
                     return `Value: ${x}`;
                 }
             },

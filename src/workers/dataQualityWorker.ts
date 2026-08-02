@@ -69,12 +69,12 @@ export type QualityWorkerResponse =
   | { type: 'ERROR'; payload: { message: string } };
 
 // Simple parsing helper to extract numeric value safely
-function parseNumeric(val: any): { isNum: boolean; value: number } {
+function parseNumeric(val: unknown): { isNum: boolean; value: number } {
   if (val === undefined || val === null) return { isNum: false, value: 0 };
   const strVal = String(val).trim();
   if (strVal === '') return { isNum: false, value: 0 };
-  const parsed = parseFloat(strVal);
-  if (isNaN(parsed)) return { isNum: false, value: 0 };
+  const parsed = Number(strVal);
+  if (!Number.isFinite(parsed)) return { isNum: false, value: 0 };
   return { isNum: true, value: parsed };
 }
 

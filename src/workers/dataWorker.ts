@@ -5,6 +5,13 @@ import { calculateTopsis } from '@/lib/topsisAnalyzer';
 
 const formulaEngine = new FormulaEngine();
 
+function parseFiniteNumeric(value: unknown): number | null {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export type WorkerMessage = 
   | { type: 'INIT_DATA', payload: { allProducts: Product[], formulas: FormulaConfig[], columns: ColumnConfig[] } }
   | { type: 'QUERY', payload: { activeFilters: FilterItem[], sortConfig: SortConfig[], useTopsis?: boolean, detectAnomaliesKey?: string } };
@@ -75,8 +82,8 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
               if (col?.isComputed && col.formulaId) {
                  return formulaExecutor(item)[col.formulaId] || 0;
               }
-              const val = item.properties[key]?.value ?? (item as unknown as Record<string, unknown>)[key];
-              return typeof val === 'number' ? val : parseFloat(String(val));
+              const value = item.properties[key]?.value ?? (item as unknown as Record<string, unknown>)[key];
+              return parseFiniteNumeric(value);
            });
 
            sortedData = [...filteredData].sort((a, b) => {
@@ -160,10 +167,10 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
              } else {
                 v = p.properties[key]?.value ?? (p as unknown as Record<string, unknown>)[key];
              }
-             if (v !== undefined && v !== null && !isNaN(parseFloat(String(v)))) {
-                const num = parseFloat(String(v));
-                vals.push({ id: p.id, val: num });
-                sum += num;
+             const numeric = parseFiniteNumeric(v);
+             if (numeric !== null) {
+                vals.push({ id: p.id, val: numeric });
+                sum += numeric;
                 count++;
              }
           });

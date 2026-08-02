@@ -283,7 +283,7 @@ export const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({ products
               <select
                 aria-label="Severity Filter Selection"
                 value={severityFilter}
-                onChange={(e: any) => setSeverityFilter(e.target.value)}
+                onChange={(event) => setSeverityFilter(event.target.value as typeof severityFilter)}
                 className="px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none"
               >
                 <option value="all">All Deviation Profiles</option>
@@ -296,7 +296,7 @@ export const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({ products
               <select
                 aria-label="Missing Urgency Selection"
                 value={missingUrgencyFilter}
-                onChange={(e: any) => setMissingUrgencyFilter(e.target.value)}
+                onChange={(event) => setMissingUrgencyFilter(event.target.value as typeof missingUrgencyFilter)}
                 className="px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none"
               >
                 <option value="all">All Specifications</option>

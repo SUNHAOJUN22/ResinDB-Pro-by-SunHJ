@@ -6,7 +6,9 @@ import {
   validateDocument, loadResinDataCatalog,
 } from '@/data/resinData';
 
-const flatten=(nodes:any[]):any[]=>nodes.flatMap((node)=>[node,...flatten(node.children??[])]);
+type TaxonomyNode = { id: string; children?: TaxonomyNode[] };
+const flatten = (nodes: TaxonomyNode[]): TaxonomyNode[] =>
+  nodes.flatMap((node) => [node, ...flatten(node.children ?? [])]);
 
 describe('versioned resin data assets',()=>{
   it('loads a non-empty, acyclic taxonomy with unique ids',()=>{
@@ -32,7 +34,7 @@ describe('versioned resin data assets',()=>{
     const manifest = JSON.parse(await readFile('data/manifest.json','utf8'));
     expect(version.data.release).toBe('3.2.0');
     expect(manifest.data.release).toBe('3.2.0');
-    expect(manifest.data.assets.some((entry:any)=>entry.file==='resins/manifest.json')).toBe(true);
+    expect((manifest.data.assets as Array<{ file: string }>).some((entry) => entry.file === 'resins/manifest.json')).toBe(true);
   });
   it('reports a coherent deterministic fallback when runtime assets fail', async()=>{
     const failingFetch = (async()=>{ throw new Error('offline'); }) as typeof fetch;

@@ -535,16 +535,20 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
   /**
    * Inline editor updates inside Step 3 Verification Sandbox Table
    */
-  const handleUpdateParsedProduct = useCallback((id: string, updatedField: keyof Product, value: any) => {
-    setParsedProducts((prev) =>
-      prev.map((p) => {
-        if (p.id === id) {
-          return { ...p, [updatedField]: value };
-        }
-        return p;
-      })
-    );
-  }, []);
+  const handleUpdateParsedProduct = useCallback(
+    function updateParsedProduct<K extends keyof Product>(
+      id: string,
+      updatedField: K,
+      value: Product[K],
+    ) {
+      setParsedProducts((prev) =>
+        prev.map((product) => (
+          product.id === id ? { ...product, [updatedField]: value } : product
+        )),
+      );
+    },
+    [],
+  );
 
   const handleUpdateParsedProperty = useCallback((id: string, propKey: string, valStr: string) => {
     setParsedProducts((prev) =>

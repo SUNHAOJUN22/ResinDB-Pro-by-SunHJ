@@ -1,6 +1,0 @@
-schemaVersion: resindb-data-compute-readme-rebuild-trigger-1.0.0
-baseline: 1a1c46375a5487333b5e3396dd971880e162793f
-payloadTarSha256: 197ed80b5e7da26421092488b470a96b1b353ec7da9970c44da39e413b01ea09
-payloadBase64Sha256: 903b0ebae42d388ebb432ae820cd4e2508cad729856eda744f693192631b6652
-visualEvidenceArtifactId: 8829515833
-purpose: govern database contracts, audit compute/display surfaces, and rebuild README with eight real UI screenshots

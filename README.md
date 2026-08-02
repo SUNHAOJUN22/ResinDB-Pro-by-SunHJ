@@ -1,64 +1,130 @@
 # ResinDB Pro by SunHJ
 
 <p align="center">
-  <img src="docs/images/resindb-ai-platform-overview.svg" alt="ResinDB Pro 科研级树脂数据、科学计算、可视化、AI 辅助与质量门平台总览" width="100%" />
-</p>
-
-<p align="center">
   <a href="https://github.com/SUNHAOJUN22/ResinDB-Pro-by-SunHJ/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/SUNHAOJUN22/ResinDB-Pro-by-SunHJ/actions/workflows/ci.yml/badge.svg?branch=main" /></a>
   <img alt="Node.js 22" src="https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" />
   <img alt="TypeScript 5.8" src="https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white" />
   <img alt="Version 3.2.0" src="https://img.shields.io/badge/version-3.2.0-7C3AED" />
-  <img alt="Maintained branch main" src="https://img.shields.io/badge/maintained%20branch-main-0EA5E9" />
+  <img alt="Main branch" src="https://img.shields.io/badge/maintained%20branch-main-0EA5E9" />
 </p>
 
-**ResinDB Pro** 是面向合成树脂研究、数据治理、牌号比较和探索性数理分析的浏览器端材料信息平台。它把独立树脂数据资产、IndexedDB 工作区、科学 Web Worker、交互式图表、报告导出和可选 AI 辅助组织在一个可审计、可复现的系统中。
+> **version-3.2.0-governed-data-scientific-compute**
+> 面向合成树脂、聚合物牌号、实验数据、科学计算与科研绘图的浏览器端材料信息平台。
+
+ResinDB Pro 不是单纯的牌号表，也不是只负责“画几张图”的前端页面。它将以下能力放在同一套可审计工作流中：
+
+- **独立治理的树脂数据库**；
+- **科研与工程数值计算**；
+- **Web Worker / TypeScript / WASM 后端调度**；
+- **牌号筛选、对比、关联、可靠性、流变和优化分析**；
+- **真实浏览器证据、覆盖率、构建预算和依赖审计**。
 
 > [!IMPORTANT]
-> 本项目是科研与工程演示软件，不是经过认证的 LIMS、ERP、质量放行系统、制造商官方牌号库或法规判定系统。演示数据、统计模型、公式和 AI 输出必须由原始检测报告、标准方法及专业人员复核。
+> 本项目是科研与工程分析工具，不是经认证的 LIMS、ERP、法规判定或质量放行系统。演示数据、统计模型、外推结果和 AI 辅助内容必须回到原始测试报告、标准方法和专业判断中复核。
 
-## 核心价值
+---
 
-| 目标 | ResinDB Pro 的实现 | 质量边界 |
+## 1. 平台定位
+
+| 能力层 | ResinDB Pro 的实现 | 质量边界 |
 |---|---|---|
-| 数据不锁在 UI | 根目录 `data/` 是唯一权威树脂数据源，构建时生成 `/data/` 运行时资产 | React/TypeScript bundle 不含完整牌号目录 |
-| 数据可追溯 | 版本、来源类型、记录状态、Schema、字节数和 SHA-256 进入 manifest | demo、reference、measured、imported 明确区分 |
-| 分析不中断交互 | 流变、动力学、可靠性、统计和优化优先在 Worker 中执行 | 非有限值、超时和错误必须显式隔离 |
-| 图表可验证 | Dashboard、Analytics、Pivot、关系网络和牌号比较均有 Chromium smoke | 空状态、详情、交互节点和移动布局均纳入证据 |
-| AI 有边界 | AI 只在显式配置后参与解释、候选整理和研究辅助 | AI 不制造实验事实，不替代专业签核 |
-| 发布可审计 | docs、数据、源码、测试、覆盖率、构建、浏览器和依赖审计逐项门禁 | 不允许 `continue-on-error` 或降低测试标准 |
+| 数据层 | 独立 `data/` 目录、版本信封、Schema、manifest、SHA-256 | 数据不隐藏在 React bundle 中 |
+| 计算层 | 26 个 Worker/计算模块、TypeScript 内核、WASM 策略、后端证据 | 非有限值和不满足条件的输入必须显式失败 |
+| 科研图表 | 相关矩阵、KDE、Weibull、WLF、Copula、Arrhenius、Prony、Pareto 等 | 观测、拟合、代理和情景投影必须区分 |
+| 工作区 | IndexedDB、本地历史、筛选、对比、导入导出 | 本地存储不等于经过服务器治理的数据库 |
+| 验证层 | 单元/科学/Worker/Chromium/覆盖率/依赖审计 | 不允许用跳过测试换取“通过” |
 
-## 功能地图
+---
 
-- **树脂数据管理**：CRUD、批量编辑、分类、筛选、标签、快照、历史恢复和 IndexedDB 持久化。
-- **数据交换**：CSV、JSON、TXT 导入；CSV、JSON、XML、PDF 导出；解析和映射错误可见。
-- **材料分析**：Dashboard、Analytics、Pivot、牌号比较、相似度、TOPSIS、Pareto 和依赖网络。
-- **科学计算**：Carreau、WLF、Prony、Arrhenius、Kissinger、Avrami、Weibull、Monte Carlo、Sobol、Copula、KDE、Mahalanobis、K-Means、PCA、RSM、SPC 等。
-- **质量与反馈**：数据完整性、公式隔离、本地反馈队列、敏感字段脱敏和 JSON 诊断导出。
-- **国际化与可访问性**：中文/英文、明暗模式、多套配色、语义标签和键盘可操作控件。
+## 2. 真实界面证据
 
-## 外置树脂数据架构
+本 README 不再堆叠 22 张同质化 AI 示意图，只保留 **8 张由完整 Chromium CI 生成的真实界面截图**。
 
-<p align="center">
-  <img src="docs/images/resindb-data-lifecycle.svg" alt="树脂数据从独立文件、校验、归一化、浏览器工作区到分析和导出的生命周期" width="100%" />
-</p>
+### 2.1 中文材料数据工作区
 
-<p align="center">
-  <img src="docs/images/resindb-data-governance.svg" alt="树脂记录、参考目录、语义字典、Schema、版本和完整性清单组成的数据治理结构" width="100%" />
-</p>
+![ResinDB 中文数据工作区](docs/images/ui-dashboard-zh-light.png)
 
-`data/` 是唯一权威数据目录；`dist/data/` 是构建生成物并被 `.gitignore` 排除。应用通过运行时 `fetch` 读取 `/data/resins/*.json`，CI 同时核验根 manifest 及其列出的文件，而不是将完整 JSON 静态导入 JavaScript。
+### 2.2 英文暗色工作区
+
+![ResinDB English dark workspace](docs/images/ui-dashboard-en-dark.png)
+
+### 2.3 牌号详情、属性、来源与工程信息
+
+![ResinDB product detail](docs/images/ui-product-detail.png)
+
+### 2.4 科研分析与绘图工作区
+
+![ResinDB scientific analytics](docs/images/ui-scientific-analytics.png)
+
+### 2.5 流变代理与拟合边界
+
+![ResinDB rheology analysis](docs/images/ui-phase2l-rheology-proxy.png)
+
+### 2.6 公式依赖与局部扰动灵敏度
+
+![ResinDB dependency heatmap](docs/images/ui-phase2l-dependency-heatmap.png)
+
+### 2.7 K-Means 后端配置与审计
+
+![ResinDB K-Means profile audit](docs/images/ui-kmeans-profile-audit.png)
+
+### 2.8 当前设备的 K-Means 校准证据
+
+![ResinDB K-Means device calibration](docs/images/ui-kmeans-device-calibration.png)
+
+---
+
+## 3. 数据库：数据层与代码层分离
+
+### 3.1 为什么必须分离
+
+数据库内容不能因为修改组件、图表或计算函数而被隐式改写。因此 ResinDB Pro 规定：
+
+- `data/` 是权威数据层；
+- `src/` 是代码层；
+- `dist/data/` 是构建时复制的运行资产；
+- 任何数据字节变化都必须更新 manifest 和 SHA-256；
+- `demo`、`reference`、`measured`、`imported` 不能混为一种证据等级。
+
+### 3.2 标准保存格式
+
+权威保存格式为 **UTF-8 JSON + 版本化数据信封**：
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "dataKind": "resin-seed-products",
+  "sourceType": "curated-demo",
+  "recordStatus": "demo",
+  "updatedAt": "2026-08-02",
+  "data": []
+}
+```
+
+六个顶层字段是固定合同，未知字段会被 Schema 和 CI 拒绝。
+
+| 字段 | 含义 |
+|---|---|
+| `schemaVersion` | 数据结构兼容版本 |
+| `dataKind` | 数据集稳定语义标识 |
+| `sourceType` | 数据来源类型 |
+| `recordStatus` | demo / reference / measured / imported |
+| `updatedAt` | 真实 ISO 日期 |
+| `data` | 数据负载 |
+
+### 3.3 数据目录
 
 ```text
 data/
-├── manifest.json                         # 文件路径、类型、字节数、SHA-256
-├── metadata.json                         # 数据治理、来源、单位和使用边界
-├── version.json                          # 应用/数据/Schema 兼容版本
+├── manifest.json
+├── metadata.json
+├── version.json
 ├── schemas/
 │   ├── resin-data-document.schema.json
 │   └── resin-product.schema.json
 └── resins/
+    ├── manifest.json
     ├── polymerDatabase.json
     ├── myLabUniverse.json
     ├── openMarketUniverse.json
@@ -70,227 +136,391 @@ data/
     └── resin-network.json
 ```
 
-每个数据文档包含 `schemaVersion`、`dataKind`、`sourceType`、`recordStatus`、`updatedAt` 和 `data`。Loader 与 CI 检查重复 ID、分类环路、跨目录引用、字节数、SHA-256、记录结构以及非有限数值。详细合同见 [`docs/DATA_ARCHITECTURE.md`](docs/DATA_ARCHITECTURE.md)。
+详细合同见 [`docs/DATA_ARCHITECTURE.md`](docs/DATA_ARCHITECTURE.md)。
 
-## 科学分析体系
+### 3.4 属性不是“裸数字”
 
-<p align="center">
-  <img src="docs/images/resindb-scientific-engine.svg" alt="流变、动力学、可靠性、不确定度、多变量分析、优化和执行保护组成的科学计算引擎" width="100%" />
-</p>
+一个材料属性可以同时保存值、单位、标准、温度、仪器、来源和统计信息：
 
-<p align="center">
-  <img src="docs/images/resindb-worker-architecture.svg" alt="React 视图、Worker hook、生命周期管理、科学 Worker、结果保护和报告之间的执行架构" width="100%" />
-</p>
+```json
+{
+  "value": 23.5,
+  "unit": "MPa",
+  "standard": "ISO 527",
+  "temperature": 23,
+  "instrument": "Universal testing machine",
+  "referenceId": "ref-001",
+  "mean": 23.5,
+  "stdDev": 0.4,
+  "count": 5
+}
+```
 
-<p align="center">
-  <img src="docs/images/resindb-formula-engine.svg" alt="白名单公式引擎的分词、解析、变量绑定、短路求值和错误隔离流程" width="100%" />
-</p>
+当前标准标量类型为 **字符串或有限数值**。Boolean、`NaN`、`Infinity` 和错误日期会被拒绝，防止数据虽然“加载成功”却无法参与计算或显示。
 
-计算密集型任务通过懒加载视图和 Web Worker 减少主线程阻塞。白名单公式解析器支持算术、比较、`&&`、`||` 和短路求值，不使用 `eval` 或 `new Function`。有效输入必须返回有限结果；坏公式只能影响自身，不能破坏相邻计算。
+---
 
-## 聚合物结构与分子信息
+## 4. 计算架构
 
-<p align="center">
-  <img src="docs/images/resindb-structure-property.svg" alt="聚合物分子结构、相态形貌、加工历史、性能响应、模型推断和工程决策之间的结构性能关系" width="100%" />
-</p>
+```mermaid
+flowchart LR
+  DATA[Governed JSON data] --> VALIDATE[Schema + semantic validation]
+  VALIDATE --> UI[React workspace]
+  UI --> HOOK[Typed hook / task contract]
+  HOOK --> POOL[Worker pool]
+  POOL --> TS[TypeScript kernel]
+  POOL --> WASM[WASM kernel]
+  POOL --> FUTURE[WebGPU / edge capability route]
+  TS --> EVIDENCE[Result + algorithm evidence]
+  WASM --> EVIDENCE
+  FUTURE --> EVIDENCE
+  EVIDENCE --> CHART[Scientific chart / report]
+```
 
-<p align="center">
-  <img src="docs/images/resindb-molecular-analysis.svg" alt="重复单元、序列拓扑、链架构、分子量分布、添加剂和证据来源组成的分子结构分析框架" width="100%" />
-</p>
+计算结果不仅包含数值，还可包含：
 
-结构—性能图用于组织证据，而不是把邻接或相关性冒充因果关系。分子序列、支化、分子量分布、结晶和界面等描述必须保留方法、条件和来源。
+- task ID；
+- kernel 和算法版本；
+- 请求后端与实际后端；
+- 精度；
+- 输入形状；
+- 耗时；
+- fallback 状态；
+- 设备能力快照；
+- 可审计元数据。
 
-## 流变、热、力学与电学分析
+26 个 Worker/计算模块的输入、输出、公式、显示入口和科学边界见：
 
-<p align="center">
-  <img src="docs/images/resindb-rheology-model.svg" alt="测量条件、Carreau WLF Prony 模型、残差诊断、牌号比较和适用域复核组成的流变分析流程" width="100%" />
-</p>
+[`docs/compute-module-catalog.json`](docs/compute-module-catalog.json)
 
-<p align="center">
-  <img src="docs/images/resindb-thermal-analysis.svg" alt="热分析曲线、基线、转变参数、Arrhenius Kissinger Avrami 动力学和不确定度报告流程" width="100%" />
-</p>
+---
 
-<p align="center">
-  <img src="docs/images/resindb-mechanical-analysis.svg" alt="试样和测试条件、应力应变响应、统计分析、性能权衡和工程判定组成的力学分析流程" width="100%" />
-</p>
+## 5. 数理程式与代表性公式
 
-<p align="center">
-  <img src="docs/images/resindb-electrical-analysis.svg" alt="电场温度边界、介电导电空间电荷击穿数据、可靠性模型和工程复核组成的电性能分析流程" width="100%" />
-</p>
+### 5.1 线性最小二乘
 
-所有比较必须先确认单位、试验条件和适用范围。模型输出不自动替代标准试验，外推默认不被当作实测事实。
+$$
+\min_{\boldsymbol{x}}\|\mathbf{A}\boldsymbol{x}-\boldsymbol{b}\|_2^2
+$$
 
-## 多尺度模拟与 AI 材料研发
+系统提供 Householder QR，并在秩亏或病态情况下使用 Jacobi-SVD 伪逆回退，同时输出秩、条件数、奇异值和残差范数。
 
-<p align="center">
-  <img src="docs/images/resindb-multiscale-simulation.svg" alt="分子、介观、连续体和工艺尺度通过可追溯描述符连接的多尺度材料模拟体系" width="100%" />
-</p>
+### 5.2 有界非线性最小二乘
 
-<p align="center">
-  <img src="docs/images/resindb-ai-material-discovery.svg" alt="证据整理、描述符构建、AI候选生成、不确定度排序、实验设计和闭环学习组成的材料发现流程" width="100%" />
-</p>
+$$
+\min_{\boldsymbol{\theta}}\frac{1}{2}\|\boldsymbol{r}(\boldsymbol{\theta})\|_2^2
+$$
 
-<p align="center">
-  <img src="docs/images/resindb-ai-workflow.svg" alt="研究问题、证据选择、确定性计算、AI解释、反证检查和人工批准组成的分析闭环" width="100%" />
-</p>
+阻尼更新形式：
 
-AI 能力默认关闭，平台不内置强制供应商。推荐闭环是：定义问题与约束 → 选择证据 → 确定性计算 → AI 辅助解释或候选整理 → 不确定度与反证检查 → 实验验证 → 人工批准。
+$$
+(\mathbf{J}^{\mathsf T}\mathbf{J}+\lambda\mathbf{I})\Delta\boldsymbol{\theta}
+=-\mathbf{J}^{\mathsf T}\boldsymbol{r}
+$$
 
-## 树脂知识网络和决策支持
+支持解析 Jacobian，保留中心差分兼容回退，并对有界参数变换实施链式法则。
 
-<p align="center">
-  <img src="docs/images/resindb-knowledge-network.svg" alt="牌号与聚合物类别、物性、工艺、厂家、参考来源及相似牌号之间的可点击树脂知识网络" width="100%" />
-</p>
+### 5.3 Carreau–Yasuda 流变模型
 
-<p align="center">
-  <img src="docs/images/resindb-comparison-decision.svg" alt="候选牌号、单位归一化、图表、相似度、TOPSIS、Pareto和人工复核组成的决策支持流程" width="100%" />
-</p>
+$$
+\eta(\dot\gamma)=\eta_0
+\left[1+(\lambda\dot\gamma)^a\right]^{(n-1)/a}
+$$
 
-关系网络支持节点点击和详情反馈，但邻接关系不等于机理证据。比较模块保留原始值和缺失状态，同时提供归一化图表和多指标探索工具。
+用于剪切变稀流变拟合；当前求解器要求至少 5 个正有限观测值。
 
-## 本地优先、数据交换和部署边界
+### 5.4 WLF 时温等效
 
-<p align="center">
-  <img src="docs/images/resindb-local-first-privacy.svg" alt="浏览器本地数据与可选AI、远程REST和服务端治理之间的隐私边界" width="100%" />
-</p>
+$$
+\log_{10}a_T=-\frac{C_1(T-T_r)}{C_2+(T-T_r)}
+$$
 
-<p align="center">
-  <img src="docs/images/resindb-import-export.svg" alt="CSV JSON TXT 解析、字段映射、验证、编辑、图表和便携格式导出的数据交换流程" width="100%" />
-</p>
+当前合同是水平移动模型，不把未建模的垂直移动伪装成已拟合参数。
 
-<p align="center">
-  <img src="docs/images/resindb-security-deployment.svg" alt="浏览器应用、服务端网关、数据服务和运营治理组成的安全部署边界" width="100%" />
-</p>
+### 5.5 Arrhenius 热老化
 
-默认数据保存在当前浏览器 IndexedDB。所有 `VITE_*` 环境变量都会进入前端构建；生产密钥必须位于具备认证、授权、限流和审计的服务端网关。更多说明见 [`SECURITY.md`](SECURITY.md)。
+$$
+k=A\exp\left(-\frac{E_a}{RT}\right)
+$$
 
-## 科研工作流和质量门
+寿命线性化可写为：
 
-<p align="center">
-  <img src="docs/images/resindb-research-workflow.svg" alt="从材料问题定义、数据整理、模型分析、方案比较、报告导出到专业复核的科研工作流" width="100%" />
-</p>
+$$
+\ln t=C+\frac{E_a}{RT}
+$$
 
-<p align="center">
-  <img src="docs/images/resindb-quality-gates.svg" alt="文档、数据、生产源码、静态检查、回归测试、构建、浏览器UI和依赖审计组成的质量门" width="100%" />
-</p>
+输出属于 Arrhenius 假设下的外推，不等于实测服役寿命。
 
-完整质量门包括：数据 manifest 可复现、Schema 和语义校验、视觉资产确定性、源码卫生、ESLint、TypeScript、完整回归、科学 Worker、覆盖率、生产构建、外置数据哨兵、HTTP smoke、Chromium UI smoke 和全依赖高危审计。
+### 5.6 Kissinger 动力学
 
-## 快速开始
+$$
+\ln\left(\frac{\beta}{T_p^2}\right)
+=C-\frac{E_a}{RT_p}
+$$
 
-### 环境要求
+要求至少 3 组有效升温速率与峰温数据。
 
-- Node.js **22 LTS**
-- npm **10+**
-- Chromium-compatible browser（仅用于 UI smoke；PDF 报告由 Node.js 生成）
+### 5.7 Weibull 可靠性
+
+$$
+F(x)=1-\exp\left[-\left(\frac{x}{\eta}\right)^\beta\right]
+$$
+
+当前采用 Bernard 中位秩和二参数线性化估计，不把结果标成最大似然 MLE。
+
+### 5.8 Spearman 等级相关
+
+$$
+\rho_s=\operatorname{corr}(R_x,R_y)
+$$
+
+其中并列观测采用平均秩。常量特征的相关性按既有合同返回 0，并明确标记为不可定义，而不是错误返回 1。
+
+### 5.9 Gaussian Copula
+
+令
+
+$$
+u_i=\frac{R_i-0.5}{n},\qquad z_i=\Phi^{-1}(u_i)
+$$
+
+然后以 normal-score 相关系数构造 Gaussian Copula 密度：
+
+$$
+c(u,v;\rho)=\frac{1}{\sqrt{1-\rho^2}}
+\exp\left[
+-\frac{\rho^2(z_u^2+z_v^2)-2\rho z_u z_v}
+{2(1-\rho^2)}
+\right]
+$$
+
+这是相依结构模型，不是因果机制证明。
+
+### 5.10 Gaussian KDE
+
+一维精确直接估计：
+
+$$
+\hat f(x)=\frac{1}{nh\sqrt{2\pi}}
+\sum_{i=1}^{n}
+\exp\left[-\frac{(x-x_i)^2}{2h^2}\right]
+$$
+
+二维产品核：
+
+$$
+\hat f(x,y)=\frac{1}{nh_xh_y}
+\sum_{i=1}^{n}
+K\left(\frac{x-x_i}{h_x}\right)
+K\left(\frac{y-y_i}{h_y}\right)
+$$
+
+### 5.11 Mahalanobis 距离
+
+$$
+D_M^2=(\boldsymbol{x}-\boldsymbol{\mu})^{\mathsf T}
+\mathbf{S}^{-1}
+(\boldsymbol{x}-\boldsymbol{\mu})
+$$
+
+实现使用正则化协方差与 Cholesky 求解，避免为每个样本显式求逆。
+
+### 5.12 Gaussian Process
+
+$$
+f(\boldsymbol{x})\sim\mathcal{GP}
+\left(m(\boldsymbol{x}),k(\boldsymbol{x},\boldsymbol{x}')\right)
+$$
+
+RBF 核：
+
+$$
+k(\boldsymbol{x},\boldsymbol{x}')=
+\exp\left(-\frac{\|\boldsymbol{x}-\boldsymbol{x}'\|^2}{2\ell^2}\right)
+$$
+
+用于 Bayesian 逆向推荐与多目标候选生成，结果是待验证候选，不是实验事实。
+
+### 5.13 Bayesian Expected Improvement
+
+$$
+EI(\boldsymbol{x})=(\mu-f^*)\Phi(z)+\sigma\phi(z),
+\qquad
+z=\frac{\mu-f^*}{\sigma}
+$$
+
+### 5.14 Pareto 多目标优化
+
+若不存在另一个可行点在所有目标上不差且至少一个目标严格更优，则该点为非支配点。
+
+$$
+\nexists\boldsymbol{x}' :
+ f_i(\boldsymbol{x}')\preceq f_i(\boldsymbol{x})\;\forall i,
+\quad
+\exists j:f_j(\boldsymbol{x}')\prec f_j(\boldsymbol{x})
+$$
+
+### 5.15 Prony 黏弹性级数
+
+$$
+E(t)=E_\infty+
+\sum_{i=1}^{N}E_i\exp\left(-\frac{t}{\tau_i}\right)
+$$
+
+采用非负/正则化求解，输出松弛时间、系数和残差诊断。
+
+### 5.16 SPC 过程能力
+
+$$
+C_p=\frac{USL-LSL}{6\sigma}
+$$
+
+$$
+C_{pk}=\min\left(
+\frac{USL-\mu}{3\sigma},
+\frac{\mu-LSL}{3\sigma}
+\right)
+$$
+
+### 5.17 K-Means
+
+$$
+\min_{\{c_i\},\{\boldsymbol{\mu}_k\}}
+\sum_{i=1}^{n}
+\|\boldsymbol{x}_i-\boldsymbol{\mu}_{c_i}\|_2^2
+$$
+
+平台会记录 TypeScript/WASM 后端选择、设备校准、数值等价和实际运行证据。
+
+---
+
+## 6. 性能优化记录
+
+已完成的性能审查包括：
+
+| 热点 | 优化方式 | 保持不变的合同 |
+|---|---|---|
+| 非线性最小二乘 | 解析 Jacobian、工作缓冲区复用 | 目标函数与边界变换 |
+| Carreau–Yasuda | 解析导数、对数和公共量预计算 | 四参数模型 |
+| Gaussian Copula | 逆正态网格预计算、秩缓冲复用 | Copula 公式和网格 |
+| Prony / Mahalanobis | 迭代和三角求解工作区复用 | 拟合与距离定义 |
+| Gaussian Process | 预测对象、Cholesky 和 kernel scale 复用 | RBF GP 均值/方差 |
+| Similarity | 单矩阵原位标准化、延迟边对象分配 | Z-score 余弦相似度 |
+| Spearman | 平均秩索引复用、中心秩预计算 | 相关矩阵数值完全一致 |
+| Monte Carlo KDE | 固定核因子外提 | 精确直接 KDE |
+
+代表性验证中：
+
+- 有界非线性拟合残差函数调用：`31 → 7`；
+- Copula 逆正态调用在最大网格下：`39,800 → 199`；
+- Spearman `8,000 × 24` 夹具：约 `70.6 ms → 38.2 ms`，矩阵最大差为 0；
+- 直接 KDE `200,000 × 101` 夹具：约 `253.8 ms → 204.7 ms`，差异处于浮点重排量级。
+
+时间结果是特定环境下的方向性证据，不承诺所有设备固定倍数。
+
+---
+
+## 7. 计算函数与显示链路门禁
+
+`npm run validate:compute` 会永久检查：
+
+1. 26 个 Worker 是否全部进入计算目录；
+2. Worker 文件、hook 和显示入口是否存在；
+3. 科学模块是否有直接测试引用；
+4. 图表 ID 是否实际接入科研绘图工作区；
+5. 输入、输出、公式和科学边界是否有文字合同；
+6. `src/compute`、`src/workers`、`src/data` 是否残留显式 `any`；
+7. 审计结果是否写入 `artifacts/compute-surface-audit.json`。
+
+完整 A/B/C 级审查记录见：
+
+[`docs/COMPUTE_AND_DISPLAY_AUDIT.md`](docs/COMPUTE_AND_DISPLAY_AUDIT.md)
+
+---
+
+## 8. 本地运行
+
+### 环境
+
+- Windows 10/11 或 Linux
+- Node.js `>=22.12.0 <23`
+- npm 10+
+- Chromium-compatible browser（用于 UI smoke）
+
+### 安装与开发
 
 ```bash
-git clone https://github.com/SUNHAOJUN22/ResinDB-Pro-by-SunHJ.git
-cd ResinDB-Pro-by-SunHJ
 npm ci
 npm run dev
 ```
 
-默认开发地址为 `http://127.0.0.1:3000`。
-
-### 环境配置
+### 生产构建
 
 ```bash
-cp .env.example .env.local
+npm run build
+npm run preview
 ```
 
-| 变量 | 说明 |
-|---|---|
-| `VITE_BASE_PATH` | 部署子路径；默认 `/` |
-| `VITE_AI_API_ENDPOINT` | 完整 OpenAI-compatible chat-completions endpoint |
-| `VITE_AI_MODEL` | 服务端模型标识 |
-| `VITE_AI_API_KEY` | 仅限受限本地开发 token |
-| `VITE_DATABASE_ADAPTER_TYPE` | `indexeddb` 或 `remote_api` |
-| `VITE_REMOTE_API_BASE_URL` | 远程 REST 基础路径 |
+---
 
-远程写入失败不会静默回退到 IndexedDB，以免浏览器和服务器形成分叉数据库。
-
-## 开发与数据贡献
+## 9. 完整验证
 
 ```bash
-npm run data:manifest       # 重新计算全部数据资产 SHA-256
-npm run validate:data       # Schema/引用/ID/环路/哈希校验
-npm run visuals:bundle      # 有意修改 SVG 后刷新确定性资产包
-npm run visuals:generate    # 从资产包恢复 22 张科研功能 SVG
-npm run visuals:check       # 字节级确定性复核
-```
-
-新增实测或导入记录时必须明确来源、单位、测试方法、条件、记录状态和复核状态。不得把 demo 数据改名后冒充厂家规格或实测结果。
-
-## 自动测试
-
-```bash
-npm ci
+npm run validate:data
 npm run validate:docs
 npm run validate:source
-npm run validate:data
+npm run validate:compute
+npm run validate:scientific-ui
 npm run lint
 npm run typecheck
 npm run test
 npm run test:unit
 npm run test:science
 npm run test:coverage
+npm run benchmark:kmeans:smoke
 npm run build
 npm run smoke
 npm run test:ui
 npm run audit:all
 ```
 
-一键完整验证：
+永久 CI 检查：
 
-```bash
-npm run validate:ci
-```
+- 数据 Schema、manifest、字节数、SHA-256 和跨文件引用；
+- 计算函数与显示链路目录；
+- 科研图表科学边界；
+- ESLint、TypeScript、回归和 Worker 测试；
+- 全生产源码覆盖率；
+- 构建预算和外置数据证明；
+- HTTP 与 Chromium 真实交互；
+- 生产依赖与完整依赖高危审计；
+- 包含 `data/`、`docs/`、README、源码和测试的确定性 exact-tree 归档。
 
-CI 还会证明远程分支仅为 `main`，上传 Coverage、真实 Chromium PNG、HTML Dashboard、PDF 图像报告和机器可读验证收据。详细验收合同见 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
+---
 
-## AI 生成科研图像体系
+## 10. 安全与科学边界
 
-README 中 **22 张**科研功能图由 `scripts/generate-readme-visuals.mjs` 从经过 SHA-256 固化的 Node.js 视觉资产包确定性恢复并纳入 CI。它们使用同一 SVG 线性图标、8-point 间距、可访问标题/描述、语义色和科研软件信息层级。图像集中保存在 `docs/images/`，不散落在源码或仓库根目录。
+- 浏览器 `VITE_*` 变量不是密钥存储方案；
+- 生产密钥必须位于服务端网关；
+- 相似度不等于化学等价；
+- 相关性和局部灵敏度不等于因果；
+- 规则生成代理不等于实测数据；
+- 情景带不等于置信区间；
+- 外推结果不等于实际服役保证；
+- AI 输出不得制造实验事实。
 
-完整视觉合同见 [`docs/README_VISUAL_DESIGN_SYSTEM.md`](docs/README_VISUAL_DESIGN_SYSTEM.md)。这些图是架构和科学流程示意，不冒充真实实验显微图或运行截图；真实 UI 截图由 Chromium 自动化生成。
+安全说明见 [`SECURITY.md`](SECURITY.md)。
 
-## 项目结构
+---
 
-```text
-.
-├── .github/workflows/ci.yml
-├── data/                         # 唯一权威树脂数据源
-├── docs/
-│   ├── DATA_ARCHITECTURE.md
-│   ├── README_VISUAL_DESIGN_SYSTEM.md
-│   ├── VALIDATION.md
-│   └── images/                   # 22 张确定性科研 SVG
-├── scripts/                      # 数据、视觉、测试、指标和报告工具
-├── src/
-│   ├── components/
-│   ├── contexts/
-│   ├── data/resinData.ts         # 运行时 loader；不含 JSON 目录
-│   ├── hooks/
-│   ├── lib/
-│   ├── services/
-│   └── workers/
-├── tests/
-│   ├── science/
-│   └── unit/
-├── FINAL_CODE_AUDIT.md
-├── package.json
-└── vite.config.ts
-```
+## 11. 总结
 
-## Roadmap
+ResinDB Pro 的核心不是“图多”，而是：
 
-- 服务端身份、RBAC、审计日志和受控数据发布工作流。
-- 仪器数据连接、单位本体和标准方法模板。
-- 更大规模目录的分页 API、索引和增量缓存。
-- 模型适用域、参数溯源和不确定度可视化增强。
-- 可签名、可归档的科研证据包和组织级质量流程。
+1. 数据以独立、版本化、可校验格式保存；
+2. 数理程式具有明确输入、输出、公式和科学边界；
+3. 计算在 Worker/后端体系中执行并产生证据；
+4. 图表展示使用真实浏览器验证；
+5. README、数据、代码和 CI 保持同一套可审计合同。
 
-## 分支与发布策略
-
-唯一长期维护分支为 **`main`**。CI 在 `main` push 时拒绝存在额外远程分支。正式发布只有在当前候选树的全部门禁真实通过后才可标记为成功；历史组合证据不能替代新鲜的最终树验证。
+这使项目能够作为一个真正的 **树脂/聚合物材料数据库与科学计算工作站** 持续演进，而不是依赖静态演示图维持表面完整性。
