@@ -1,14 +1,14 @@
 import type { Category, Manufacturer, Product, Reference } from '@/types/index';
 import type { MaterialRecord } from '@/lib/adapters/types';
+import {
+  isNonEmptyString,
+  isProductRecord,
+  isRecord,
+  validateVersionedDataDocument,
+  type VersionedDataDocument,
+} from './dataContract';
 
-export interface VersionedDataDocument<T> {
-  schemaVersion: string;
-  dataKind: string;
-  sourceType: string;
-  recordStatus: 'demo' | 'reference' | 'measured' | 'imported';
-  updatedAt: string;
-  data: T;
-}
+export type { VersionedDataDocument } from './dataContract';
 
 export interface ResinNetworkNode {
   id: string;
@@ -42,37 +42,21 @@ export interface ResinDataCatalog {
   categoryAliases: CategoryAlias[];
 }
 
-const EXPECTED_SCHEMA = '1.0.0';
 const NORMALIZED_BASE_URL = `${import.meta.env.BASE_URL.replace(/\/?$/, '/') }data/resins`;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 export function validateDocument<T>(
   raw: unknown,
   kind: string,
   validateData: (value: unknown) => value is T,
 ): VersionedDataDocument<T> {
-  if (
-    !isRecord(raw) ||
-    raw.schemaVersion !== EXPECTED_SCHEMA ||
-    raw.dataKind !== kind ||
-    typeof raw.sourceType !== 'string' ||
-    typeof raw.updatedAt !== 'string' ||
-    !['demo', 'reference', 'measured', 'imported'].includes(String(raw.recordStatus)) ||
-    !validateData(raw.data)
-  ) {
-    throw new Error(`Invalid or unsupported ResinDB data document: ${kind}`);
-  }
-  return raw as unknown as VersionedDataDocument<T>;
+  return validateVersionedDataDocument(raw, kind, validateData);
 }
 
 const isArray = (value: unknown): value is unknown[] => Array.isArray(value);
 const isCategoryArray = (value: unknown): value is Category[] =>
-  Array.isArray(value) && value.every((item) => isRecord(item) && typeof item.id === 'string' && typeof item.name === 'string');
+  Array.isArray(value) && value.every((item) => isRecord(item) && isNonEmptyString(item.id) && isNonEmptyString(item.name));
 const isProductArray = (value: unknown): value is Product[] =>
-  Array.isArray(value) && value.every((item) => isRecord(item) && typeof item.id === 'string' && typeof item.gradeName === 'string' && Array.isArray(item.categoryIds) && isRecord(item.properties));
+  Array.isArray(value) && value.every(isProductRecord);
 const isMaterialRecordArray = (value: unknown): value is MaterialRecord[] =>
   Array.isArray(value) && value.every((item) => isRecord(item) && typeof item.id === 'string' && typeof item.grade === 'string' && isRecord(item.properties));
 
@@ -161,8 +145,8 @@ export async function loadResinDataCatalog(
   ] = await Promise.all([
     load('resin-taxonomy.json', 'resin-taxonomy', isCategoryArray, fallbackCategoryTree),
     load('resin-property-groups.json', 'resin-property-groups', (value): value is Record<string, string[]> => isRecord(value) && Object.values(value).every((entry) => Array.isArray(entry) && entry.every((item) => typeof item === 'string')), {}),
-    load('resin-manufacturers.json', 'resin-manufacturers', (value): value is Manufacturer[] => Array.isArray(value) && value.every((item) => isRecord(item) && typeof item.id === 'string' && typeof item.name === 'string'), []),
-    load('resin-references.json', 'resin-references', (value): value is Reference[] => Array.isArray(value) && value.every((item) => isRecord(item) && typeof item.id === 'string' && typeof item.name === 'string'), []),
+    load('resin-manufacturers.json', 'resin-manufacturers', (value): value is Manufacturer[] => Array.isArray(value) && value.every((item) => isRecord(item) && isNonEmptyString(item.id) && isNonEmptyString(item.name)), []),
+    load('resin-references.json', 'resin-references', (value): value is Reference[] => Array.isArray(value) && value.every((item) => isRecord(item) && isNonEmptyString(item.id) && isNonEmptyString(item.name)), []),
     load('polymerDatabase.json', 'resin-seed-products', isProductArray, fallbackProducts),
     load('myLabUniverse.json', 'laboratory-material-records', isMaterialRecordArray, []),
     load('openMarketUniverse.json', 'market-material-records', isMaterialRecordArray, []),

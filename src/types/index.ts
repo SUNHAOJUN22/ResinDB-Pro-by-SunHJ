@@ -36,7 +36,7 @@ export interface PropertyValue {
   unit?: string;
   // 二维描述扩展
   standard?: string;    // 测试标准
-  temperature?: string; // 测试温度
+  temperature?: string | number; // 测试温度
   referenceId?: string; // 参考文献ID (Data Source)
   instrument?: string;  // 来源仪器/设备 (Source Machine)
   sourceUrl?: string;   // 来源链接 (Website Link)
@@ -92,7 +92,7 @@ export interface TemplateParameter {
   key: string;
   label: string;
   type: 'number' | 'text';
-  defaultValue: any;
+  defaultValue: string | number;
   placeholder?: string;
   unit?: string;
   description?: string;

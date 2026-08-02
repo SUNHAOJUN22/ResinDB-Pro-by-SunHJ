@@ -23,6 +23,15 @@ import {
   ArrowDownRight
 } from 'lucide-react';
 
+
+interface CapacityStreamPoint {
+  name: string;
+  historical: number | null;
+  projected: number | null;
+  lower: number;
+  upper: number;
+}
+
 export const ResinCapacityForecast: React.FC = () => {
   const { allProducts, selectedIds, categoryNameMap } = useData();
   const { language } = useLanguage();
@@ -234,7 +243,7 @@ export const ResinCapacityForecast: React.FC = () => {
     }
 
     // Combine historical and projected timelines
-    const finalStream: any[] = [];
+    const finalStream: CapacityStreamPoint[] = [];
     historicalPoints.forEach(p => {
       finalStream.push({
         name: p.dateStr,

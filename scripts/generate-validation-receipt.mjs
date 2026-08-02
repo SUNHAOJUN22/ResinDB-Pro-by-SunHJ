@@ -23,6 +23,8 @@ const [
   ciGates,
   context,
   kmeansBenchmark,
+  computeSurfaceAudit,
+  scientificUiAudit,
 ] = await Promise.all([
   readJson('test-results.json'),
   readJson('coverage-summary.json'),
@@ -33,6 +35,8 @@ const [
   readJson('ci-gates.json'),
   readJson('ci-context.json', { sha: 'local-worktree', repository: 'local' }),
   readJson('kmeans-backend-benchmark.json'),
+  readJson('compute-surface-audit.json'),
+  readJson('scientific-ui-audit.json'),
 ]);
 
 let branchProof = '';
@@ -70,6 +74,10 @@ const checks = {
   externalData: Number(build?.externalResinDataBytes ?? 0) > 0,
   uiEvidence: screenshotChecks.length >= 7 && screenshotChecks.every((entry) => entry.exists),
   kmeansBenchmarkEvidence: validKMeansBenchmark(kmeansBenchmark),
+  computeSurface: computeSurfaceAudit?.acceptance === 'PASS'
+    && computeSurfaceAudit?.catalogModules === computeSurfaceAudit?.workerFiles
+    && computeSurfaceAudit?.workerFiles >= 26,
+  scientificUi: scientificUiAudit?.acceptance === 'PASS',
   productionAudit: noHighAuditFindings(prodAudit),
   completeAudit: noHighAuditFindings(fullAudit),
   singleMainBranch: branchProof.split(/\r?\n/).filter(Boolean).length === 1 && /refs\/heads\/main$/.test(branchProof),
@@ -100,6 +108,17 @@ const receipt = {
     echartsBytes: build.echarts?.bytes,
     echartsBudgetBytes: build.budgets?.echartsRawBytes,
     externalResinDataBytes: build.externalResinDataBytes,
+  } : null,
+  computeSurface: computeSurfaceAudit ? {
+    acceptance: computeSurfaceAudit.acceptance,
+    catalogModules: computeSurfaceAudit.catalogModules,
+    workerFiles: computeSurfaceAudit.workerFiles,
+    chartMappedModules: computeSurfaceAudit.chartMappedModules,
+  } : null,
+  scientificUi: scientificUiAudit ? {
+    acceptance: scientificUiAudit.acceptance,
+    chartFiles: scientificUiAudit.chartFiles,
+    directEchartsInitFiles: scientificUiAudit.directEchartsInitFiles,
   } : null,
   kmeansBenchmark: kmeansBenchmark ? {
     schemaVersion: kmeansBenchmark.schemaVersion,

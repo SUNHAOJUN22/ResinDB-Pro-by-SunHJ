@@ -1,12 +1,10 @@
 import { spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const root = resolve(import.meta.dirname, '../..')
 const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
-const bundle = JSON.parse(readFileSync(resolve(root, 'scripts/readme-visuals.bundle.json'), 'utf8'))
 
 describe('stage-one Node-only tooling', () => {
   it('contains no Python scripts', () => {
@@ -14,25 +12,38 @@ describe('stage-one Node-only tooling', () => {
     expect(pythonFiles).toEqual([])
   })
 
-  it('uses Node.js for all migrated package commands', () => {
+  it('uses Node.js for the governed validation commands', () => {
     expect(packageJson.scripts).toMatchObject({
-      'visuals:bundle': 'node scripts/bundle-readme-visuals.mjs',
-      'visuals:generate': 'node scripts/generate-readme-visuals.mjs',
-      'visuals:check': 'node scripts/generate-readme-visuals.mjs --check',
       'validate:docs': 'node scripts/validate-repository-docs.mjs',
       'validate:source': 'node scripts/validate-source-hygiene.mjs',
+      'validate:compute': 'node scripts/validate-compute-surface.mjs',
+      'validate:data': 'node scripts/validate-data.mjs',
+      'report:pdf': 'node scripts/generate-validation-pdf.mjs',
     })
+    expect(packageJson.scripts['visuals:bundle']).toBeUndefined()
+    expect(packageJson.scripts['visuals:generate']).toBeUndefined()
+    expect(packageJson.scripts['visuals:check']).toBeUndefined()
   })
 
-  it('pins all 22 visual assets by size and SHA-256', () => {
-    expect(bundle.fileCount).toBe(22)
-    expect(Object.keys(bundle.files)).toHaveLength(22)
-    for (const [name, metadata] of Object.entries<any>(bundle.files)) {
-      const path = resolve(root, 'docs/images', name)
-      expect(existsSync(path)).toBe(true)
-      const content = readFileSync(path)
-      expect(content.length).toBe(metadata.size)
-      expect(createHash('sha256').update(content).digest('hex')).toBe(metadata.sha256)
+  it('uses eight real UI screenshots and no synthetic visual generator inventory', () => {
+    const imageDirectory = resolve(root, 'docs/images')
+    const screenshots = readdirSync(imageDirectory)
+      .filter((name) => /^ui-.*\.png$/.test(name))
+      .sort()
+    const syntheticVisuals = readdirSync(imageDirectory)
+      .filter((name) => /^resindb-.*\.svg$/.test(name))
+    const readme = readFileSync(resolve(root, 'README.md'), 'utf8')
+
+    expect(screenshots).toHaveLength(8)
+    expect(screenshots.length).toBeLessThanOrEqual(10)
+    expect(syntheticVisuals).toEqual([])
+    expect(existsSync(resolve(root, 'scripts/readme-visuals.bundle.json'))).toBe(false)
+    expect(existsSync(resolve(root, 'scripts/generate-readme-visuals.mjs'))).toBe(false)
+    expect(existsSync(resolve(root, 'scripts/bundle-readme-visuals.mjs'))).toBe(false)
+
+    for (const screenshot of screenshots) {
+      expect(statSync(resolve(imageDirectory, screenshot)).size).toBeGreaterThan(20_000)
+      expect(readme).toContain(`docs/images/${screenshot}`)
     }
   })
 
