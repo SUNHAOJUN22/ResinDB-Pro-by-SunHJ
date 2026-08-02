@@ -76,7 +76,7 @@ describe('deterministic NIPALS PCA', () => {
 
   it('returns a finite zero projection for a single valid observation', () => {
     const result = PCA.getComponents([[4, 8]], 2);
-    expect(result).toEqual({ projected: [[]], loadingVectors: [] });
+    expect(result).toEqual({ projected: [[0, 0]], loadingVectors: [] });
   });
 
   it('keeps empty and entirely invalid inputs explicit', () => {
