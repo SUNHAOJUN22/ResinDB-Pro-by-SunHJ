@@ -1,7 +1,7 @@
 name: One-time pass8 main controller through registered CI path
 
 on:
-  push:
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   apply-pass8:
-    if: contains(github.event.head_commit.message, 'run pass8 main controller')
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'agent/material-statistics-polymer-physics-20260805'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -33,7 +33,7 @@ jobs:
           token: ${{ github.token }}
           path: candidate
 
-      - name: Decode, verify and apply pass8 to candidate
+      - name: Decode, verify and commit pass8 candidate locally
         shell: bash
         run: |
           set -euo pipefail
@@ -143,13 +143,11 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'fix: harden material statistics and polymer physics'
-          git push origin HEAD:agent/material-statistics-polymer-physics-20260805
 
-      - name: Restore permanent CI and remove main controller files
+      - name: Restore permanent main CI before candidate synchronization
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf candidate
           git show 9f3e317abd39dec8f134236ccf07296b2c6cdf5e:.github/workflows/ci.yml > .github/workflows/ci.yml
           rm -f .github/workflows/one-time-pass8-branch-apply.yml
           rm -f .github/run-pass8-branch-apply.trigger
@@ -159,3 +157,10 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'chore: remove pass8 main controller'
           git push origin HEAD:main
+
+      - name: Push clean pass8 candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd candidate
+          git push origin HEAD:agent/material-statistics-polymer-physics-20260805
