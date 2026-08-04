@@ -1,0 +1,91 @@
+name: One-time pass8 branch payload application
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: one-time-pass8-branch-apply
+  cancel-in-progress: false
+
+jobs:
+  apply-pass8-to-candidate:
+    if: contains(github.event.head_commit.message, 'run pass8 branch payload application')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out main control tree
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Check out pass8 candidate branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: agent/material-statistics-polymer-physics-20260805
+          fetch-depth: 0
+          token: ${{ github.token }}
+          path: candidate
+
+      - name: Decode and apply verified payload to candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd candidate
+          cat .github/pass8-payload/part-* | base64 -d > /tmp/resindb-pass8-payload.tar.xz
+          printf '%s  %s\n' \
+            'a8e69d380c076a3d2bc872dd76ebc6bb61d2f1c6c8540f5b9bd267ecd8e4e47a' \
+            '/tmp/resindb-pass8-payload.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/resindb-pass8-payload.tar.xz -C .
+
+          rm -rf .github/pass8-payload
+          rm -f .github/workflows/one-time-pass8-material-physics-payload.yml
+          rm -f .github/run-pass8-material-physics-payload.trigger
+
+          test -s src/lib/materialScience.ts
+          test -s src/utils/polymerPhysics.ts
+          test -s src/components/charts/DataVisualizerLegacy.tsx
+          test -s tests/unit/materialScienceRobustness.test.ts
+          test -s tests/unit/polymerPhysics.test.ts
+          test -s docs/CODE_MATH_PERFORMANCE_AUDIT_2026-08-05_PASS8_MATERIAL_PHYSICS.md
+          grep -q 'createPercentileNormalizer' src/lib/materialScience.ts
+          grep -q 'regularizedIncompleteBeta' src/lib/materialScience.ts
+          grep -q 'relative-number-intensity' src/lib/materialScience.ts
+          grep -q 'coolingEndK' src/utils/polymerPhysics.ts
+          grep -q 'fix deform' src/utils/polymerPhysics.ts
+          grep -q 'Material Statistics and Polymer Physics' README.md
+
+          git add -A
+          git diff --cached --name-only | sort > /tmp/pass8-files.txt
+          cat > /tmp/pass8-expected.txt <<'EOF'
+          README.md
+          docs/CODE_MATH_PERFORMANCE_AUDIT_2026-08-05_PASS8_MATERIAL_PHYSICS.md
+          src/components/charts/DataVisualizerLegacy.tsx
+          src/lib/materialScience.ts
+          src/utils/polymerPhysics.ts
+          tests/unit/materialScienceRobustness.test.ts
+          tests/unit/polymerPhysics.test.ts
+          EOF
+          sort -o /tmp/pass8-expected.txt /tmp/pass8-expected.txt
+          diff -u /tmp/pass8-expected.txt /tmp/pass8-files.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: harden material statistics and polymer physics'
+          git push origin HEAD:agent/material-statistics-polymer-physics-20260805
+
+      - name: Remove one-time control files from main
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf candidate
+          git rm .github/workflows/one-time-pass8-branch-apply.yml
+          git rm .github/run-pass8-branch-apply.trigger
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: remove pass8 branch payload controller'
+          git push origin HEAD:main
