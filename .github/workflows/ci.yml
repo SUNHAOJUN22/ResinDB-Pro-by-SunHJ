@@ -3,6 +3,7 @@ name: One-time pass8 main controller through registered CI path
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
