@@ -1,0 +1,71 @@
+name: One-time Pass 9 finite aggregation delivery
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: >-
+      github.event.issue.number == 34 &&
+      github.event.comment.body == '/apply-pass9-finite-aggregation-383d4584'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Verify transport and apply reviewed tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_head='b78c20f15897cdcc7355553fefd7326c9d86d15f'
+          expected_payload='383d4584f76911fda5ed866c0b906d5a2fd07458c88917b63a6e434b3256dc03'
+          test "$(git rev-parse HEAD)" = "$expected_head"
+          cat .github/pass9-delivery/chunk-*.txt > /tmp/pass9.tar.gz.b64
+          base64 --decode /tmp/pass9.tar.gz.b64 > /tmp/pass9.tar.gz
+          echo "${expected_payload}  /tmp/pass9.tar.gz" | sha256sum --check --strict
+          tar -xzf /tmp/pass9.tar.gz -C .
+
+          node scripts/validate-source-hygiene.mjs
+          node scripts/validate-repository-docs.mjs
+          node scripts/validate-compute-surface.mjs
+          node scripts/validate-data.mjs
+
+          node --experimental-strip-types --input-type=module <<'NODE'
+          import { summarizeFinite } from './src/lib/numericAggregation.ts'
+          const cancellation = summarizeFinite([1e16, 1, -1e16])
+          if (!cancellation || cancellation.sum !== 1) throw new Error('Compensated sum contract failed')
+          function* millionValues() {
+            for (let i = 0; i < 1_000_000; i += 1) yield i - 500_000
+          }
+          const summary = summarizeFinite(millionValues())
+          if (!summary || summary.count !== 1_000_000 || summary.min !== -500_000 || summary.max !== 499_999) {
+            throw new Error('Million-value finite aggregation contract failed')
+          }
+          console.log(JSON.stringify({ cancellation, million: summary }))
+          NODE
+
+          if grep -R -n -E 'Math\.(min|max)\([[:space:]]*\.\.\.' src; then
+            echo 'Variadic array extrema remain in production source' >&2
+            exit 1
+          fi
+
+      - name: Commit production code and remove controller residue
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .github/pass9-delivery
+          git rm .github/workflows/one-time-pass9-finite-aggregation.yml
+          git add README.md docs scripts src tests
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: harden finite aggregation across production paths'
+          git push origin HEAD:main
