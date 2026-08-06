@@ -1,167 +1,295 @@
-name: One-time pass8 main controller through registered CI path
+name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, closed]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  statuses: write
 
 concurrency:
-  group: one-time-pass8-main-controller
-  cancel-in-progress: false
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  apply-pass8:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'agent/material-statistics-polymer-physics-20260805'
+  validate:
+    name: Exact-tree validation, browser evidence and reports
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 75
     steps:
-      - name: Check out main controller tree
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install exact dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > /tmp/npm-ci.log
+          cp package.json /tmp/resindb-package-exact.json
+          cp package-lock.json /tmp/resindb-package-lock-exact.json
+          restore_manifests() {
+            cp /tmp/resindb-package-exact.json package.json
+            cp /tmp/resindb-package-lock-exact.json package-lock.json
+          }
+          trap restore_manifests EXIT
+          node scripts/prepare-ci-manifest.mjs | tee /tmp/ci-manifest-normalization.json
+          for registry in https://registry.npmjs.org https://registry.npmmirror.com; do
+            for attempt in 1 2 3; do
+              printf '\nregistry=%s attempt=%s\n' "$registry" "$attempt" | tee -a /tmp/npm-ci.log
+              if npm ci --registry="$registry" >> /tmp/npm-ci.log 2>&1; then
+                restore_manifests
+                trap - EXIT
+                cat /tmp/ci-manifest-normalization.json
+                cat /tmp/npm-ci.log
+                exit 0
+              fi
+              tail -n 200 /tmp/npm-ci.log
+              sleep $((attempt * 10))
+            done
+          done
+          exit 1
+
+      - name: Upload npm diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: npm-ci-diagnostics-${{ github.sha }}
+          path: |
+            /tmp/npm-ci.log
+            /tmp/ci-manifest-normalization.json
+          retention-days: 5
+
+      - name: Documentation and deterministic scientific visuals
+        run: npm run validate:docs
+      - name: Production source hygiene
+        run: npm run validate:source
+      - name: Governed external data
+        run: npm run validate:data
+      - name: Compute functions and display-chain governance
+        run: npm run validate:compute
+      - name: Scientific UI and figure semantics
+        run: npm run validate:scientific-ui
+      - name: ESLint
+        run: npm run lint
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Deterministic K-Means backend benchmark smoke
+        run: npm run benchmark:kmeans:smoke
+      - name: Complete regression tests
+        run: npm test
+      - name: Isolated unit tests
+        run: npm run test:unit
+      - name: Isolated scientific and worker tests
+        run: npm run test:science
+      - name: Whole-production-source coverage
+        run: npm run test:coverage
+      - name: Production build and external-data proof
+        run: npm run build
+      - name: HTTP production smoke
+        run: npm run smoke
+      - name: Chromium interactive UI smoke
+        run: npm run test:ui
+
+      - name: Production dependency audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          set +e
+          npm audit --omit=dev --audit-level=high --json > artifacts/npm-audit-prod.json
+          code=$?
+          set -e
+          jq '.metadata.vulnerabilities' artifacts/npm-audit-prod.json
+          exit "$code"
+
+      - name: Complete dependency audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          npm audit --audit-level=high --json > artifacts/npm-audit-all.json
+          code=$?
+          set -e
+          jq '.metadata.vulnerabilities' artifacts/npm-audit-all.json
+          exit "$code"
+
+      - name: Record dependency freshness
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          set +e
+          npm outdated --json > artifacts/npm-outdated.json
+          code=$?
+          set -e
+          if [ ! -s artifacts/npm-outdated.json ]; then printf '{}\n' > artifacts/npm-outdated.json; fi
+          printf '%s\n' "$code" > artifacts/npm-outdated-exit-code.txt
+          jq . artifacts/npm-outdated.json
+
+      - name: Prove main is the sole remote branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-remote --heads origin | tee artifacts/branch-proof.txt
+          test "$(wc -l < artifacts/branch-proof.txt | tr -d ' ')" -eq 1
+          test "$(grep -c 'refs/heads/main$' artifacts/branch-proof.txt || true)" -eq 1
+
+      - name: Bundle deterministic exact tracked tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          git ls-files -z \
+            | LC_ALL=C sort -z \
+            | tar --null --verbatim-files-from --files-from=- \
+                --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 \
+                --numeric-owner --mode='u+rwX,go+rX,go-w' \
+                -czf artifacts/exact-source-tree.tar.gz
+          sha256sum artifacts/exact-source-tree.tar.gz | tee artifacts/exact-source-tree.sha256
+          test "$(stat -c%s artifacts/exact-source-tree.tar.gz)" -gt 100000
+
+      - name: Write exact-tree context and passed core gates
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const tests = JSON.parse(fs.readFileSync('artifacts/test-results.json', 'utf8'));
+          const gates = [
+            'docs',
+            'source-hygiene',
+            'governed-data',
+            'compute-surface',
+            'scientific-ui',
+            'lint',
+            'typescript',
+            'regression',
+            'isolated-unit',
+            'isolated-science-workers',
+            'whole-source-coverage',
+            'build',
+            'http-smoke',
+            'chromium-ui',
+            'production-audit',
+            'complete-audit',
+            'deterministic-exact-tracked-tree',
+          ];
+          if (process.env.GITHUB_EVENT_NAME === 'push' && process.env.GITHUB_REF === 'refs/heads/main') {
+            gates.push('single-main-branch');
+          }
+          const context = {
+            schemaVersion: 3,
+            repository: process.env.GITHUB_REPOSITORY,
+            sha: process.env.GITHUB_SHA,
+            ref: process.env.GITHUB_REF,
+            runId: Number(process.env.GITHUB_RUN_ID),
+            runAttempt: Number(process.env.GITHUB_RUN_ATTEMPT),
+            testFiles: tests.testResults.length,
+            testCount: tests.numTotalTests,
+            generatedAt: new Date().toISOString(),
+          };
+          fs.writeFileSync('artifacts/ci-context.json', `${JSON.stringify(context, null, 2)}\n`);
+          fs.writeFileSync('artifacts/ci-gates.json', `${JSON.stringify({
+            schemaVersion: 1,
+            status: 'PASS',
+            gates,
+          }, null, 2)}\n`);
+          NODE
+
+      - name: Generate exact-tree validation receipt
+        run: npm run report:receipt
+      - name: Generate HTML and Markdown validation reports
+        run: npm run report:validation
+      - name: Generate PDF image report
+        run: npm run report:pdf
+
+      - name: Render PDF for visual acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          pdf='artifacts/ResinDB-Pro-3.2.0-Final-Validation-Report.pdf'
+          test -s "$pdf"
+          if ! command -v pdfinfo >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y poppler-utils
+          fi
+          pdfinfo "$pdf"
+          pdftoppm -png -r 120 "$pdf" artifacts/pdf-render >/dev/null
+          mapfile -t pages < <(find artifacts -maxdepth 1 -name 'pdf-render-*.png' -print | sort -V)
+          test "${#pages[@]}" -ge 2
+          test "$(stat -c%s "${pages[0]}")" -gt 10000
+
+      - name: Upload complete validation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resindb-pro-3.2.0-evidence-${{ github.sha }}
+          path: |
+            coverage/
+            artifacts/
+            FINAL_CODE_AUDIT.md
+            FINAL_RELEASE_REPORT.md
+          if-no-files-found: warn
+          retention-days: 30
+
+  cleanup-merged-branch:
+    name: Delete merged same-repository branch
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main with authenticated origin
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: main
           fetch-depth: 0
-          token: ${{ github.token }}
 
-      - name: Check out candidate branch
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: agent/material-statistics-polymer-physics-20260805
-          fetch-depth: 0
-          token: ${{ github.token }}
-          path: candidate
-
-      - name: Decode, verify and commit pass8 candidate locally
+      - name: Delete merged branch if it still exists
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
         shell: bash
         run: |
           set -euo pipefail
-          cd candidate
-          git show 9f3e317abd39dec8f134236ccf07296b2c6cdf5e:.github/workflows/ci.yml > /tmp/resindb-permanent-ci.yml
-          cat .github/pass8-payload/part-* | base64 -d > /tmp/resindb-pass8-payload.tar.xz
-          printf '%s  %s\n' \
-            'a8e69d380c076a3d2bc872dd76ebc6bb61d2f1c6c8540f5b9bd267ecd8e4e47a' \
-            '/tmp/resindb-pass8-payload.tar.xz' | sha256sum -c -
-          tar -xJf /tmp/resindb-pass8-payload.tar.xz -C .
-          cp /tmp/resindb-permanent-ci.yml .github/workflows/ci.yml
-          git checkout HEAD -- src/components/charts/DataVisualizerLegacy.tsx
-          rm -rf .github/pass8-payload
-          rm -f .github/workflows/one-time-pass8-material-physics-payload.yml
-          rm -f .github/run-pass8-material-physics-payload.trigger
+          git check-ref-format --branch "$BRANCH" >/dev/null
+          test "$BRANCH" != main
+          if git ls-remote --exit-code --heads origin "refs/heads/${BRANCH}" >/dev/null 2>&1; then
+            git push origin ":refs/heads/${BRANCH}"
+          fi
 
-          python <<'PY'
-          from pathlib import Path
-          source = Path('src/lib/materialScience.ts')
-          text = source.read_text()
-          text = text.replace(
-              'const STUDENT_T_95_CACHE = new Map<number, number>();\n',
-              'const STUDENT_T_95_CACHE = new Map<number, number>();\n'
-              'const PERCENTILE_NORMALIZER_CACHE = new WeakMap<readonly number[], (value: number) => number>();\n',
-          )
-          old = '''  createPercentileNormalizer: (dataArray: number[]): ((value: number) => number) => {
-            const sorted = finiteValues(dataArray).sort((left, right) => left - right);
-            if (sorted.length < 2) return () => 50;
-
-            return (value: number): number => {
-              if (!Number.isFinite(value)) return 50;
-              const lower = lowerBound(sorted, value);
-              const upper = upperBound(sorted, value);
-              let rankIndex: number;
-              if (lower < upper) rankIndex = (lower + upper - 1) / 2;
-              else rankIndex = Math.min(sorted.length - 1, Math.max(0, lower));
-              const displayPercentile = 20 + (80 * rankIndex) / (sorted.length - 1);
-              return Math.max(5, Math.min(100, displayPercentile));
-            };
-          },
-          '''
-          new = '''  createPercentileNormalizer: (dataArray: number[]): ((value: number) => number) => {
-            const cached = PERCENTILE_NORMALIZER_CACHE.get(dataArray);
-            if (cached) return cached;
-
-            const sorted = finiteValues(dataArray).sort((left, right) => left - right);
-            const normalize = sorted.length < 2
-              ? () => 50
-              : (value: number): number => {
-                if (!Number.isFinite(value)) return 50;
-                const lower = lowerBound(sorted, value);
-                const upper = upperBound(sorted, value);
-                let rankIndex: number;
-                if (lower < upper) rankIndex = (lower + upper - 1) / 2;
-                else rankIndex = Math.min(sorted.length - 1, Math.max(0, lower));
-                const displayPercentile = 20 + (80 * rankIndex) / (sorted.length - 1);
-                return Math.max(5, Math.min(100, displayPercentile));
-              };
-            PERCENTILE_NORMALIZER_CACHE.set(dataArray, normalize);
-            return normalize;
-          },
-          '''
-          if old not in text:
-              raise SystemExit('percentile normalizer source block not found')
-          source.write_text(text.replace(old, new))
-
-          audit = Path('docs/CODE_MATH_PERFORMANCE_AUDIT_2026-08-05_PASS8_MATERIAL_PHYSICS.md')
-          text = audit.read_text()
-          text = text.replace(
-              '2. `src/components/charts/DataVisualizerLegacy.tsx`：雷达图中位秩归一化调用链；\n'
-              '3. `src/utils/polymerPhysics.ts`',
-              '2. `src/utils/polymerPhysics.ts`',
-          )
-          text = text.replace('4. 新增 23 项专项数值与物理边界测试。', '3. 新增 23 项专项数值与物理边界测试。')
-          text = text.replace(
-              '新路径每个维度只排序一次，再使用二分查找计算并列平均秩。',
-              '新路径按参考数组对象缓存每个维度的排序结果，再使用二分查找计算并列平均秩；现有显示调用无需改写即可复用缓存。',
-          )
-          audit.write_text(text)
-          PY
-
-          test -s src/lib/materialScience.ts
-          test -s src/utils/polymerPhysics.ts
-          test -s tests/unit/materialScienceRobustness.test.ts
-          test -s tests/unit/polymerPhysics.test.ts
-          test -s docs/CODE_MATH_PERFORMANCE_AUDIT_2026-08-05_PASS8_MATERIAL_PHYSICS.md
-          grep -q 'PERCENTILE_NORMALIZER_CACHE' src/lib/materialScience.ts
-          grep -q 'regularizedIncompleteBeta' src/lib/materialScience.ts
-          grep -q 'relative-number-intensity' src/lib/materialScience.ts
-          grep -q 'coolingEndK' src/utils/polymerPhysics.ts
-          grep -q 'fix deform' src/utils/polymerPhysics.ts
-          grep -q 'Material Statistics and Polymer Physics' README.md
-
-          git add -A
-          git diff --check
-          git diff --cached --name-only | sort > /tmp/pass8-files.txt
-          cat > /tmp/pass8-expected.txt <<'EOF'
-          README.md
-          docs/CODE_MATH_PERFORMANCE_AUDIT_2026-08-05_PASS8_MATERIAL_PHYSICS.md
-          src/lib/materialScience.ts
-          src/utils/polymerPhysics.ts
-          tests/unit/materialScienceRobustness.test.ts
-          tests/unit/polymerPhysics.test.ts
-          EOF
-          sort -o /tmp/pass8-expected.txt /tmp/pass8-expected.txt
-          diff -u /tmp/pass8-expected.txt /tmp/pass8-files.txt
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'fix: harden material statistics and polymer physics'
-
-      - name: Restore permanent main CI before candidate synchronization
+  publish-status:
+    name: Publish queryable CI evidence status
+    if: always() && github.event_name == 'push'
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish commit status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ needs.validate.result }}
         shell: bash
         run: |
           set -euo pipefail
-          git show 9f3e317abd39dec8f134236ccf07296b2c6cdf5e:.github/workflows/ci.yml > .github/workflows/ci.yml
-          rm -f .github/workflows/one-time-pass8-branch-apply.yml
-          rm -f .github/run-pass8-branch-apply.trigger
-          rm -f .github/run-pass8-main-controller.trigger
-          git add -A
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'chore: remove pass8 main controller'
-          git push origin HEAD:main
-
-      - name: Push clean pass8 candidate
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd candidate
-          git push origin HEAD:agent/material-statistics-polymer-physics-20260805
+          state=failure
+          [ "$RESULT" = success ] && state=success
+          [ "$RESULT" = cancelled ] && state=error
+          payload=$(jq -nc --arg state "$state" --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" --arg description "ResinDB exact-tree validation: ${RESULT}" --arg context 'resindb/ci-evidence' '{state:$state,target_url:$target_url,description:$description,context:$context}')
+          curl -fsSL -X POST -H 'Accept: application/vnd.github+json' -H "Authorization: Bearer ${GH_TOKEN}" -H 'X-GitHub-Api-Version: 2022-11-28' "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$payload" >/dev/null
