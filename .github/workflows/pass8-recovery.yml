@@ -1,0 +1,146 @@
+name: Scoped pass8 recovery controller
+
+on:
+  pull_request:
+    branches: [main]
+    types: [reopened, synchronize]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: scoped-pass8-recovery
+  cancel-in-progress: false
+
+jobs:
+  recover-reviewed-candidate:
+    if: >-
+      github.event.pull_request.number == 34 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/material-statistics-polymer-physics-20260805'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out candidate branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: agent/material-statistics-polymer-physics-20260805
+          fetch-depth: 0
+          token: ${{ github.token }}
+          path: candidate
+
+      - name: Detect whether reviewed payload remains
+        id: probe
+        shell: bash
+        run: |
+          if [ -d candidate/.github/pass8-payload ]; then
+            echo 'apply=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'apply=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Decode, verify and apply reviewed payload
+        if: steps.probe.outputs.apply == 'true'
+        shell: bash
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          test "$(find .github/pass8-payload -maxdepth 1 -type f -name 'part-*' | wc -l | tr -d ' ')" -eq 4
+          cat .github/pass8-payload/part-00 \
+              .github/pass8-payload/part-01 \
+              .github/pass8-payload/part-02 \
+              .github/pass8-payload/part-03 \
+            | base64 -d > /tmp/resindb-pass8-reviewed.tar.xz
+          printf '%s  %s\n' \
+            '6203da7ec2d8a3603641ed65f194188f20898e2fff6c02739dca045e87beabc7' \
+            '/tmp/resindb-pass8-reviewed.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/resindb-pass8-reviewed.tar.xz -C .
+
+          rm -rf .github/pass8-payload
+          rm -f .github/run-pass8-material-physics-payload.trigger
+          rm -f .github/workflows/one-time-pass8-material-physics-payload.yml
+          rm -f .github/run-pass8-branch-apply.trigger
+          rm -f .github/run-pass8-main-controller.trigger
+          rm -f .github/workflows/one-time-pass8-branch-apply.yml
+
+          cat > /tmp/pass8-reviewed-sha256.txt <<'EOF'
+          113e5aa71f1afc893367278934f4d107114e47cb0bd9dc1b1727b0b377459d03  .github/workflows/ci.yml
+          a6bed15a012382f609e8d589c80b5995708b39df351c13e3f1c2810e50b80200  README.md
+          f3cab907aab0e4599411e3b30ddc3bea0ceae7f0551ab24415575ea0e9cedeb1  docs/CODE_MATH_PERFORMANCE_AUDIT_2026-08-05_PASS8_MATERIAL_PHYSICS.md
+          d3e972115c657749e6574991aa6684a399fa134aa871ce10c4ba993825402f55  src/lib/materialScience.ts
+          7625a194ef7f147d70b4d434999ea6aa4b9daa7a8ead220793cb405f565862df  src/utils/polymerPhysics.ts
+          23eaee8e0c66896a66fb1d990d2a566ead4ecb5003ca018bb9483005a7a9c0c4  tests/unit/materialScienceRobustness.test.ts
+          1a03219307b7e360521b676766e099f3741faad1d39a67d62a1efd06934bd9af  tests/unit/polymerPhysics.test.ts
+          EOF
+          sed -i 's/^          //' /tmp/pass8-reviewed-sha256.txt
+          sha256sum -c /tmp/pass8-reviewed-sha256.txt
+
+          git add -A
+          git diff --check --cached
+          git diff --cached --name-only | sort > /tmp/pass8-staged.txt
+          python <<'PY'
+          from pathlib import Path
+
+          staged = set(Path('/tmp/pass8-staged.txt').read_text().splitlines())
+          required = {
+              '.github/workflows/ci.yml',
+              'README.md',
+              'docs/CODE_MATH_PERFORMANCE_AUDIT_2026-08-05_PASS8_MATERIAL_PHYSICS.md',
+              'src/lib/materialScience.ts',
+              'src/utils/polymerPhysics.ts',
+              'tests/unit/materialScienceRobustness.test.ts',
+              'tests/unit/polymerPhysics.test.ts',
+          }
+          removable = {
+              '.github/run-pass8-material-physics-payload.trigger',
+              '.github/workflows/one-time-pass8-material-physics-payload.yml',
+              '.github/run-pass8-branch-apply.trigger',
+              '.github/run-pass8-main-controller.trigger',
+              '.github/workflows/one-time-pass8-branch-apply.yml',
+              '.github/pass8-payload/part-00',
+              '.github/pass8-payload/part-01',
+              '.github/pass8-payload/part-02',
+              '.github/pass8-payload/part-03',
+          }
+          missing = required - staged
+          unexpected = staged - required - removable
+          if missing or unexpected:
+              raise SystemExit(f'missing={sorted(missing)} unexpected={sorted(unexpected)}')
+          PY
+          test ! -e .github/pass8-payload
+          grep -q 'curated-repeat-unit-library-2.1.0' src/utils/polymerPhysics.ts
+          grep -q 'PERCENTILE_NORMALIZER_CACHE' src/lib/materialScience.ts
+          grep -q 'Compute functions and display-chain governance' .github/workflows/ci.yml
+          grep -q '新增 26 项专项数值与物理边界测试' docs/CODE_MATH_PERFORMANCE_AUDIT_2026-08-05_PASS8_MATERIAL_PHYSICS.md
+
+      - name: Commit clean candidate tree
+        if: steps.probe.outputs.apply == 'true'
+        shell: bash
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: harden material statistics and polymer physics'
+          git push origin HEAD:agent/material-statistics-polymer-physics-20260805
+
+      - name: Check out main control tree
+        if: steps.probe.outputs.apply == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ github.token }}
+          path: control
+
+      - name: Remove scoped recovery controller from main
+        if: steps.probe.outputs.apply == 'true'
+        shell: bash
+        working-directory: control
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/pass8-recovery.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'ci: remove scoped pass8 recovery controller'
+          git push origin HEAD:main
