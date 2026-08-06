@@ -1,0 +1,47 @@
+name: Dependency lock repair candidate
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  generate-lock-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out pull request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Generate non-breaking npm audit lock repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm audit fix --package-lock-only --audit-level=high
+          set +e
+          npm audit --audit-level=high --json > audit-after.json
+          code=$?
+          set -e
+          printf '%s\n' "$code" > audit-after-exit-code.txt
+          jq '.metadata.vulnerabilities' audit-after.json
+      - name: Upload repaired lock candidate
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: dependency-lock-candidate-${{ github.event.pull_request.head.sha }}
+          path: |
+            package.json
+            package-lock.json
+            audit-after.json
+            audit-after-exit-code.txt
+          if-no-files-found: error
+          retention-days: 3
