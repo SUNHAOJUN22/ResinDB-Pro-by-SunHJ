@@ -1,4 +1,4 @@
-name: One-time pass8 material statistics and polymer physics payload
+name: One-time pass8 reviewed payload application
 
 on:
   push:
@@ -8,7 +8,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: one-time-pass8-material-physics-payload
+  group: one-time-pass8-reviewed-payload
   cancel-in-progress: false
 
 jobs:
@@ -24,51 +24,84 @@ jobs:
           fetch-depth: 0
           token: ${{ github.token }}
 
-      - name: Decode, verify and apply deterministic payload
+      - name: Decode, verify and apply reviewed payload
         shell: bash
         run: |
           set -euo pipefail
-          cat .github/pass8-payload/part-* | base64 -d > /tmp/resindb-pass8-payload.tar.xz
+          test "$(find .github/pass8-payload -maxdepth 1 -type f -name 'part-*' | wc -l | tr -d ' ')" -eq 4
+          cat .github/pass8-payload/part-00 \
+              .github/pass8-payload/part-01 \
+              .github/pass8-payload/part-02 \
+              .github/pass8-payload/part-03 \
+            | base64 -d > /tmp/resindb-pass8-reviewed.tar.xz
           printf '%s  %s\n' \
-            'a8e69d380c076a3d2bc872dd76ebc6bb61d2f1c6c8540f5b9bd267ecd8e4e47a' \
-            '/tmp/resindb-pass8-payload.tar.xz' | sha256sum -c -
-          tar -xJf /tmp/resindb-pass8-payload.tar.xz -C .
+            '6203da7ec2d8a3603641ed65f194188f20898e2fff6c02739dca045e87beabc7' \
+            '/tmp/resindb-pass8-reviewed.tar.xz' | sha256sum -c -
+          tar -xJf /tmp/resindb-pass8-reviewed.tar.xz -C .
 
           rm -rf .github/pass8-payload
-          rm -f .github/workflows/one-time-pass8-material-physics-payload.yml
           rm -f .github/run-pass8-material-physics-payload.trigger
+          rm -f .github/workflows/one-time-pass8-material-physics-payload.yml
+          rm -f .github/run-pass8-branch-apply.trigger
+          rm -f .github/run-pass8-main-controller.trigger
+          rm -f .github/workflows/one-time-pass8-branch-apply.yml
 
-          test -s src/lib/materialScience.ts
-          test -s src/utils/polymerPhysics.ts
-          test -s src/components/charts/DataVisualizerLegacy.tsx
-          test -s tests/unit/materialScienceRobustness.test.ts
-          test -s tests/unit/polymerPhysics.test.ts
-          test -s docs/CODE_MATH_PERFORMANCE_AUDIT_2026-08-05_PASS8_MATERIAL_PHYSICS.md
-          grep -q 'createPercentileNormalizer' src/lib/materialScience.ts
-          grep -q 'regularizedIncompleteBeta' src/lib/materialScience.ts
-          grep -q 'relative-number-intensity' src/lib/materialScience.ts
-          grep -q 'coolingEndK' src/utils/polymerPhysics.ts
-          grep -q 'fix deform' src/utils/polymerPhysics.ts
-          grep -q 'Material Statistics and Polymer Physics' README.md
+          cat > /tmp/pass8-reviewed-sha256.txt <<'EOF'
+          113e5aa71f1afc893367278934f4d107114e47cb0bd9dc1b1727b0b377459d03  .github/workflows/ci.yml
+          a6bed15a012382f609e8d589c80b5995708b39df351c13e3f1c2810e50b80200  README.md
+          f3cab907aab0e4599411e3b30ddc3bea0ceae7f0551ab24415575ea0e9cedeb1  docs/CODE_MATH_PERFORMANCE_AUDIT_2026-08-05_PASS8_MATERIAL_PHYSICS.md
+          d3e972115c657749e6574991aa6684a399fa134aa871ce10c4ba993825402f55  src/lib/materialScience.ts
+          7625a194ef7f147d70b4d434999ea6aa4b9daa7a8ead220793cb405f565862df  src/utils/polymerPhysics.ts
+          23eaee8e0c66896a66fb1d990d2a566ead4ecb5003ca018bb9483005a7a9c0c4  tests/unit/materialScienceRobustness.test.ts
+          1a03219307b7e360521b676766e099f3741faad1d39a67d62a1efd06934bd9af  tests/unit/polymerPhysics.test.ts
+          EOF
+          sed -i 's/^          //' /tmp/pass8-reviewed-sha256.txt
+          sha256sum -c /tmp/pass8-reviewed-sha256.txt
 
-      - name: Commit formal pass8 candidate tree
+          git add -A
+          git diff --check --cached
+          git diff --cached --name-only | sort > /tmp/pass8-staged.txt
+          python <<'PY'
+          from pathlib import Path
+
+          staged = set(Path('/tmp/pass8-staged.txt').read_text().splitlines())
+          required = {
+              '.github/workflows/ci.yml',
+              'README.md',
+              'docs/CODE_MATH_PERFORMANCE_AUDIT_2026-08-05_PASS8_MATERIAL_PHYSICS.md',
+              'src/lib/materialScience.ts',
+              'src/utils/polymerPhysics.ts',
+              'tests/unit/materialScienceRobustness.test.ts',
+              'tests/unit/polymerPhysics.test.ts',
+          }
+          removable = {
+              '.github/run-pass8-material-physics-payload.trigger',
+              '.github/workflows/one-time-pass8-material-physics-payload.yml',
+              '.github/run-pass8-branch-apply.trigger',
+              '.github/run-pass8-main-controller.trigger',
+              '.github/workflows/one-time-pass8-branch-apply.yml',
+              '.github/pass8-payload/part-00',
+              '.github/pass8-payload/part-01',
+              '.github/pass8-payload/part-02',
+              '.github/pass8-payload/part-03',
+          }
+          missing = required - staged
+          unexpected = staged - required - removable
+          if missing or unexpected:
+              raise SystemExit(f'missing={sorted(missing)} unexpected={sorted(unexpected)}')
+          PY
+
+          test ! -e .github/pass8-payload
+          test ! -e .github/workflows/one-time-pass8-material-physics-payload.yml
+          grep -q 'curated-repeat-unit-library-2.1.0' src/utils/polymerPhysics.ts
+          grep -q 'PERCENTILE_NORMALIZER_CACHE' src/lib/materialScience.ts
+          grep -q 'Compute functions and display-chain governance' .github/workflows/ci.yml
+          grep -q '新增 26 项专项数值与物理边界测试' docs/CODE_MATH_PERFORMANCE_AUDIT_2026-08-05_PASS8_MATERIAL_PHYSICS.md
+
+      - name: Commit and push clean candidate tree
         shell: bash
         run: |
           set -euo pipefail
-          git add -A
-          git status --short
-          git diff --cached --name-only | sort > /tmp/pass8-files.txt
-          cat > /tmp/pass8-expected.txt <<'EOF'
-          README.md
-          docs/CODE_MATH_PERFORMANCE_AUDIT_2026-08-05_PASS8_MATERIAL_PHYSICS.md
-          src/components/charts/DataVisualizerLegacy.tsx
-          src/lib/materialScience.ts
-          src/utils/polymerPhysics.ts
-          tests/unit/materialScienceRobustness.test.ts
-          tests/unit/polymerPhysics.test.ts
-          EOF
-          sort -o /tmp/pass8-expected.txt /tmp/pass8-expected.txt
-          diff -u /tmp/pass8-expected.txt /tmp/pass8-files.txt
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'fix: harden material statistics and polymer physics'
