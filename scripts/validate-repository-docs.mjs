@@ -19,6 +19,12 @@ const EXPECTED_SCREENSHOTS = [
   'ui-kmeans-profile-audit.png',
   'ui-kmeans-device-calibration.png',
 ].sort();
+const EXPECTED_AI_DIAGRAMS = [
+  'ai-platform-architecture.svg',
+  'ai-material-statistics.svg',
+  'ai-polymer-lammps-workflow.svg',
+  'ai-delivery-validation.svg',
+].sort();
 const FORBIDDEN = [
   '.github/apply-final-v2.trigger', '.github/workflows/apply-final-v2.yml',
   '.github/apply-final-small.trigger', '.github/workflows/apply-final-small.yml',
@@ -93,10 +99,19 @@ for (const name of EXPECTED_SCREENSHOTS) {
   if (readme.split(relativePath).length - 1 !== 1) fail(`${relativePath} must be referenced exactly once`);
   if (statSync(resolve(IMAGE_DIR, name)).size < 20_000) fail(`${relativePath} is too small to be a real UI evidence screenshot`);
 }
+for (const name of EXPECTED_AI_DIAGRAMS) {
+  const relativePath = `docs/images/${name}`;
+  if (!existsSync(resolve(IMAGE_DIR, name))) fail(`README AI diagram is missing: ${relativePath}`);
+  if (readme.split(relativePath).length - 1 !== 1) fail(`${relativePath} must be referenced exactly once`);
+  if (statSync(resolve(IMAGE_DIR, name)).size < 5_000) fail(`${relativePath} is too small for a README technical diagram`);
+}
 const markdownImages = [...readme.matchAll(/!\[[^\]]*]\(([^)]+)\)/g)]
   .map((match) => match[1])
   .filter((target) => !target.startsWith('http'));
-if (markdownImages.length > 10) fail(`README local image count must not exceed 10; found ${markdownImages.length}`);
+const expectedLocalImageCount = EXPECTED_SCREENSHOTS.length + EXPECTED_AI_DIAGRAMS.length;
+if (markdownImages.length !== expectedLocalImageCount) {
+  fail(`README local image count must equal ${expectedLocalImageCount}; found ${markdownImages.length}`);
+}
 const oldSynthetic = readdirSync(IMAGE_DIR).filter((name) => /^resindb-.*\.svg$/.test(name));
 if (oldSynthetic.length) fail(`Synthetic README visual residue remains: ${JSON.stringify(oldSynthetic.sort())}`);
 
@@ -163,6 +178,6 @@ for (const phrase of [
 if (ci.includes('contents: write')) fail('Permanent CI must be read-only');
 if (/\bpython(?:3)?\b/i.test(ci)) fail('Permanent CI must not depend on Python');
 console.log(
-  `Validated README links, ${EXPECTED_SCREENSHOTS.length} real UI screenshots, version ${version}, `
+  `Validated README links, ${EXPECTED_SCREENSHOTS.length} real UI screenshots, ${EXPECTED_AI_DIAGRAMS.length} conceptual AI diagrams, version ${version}, `
   + 'canonical data contracts, compute catalog, Node-only tooling and repository hygiene.',
 );

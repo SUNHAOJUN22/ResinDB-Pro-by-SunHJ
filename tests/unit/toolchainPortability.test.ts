@@ -29,17 +29,26 @@ describe('stage-one Node-only tooling', () => {
     expect(receiptScript).toContain('singleMainBranch: !branchProofRequired || branchProofValid')
   })
 
-  it('uses eight real UI screenshots and no synthetic visual generator inventory', () => {
+  it('uses eight runtime screenshots plus four governed conceptual diagrams', () => {
     const imageDirectory = resolve(root, 'docs/images')
     const screenshots = readdirSync(imageDirectory)
       .filter((name) => /^ui-.*\.png$/.test(name))
       .sort()
+    const diagrams = readdirSync(imageDirectory)
+      .filter((name) => /^ai-.*\.svg$/.test(name))
+      .sort()
+    const expectedDiagrams = [
+      'ai-delivery-validation.svg',
+      'ai-material-statistics.svg',
+      'ai-platform-architecture.svg',
+      'ai-polymer-lammps-workflow.svg',
+    ]
     const syntheticVisuals = readdirSync(imageDirectory)
       .filter((name) => /^resindb-.*\.svg$/.test(name))
     const readme = readFileSync(resolve(root, 'README.md'), 'utf8')
 
     expect(screenshots).toHaveLength(8)
-    expect(screenshots.length).toBeLessThanOrEqual(10)
+    expect(diagrams).toEqual(expectedDiagrams)
     expect(syntheticVisuals).toEqual([])
     expect(existsSync(resolve(root, 'scripts/readme-visuals.bundle.json'))).toBe(false)
     expect(existsSync(resolve(root, 'scripts/generate-readme-visuals.mjs'))).toBe(false)
@@ -49,6 +58,12 @@ describe('stage-one Node-only tooling', () => {
       expect(statSync(resolve(imageDirectory, screenshot)).size).toBeGreaterThan(20_000)
       expect(readme).toContain(`docs/images/${screenshot}`)
     }
+    for (const diagram of diagrams) {
+      expect(statSync(resolve(imageDirectory, diagram)).size).toBeGreaterThan(5_000)
+      expect(readme).toContain(`docs/images/${diagram}`)
+    }
+    expect(readme).toContain('AI conceptual diagrams')
+    expect(readme).toContain('Chromium runtime screenshots')
   })
 
   it('rejects future stage-one delta transport residue', () => {
