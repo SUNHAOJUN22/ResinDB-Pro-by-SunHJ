@@ -23,6 +23,10 @@ describe('stage-one Node-only tooling', () => {
     expect(packageJson.scripts['visuals:bundle']).toBeUndefined()
     expect(packageJson.scripts['visuals:generate']).toBeUndefined()
     expect(packageJson.scripts['visuals:check']).toBeUndefined()
+
+    const receiptScript = readFileSync(resolve(root, 'scripts/generate-validation-receipt.mjs'), 'utf8')
+    expect(receiptScript).toContain("const branchProofRequired = context.ref === 'refs/heads/main'")
+    expect(receiptScript).toContain('singleMainBranch: !branchProofRequired || branchProofValid')
   })
 
   it('uses eight real UI screenshots and no synthetic visual generator inventory', () => {

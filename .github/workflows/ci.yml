@@ -5,12 +5,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
   contents: read
-  statuses: write
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -19,7 +18,6 @@ concurrency:
 jobs:
   validate:
     name: Exact-tree validation, browser evidence and reports
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
@@ -245,51 +243,3 @@ jobs:
             FINAL_RELEASE_REPORT.md
           if-no-files-found: warn
           retention-days: 30
-
-  cleanup-merged-branch:
-    name: Delete merged same-repository branch
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.action == 'closed' &&
-      github.event.pull_request.merged == true &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out main with authenticated origin
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: main
-          fetch-depth: 0
-
-      - name: Delete merged branch if it still exists
-        env:
-          BRANCH: ${{ github.event.pull_request.head.ref }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          git check-ref-format --branch "$BRANCH" >/dev/null
-          test "$BRANCH" != main
-          if git ls-remote --exit-code --heads origin "refs/heads/${BRANCH}" >/dev/null 2>&1; then
-            git push origin ":refs/heads/${BRANCH}"
-          fi
-
-  publish-status:
-    name: Publish queryable CI evidence status
-    if: always() && github.event_name == 'push'
-    needs: validate
-    runs-on: ubuntu-latest
-    steps:
-      - name: Publish commit status
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RESULT: ${{ needs.validate.result }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          state=failure
-          [ "$RESULT" = success ] && state=success
-          [ "$RESULT" = cancelled ] && state=error
-          payload=$(jq -nc --arg state "$state" --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" --arg description "ResinDB exact-tree validation: ${RESULT}" --arg context 'resindb/ci-evidence' '{state:$state,target_url:$target_url,description:$description,context:$context}')
-          curl -fsSL -X POST -H 'Accept: application/vnd.github+json' -H "Authorization: Bearer ${GH_TOKEN}" -H 'X-GitHub-Api-Version: 2022-11-28' "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" -d "$payload" >/dev/null

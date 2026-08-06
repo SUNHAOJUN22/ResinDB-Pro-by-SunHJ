@@ -41,6 +41,9 @@ const [
 
 let branchProof = '';
 try { branchProof = (await readFile(path.join(artifacts, 'branch-proof.txt'), 'utf8')).trim(); } catch {}
+const branchProofRequired = context.ref === 'refs/heads/main';
+const branchProofValid = branchProof.split(/\r?\n/).filter(Boolean).length === 1
+  && /refs\/heads\/main$/.test(branchProof);
 const screenshotEntries = Object.entries(ui?.screenshots ?? {});
 const screenshotChecks = await Promise.all(screenshotEntries.map(async ([scene, file]) => ({
   scene,
@@ -80,7 +83,7 @@ const checks = {
   scientificUi: scientificUiAudit?.acceptance === 'PASS',
   productionAudit: noHighAuditFindings(prodAudit),
   completeAudit: noHighAuditFindings(fullAudit),
-  singleMainBranch: branchProof.split(/\r?\n/).filter(Boolean).length === 1 && /refs\/heads\/main$/.test(branchProof),
+  singleMainBranch: !branchProofRequired || branchProofValid,
 };
 
 const receipt = {
@@ -131,6 +134,10 @@ const receipt = {
     reportDigest: kmeansBenchmark.reportDigest,
   } : null,
   uiScenes: screenshotChecks,
+  branchGovernance: {
+    required: branchProofRequired,
+    proofValid: branchProofValid,
+  },
   branchProof,
 };
 
