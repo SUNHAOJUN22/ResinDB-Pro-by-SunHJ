@@ -1,6 +1,10 @@
 name: One-time Pass 9 finite aggregation delivery
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/one-time-pass9-finite-aggregation.yml
   issue_comment:
     types: [created]
 
@@ -10,8 +14,9 @@ permissions:
 jobs:
   apply:
     if: >-
-      github.event.issue.number == 34 &&
-      github.event.comment.body == '/apply-pass9-finite-aggregation-383d4584'
+      github.event_name == 'push' ||
+      (github.event.issue.number == 34 &&
+       github.event.comment.body == '/apply-pass9-finite-aggregation-383d4584')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
