@@ -1,0 +1,67 @@
+name: One-time bilingual README CI observer
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  observe:
+    if: >-
+      github.event.issue.number == 34 &&
+      github.event.comment.body == '/observe-readme-ci-a66e9a36'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Resolve target clean-main CI
+        id: result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: a66e9a36e6d9a70814ff6cee5b78909f6fee4584
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id=none
+          status=missing
+          conclusion=none
+          for attempt in $(seq 1 120); do
+            response=$(curl -fsSL \
+              -H 'Accept: application/vnd.github+json' \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${TARGET_SHA}&event=push&per_page=20")
+            run=$(jq -c '[.workflow_runs[] | select(.name == "CI")] | sort_by(.created_at) | last // {}' <<<"$response")
+            run_id=$(jq -r '.id // "none"' <<<"$run")
+            status=$(jq -r '.status // "missing"' <<<"$run")
+            conclusion=$(jq -r '.conclusion // "none"' <<<"$run")
+            if [ "$run_id" != none ] && [ "$status" = completed ]; then
+              break
+            fi
+            sleep 10
+          done
+          echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
+          echo "status=${status}" >> "$GITHUB_OUTPUT"
+          echo "conclusion=${conclusion}" >> "$GITHUB_OUTPUT"
+          test "$run_id" != none
+          test "$status" = completed
+
+      - name: Remove observer and record result
+        if: always()
+        env:
+          RUN_ID: ${{ steps.result.outputs.run_id }}
+          STATUS: ${{ steps.result.outputs.status }}
+          CONCLUSION: ${{ steps.result.outputs.conclusion }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" repo
+          cd repo
+          git checkout main
+          git rm .github/workflows/one-time-readme-ci-observer.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "chore: remove README CI observer [target=a66e9a36 run=${RUN_ID:-none} status=${STATUS:-unknown} conclusion=${CONCLUSION:-unknown}]"
+          git push origin HEAD:main
