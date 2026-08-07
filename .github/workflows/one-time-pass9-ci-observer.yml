@@ -1,23 +1,22 @@
 name: One-time Pass 9 CI observer
 
 on:
-  issue_comment:
-    types: [created]
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/one-time-pass9-ci-observer.yml
 
 permissions:
   actions: read
-  issues: write
+  statuses: write
   contents: read
 
 jobs:
   observe:
-    if: >-
-      github.event.issue.number == 34 &&
-      github.event.comment.body == '/observe-pass9-ci-44b38289'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Query target permanent CI and report
+      - name: Query target permanent CI and set commit status
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_SHA: 44b38289c8035881b0411992249403e1b417abc2
@@ -33,7 +32,13 @@ jobs:
           run_id=$(jq -r '.id // "none"' <<<"$run")
           status=$(jq -r '.status // "missing"' <<<"$run")
           conclusion=$(jq -r '.conclusion // "none"' <<<"$run")
-          printf 'PASS9_CI_RESULT target=%s run=%s status=%s conclusion=%s\n' "$TARGET_SHA" "$run_id" "$status" "$conclusion" > /tmp/result.txt
-          gh api "repos/${GITHUB_REPOSITORY}/issues/34/comments" -f body="$(cat /tmp/result.txt)"
+          state=pending
+          if [ "$status" = completed ] && [ "$conclusion" = success ]; then state=success; fi
+          if [ "$status" = completed ] && [ "$conclusion" != success ]; then state=failure; fi
+          description="run=${run_id} status=${status} conclusion=${conclusion}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${TARGET_SHA}" \
+            -f state="$state" \
+            -f context='pass9-ci-observer' \
+            -f description="$description"
           test "$run_id" != none
           test "$status" = completed
