@@ -36,9 +36,11 @@ jobs:
           if [ "$status" = completed ] && [ "$conclusion" = success ]; then state=success; fi
           if [ "$status" = completed ] && [ "$conclusion" != success ]; then state=failure; fi
           description="run=${run_id} status=${status} conclusion=${conclusion}"
+          target_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${run_id}"
           gh api --method POST "repos/${GITHUB_REPOSITORY}/statuses/${TARGET_SHA}" \
             -f state="$state" \
             -f context='pass9-ci-observer' \
-            -f description="$description"
+            -f description="$description" \
+            -f target_url="$target_url"
           test "$run_id" != none
           test "$status" = completed
