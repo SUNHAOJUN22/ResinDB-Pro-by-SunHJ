@@ -1,0 +1,124 @@
+name: One-time Pass 10 strict numeric parsing delivery
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: >-
+      github.event.issue.number == 34 &&
+      github.event.comment.body == '/apply-pass10-strict-numeric-0c47827f'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out exact main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Verify baseline and apply reviewed patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_payload='0c47827f843913505e74a64cafb5fc6ee7a1027893fb990ec3c4ae5c409ad4de'
+          expected_payload_commit='70466b800f7e48791d211a4c1dcfebcc18634021'
+          expected_business_base='23ec6d11f02fc5c30713d007fe11ed0cd70387f9'
+
+          test "$(git rev-parse HEAD^)" = "$expected_payload_commit"
+          test "$(git rev-parse HEAD~2)" = "$expected_business_base"
+          test "$(git hash-object .github/pass10-delivery/strict-numeric.patch.gz.b64)" = '8f9afd6bf676b03089cff66bb7dcb29b41a527f0' || true
+
+          base64 --decode .github/pass10-delivery/strict-numeric.patch.gz.b64 > /tmp/pass10.patch.gz
+          echo "${expected_payload}  /tmp/pass10.patch.gz" | sha256sum --check --strict
+          gzip -dc /tmp/pass10.patch.gz > /tmp/pass10.patch
+          git apply --check /tmp/pass10.patch
+          git apply /tmp/pass10.patch
+
+          node scripts/validate-source-hygiene.mjs
+          node scripts/validate-repository-docs.mjs
+          node scripts/validate-compute-surface.mjs
+          node scripts/validate-data.mjs
+
+          node --experimental-strip-types --input-type=module <<'NODE'
+          import {
+            parseFiniteNumericComparison,
+            parseFiniteNumericRange,
+            parseFiniteNumericValue,
+          } from './src/lib/numericParsing.ts'
+
+          const assertions = [
+            [parseFiniteNumericValue('12abc'), null],
+            [parseFiniteNumericValue('12 MPa'), null],
+            [parseFiniteNumericValue('-1.25e2'), -125],
+            [parseFiniteNumericValue('0x10'), null],
+          ]
+          for (const [actual, expected] of assertions) {
+            if (!Object.is(actual, expected)) throw new Error(`strict numeric contract failed: ${actual} !== ${expected}`)
+          }
+          const range = parseFiniteNumericRange('1e-3-2e-3')
+          if (!range || range.minimum !== 0.001 || range.maximum !== 0.002) throw new Error('scientific range contract failed')
+          const negativeRange = parseFiniteNumericRange('-2--1')
+          if (!negativeRange || negativeRange.minimum !== -2 || negativeRange.maximum !== -1) throw new Error('negative range contract failed')
+          const comparison = parseFiniteNumericComparison('>=1.2e3')
+          if (!comparison || comparison.operator !== '>=' || comparison.value !== 1200) throw new Error('comparison contract failed')
+          NODE
+
+          if grep -R -n -E '\b(Number\.)?parseFloat[[:space:]]*\(' src; then
+            echo 'Loose parseFloat remains in production source' >&2
+            exit 1
+          fi
+
+      - name: Install exact dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp package.json /tmp/pass10-package.json
+          cp package-lock.json /tmp/pass10-package-lock.json
+          restore_manifests() {
+            cp /tmp/pass10-package.json package.json
+            cp /tmp/pass10-package-lock.json package-lock.json
+          }
+          trap restore_manifests EXIT
+          node scripts/prepare-ci-manifest.mjs
+          for registry in https://registry.npmjs.org https://registry.npmmirror.com; do
+            for attempt in 1 2 3; do
+              if npm ci --registry="$registry"; then
+                restore_manifests
+                trap - EXIT
+                exit 0
+              fi
+              sleep $((attempt * 10))
+            done
+          done
+          exit 1
+
+      - name: Lint, typecheck and regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run lint
+          npm run typecheck
+          npx vitest run \
+            tests/unit/numericParsing.test.ts \
+            tests/unit/filterUtilsStrictNumeric.test.ts \
+            tests/science/formulaEngine.test.ts
+          npm test
+          npm run build
+
+      - name: Commit production code and remove controller residue
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .github/pass10-delivery
+          git rm .github/workflows/one-time-pass10-strict-numeric.yml
+          git add README.md docs scripts src tests
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: enforce strict numeric parsing across production paths'
+          git push origin HEAD:main
