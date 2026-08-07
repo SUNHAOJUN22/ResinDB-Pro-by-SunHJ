@@ -11,7 +11,7 @@ jobs:
   apply:
     if: >-
       github.event.issue.number == 34 &&
-      github.event.comment.body == '/apply-pass9-finite-aggregation-688b1b8f'
+      github.event.comment.body == '/apply-pass9-finite-aggregation-e7dada95'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -28,11 +28,11 @@ jobs:
           set -euo pipefail
           git push origin --delete __do_not_use__ || true
 
-      - name: Verify baseline, transport and reviewed tree
+      - name: Verify baseline and apply reviewed patch
         shell: bash
         run: |
           set -euo pipefail
-          expected_payload='688b1b8f7503ffdbb411e16f490e022814a5551130aa735f42c863d96d5271b4'
+          expected_payload='e7dada954c1fd46d18280dd289dc913d87876e87c478cacc7b0eed01ecfbe1af'
 
           verify_blob() {
             local path="$1"
@@ -61,11 +61,14 @@ jobs:
           test ! -e docs/CODE_MATH_PERFORMANCE_AUDIT_2026-08-07_PASS9_FINITE_AGGREGATION.md
 
           mapfile -t chunks < <(find .github/pass9-delivery -maxdepth 1 -name 'chunk-*.txt' -print | sort)
-          test "${#chunks[@]}" -eq 14
-          cat "${chunks[@]}" > /tmp/pass9.tar.gz.b64
-          base64 --decode /tmp/pass9.tar.gz.b64 > /tmp/pass9.tar.gz
-          echo "${expected_payload}  /tmp/pass9.tar.gz" | sha256sum --check --strict
-          tar -xzf /tmp/pass9.tar.gz -C .
+          test "${#chunks[@]}" -eq 3
+          cat "${chunks[@]}" > /tmp/pass9-patch.tar.gz.b64
+          base64 --decode /tmp/pass9-patch.tar.gz.b64 > /tmp/pass9-patch.tar.gz
+          echo "${expected_payload}  /tmp/pass9-patch.tar.gz" | sha256sum --check --strict
+          rm -rf /tmp/pass9-patch
+          mkdir -p /tmp/pass9-patch
+          tar -xzf /tmp/pass9-patch.tar.gz -C /tmp/pass9-patch
+          python /tmp/pass9-patch/apply.py
 
           node scripts/validate-source-hygiene.mjs
           node scripts/validate-repository-docs.mjs
