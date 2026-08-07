@@ -1,4 +1,5 @@
 import type { Product } from '@/types/index';
+import { summarizeFiniteNumbers } from '@/lib/numericAggregation';
 
 const MINIMUM_SHARED_FEATURES = 2;
 const RANGE_TOLERANCE_FACTOR = 32;
@@ -273,7 +274,10 @@ export function buildNormalizedComparisonProfile(
       summary.mins[key],
       summary.maxes[key],
     ));
-    const spread = Math.max(...normalized) - Math.min(...normalized);
+    const normalizedSummary = summarizeFiniteNumbers(normalized);
+    const spread = normalizedSummary
+      ? normalizedSummary.maximum - normalizedSummary.minimum
+      : 0;
     candidates.push({ key, spread, values });
   }
 

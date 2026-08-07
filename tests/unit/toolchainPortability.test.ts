@@ -99,6 +99,12 @@ describe('stage-one Node-only tooling', () => {
     expect(workflow).not.toContain('npm run audit:all -- --json')
   })
 
+  it('forbids variadic array extrema in production source', () => {
+    const validator = readFileSync(resolve(root, 'scripts/validate-source-hygiene.mjs'), 'utf8')
+    expect(validator).toContain('variadic array extrema')
+    expect(validator).toContain('Math\\.(?:min|max)')
+  })
+
   it('documents the stage-one implementation contract', () => {
     const taskbook = readFileSync(resolve(root, 'docs/PHASE_1_IMPLEMENTATION_TASKBOOK.md'), 'utf8')
     expect(taskbook).toContain('工具链统一与跨平台兼容基线')

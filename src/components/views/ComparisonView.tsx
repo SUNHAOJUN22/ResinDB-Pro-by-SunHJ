@@ -18,6 +18,7 @@ import { RADAR_KEYS, isLowBest } from '@/utils/productUtils';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import * as echarts from "@/lib/echarts";
+import { summarizeFinite } from '@/lib/numericAggregation';
 
 const KEY_SPECS = [
   "CAS Number",
@@ -69,15 +70,13 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
     );
 
     allPropKeys.forEach((key) => {
-      const values = displayProducts
-        .map((p) => {
-          const val = p.properties[key]?.value;
-          return typeof val === "number" ? val : parseFloat(String(val));
-        })
-        .filter((n) => !isNaN(n));
+      const summary = summarizeFinite(displayProducts, (product) => {
+        const value = product.properties[key]?.value;
+        return typeof value === "number" ? value : parseFloat(String(value));
+      });
 
-      if (values.length > 1) {
-        map[key] = isLowBest(key) ? Math.min(...values) : Math.max(...values);
+      if (summary && summary.count > 1) {
+        map[key] = isLowBest(key) ? summary.minimum : summary.maximum;
       }
     });
     return map;

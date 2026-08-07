@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import type { EChartsOption } from '@/lib/echarts';
 import { ScientificEChart } from './ScientificEChart';
 import { SCIENTIFIC_PALETTE, formatScientificNumber, scientificTooltipItem } from './scientificFigurePolicy';
+import { summarizeFinite } from '@/lib/numericAggregation';
 
 interface WeibullChartProps {
   points: { value: number; x: number; y: number; p: number }[];
@@ -16,8 +17,9 @@ interface WeibullChartProps {
 export const WeibullChart: React.FC<WeibullChartProps> = React.memo((props) => {
   const { points, m, eta, rSquared, safeValue95, targetKey, theme } = props;
   const option = useMemo<EChartsOption>(() => {
-    const minX = points.length ? Math.min(...points.map((point) => point.x)) : 0;
-    const maxX = points.length ? Math.max(...points.map((point) => point.x)) : 0;
+    const bounds = summarizeFinite(points, (point) => point.x);
+    const minX = bounds?.minimum ?? 0;
+    const maxX = bounds?.maximum ?? 0;
     const b5Log = safeValue95 > 0 ? Math.log(safeValue95) : null;
     return {
       title: {

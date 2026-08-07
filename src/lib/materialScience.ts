@@ -8,6 +8,7 @@
  */
 
 import { fillAverageRanks } from '@/compute/rankStatistics';
+import { summarizeFinite } from '@/lib/numericAggregation';
 
 export interface CorrelationResult {
   propertyX: string;
@@ -549,13 +550,13 @@ export const materialEngine = {
     if (valid.length < 3) return null;
 
     const lowShear = valid.slice(0, 3);
-    const averageViscosity = lowShear.reduce((sum, point) => sum + point.viscosity, 0) / lowShear.length;
+    const viscositySummary = summarizeFinite(lowShear, (point) => point.viscosity);
+    if (!viscositySummary) return null;
+    const averageViscosity = viscositySummary.mean;
     const fit = fitLinearRegression(lowShear.map((point) => (
       [Math.log10(point.rate), Math.log10(point.viscosity)] as [number, number]
     )));
-    const minimum = Math.min(...lowShear.map((point) => point.viscosity));
-    const maximum = Math.max(...lowShear.map((point) => point.viscosity));
-    const relativeSpread = (maximum - minimum) / averageViscosity;
+    const relativeSpread = (viscositySummary.maximum - viscositySummary.minimum) / averageViscosity;
     const logLogSlope = fit?.slope ?? Number.NaN;
 
     return {

@@ -1,3 +1,5 @@
+import { summarizeFinite } from '@/lib/numericAggregation';
+
 const KINETICS_MODEL_VERSION = 'kissinger-first-order-extrapolation-2.0.0';
 
 export interface KineticsMessage {
@@ -83,8 +85,10 @@ self.onmessage = (event: MessageEvent<KineticsMessage>) => {
     const A = (activationEnergyJoules / gasConstant) * Math.exp(intercept);
     if (!(A > 0) || !Number.isFinite(A)) throw new Error('Kissinger pre-exponential estimate is invalid.');
 
-    const minimumX = Math.min(...points.map((point) => point.x));
-    const maximumX = Math.max(...points.map((point) => point.x));
+    const xBounds = summarizeFinite(points, (point) => point.x);
+    if (!xBounds) throw new Error('Kissinger fitting produced no finite inverse temperatures.');
+    const minimumX = xBounds.minimum;
+    const maximumX = xBounds.maximum;
     const padding = (maximumX - minimumX) * 0.1;
     const line = [
       { x: minimumX - padding, y: slope * (minimumX - padding) + intercept },

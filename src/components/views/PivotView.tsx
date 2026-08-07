@@ -13,6 +13,8 @@ import { Product, ColumnConfig, FormulaConfig } from '@/types/index';
 import { formulaEngine } from "@/lib/formulaParser";
 import { useLanguage } from "@/contexts/LanguageContext";
 import groupBy from "lodash/groupBy";
+import { summarizeFinite } from '@/lib/numericAggregation';
+import { parseFiniteNumericValue } from '@/services/mathUtils';
 import {
   BarChart,
   Bar,
@@ -92,25 +94,27 @@ export const PivotView: React.FC<PivotViewProps> = React.memo(({ data, columns, 
         // Calculate metrics
         valueMetrics.forEach(mKey => {
           const col = columns.find(c => c.key === mKey);
-          const values = groupItems.map(item => {
-             if (col?.isComputed && col.formulaId) {
-                const f = formulas.find(form => form.id === col.formulaId);
-                return f ? formulaExecutor(item)[f.id] : 0;
-             }
-             return item.properties[mKey]?.value ?? 0;
-          }).filter(v => typeof v === "number") as number[];
+          const summary = summarizeFinite(groupItems, (item) => {
+            if (col?.isComputed && col.formulaId) {
+              const formula = formulas.find((entry) => entry.id === col.formulaId);
+              return formula
+                ? parseFiniteNumericValue(formulaExecutor(item)[formula.id])
+                : null;
+            }
+            return parseFiniteNumericValue(item.properties[mKey]?.value);
+          });
 
-          if (values.length === 0) {
+          if (!summary) {
             row[mKey] = 0;
             return;
           }
 
           switch(aggType) {
-            case "sum": row[mKey] = values.reduce((a, b) => a + b, 0); break;
-            case "avg": row[mKey] = values.reduce((a, b) => a + b, 0) / values.length; break;
-            case "min": row[mKey] = Math.min(...values); break;
-            case "max": row[mKey] = Math.max(...values); break;
-            case "count": row[mKey] = values.length; break;
+            case "sum": row[mKey] = summary.sum; break;
+            case "avg": row[mKey] = summary.mean; break;
+            case "min": row[mKey] = summary.minimum; break;
+            case "max": row[mKey] = summary.maximum; break;
+            case "count": row[mKey] = summary.count; break;
           }
         });
 

@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import type { EChartsOption } from '@/lib/echarts';
 import { ScientificEChart } from './ScientificEChart';
 import { SCIENTIFIC_PALETTE, formatScientificNumber, scientificTooltipItem } from './scientificFigurePolicy';
+import { summarizeFinite } from '@/lib/numericAggregation';
 
 interface ArrheniusChartProps {
   points: { tempC: number; time: number; x: number; y: number }[];
@@ -12,9 +13,9 @@ interface ArrheniusChartProps {
 
 export const ArrheniusChart: React.FC<ArrheniusChartProps> = React.memo(({ points, equation, rSquared, theme }) => {
   const option = useMemo<EChartsOption>(() => {
-    const inverseTemperatures = points.map((point) => point.x);
-    const minX = inverseTemperatures.length ? Math.min(...inverseTemperatures) : 0;
-    const maxX = inverseTemperatures.length ? Math.max(...inverseTemperatures) : 0;
+    const bounds = summarizeFinite(points, (point) => point.x);
+    const minX = bounds?.minimum ?? 0;
+    const maxX = bounds?.maximum ?? 0;
     const span = Math.max(maxX - minX, 1e-6);
     const lineStart = minX - span * 0.08;
     const lineEnd = maxX + span * 0.08;

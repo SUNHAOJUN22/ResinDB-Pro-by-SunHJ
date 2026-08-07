@@ -14,6 +14,7 @@ const RULES = [
   ['eval execution', /(^|[^A-Za-z0-9_$])eval\s*\(/],
   ['Function constructor execution', /\bnew\s+Function\s*\(/],
   ['unfinished marker', /\b(?:TODO|FIXME|HACK)\b/],
+  ['variadic array extrema', /Math\.(?:min|max)\(\s*\.\.\./],
   ['explicit any type', /(?:\:\s*any\b|<any>|\bas any\b)/],
 ]
 

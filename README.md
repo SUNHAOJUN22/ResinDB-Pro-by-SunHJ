@@ -426,6 +426,34 @@ $$
 [x_{min}-\Delta,\;x_{max}+\Delta]
 $$
 
+### 5.6.1 有限值单遍聚合 / Finite one-pass aggregation
+
+大规模筛选、图表边界与 Worker 初始化统一使用 `summarizeFinite()`，避免把完整数组展开为 `Math.min(...array)` / `Math.max(...array)` 的函数实参。对输入序列 \(x_i\)，仅保留有限值：
+
+$$
+I_i=\mathbf{1}[x_i\in\mathbb{R},\ |x_i|<\infty],
+\qquad
+n_f=\sum_i I_i
+$$
+
+单遍更新边界：
+
+$$
+x_{\min}^{(k)}=\min(x_{\min}^{(k-1)},x_k),
+\qquad
+x_{\max}^{(k)}=\max(x_{\max}^{(k-1)},x_k)
+$$
+
+求和使用 Neumaier 补偿项 \(c\)，最终均值为：
+
+$$
+\bar{x}=\frac{S+c}{n_f}
+$$
+
+该实现将边界与统计聚合的额外空间保持为 \(O(1)\)，并消除超大数组参数展开导致的 `RangeError`。当前合同用于牌号比较、Pivot 聚合、Arrhenius/Weibull 图边界、Kissinger Worker、Prony Worker、低剪切黏度筛选与归一化雷达轮廓。
+
+*Large comparison, pivot, chart-bound, and worker paths use a finite one-pass reducer instead of variadic array extrema. The reducer ignores non-finite observations, maintains O(1) aggregation state, and uses Neumaier compensation for the sum.*
+
 对数轴在对数域扩展：
 
 $$
@@ -907,6 +935,7 @@ npm run validate:ci
 | Direct recommender | 稀疏单遍 min/max、目标缓存、稳定排序 | Min-max RMS 距离和覆盖率 |
 | Radar percentile | 每个维度排序一次、二分中位秩 | 20–100 描述性显示尺度 |
 | Statistical regression | 中心化在线协方差、Student-t/Beta、临界值缓存 | 线性模型与 95% 区间 |
+| Finite aggregation | `summarizeFinite()` 单遍边界 + Neumaier 补偿和 | 有限值过滤、均值/边界语义与 O(1) 聚合状态 |
 | Axis bounds | 单遍有限值扫描 | 15% 轴边距与负值保留 |
 | Spearman | 平均秩索引复用 | 并列秩语义 |
 | KDE | 固定核因子外提 | 精确直接 KDE |
@@ -919,7 +948,7 @@ npm run validate:ci
 - KDE `200,000 × 101`：约 `253.8 ms → 204.7 ms`；
 - 稀疏牌号推荐 `10,000 × 120`：约 `397.94 ms → 11.46 ms`；
 - 雷达中位秩 `100,000` 参考值、36 次查询：`1,101.91 ms → 32.52 ms`，约 `33.9×`；
-- `1,000,000` 个有限值单遍边界扫描：中位数约 `8.38 ms`；旧展开参数路径触发 `RangeError`；
+- `1,000,000` 个有限值可由生成器单遍聚合，不需要数组参数展开；旧展开参数路径可触发 `RangeError`；
 - 30 组 Pearson/Student-t 概率与 SciPy 最大绝对差约 `2.21×10^-14`。
 
 > [!NOTE]

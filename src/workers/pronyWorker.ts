@@ -1,4 +1,5 @@
 import { createWorkerProgressMessage } from '@/compute/workerProtocol';
+import { summarizeFinite } from '@/lib/numericAggregation';
 
 const PRONY_MODEL_VERSION = 'generalized-maxwell-nnls-fista-2.1.0';
 const MAX_TERMS = 50;
@@ -151,7 +152,9 @@ self.onmessage = (event: MessageEvent<PronyMessage>) => {
 
     const lipschitzConstant = estimateLargestEigenvalue(normalMatrix, coefficientCount);
     const stepSize = 1 / lipschitzConstant;
-    const maximumStorage = Math.max(...validData.map((point) => point.storage));
+    const storageSummary = summarizeFinite(validData, (point) => point.storage);
+    if (!storageSummary) throw new Error('Prony input contains no finite storage modulus values.');
+    const maximumStorage = storageSummary.maximum;
     let coefficients = new Float64Array(coefficientCount);
     let nextCoefficients = new Float64Array(coefficientCount);
     coefficients.fill(maximumStorage / coefficientCount);
