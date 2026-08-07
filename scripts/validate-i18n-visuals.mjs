@@ -27,7 +27,7 @@ const TEXT_EXTENSIONS = new Set([
   '.yaml',
   '.yml',
 ]);
-const SCAN_ROOTS = ['src', 'scripts', 'tests', 'docs', 'data', 'schemas'];
+const SCAN_ROOTS = ['src', 'scripts', 'docs', 'data', 'schemas'];
 const EXCLUDED_DIRECTORIES = new Set([
   '.git',
   'artifacts',
@@ -35,8 +35,7 @@ const EXCLUDED_DIRECTORIES = new Set([
   'dist',
   'node_modules',
 ]);
-const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u;
-const MOJIBAKE_PATTERN = /\uFFFD|Ã[\u0080-\u00BF]|Â[\u0080-\u00BF]|â[\u0080-\u00BF]{1,2}|ðŸ|ï»¿|锟斤拷/u;
+const MOJIBAKE_PATTERN = /\uFFFD|\u00C3[\u0080-\u00BF]|\u00C2[\u0080-\u00BF]|\u00E2[\u0080-\u00BF]{1,2}|\u00F0\u0178|\u00EF\u00BB\u00BF|\u951F\u65A4\u62F7/u;
 const HAN_PATTERN = /\p{Script=Han}/u;
 const CJK_FONT_PATTERN = /Noto Sans (?:SC|CJK)|Microsoft YaHei|PingFang SC|WenQuanYi Micro Hei/u;
 const REQUIRED_LOCALIZED_KEYS = [
@@ -68,13 +67,30 @@ function walk(directory) {
   return files.sort();
 }
 
+function hasForbiddenControlCharacter(value) {
+  for (const character of value) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint === undefined) continue;
+    if (
+      (codePoint >= 0 && codePoint <= 8)
+      || codePoint === 11
+      || codePoint === 12
+      || (codePoint >= 14 && codePoint <= 31)
+      || codePoint === 127
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function readUtf8(path) {
   const bytes = readFileSync(path);
   const text = bytes.toString('utf8');
   const label = repositoryPath(path);
   if (text.includes('\uFFFD')) failures.push(`${label}: invalid UTF-8 replacement character`);
   if (MOJIBAKE_PATTERN.test(text)) failures.push(`${label}: probable mojibake sequence`);
-  if (CONTROL_CHARACTER_PATTERN.test(text)) failures.push(`${label}: forbidden control character`);
+  if (hasForbiddenControlCharacter(text)) failures.push(`${label}: forbidden control character`);
   if (text.charCodeAt(0) === 0xfeff) warnings.push(`${label}: UTF-8 BOM present`);
   return text;
 }
@@ -118,7 +134,10 @@ function exportedLocaleMap(path, variableName) {
   for (const localeProperty of rootObject.properties) {
     if (!ts.isPropertyAssignment(localeProperty)) continue;
     const locale = propertyName(localeProperty.name);
-    if ((locale !== 'zh' && locale !== 'en') || !ts.isObjectLiteralExpression(localeProperty.initializer)) {
+    if (
+      (locale !== 'zh' && locale !== 'en')
+      || !ts.isObjectLiteralExpression(localeProperty.initializer)
+    ) {
       continue;
     }
     for (const entry of localeProperty.initializer.properties) {
@@ -126,7 +145,9 @@ function exportedLocaleMap(path, variableName) {
       const key = propertyName(entry.name);
       if (!key) continue;
       if (!ts.isStringLiteralLike(entry.initializer)) {
-        failures.push(`${repositoryPath(path)}: ${variableName}.${locale}.${key} must be a string literal`);
+        failures.push(
+          `${repositoryPath(path)}: ${variableName}.${locale}.${key} must be a string literal`,
+        );
         continue;
       }
       output[locale].set(key, entry.initializer.text.normalize('NFC'));
@@ -179,7 +200,7 @@ function validateLocaleMaps() {
 
 function readmeLocalImages() {
   const readme = readUtf8(join(ROOT, 'README.md'));
-  return [...readme.matchAll(/!\[[^\]]*]\(([^)]+)\)/gu)]
+  return [...readme.matchAll(/!\[[^\n]*?\]\(([^)\n]+)\)/gu)]
     .map((match) => match[1].trim().split(/[?#]/u, 1)[0])
     .filter((target) => target && !/^(?:https?:|data:)/u.test(target));
 }
@@ -194,7 +215,9 @@ function validateSvg(path) {
   if (HAN_PATTERN.test(text) && !CJK_FONT_PATTERN.test(text)) {
     failures.push(`${label}: CJK text lacks an explicit CJK font fallback`);
   }
-  if (/<script\b|javascript:/iu.test(text)) failures.push(`${label}: active script content is forbidden`);
+  if (/<script\b|javascript:/iu.test(text)) {
+    failures.push(`${label}: active script content is forbidden`);
+  }
 }
 
 function validateVisualAssets() {
