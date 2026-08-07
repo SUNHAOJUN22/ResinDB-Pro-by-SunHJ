@@ -1,10 +1,6 @@
 name: One-time Pass 9 finite aggregation delivery
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/one-time-pass9-finite-aggregation.yml
   issue_comment:
     types: [created]
 
@@ -14,11 +10,10 @@ permissions:
 jobs:
   apply:
     if: >-
-      github.event_name == 'push' ||
-      (github.event.issue.number == 34 &&
-       github.event.comment.body == '/apply-pass9-finite-aggregation-383d4584')
+      github.event.issue.number == 34 &&
+      github.event.comment.body == '/apply-pass9-finite-aggregation-688b1b8f'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Check out exact main
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -27,11 +22,17 @@ jobs:
           fetch-depth: 0
           token: ${{ github.token }}
 
+      - name: Remove accidental temporary branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin --delete __do_not_use__ || true
+
       - name: Verify baseline, transport and reviewed tree
         shell: bash
         run: |
           set -euo pipefail
-          expected_payload='383d4584f76911fda5ed866c0b906d5a2fd07458c88917b63a6e434b3256dc03'
+          expected_payload='688b1b8f7503ffdbb411e16f490e022814a5551130aa735f42c863d96d5271b4'
 
           verify_blob() {
             local path="$1"
@@ -60,7 +61,7 @@ jobs:
           test ! -e docs/CODE_MATH_PERFORMANCE_AUDIT_2026-08-07_PASS9_FINITE_AGGREGATION.md
 
           mapfile -t chunks < <(find .github/pass9-delivery -maxdepth 1 -name 'chunk-*.txt' -print | sort)
-          test "${#chunks[@]}" -eq 6
+          test "${#chunks[@]}" -eq 14
           cat "${chunks[@]}" > /tmp/pass9.tar.gz.b64
           base64 --decode /tmp/pass9.tar.gz.b64 > /tmp/pass9.tar.gz
           echo "${expected_payload}  /tmp/pass9.tar.gz" | sha256sum --check --strict
@@ -79,7 +80,7 @@ jobs:
             for (let i = 0; i < 1_000_000; i += 1) yield i - 500_000
           }
           const summary = summarizeFinite(millionValues())
-          if (!summary || summary.count !== 1_000_000 || summary.min !== -500_000 || summary.max !== 499_999) {
+          if (!summary || summary.count !== 1_000_000 || summary.minimum !== -500_000 || summary.maximum !== 499_999 || summary.sum !== -500_000) {
             throw new Error('Million-value finite aggregation contract failed')
           }
           console.log(JSON.stringify({ cancellation, million: summary }))
