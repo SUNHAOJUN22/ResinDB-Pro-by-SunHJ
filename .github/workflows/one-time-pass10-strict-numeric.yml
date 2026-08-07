@@ -4,14 +4,14 @@ on:
   push:
     branches: [main]
     paths:
-      - .github/pass10-delivery/execute-v2.trigger
+      - .github/pass10-delivery/execute-v3.trigger
 
 permissions:
   contents: write
   statuses: write
 
 concurrency:
-  group: pass10-strict-numeric-delivery-v2
+  group: pass10-strict-numeric-delivery-v3
   cancel-in-progress: true
 
 jobs:
@@ -26,15 +26,13 @@ jobs:
           fetch-depth: 0
           token: ${{ github.token }}
 
-      - name: Verify chunked payload and apply reviewed patch
+      - name: Verify normalized payload and apply reviewed patch
         shell: bash
         run: |
           set -euo pipefail
           expected_payload='0c47827f843913505e74a64cafb5fc6ee7a1027893fb990ec3c4ae5c409ad4de'
-          mapfile -t chunks < <(find .github/pass10-delivery -maxdepth 1 -name 'payload-*.txt' -print | sort)
-          test "${#chunks[@]}" -eq 8
-          cat "${chunks[@]}" > /tmp/pass10.patch.gz.b64
-          base64 --decode /tmp/pass10.patch.gz.b64 > /tmp/pass10.patch.gz
+          test -s .github/pass10-delivery/strict-numeric.patch.gz.b64
+          base64 --ignore-garbage --decode .github/pass10-delivery/strict-numeric.patch.gz.b64 > /tmp/pass10.patch.gz
           echo "${expected_payload}  /tmp/pass10.patch.gz" | sha256sum --check --strict
           gzip -dc /tmp/pass10.patch.gz > /tmp/pass10.patch
           git apply --check /tmp/pass10.patch
@@ -144,7 +142,7 @@ jobs:
           fi
           jq -n \
             --arg state "$state" \
-            --arg context 'pass10-delivery-v2' \
+            --arg context 'pass10-delivery-v3' \
             --arg description "$description" \
             --arg target_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/status.json
