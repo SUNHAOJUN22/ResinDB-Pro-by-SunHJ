@@ -14,8 +14,24 @@ const LANGUAGE_ALIASES: Readonly<Record<string, Language>> = {
   english: 'en',
 };
 
-const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/u;
 const MOJIBAKE_PATTERN = /\uFFFD|Ã[\u0080-\u00BF]|Â[\u0080-\u00BF]|â[\u0080-\u00BF]{1,2}|ðŸ|ï»¿|锟斤拷/u;
+
+function hasForbiddenControlCharacter(value: string): boolean {
+  for (const character of value) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint === undefined) continue;
+    if (
+      (codePoint >= 0 && codePoint <= 8)
+      || codePoint === 11
+      || codePoint === 12
+      || (codePoint >= 14 && codePoint <= 31)
+      || codePoint === 127
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 export function parseLanguage(value: unknown): Language | null {
   if (typeof value !== 'string') return null;
@@ -32,7 +48,7 @@ export function languageTag(language: Language): 'zh-CN' | 'en' {
 }
 
 export function hasCorruptedUnicode(value: string): boolean {
-  return CONTROL_CHARACTER_PATTERN.test(value) || MOJIBAKE_PATTERN.test(value);
+  return hasForbiddenControlCharacter(value) || MOJIBAKE_PATTERN.test(value);
 }
 
 export function normalizeUiText(value: unknown, fallback = ''): string {
