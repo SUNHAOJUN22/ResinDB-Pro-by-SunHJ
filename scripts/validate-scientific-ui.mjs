@@ -53,13 +53,28 @@ function prohibitText(path, text, message) {
 
 requireText(
   'src/components/charts/scientificFigurePolicy.ts',
-  'scientific-figure-policy-1.0.0',
-  'figure policy missing',
+  'scientific-figure-policy-1.1.0',
+  'current figure policy missing',
+);
+requireText(
+  'src/components/charts/scientificFigurePolicy.ts',
+  'SCIENTIFIC_FONT_FAMILY',
+  'CJK-safe scientific typography missing',
 );
 requireText(
   'src/components/charts/ScientificEChart.tsx',
   'useDirtyRect: true',
   'shared dirty-rect chart host missing',
+);
+requireText(
+  'src/components/charts/ScientificEChart.tsx',
+  'useLanguage',
+  'scientific chart states are not localized',
+);
+requireText(
+  'src/components/charts/ScientificEChart.tsx',
+  "typeof ResizeObserver === 'undefined'",
+  'scientific chart resize fallback missing',
 );
 requireText(
   'src/components/charts/GpcDistribution.ts',
@@ -189,7 +204,7 @@ const directEchartsInitFiles = chartFiles
   .map((file) => relative(root, file));
 
 const metrics = {
-  schemaVersion: 'scientific-ui-audit-1.2.0',
+  schemaVersion: 'scientific-ui-audit-1.3.0',
   productionTypeScriptFiles: sourceFiles.length,
   chartFiles: chartFiles.length,
   directEchartsInitFiles,
@@ -198,6 +213,8 @@ const metrics = {
   migratedCompatibilityWrappers: phase2lMigrations
     .filter((entry) => entry.status === 'migrated')
     .map((entry) => entry.name),
+  localizedScientificFigureStates: true,
+  cjkSafeScientificTypography: true,
   failures,
   acceptance: failures.length ? 'FAIL' : 'PASS',
 };
