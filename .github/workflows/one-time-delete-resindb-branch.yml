@@ -1,0 +1,29 @@
+name: One-time delete merged ResinDB branch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/delete-resindb-branch.trigger
+
+permissions:
+  contents: write
+
+concurrency:
+  group: resindb-merged-branch-cleanup
+  cancel-in-progress: false
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main with repository credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Delete merged acceptance branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin --delete agent/final-acceptance-resindb-20260808
