@@ -1,0 +1,55 @@
+name: One-time localized image audit patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/patch-localized-image-audit.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: resindb-localized-image-audit
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12'
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Patch and validate localized image discovery
+        run: |
+          python .github/patch-localized-image-audit.py
+          npm ci
+          npm run validate:i18n-visuals
+          npm run validate:docs
+          npm run validate:scientific-ui
+          npm run typecheck
+      - name: Remove transport and publish audit contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/patch-localized-image-audit.py
+          rm -f .github/workflows/patch-localized-image-audit-once.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'test: audit HTML and Markdown images in localized READMEs'
+          git push origin HEAD:main
