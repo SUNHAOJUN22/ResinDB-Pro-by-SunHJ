@@ -6,8 +6,7 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: write
-  issues: write
+  contents: read
 
 concurrency:
   group: resindb-exact-final-acceptance
@@ -15,19 +14,15 @@ concurrency:
 
 jobs:
   finalize:
-    if: >-
-      github.event.pull_request.number == 35 &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.head.ref == 'agent/final-acceptance-resindb-20260808'
     runs-on: ubuntu-latest
     timeout-minutes: 150
     steps:
-      - name: Check out exact acceptance branch with write access
+      - name: Check out exact acceptance branch
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: agent/final-acceptance-resindb-20260808
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Install CJK fonts for deterministic visual evidence
         shell: bash
@@ -71,7 +66,7 @@ jobs:
           NODE
           cp package-lock.json /tmp/audited-package-lock.json
 
-      - name: Restore permanent CI and bilingual visual documentation contract
+      - name: Materialize permanent CI and bilingual visual documentation
         shell: bash
         run: |
           set -euo pipefail
@@ -193,31 +188,37 @@ Windows uses the governed fallback chain headed by Microsoft YaHei; Linux uses N
           npm run validate:docs
           npm run validate:i18n-visuals
 
-      - name: Publish exact clean acceptance tree
-        id: publish
+      - name: Assemble final acceptance overlay
         shell: bash
         run: |
           set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git diff --cached --check
-          git commit -m 'fix: finalize readable bilingual scientific visual delivery'
-          git push origin HEAD:agent/final-acceptance-resindb-20260808
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          mkdir -p artifacts/final-overlay/.github/workflows
+          mkdir -p artifacts/final-overlay/docs/images
+          cp package-lock.json artifacts/final-overlay/package-lock.json
+          cp README.md artifacts/final-overlay/README.md
+          cp .github/workflows/ci.yml artifacts/final-overlay/.github/workflows/ci.yml
+          cp docs/README_RUNTIME_VISUAL_EVIDENCE.json artifacts/final-overlay/docs/README_RUNTIME_VISUAL_EVIDENCE.json
+          cp docs/images/ui-dashboard-zh-light.png artifacts/final-overlay/docs/images/
+          cp docs/images/ui-dashboard-en-dark.png artifacts/final-overlay/docs/images/
+          cp docs/images/ui-product-detail.png artifacts/final-overlay/docs/images/
+          cp docs/images/ui-scientific-analytics.png artifacts/final-overlay/docs/images/
+          cp docs/images/ui-phase2l-rheology-proxy.png artifacts/final-overlay/docs/images/
+          cp docs/images/ui-phase2l-dependency-heatmap.png artifacts/final-overlay/docs/images/
+          cp docs/images/ui-kmeans-profile-audit.png artifacts/final-overlay/docs/images/
+          cp docs/images/ui-kmeans-device-calibration.png artifacts/final-overlay/docs/images/
+          find artifacts/final-overlay -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > artifacts/final-overlay/SHA256SUMS
 
-      - name: Post exact acceptance result
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SOURCE_SHA: ${{ steps.publish.outputs.sha }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          body="RESINDB_FINAL_ACCEPTANCE: PASS — exact source ${SOURCE_SHA}; zero production/full dependency findings; complete validate:ci; readable CJK font evidence; completed non-blank scientific Canvas; README screenshots regenerated from the production build; permanent read-only CI restored."
-          jq -n --arg body "$body" '{body:$body}' > /tmp/comment.json
-          curl -fsSL -X POST \
-            -H 'Accept: application/vnd.github+json' \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H 'X-GitHub-Api-Version: 2022-11-28' \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/issues/35/comments" \
-            -d @/tmp/comment.json
+      - name: Upload final acceptance overlay and evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resindb-final-acceptance-overlay-${{ github.sha }}
+          path: |
+            artifacts/final-overlay/
+            artifacts/ui-smoke-manifest.json
+            artifacts/npm-audit-prod.json
+            artifacts/npm-audit-all.json
+            artifacts/test-results.json
+            artifacts/coverage-summary.json
+          if-no-files-found: warn
+          retention-days: 14
