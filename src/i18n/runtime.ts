@@ -14,7 +14,7 @@ const LANGUAGE_ALIASES: Readonly<Record<string, Language>> = {
   english: 'en',
 };
 
-const MOJIBAKE_PATTERN = /\uFFFD|Ã[\u0080-\u00BF]|Â[\u0080-\u00BF]|â[\u0080-\u00BF]{1,2}|ðŸ|ï»¿|锟斤拷/u;
+const MOJIBAKE_PATTERN = /\uFFFD|\u00C3[\u0080-\u00BF]|\u00C2[\u0080-\u00BF]|\u00E2[\u0080-\u00BF]{1,2}|\u00F0\u0178|\u00EF\u00BB\u00BF|\u951F\u65A4\u62F7/u;
 
 function hasForbiddenControlCharacter(value: string): boolean {
   for (const character of value) {
