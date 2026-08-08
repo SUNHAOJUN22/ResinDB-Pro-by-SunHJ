@@ -1044,7 +1044,7 @@ npm run validate:ci
 - [ ] 永久 CI 为只读且最新 `main` 全绿；
 - [ ] `npm ci` 可从 lockfile 复现；
 - [ ] 数据 manifest 与 SHA-256 通过；
-- [ ] `315/315` 或更新后的完整测试集全部通过；
+- [ ] `326/326` 或更新后的完整测试集全部通过；
 - [ ] TypeScript、ESLint、构建、HTTP 和 Chromium 通过；
 - [ ] 生产与完整依赖审计均无高危/严重漏洞；
 - [ ] exact-tree、SHA-256、PASS receipt、PDF 和证据 ZIP 已归档；
@@ -1054,6 +1054,23 @@ npm run validate:ci
 
 ---
 
+<!-- FINAL_ACCEPTANCE_EVIDENCE_START -->
+
+## 当前验收证据 / Current acceptance evidence
+
+本节绑定 GitHub Actions 运行 `31238772446` 生成的最终覆盖包，而不是历史口头结论：
+
+- 完整回归：`326/326` tests，`159/159` suites，失败数 `0`；
+- 全生产 TypeScript 覆盖范围：`238/238` files；lines `43.93%`，statements `42.75%`，branches `27.31%`，functions `27.39%`；
+- 依赖安全：`dompurify 3.4.13`、`nanoid 3.3.17`，运行 `31238772446` 及最终落库作业均执行生产与完整 `npm audit --audit-level=high`，结果为零漏洞；
+- 中文显示：Chromium 实际加载 `Noto Sans CJK SC`，字体状态 `loaded`；
+- 数理绘图：ECharts 完成 `finished` 生命周期，Canvas `938×1991`，数据点 `6`，非背景采样 `9110`，彩色采样 `9080`；
+- 浏览器合同：中文/英文、浅色/深色、数据表、产品详情、流变曲线、依赖热图、K-Means 设备校准与审计均由同一生产构建生成截图证据。
+
+*This evidence is bound to GitHub Actions run `31238772446`: 326/326 tests passed; all 238 production TypeScript files were instrumented; production and complete dependency audits were repeated during final publication with zero findings; Chromium loaded Noto Sans CJK SC; and a completed non-blank scientific Canvas was measured before README screenshots were accepted.*
+
+<!-- FINAL_ACCEPTANCE_EVIDENCE_END -->
+
 ## 总结 / Summary
 
 ResinDB Pro 将独立数据治理、材料统计、聚合物物理筛选、Worker 计算、科学图表和验收证据组织成同一套可重复工程合同。
@@ -1061,3 +1078,20 @@ ResinDB Pro 将独立数据治理、材料统计、聚合物物理筛选、Worke
 *ResinDB Pro unifies governed data, material statistics, polymer-physics screening, Worker-based computation, scientific visualization, and acceptance evidence under one reproducible engineering contract.*
 
 项目的可信度来自 **公式、适用域、测试、浏览器证据、依赖审计和 exact-tree**，而不是来自图像数量或未经核验的性能叙述。
+
+
+## Linux 中文字体与截图验收 / Linux CJK font and screenshot acceptance
+
+中文界面与科研图表只有在实际字体和真实绘制同时成立时才允许进入 README。永久 CI 安装并验证 Noto CJK，Chromium 随后检查字体可用性、ECharts `finished` 生命周期、非零数据点、Canvas 尺寸与非空彩色像素；仅存在 `canvas` 或 SVG 图标不再视为图表通过。
+
+*Chinese UI and scientific figures are accepted only when a real CJK font and a completed non-blank plot are both observable. Permanent CI installs and verifies Noto CJK, then requires Chromium font evidence, the ECharts `finished` lifecycle, non-zero data points, a sized Canvas, and non-background chromatic pixels.*
+
+Minimal Ubuntu/Debian runtime prerequisite:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+fc-cache -f
+```
+
+Windows uses the governed fallback chain headed by Microsoft YaHei; Linux uses Noto Sans CJK SC/Noto Sans SC. README screenshots are regenerated from the same production build after these checks.
