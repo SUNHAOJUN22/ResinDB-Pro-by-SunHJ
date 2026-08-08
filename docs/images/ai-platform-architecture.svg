@@ -1,4 +1,194 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img">
-<rect width="1600" height="900" fill="#F7FAFC"/>
-<text x="800" y="70" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="50" font-weight="800" fill="#0B1F4D" text-anchor="middle">ResinDB Pro / 树脂数据库与科学计算平台</text><text x="800" y="112" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="24" font-weight="500" fill="#465A73" text-anchor="middle">Material Statistics · Polymer Physics · Compute Surface · Validation Evidence / 材料统计 · 聚合物物理 · 计算层 · 验证证据链</text><line x1="210" y1="132" x2="1390" y2="132" stroke="#D7E2F0" stroke-width="2"/><rect x="30" y="165" width="340" height="530" rx="24" fill="#FFFFFF" stroke="#0B1F4D" stroke-width="3"/><path d="M54,165 H346 Q370,165 370,189 V253 H30 V189 Q30,165 54,165 Z" fill="#0B1F4D"/><circle cx="78" cy="209" r="25" fill="#FFFFFF" stroke="none" stroke-width="0"/><text x="78" y="218" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="24" font-weight="800" fill="#0B1F4D" text-anchor="middle">1</text><text x="118" y="202" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="22" font-weight="700" fill="#FFFFFF" text-anchor="start">数据层</text><text x="118" y="232" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="700" fill="#FFFFFF" text-anchor="start">Data Layer</text><line x1="61" y1="292" x2="85" y2="272" stroke="#0B1F4D" stroke-width="3"/><line x1="85" y1="272" x2="110" y2="297" stroke="#0B1F4D" stroke-width="3"/><line x1="110" y1="297" x2="97" y2="326" stroke="#0B1F4D" stroke-width="3"/><line x1="97" y1="326" x2="63" y2="322" stroke="#0B1F4D" stroke-width="3"/><line x1="63" y1="322" x2="61" y2="292" stroke="#0B1F4D" stroke-width="3"/><line x1="61" y1="292" x2="110" y2="297" stroke="#0B1F4D" stroke-width="3"/><line x1="85" y1="272" x2="97" y2="326" stroke="#0B1F4D" stroke-width="3"/><circle cx="61" cy="292" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><circle cx="85" cy="272" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><circle cx="110" cy="297" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><circle cx="97" cy="326" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><circle cx="63" cy="322" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><text x="135" y="297" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="600" fill="#0B1F4D" text-anchor="start">Governed resin JSON</text><text x="135" y="325" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="500" fill="#465A73" text-anchor="start">受控树脂 JSON</text><line x1="52" y1="343" x2="348" y2="343" stroke="#D7E2F0" stroke-width="1"/><line x1="61" y1="366" x2="85" y2="346" stroke="#0B1F4D" stroke-width="3"/><line x1="85" y1="346" x2="110" y2="371" stroke="#0B1F4D" stroke-width="3"/><line x1="110" y1="371" x2="97" y2="400" stroke="#0B1F4D" stroke-width="3"/><line x1="97" y1="400" x2="63" y2="396" stroke="#0B1F4D" stroke-width="3"/><line x1="63" y1="396" x2="61" y2="366" stroke="#0B1F4D" stroke-width="3"/><line x1="61" y1="366" x2="110" y2="371" stroke="#0B1F4D" stroke-width="3"/><line x1="85" y1="346" x2="97" y2="400" stroke="#0B1F4D" stroke-width="3"/><circle cx="61" cy="366" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><circle cx="85" cy="346" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><circle cx="110" cy="371" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><circle cx="97" cy="400" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><circle cx="63" cy="396" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><text x="135" y="371" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="600" fill="#0B1F4D" text-anchor="start">ASTM / ISO records</text><text x="135" y="399" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="500" fill="#465A73" text-anchor="start">标准与单位记录</text><line x1="52" y1="417" x2="348" y2="417" stroke="#D7E2F0" stroke-width="1"/><line x1="61" y1="440" x2="85" y2="420" stroke="#0B1F4D" stroke-width="3"/><line x1="85" y1="420" x2="110" y2="445" stroke="#0B1F4D" stroke-width="3"/><line x1="110" y1="445" x2="97" y2="474" stroke="#0B1F4D" stroke-width="3"/><line x1="97" y1="474" x2="63" y2="470" stroke="#0B1F4D" stroke-width="3"/><line x1="63" y1="470" x2="61" y2="440" stroke="#0B1F4D" stroke-width="3"/><line x1="61" y1="440" x2="110" y2="445" stroke="#0B1F4D" stroke-width="3"/><line x1="85" y1="420" x2="97" y2="474" stroke="#0B1F4D" stroke-width="3"/><circle cx="61" cy="440" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><circle cx="85" cy="420" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><circle cx="110" cy="445" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><circle cx="97" cy="474" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><circle cx="63" cy="470" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><text x="135" y="445" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="600" fill="#0B1F4D" text-anchor="start">Descriptors &amp; properties</text><text x="135" y="473" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="500" fill="#465A73" text-anchor="start">描述符与性能</text><line x1="52" y1="491" x2="348" y2="491" stroke="#D7E2F0" stroke-width="1"/><line x1="61" y1="514" x2="85" y2="494" stroke="#0B1F4D" stroke-width="3"/><line x1="85" y1="494" x2="110" y2="519" stroke="#0B1F4D" stroke-width="3"/><line x1="110" y1="519" x2="97" y2="548" stroke="#0B1F4D" stroke-width="3"/><line x1="97" y1="548" x2="63" y2="544" stroke="#0B1F4D" stroke-width="3"/><line x1="63" y1="544" x2="61" y2="514" stroke="#0B1F4D" stroke-width="3"/><line x1="61" y1="514" x2="110" y2="519" stroke="#0B1F4D" stroke-width="3"/><line x1="85" y1="494" x2="97" y2="548" stroke="#0B1F4D" stroke-width="3"/><circle cx="61" cy="514" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><circle cx="85" cy="494" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><circle cx="110" cy="519" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><circle cx="97" cy="548" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><circle cx="63" cy="544" r="6" fill="#0B1F4D" stroke="none" stroke-width="0"/><text x="135" y="519" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="600" fill="#0B1F4D" text-anchor="start">Manifest + SHA-256</text><text x="135" y="547" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="500" fill="#465A73" text-anchor="start">清单与哈希</text><path d="M376,422 H392 V410 L410,430 L392,450 V438 H376 Z" fill="#0B1F4D"/><rect x="415" y="165" width="350" height="530" rx="24" fill="#FFFFFF" stroke="#0B8A8F" stroke-width="3"/><path d="M439,165 H741 Q765,165 765,189 V253 H415 V189 Q415,165 439,165 Z" fill="#0B8A8F"/><circle cx="463" cy="209" r="25" fill="#FFFFFF" stroke="none" stroke-width="0"/><text x="463" y="218" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="24" font-weight="800" fill="#0B8A8F" text-anchor="middle">2</text><text x="503" y="202" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="22" font-weight="700" fill="#FFFFFF" text-anchor="start">科学计算</text><text x="503" y="232" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="700" fill="#FFFFFF" text-anchor="start">Scientific Compute</text><line x1="438" y1="335" x2="438" y2="275" stroke="#0B8A8F" stroke-width="3"/><line x1="438" y1="335" x2="505" y2="335" stroke="#0B8A8F" stroke-width="3"/><polyline points="448,323 463,308 478,313 498,285" fill="none" stroke="#0B8A8F" stroke-width="4"/><circle cx="448" cy="323" r="5" fill="#0B8A8F" stroke="none" stroke-width="0"/><circle cx="463" cy="308" r="5" fill="#0B8A8F" stroke="none" stroke-width="0"/><circle cx="478" cy="313" r="5" fill="#0B8A8F" stroke="none" stroke-width="0"/><circle cx="498" cy="285" r="5" fill="#0B8A8F" stroke="none" stroke-width="0"/><text x="520" y="297" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="600" fill="#0B1F4D" text-anchor="start">Pearson · Spearman</text><text x="520" y="325" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="500" fill="#465A73" text-anchor="start">相关与等级相关</text><line x1="437" y1="343" x2="743" y2="343" stroke="#D7E2F0" stroke-width="1"/><line x1="438" y1="409" x2="438" y2="349" stroke="#0B8A8F" stroke-width="3"/><line x1="438" y1="409" x2="505" y2="409" stroke="#0B8A8F" stroke-width="3"/><polyline points="448,397 463,382 478,387 498,359" fill="none" stroke="#0B8A8F" stroke-width="4"/><circle cx="448" cy="397" r="5" fill="#0B8A8F" stroke="none" stroke-width="0"/><circle cx="463" cy="382" r="5" fill="#0B8A8F" stroke="none" stroke-width="0"/><circle cx="478" cy="387" r="5" fill="#0B8A8F" stroke="none" stroke-width="0"/><circle cx="498" cy="359" r="5" fill="#0B8A8F" stroke="none" stroke-width="0"/><text x="520" y="371" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="600" fill="#0B1F4D" text-anchor="start">Regression · CI · KDE</text><text x="520" y="399" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="500" fill="#465A73" text-anchor="start">回归、区间与核密度</text><line x1="437" y1="417" x2="743" y2="417" stroke="#D7E2F0" stroke-width="1"/><line x1="438" y1="483" x2="438" y2="423" stroke="#0B8A8F" stroke-width="3"/><line x1="438" y1="483" x2="505" y2="483" stroke="#0B8A8F" stroke-width="3"/><polyline points="448,471 463,456 478,461 498,433" fill="none" stroke="#0B8A8F" stroke-width="4"/><circle cx="448" cy="471" r="5" fill="#0B8A8F" stroke="none" stroke-width="0"/><circle cx="463" cy="456" r="5" fill="#0B8A8F" stroke="none" stroke-width="0"/><circle cx="478" cy="461" r="5" fill="#0B8A8F" stroke="none" stroke-width="0"/><circle cx="498" cy="433" r="5" fill="#0B8A8F" stroke="none" stroke-width="0"/><text x="520" y="445" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="600" fill="#0B1F4D" text-anchor="start">Polymer screening</text><text x="520" y="473" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="500" fill="#465A73" text-anchor="start">聚合物经验筛选</text><line x1="437" y1="491" x2="743" y2="491" stroke="#D7E2F0" stroke-width="1"/><line x1="438" y1="557" x2="438" y2="497" stroke="#0B8A8F" stroke-width="3"/><line x1="438" y1="557" x2="505" y2="557" stroke="#0B8A8F" stroke-width="3"/><polyline points="448,545 463,530 478,535 498,507" fill="none" stroke="#0B8A8F" stroke-width="4"/><circle cx="448" cy="545" r="5" fill="#0B8A8F" stroke="none" stroke-width="0"/><circle cx="463" cy="530" r="5" fill="#0B8A8F" stroke="none" stroke-width="0"/><circle cx="478" cy="535" r="5" fill="#0B8A8F" stroke="none" stroke-width="0"/><circle cx="498" cy="507" r="5" fill="#0B8A8F" stroke="none" stroke-width="0"/><text x="520" y="519" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="600" fill="#0B1F4D" text-anchor="start">LAMMPS templates</text><text x="520" y="547" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="500" fill="#465A73" text-anchor="start">LAMMPS 模板</text><path d="M770,422 H786 V410 L804,430 L786,450 V438 H770 Z" fill="#0B1F4D"/><rect x="810" y="165" width="340" height="530" rx="24" fill="#FFFFFF" stroke="#1457C5" stroke-width="3"/><path d="M834,165 H1126 Q1150,165 1150,189 V253 H810 V189 Q810,165 834,165 Z" fill="#1457C5"/><circle cx="858" cy="209" r="25" fill="#FFFFFF" stroke="none" stroke-width="0"/><text x="858" y="218" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="24" font-weight="800" fill="#1457C5" text-anchor="middle">3</text><text x="898" y="202" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="22" font-weight="700" fill="#FFFFFF" text-anchor="start">应用与界面</text><text x="898" y="232" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="700" fill="#FFFFFF" text-anchor="start">Application &amp; UI</text><line x1="833" y1="335" x2="833" y2="275" stroke="#1457C5" stroke-width="3"/><line x1="833" y1="335" x2="900" y2="335" stroke="#1457C5" stroke-width="3"/><polyline points="843,323 858,308 873,313 893,285" fill="none" stroke="#1457C5" stroke-width="4"/><circle cx="843" cy="323" r="5" fill="#1457C5" stroke="none" stroke-width="0"/><circle cx="858" cy="308" r="5" fill="#1457C5" stroke="none" stroke-width="0"/><circle cx="873" cy="313" r="5" fill="#1457C5" stroke="none" stroke-width="0"/><circle cx="893" cy="285" r="5" fill="#1457C5" stroke="none" stroke-width="0"/><text x="915" y="297" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="600" fill="#0B1F4D" text-anchor="start">Grade recommendation</text><text x="915" y="325" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="500" fill="#465A73" text-anchor="start">牌号推荐</text><line x1="832" y1="343" x2="1128" y2="343" stroke="#D7E2F0" stroke-width="1"/><line x1="833" y1="409" x2="833" y2="349" stroke="#1457C5" stroke-width="3"/><line x1="833" y1="409" x2="900" y2="409" stroke="#1457C5" stroke-width="3"/><polyline points="843,397 858,382 873,387 893,359" fill="none" stroke="#1457C5" stroke-width="4"/><circle cx="843" cy="397" r="5" fill="#1457C5" stroke="none" stroke-width="0"/><circle cx="858" cy="382" r="5" fill="#1457C5" stroke="none" stroke-width="0"/><circle cx="873" cy="387" r="5" fill="#1457C5" stroke="none" stroke-width="0"/><circle cx="893" cy="359" r="5" fill="#1457C5" stroke="none" stroke-width="0"/><text x="915" y="371" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="600" fill="#0B1F4D" text-anchor="start">Scientific charts</text><text x="915" y="399" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="500" fill="#465A73" text-anchor="start">科研图表</text><line x1="832" y1="417" x2="1128" y2="417" stroke="#D7E2F0" stroke-width="1"/><line x1="833" y1="483" x2="833" y2="423" stroke="#1457C5" stroke-width="3"/><line x1="833" y1="483" x2="900" y2="483" stroke="#1457C5" stroke-width="3"/><polyline points="843,471 858,456 873,461 893,433" fill="none" stroke="#1457C5" stroke-width="4"/><circle cx="843" cy="471" r="5" fill="#1457C5" stroke="none" stroke-width="0"/><circle cx="858" cy="456" r="5" fill="#1457C5" stroke="none" stroke-width="0"/><circle cx="873" cy="461" r="5" fill="#1457C5" stroke="none" stroke-width="0"/><circle cx="893" cy="433" r="5" fill="#1457C5" stroke="none" stroke-width="0"/><text x="915" y="445" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="600" fill="#0B1F4D" text-anchor="start">Worker modules</text><text x="915" y="473" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="500" fill="#465A73" text-anchor="start">计算工作模块</text><line x1="832" y1="491" x2="1128" y2="491" stroke="#D7E2F0" stroke-width="1"/><line x1="833" y1="557" x2="833" y2="497" stroke="#1457C5" stroke-width="3"/><line x1="833" y1="557" x2="900" y2="557" stroke="#1457C5" stroke-width="3"/><polyline points="843,545 858,530 873,535 893,507" fill="none" stroke="#1457C5" stroke-width="4"/><circle cx="843" cy="545" r="5" fill="#1457C5" stroke="none" stroke-width="0"/><circle cx="858" cy="530" r="5" fill="#1457C5" stroke="none" stroke-width="0"/><circle cx="873" cy="535" r="5" fill="#1457C5" stroke="none" stroke-width="0"/><circle cx="893" cy="507" r="5" fill="#1457C5" stroke="none" stroke-width="0"/><text x="915" y="519" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="600" fill="#0B1F4D" text-anchor="start">Browser interaction</text><text x="915" y="547" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="500" fill="#465A73" text-anchor="start">浏览器交互</text><path d="M1155,422 H1170 V410 L1188,430 L1170,450 V438 H1155 Z" fill="#0B1F4D"/><rect x="1195" y="165" width="375" height="530" rx="24" fill="#FFFFFF" stroke="#465A73" stroke-width="3"/><path d="M1219,165 H1546 Q1570,165 1570,189 V253 H1195 V189 Q1195,165 1219,165 Z" fill="#465A73"/><circle cx="1243" cy="209" r="25" fill="#FFFFFF" stroke="none" stroke-width="0"/><text x="1243" y="218" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="24" font-weight="800" fill="#465A73" text-anchor="middle">4</text><text x="1283" y="202" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="22" font-weight="700" fill="#FFFFFF" text-anchor="start">验证证据链</text><text x="1283" y="232" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="700" fill="#FFFFFF" text-anchor="start">Validation Evidence</text><path d="M1250,268 L1280,282 V307 C1280,327 1262,340 1250,347 C1238,340 1220,327 1220,307 V282 Z" fill="none" stroke="#465A73" stroke-width="5"/><path d="M1236,305 L1247,317 L1268,293" fill="none" stroke="#465A73" stroke-width="5" stroke-linecap="round"/><text x="1300" y="297" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="600" fill="#0B1F4D" text-anchor="start">Tests + coverage</text><text x="1300" y="325" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="500" fill="#465A73" text-anchor="start">测试与覆盖率</text><line x1="1217" y1="343" x2="1548" y2="343" stroke="#D7E2F0" stroke-width="1"/><path d="M1250,342 L1280,356 V381 C1280,401 1262,414 1250,421 C1238,414 1220,401 1220,381 V356 Z" fill="none" stroke="#465A73" stroke-width="5"/><path d="M1236,379 L1247,391 L1268,367" fill="none" stroke="#465A73" stroke-width="5" stroke-linecap="round"/><text x="1300" y="371" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="600" fill="#0B1F4D" text-anchor="start">Chromium smoke</text><text x="1300" y="399" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="500" fill="#465A73" text-anchor="start">浏览器冒烟</text><line x1="1217" y1="417" x2="1548" y2="417" stroke="#D7E2F0" stroke-width="1"/><path d="M1250,416 L1280,430 V455 C1280,475 1262,488 1250,495 C1238,488 1220,475 1220,455 V430 Z" fill="none" stroke="#465A73" stroke-width="5"/><path d="M1236,453 L1247,465 L1268,441" fill="none" stroke="#465A73" stroke-width="5" stroke-linecap="round"/><text x="1300" y="445" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="600" fill="#0B1F4D" text-anchor="start">Audit + exact-tree</text><text x="1300" y="473" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="500" fill="#465A73" text-anchor="start">审计与精确树</text><line x1="1217" y1="491" x2="1548" y2="491" stroke="#D7E2F0" stroke-width="1"/><path d="M1250,490 L1280,504 V529 C1280,549 1262,562 1250,569 C1238,562 1220,549 1220,529 V504 Z" fill="none" stroke="#465A73" stroke-width="5"/><path d="M1236,527 L1247,539 L1268,515" fill="none" stroke="#465A73" stroke-width="5" stroke-linecap="round"/><text x="1300" y="519" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="20" font-weight="600" fill="#0B1F4D" text-anchor="start">PDF + PASS receipt</text><text x="1300" y="547" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="500" fill="#465A73" text-anchor="start">报告与通过凭证</text><rect x="70" y="735" width="1460" height="115" rx="20" fill="#EEF4FA" stroke="#0B1F4D" stroke-width="2"/><text x="800" y="775" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="25" font-weight="800" fill="#0B1F4D" text-anchor="middle">Key Numerical Contracts / 关键数理合同</text><circle cx="155" cy="815" r="20" fill="#0B1F4D" stroke="none" stroke-width="0"/><text x="155" y="823" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="800" fill="#FFFFFF" text-anchor="middle">1</text><text x="310" y="824" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="22" font-weight="700" fill="#0B1F4D" text-anchor="middle">t = r√((n−2)/(1−r²))</text><circle cx="645" cy="815" r="20" fill="#0B8A8F" stroke="none" stroke-width="0"/><text x="645" y="823" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="800" fill="#FFFFFF" text-anchor="middle">2</text><text x="800" y="824" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="22" font-weight="700" fill="#0B1F4D" text-anchor="middle">β̂₁ = Sxy / Sxx</text><circle cx="1125" cy="815" r="20" fill="#1457C5" stroke="none" stroke-width="0"/><text x="1125" y="823" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="18" font-weight="800" fill="#FFFFFF" text-anchor="middle">3</text><text x="1280" y="824" font-family="Inter, 'Noto Sans SC', 'Microsoft YaHei', Arial, sans-serif" font-size="22" font-weight="700" fill="#0B1F4D" text-anchor="middle">σx [MPa] = −pxx [atm] × 0.101325</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">ResinDB Pro bilingual scientific visual integrity architecture</title>
+  <desc id="desc">AI-assisted conceptual illustration showing governed resin data, Unicode-safe Chinese and English language routing, typed scientific workers, resilient chart rendering, and exact-tree validation evidence. This is not scientific data.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset="0.52" stop-color="#0b1830"/>
+      <stop offset="1" stop-color="#111a35"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="emerald" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#34d399"/>
+      <stop offset="1" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbbf24"/>
+      <stop offset="1" stop-color="#f97316"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#9fb7d7" stroke-opacity="0.06" stroke-width="1"/>
+    </pattern>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#020617" flood-opacity="0.55"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="#67e8f9"/>
+    </marker>
+    <style>
+      text{font-family:Inter,"Noto Sans SC","Noto Sans CJK SC","Microsoft YaHei","PingFang SC","WenQuanYi Micro Hei","Segoe UI",sans-serif}
+      .eyebrow{font-size:18px;letter-spacing:4px;font-weight:700;fill:#67e8f9}
+      .title{font-size:46px;font-weight:760;fill:#f8fafc}
+      .subtitle{font-size:20px;fill:#a9bdd7}
+      .panel-title{font-size:22px;font-weight:720;fill:#f8fafc}
+      .panel-subtitle{font-size:15px;fill:#93a9c5}
+      .label{font-size:15px;font-weight:650;fill:#dbeafe}
+      .small{font-size:13px;fill:#9fb3cc}
+      .formula{font-family:"STIX Two Math","Cambria Math","Noto Sans Math","Noto Sans SC",serif;font-size:18px;fill:#e0f2fe}
+      .badge{font-size:12px;font-weight:700;letter-spacing:1px;fill:#07111f}
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#background)"/>
+  <rect width="1600" height="900" fill="url(#grid)"/>
+  <circle cx="1420" cy="130" r="250" fill="#2563eb" opacity="0.08"/>
+  <circle cx="180" cy="780" r="260" fill="#7c3aed" opacity="0.07"/>
+
+  <g transform="translate(80 68)">
+    <text class="eyebrow">RESINDB PRO · GOVERNED SCIENTIFIC WORKSTATION</text>
+    <text class="title" y="58">双语科研可视化完整性链路</text>
+    <text class="subtitle" y="96">Bilingual scientific visualization integrity — data, language, mathematics, rendering and evidence in one auditable path</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="80" y="205" width="290" height="440" rx="28" fill="#0d2035" stroke="#1e4e70" stroke-width="2"/>
+    <rect x="405" y="205" width="290" height="440" rx="28" fill="#151d3b" stroke="#4b3b82" stroke-width="2"/>
+    <rect x="730" y="205" width="290" height="440" rx="28" fill="#0d2a2c" stroke="#1f6655" stroke-width="2"/>
+    <rect x="1055" y="205" width="465" height="440" rx="28" fill="#182132" stroke="#635326" stroke-width="2"/>
+  </g>
+
+  <g transform="translate(108 232)">
+    <rect width="116" height="28" rx="14" fill="url(#cyan)"/>
+    <text class="badge" x="58" y="19" text-anchor="middle">DATA LAYER</text>
+    <text class="panel-title" y="68">治理数据与语义合同</text>
+    <text class="panel-subtitle" y="94">Governed data + provenance</text>
+
+    <g transform="translate(0 130)">
+      <rect width="234" height="72" rx="16" fill="#102b45" stroke="#24547a"/>
+      <circle cx="28" cy="26" r="10" fill="#22d3ee"/>
+      <path d="M18 42h20M15 50h26" stroke="#67e8f9" stroke-width="3" stroke-linecap="round"/>
+      <text class="label" x="54" y="28">JSON Schema</text>
+      <text class="small" x="54" y="50">value · unit · standard · source</text>
+    </g>
+    <g transform="translate(0 220)">
+      <rect width="234" height="72" rx="16" fill="#102b45" stroke="#24547a"/>
+      <path d="M20 18h32v36H20zM28 26h16M28 34h16M28 42h11" fill="none" stroke="#7dd3fc" stroke-width="2"/>
+      <text class="label" x="64" y="28">Manifest + SHA-256</text>
+      <text class="small" x="64" y="50">exact bytes · version envelope</text>
+    </g>
+    <g transform="translate(0 310)">
+      <rect width="234" height="72" rx="16" fill="#102b45" stroke="#24547a"/>
+      <path d="M20 38c18-24 28 24 46 0s28 24 46 0" fill="none" stroke="#67e8f9" stroke-width="3"/>
+      <text class="label" x="124" y="28">材料属性不是裸数字</text>
+      <text class="small" x="124" y="50">A property is not a bare scalar</text>
+    </g>
+  </g>
+
+  <g transform="translate(433 232)">
+    <rect width="136" height="28" rx="14" fill="url(#violet)"/>
+    <text class="badge" x="68" y="19" text-anchor="middle">LANGUAGE GATE</text>
+    <text class="panel-title" y="68">Unicode 安全语言路由</text>
+    <text class="panel-subtitle" y="94">Unicode-safe zh/en runtime</text>
+
+    <g transform="translate(0 126)">
+      <rect width="234" height="82" rx="18" fill="#211d49" stroke="#5b4aa0"/>
+      <text x="20" y="30" font-size="24" font-weight="760" fill="#ddd6fe">中文</text>
+      <text x="108" y="30" font-size="24" font-weight="760" fill="#c4b5fd">English</text>
+      <text class="small" x="20" y="58">zh-CN ⇄ en · persisted · typed</text>
+    </g>
+    <g transform="translate(0 228)">
+      <rect width="234" height="64" rx="16" fill="#211d49" stroke="#5b4aa0"/>
+      <text class="formula" x="18" y="28">s' = NFC(s)</text>
+      <text class="small" x="18" y="50">reject U+FFFD · mojibake · controls</text>
+    </g>
+    <g transform="translate(0 312)">
+      <rect width="234" height="70" rx="16" fill="#211d49" stroke="#5b4aa0"/>
+      <path d="M22 18l18 18-18 18M51 18l-18 18 18 18" fill="none" stroke="#c4b5fd" stroke-width="3" stroke-linecap="round"/>
+      <text class="label" x="74" y="28">明确回退</text>
+      <text class="small" x="74" y="50">No raw key or broken glyph leakage</text>
+    </g>
+  </g>
+
+  <g transform="translate(758 232)">
+    <rect width="132" height="28" rx="14" fill="url(#emerald)"/>
+    <text class="badge" x="66" y="19" text-anchor="middle">MATH WORKERS</text>
+    <text class="panel-title" y="68">类型化科研计算内核</text>
+    <text class="panel-subtitle" y="94">Typed Worker / WASM kernels</text>
+
+    <g transform="translate(0 126)">
+      <rect width="234" height="72" rx="16" fill="#103736" stroke="#257064"/>
+      <text class="formula" x="18" y="29">D²=(x−μ)ᵀS⁻¹(x−μ)</text>
+      <text class="small" x="18" y="52">finite inputs · regularized covariance</text>
+    </g>
+    <g transform="translate(0 216)">
+      <rect width="234" height="72" rx="16" fill="#103736" stroke="#257064"/>
+      <text class="formula" x="18" y="29">EI=(μ−f*)Φ(z)+σφ(z)</text>
+      <text class="small" x="18" y="52">seeded GP candidates · explicit uncertainty</text>
+    </g>
+    <g transform="translate(0 306)">
+      <rect width="234" height="76" rx="16" fill="#103736" stroke="#257064"/>
+      <text class="formula" x="18" y="29">min Σᵢ‖xᵢ−μcᵢ‖²</text>
+      <text class="small" x="18" y="52">TypeScript ⇄ calibrated WASM · f64</text>
+    </g>
+  </g>
+
+  <g transform="translate(1083 232)">
+    <rect width="150" height="28" rx="14" fill="url(#amber)"/>
+    <text class="badge" x="75" y="19" text-anchor="middle">VISUAL + EVIDENCE</text>
+    <text class="panel-title" y="68">韧性绘图与验收证据</text>
+    <text class="panel-subtitle" y="94">Resilient ScientificEChart + exact-tree receipt</text>
+
+    <g transform="translate(0 124)">
+      <rect width="410" height="176" rx="20" fill="#222b3d" stroke="#806a2e"/>
+      <path d="M42 136V30M42 136h322" stroke="#8191aa" stroke-width="2"/>
+      <path d="M64 119C118 88 144 110 192 72s93 8 151-42" fill="none" stroke="#22d3ee" stroke-width="5" filter="url(#glow)"/>
+      <circle cx="64" cy="119" r="6" fill="#a78bfa"/>
+      <circle cx="192" cy="72" r="6" fill="#34d399"/>
+      <circle cx="343" cy="30" r="6" fill="#fbbf24"/>
+      <text class="small" x="54" y="25">CJK-safe labels · ResizeObserver fallback · theme/locale sync</text>
+      <text class="small" x="262" y="158">Scientific figure</text>
+    </g>
+    <g transform="translate(0 322)">
+      <rect width="196" height="68" rx="16" fill="#2a2d3a" stroke="#76622c"/>
+      <path d="M18 18h34v34H18zM25 28l8 8 14-16" fill="none" stroke="#fbbf24" stroke-width="3"/>
+      <text class="label" x="66" y="28">Chromium 真实截图</text>
+      <text class="small" x="66" y="50">runtime UI evidence</text>
+    </g>
+    <g transform="translate(214 322)">
+      <rect width="196" height="68" rx="16" fill="#2a2d3a" stroke="#76622c"/>
+      <path d="M20 20h32M20 32h32M20 44h22" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+      <text class="label" x="66" y="28">机器验收回执</text>
+      <text class="small" x="66" y="50">tests · coverage · hashes</text>
+    </g>
+  </g>
+
+  <g fill="none" stroke="#67e8f9" stroke-width="3" stroke-linecap="round" marker-end="url(#arrow)" opacity="0.92">
+    <path d="M370 425H397"/>
+    <path d="M695 425H722"/>
+    <path d="M1020 425H1047"/>
+  </g>
+
+  <g transform="translate(80 700)">
+    <rect width="1440" height="116" rx="24" fill="#0c1728" stroke="#263a55"/>
+    <text x="32" y="38" font-size="17" font-weight="700" fill="#f8fafc">统一验收不变量 / Unified acceptance invariant</text>
+    <text class="formula" x="32" y="72">PASS = UTF-8 ∧ locale parity ∧ finite numerics ∧ visible chart ∧ exact source identity</text>
+    <text class="small" x="32" y="98">A software PASS proves the governed implementation and evidence chain; it does not certify a material grade, experiment, force field, regulation or industrial release.</text>
+  </g>
+
+  <g transform="translate(80 850)">
+    <rect width="565" height="26" rx="13" fill="#f8fafc" opacity="0.92"/>
+    <text x="282" y="18" text-anchor="middle" font-size="12" font-weight="800" letter-spacing="1.1" fill="#111827">AI-ASSISTED CONCEPTUAL ILLUSTRATION · NOT SCIENTIFIC DATA</text>
+    <text x="1440" y="18" text-anchor="end" font-size="13" fill="#7f96b3">ResinDB Pro · Version 3.2.0</text>
+  </g>
 </svg>

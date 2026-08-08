@@ -9,113 +9,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  finalize:
-    name: One-time bilingual visual finalizer
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'agent/final-acceptance-resindb-20260808' && github.actor != 'github-actions[bot]'
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - name: Check out acceptance branch
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: agent/final-acceptance-resindb-20260808
-          fetch-depth: 0
-          persist-credentials: true
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - name: Publish permanent bilingual visual contracts
-        shell: bash
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const fs = require('node:fs');
-
-          let readme = fs.readFileSync('README.md', 'utf8');
-          const anchor = '### 2.4 真实界面证据 / Real UI evidence';
-          const section = `### 2.4 双语科学图表完整性 / Bilingual scientific visual integrity
-
-语言、字体、数值与绘图生命周期属于同一个显示合同。中文和英文模式使用受控 locale alias，界面文本执行 Unicode NFC 归一化；替换字符、常见 mojibake 和不可见控制字符不得进入交付结果。ScientificEChart 对零尺寸容器、字体加载、ResizeObserver 缺失和动态主题/语言切换提供显式恢复路径。
-
-*Language, typography, numerics, and the chart lifecycle form one display contract. Governed locale aliases, Unicode normalization, CJK-safe font fallbacks, resilient resize behavior, and exact-tree evidence prevent broken glyphs or invisible mathematical figures from becoming silent failures.*
-
-![Bilingual scientific visual integrity](docs/images/ai-i18n-scientific-visual-integrity.svg)
-
-验收命令 / Acceptance command:
-
-\`\`\`bash
-npm run validate:i18n-visuals
-\`\`\`
-
-该门禁检查翻译键一致性、关键中英文语义、UTF-8、乱码特征、README 图链接、SVG 的 \`viewBox\`、\`title\`、\`desc\`、CJK 字体回退和主动脚本禁用。
-
-`;
-          if (!readme.includes('ai-i18n-scientific-visual-integrity.svg')) {
-            if (!readme.includes(anchor)) throw new Error('README visual anchor missing');
-            readme = readme.replace(anchor, `${section}### 2.5 真实界面证据 / Real UI evidence`);
-          }
-          fs.writeFileSync('README.md', readme, 'utf8');
-
-          let docs = fs.readFileSync('scripts/validate-repository-docs.mjs', 'utf8');
-          if (!docs.includes("'ai-i18n-scientific-visual-integrity.svg'")) {
-            docs = docs.replace(
-              "  'ai-delivery-validation.svg',\n].sort();",
-              "  'ai-delivery-validation.svg',\n  'ai-i18n-scientific-visual-integrity.svg',\n].sort();",
-            );
-          }
-          if (!docs.includes("'validate:i18n-visuals':")) {
-            docs = docs.replace(
-              "  'validate:docs': 'node scripts/validate-repository-docs.mjs',",
-              "  'validate:docs': 'node scripts/validate-repository-docs.mjs',\n  'validate:i18n-visuals': 'node scripts/validate-i18n-visuals.mjs',",
-            );
-          }
-          fs.writeFileSync('scripts/validate-repository-docs.mjs', docs, 'utf8');
-
-          const workflowPath = '.github/workflows/ci.yml';
-          let workflow = fs.readFileSync(workflowPath, 'utf8');
-          const start = workflow.indexOf('  finalize:\n');
-          const end = workflow.indexOf('  validate:\n');
-          if (start < 0 || end <= start) throw new Error('temporary finalizer block is missing');
-          workflow = workflow.slice(0, start) + workflow.slice(end);
-          workflow = workflow.replace('permissions:\n  contents: write', 'permissions:\n  contents: read');
-          if (!workflow.includes('Bilingual text and visual integrity')) {
-            workflow = workflow.replace(
-              '      - name: Documentation and deterministic scientific visuals\n        run: npm run validate:docs\n',
-              '      - name: Documentation and deterministic scientific visuals\n        run: npm run validate:docs\n      - name: Bilingual text and visual integrity\n        run: npm run validate:i18n-visuals\n',
-            );
-          }
-          if (!workflow.includes("            'i18n-visuals',")) {
-            workflow = workflow.replace(
-              "            'docs',\n            'source-hygiene',",
-              "            'docs',\n            'i18n-visuals',\n            'source-hygiene',",
-            );
-          }
-          fs.writeFileSync(workflowPath, workflow, 'utf8');
-          NODE
-          rm -f .github/workflows/finalize-resindb-acceptance-once.yml
-          npm ci
-          npm run validate:docs
-          npm run validate:i18n-visuals
-          npm run validate:scientific-ui
-          npm run lint
-          npm run typecheck
-          npm run test:unit
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git diff --cached --check
-          git commit -m 'docs: bind bilingual visual integrity to permanent acceptance'
-          git push origin HEAD:agent/final-acceptance-resindb-20260808
-
   validate:
     name: Exact-tree validation, browser evidence and reports
     runs-on: ubuntu-latest
