@@ -4,10 +4,11 @@ import {
   escapeScientificHtml,
   formatScientificNumber,
   SCIENTIFIC_FIGURE_POLICY_VERSION,
+  SCIENTIFIC_FONT_FAMILY,
 } from '@/components/charts/scientificFigurePolicy';
 
 describe('scientific figure policy', () => {
-  it('enforces accessible export, log-axis and reduced-motion defaults', () => {
+  it('enforces accessible export, CJK typography, log-axis and reduced-motion defaults', () => {
     const option = applyScientificFigurePolicy({
       tooltip: { trigger: 'axis' },
       xAxis: { type: 'log' },
@@ -20,9 +21,12 @@ describe('scientific figure policy', () => {
       reducedMotion: true,
       dataCount: 1,
     }) as Record<string, unknown>;
-    expect(SCIENTIFIC_FIGURE_POLICY_VERSION).toBe('scientific-figure-policy-1.0.0');
+    expect(SCIENTIFIC_FIGURE_POLICY_VERSION).toBe('scientific-figure-policy-1.1.0');
+    expect(SCIENTIFIC_FONT_FAMILY).toContain('Noto Sans SC');
+    expect(SCIENTIFIC_FONT_FAMILY).toContain('Microsoft YaHei');
     expect(option.animation).toBe(false);
     expect(option.aria).toMatchObject({ enabled: true });
+    expect(option.textStyle).toMatchObject({ fontFamily: SCIENTIFIC_FONT_FAMILY });
     expect(option.toolbox).toMatchObject({
       feature: { saveAsImage: { name: 'test-figure', pixelRatio: 3 } },
     });
