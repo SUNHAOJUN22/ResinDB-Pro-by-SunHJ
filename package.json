@@ -83,6 +83,10 @@
     "vite": "^7.2.2",
     "vitest": "^4.1.5"
   },
+  "overrides": {
+    "dompurify": "3.4.13",
+    "nanoid": "3.3.17"
+  },
   "engines": {
     "node": ">=22.12.0 <23"
   }
