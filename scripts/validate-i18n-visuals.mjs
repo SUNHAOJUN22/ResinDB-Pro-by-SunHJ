@@ -202,8 +202,12 @@ function readmeLocalImages() {
   const readmePaths = ['README.md', 'README.zh-CN.md', 'README.en.md'];
   return readmePaths.flatMap((relativePath) => {
     const readme = readUtf8(join(ROOT, relativePath));
-    return [...readme.matchAll(/!\[[^\n]*?\]\(([^)\n]+)\)/gu)]
-      .map((match) => match[1].trim().split(/[?#]/u, 1)[0])
+    const markdownTargets = [...readme.matchAll(/!\[[^\n]*?\]\(([^)\n]+)\)/gu)]
+      .map((match) => match[1]);
+    const htmlTargets = [...readme.matchAll(/<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/giu)]
+      .map((match) => match[1]);
+    return [...markdownTargets, ...htmlTargets]
+      .map((target) => target.trim().split(/[?#]/u, 1)[0])
       .filter((target) => target && !/^(?:https?:|data:)/u.test(target));
   });
 }
