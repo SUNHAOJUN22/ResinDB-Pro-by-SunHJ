@@ -46,6 +46,8 @@ jobs:
           test -s /tmp/resindb-final-artifact/ui-smoke-manifest.json
           test -s /tmp/resindb-final-artifact/test-results.json
           test -s /tmp/resindb-final-artifact/coverage-summary.json
+          test -s /tmp/resindb-final-artifact/npm-audit-prod.json
+          test -s /tmp/resindb-final-artifact/npm-audit-all.json
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -53,7 +55,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      - name: Apply audited overlay and restore permanent CI
+      - name: Apply audited overlay and validate permanent delivery
         shell: bash
         run: |
           set -euo pipefail
@@ -62,6 +64,8 @@ jobs:
           node .github/materialize-resindb-final.mjs
           node .github/apply-resindb-final-overlay.mjs /tmp/resindb-final-artifact
           npm ci
+          npm audit --omit=dev --audit-level=high
+          npm audit --audit-level=high
           node scripts/validate-repository-docs.mjs
           node scripts/validate-i18n-visuals.mjs
           node scripts/validate-scientific-ui.mjs
@@ -70,28 +74,35 @@ jobs:
           grep -q 'Install CJK fonts for deterministic visual evidence' .github/workflows/ci.yml
           grep -q '326/326' README.md
           grep -q 'Noto Sans CJK SC' docs/README_RUNTIME_VISUAL_EVIDENCE.json
+          cp .github/workflows/ci.yml /tmp/resindb-permanent-ci.yml
 
-      - name: Commit exact final delivery tree
+      - name: Commit exact non-workflow delivery payload
         id: commit
         shell: bash
         run: |
           set -euo pipefail
+          git checkout HEAD -- .github/workflows
+          test -z "$(git status --short -- .github/workflows)"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git diff --cached --check
-          git commit -m 'fix: finalize audited bilingual scientific delivery'
+          if git diff --cached --quiet; then
+            echo 'No non-workflow payload changes were produced.' >&2
+            exit 1
+          fi
+          git commit -m 'fix: finalize audited bilingual scientific delivery payload'
           git push origin HEAD:agent/final-acceptance-resindb-20260808
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Record publication result
+      - name: Record payload publication result
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ steps.commit.outputs.sha }}
         shell: bash
         run: |
           set -euo pipefail
-          body="RESINDB_FINAL_OVERLAY_PUBLISHED: ${SOURCE_SHA} — run 31238772446; 326/326 tests; zero high-threshold dependency findings; CJK font and non-blank scientific Canvas evidence committed; permanent read-only CI restored."
+          body="RESINDB_FINAL_PAYLOAD_PUBLISHED: ${SOURCE_SHA} — run 31238772446; 326/326 tests; zero dependency findings; CJK font and non-blank scientific Canvas evidence committed. Permanent CI was validated and will be restored through the GitHub connector."
           jq -n --arg body "$body" '{body:$body}' > /tmp/comment.json
           curl -fsSL -X POST \
             -H 'Accept: application/vnd.github+json' \
