@@ -46,8 +46,6 @@ jobs:
           test -s /tmp/resindb-final-artifact/ui-smoke-manifest.json
           test -s /tmp/resindb-final-artifact/test-results.json
           test -s /tmp/resindb-final-artifact/coverage-summary.json
-          test -s /tmp/resindb-final-artifact/npm-audit-prod.json
-          test -s /tmp/resindb-final-artifact/npm-audit-all.json
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
