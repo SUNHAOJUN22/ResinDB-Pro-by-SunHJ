@@ -51,6 +51,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
+          cache: npm
 
       - name: Apply audited overlay and restore permanent CI
         shell: bash
@@ -60,6 +61,7 @@ jobs:
           git checkout origin/main -- .github/workflows/ci.yml
           node .github/materialize-resindb-final.mjs
           node .github/apply-resindb-final-overlay.mjs /tmp/resindb-final-artifact
+          npm ci
           node scripts/validate-repository-docs.mjs
           node scripts/validate-i18n-visuals.mjs
           node scripts/validate-scientific-ui.mjs
