@@ -101,6 +101,14 @@ export const ScientificEChart: React.FC<ScientificEChartProps> = React.memo(({
     onChartReadyRef.current?.(chart);
 
     let disposed = false;
+    const markRendered = () => {
+      if (!disposed && !chart.isDisposed()) {
+        container.dataset.scientificChartRendered = 'true';
+      }
+    };
+    chart.on('finished', markRendered);
+    container.dataset.scientificChartRendered = 'false';
+
     const resizeAfterLayout = () => {
       if (disposed || chart.isDisposed()) return;
       const bounds = container.getBoundingClientRect();
@@ -114,6 +122,8 @@ export const ScientificEChart: React.FC<ScientificEChartProps> = React.memo(({
     return () => {
       disposed = true;
       cancelAnimationFrame(frame);
+      chart.off('finished', markRendered);
+      delete container.dataset.scientificChartRendered;
       if (!chart.isDisposed()) chart.dispose();
       chartRef.current = null;
     };
@@ -122,16 +132,22 @@ export const ScientificEChart: React.FC<ScientificEChartProps> = React.memo(({
   useEffect(() => {
     const chart = chartRef.current;
     const container = containerRef.current;
-    if (!chart || chart.isDisposed()) return;
+    if (!chart || chart.isDisposed()) return undefined;
+    if (container) container.dataset.scientificChartRendered = 'false';
     if (!normalizedOption || empty || error) {
       chart.clear();
-      return;
+      return undefined;
     }
-    chart.setOption(normalizedOption, { notMerge: true, lazyUpdate: true });
-    const bounds = container?.getBoundingClientRect();
-    if (bounds && bounds.width > 0 && bounds.height > 0) {
-      chart.resize({ animation: { duration: 0 } });
-    }
+    chart.setOption(normalizedOption, { notMerge: true, lazyUpdate: false });
+    const resize = () => {
+      const bounds = container?.getBoundingClientRect();
+      if (bounds && bounds.width > 0 && bounds.height > 0 && !chart.isDisposed()) {
+        chart.resize({ animation: { duration: 0 } });
+      }
+    };
+    resize();
+    const frame = requestAnimationFrame(resize);
+    return () => cancelAnimationFrame(frame);
   }, [empty, error, normalizedOption]);
 
   useEffect(() => {
@@ -172,11 +188,23 @@ export const ScientificEChart: React.FC<ScientificEChartProps> = React.memo(({
   }, []);
 
   const stateVisible = loading || empty || Boolean(error);
+  const figureState = loading
+    ? 'loading'
+    : error
+      ? 'error'
+      : empty
+        ? 'empty'
+        : normalizedOption
+          ? 'ready'
+          : 'unavailable';
+
   return (
     <div
       className={`scientific-figure relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 ${className}`}
       style={{ height, minHeight: 300 }}
       data-scientific-figure="true"
+      data-scientific-figure-state={figureState}
+      data-scientific-figure-points={dataCount}
     >
       <div
         ref={containerRef}
@@ -184,6 +212,7 @@ export const ScientificEChart: React.FC<ScientificEChartProps> = React.memo(({
         aria-label={ariaLabel}
         aria-describedby={description ? descriptionId : undefined}
         className={`h-full w-full transition-opacity ${stateVisible ? 'opacity-0' : 'opacity-100'}`}
+        data-scientific-chart-canvas="true"
       />
       {description && <span id={descriptionId} className="sr-only">{description}</span>}
       {stateVisible && (
