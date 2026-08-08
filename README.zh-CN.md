@@ -19,25 +19,57 @@ ResinDB Pro 把树脂牌号、实验/参考属性、统计模型、科学计算 
 
 ## 数理核心
 
-$$
-D_M(\mathbf x)=\sqrt{(\mathbf x-oldsymbol\mu)^\mathsf T\Sigma^{-1}(\mathbf x-oldsymbol\mu)}
-$$
+多变量异常度使用 Mahalanobis 距离：
 
 $$
-\eta(\dot\gamma)=\eta_\infty+(\eta_0-\eta_\infty)\left[1+(\lambda\dot\gamma)^aight]^{(n-1)/a}
+D_M(\mathbf{x})=
+\sqrt{(\mathbf{x}-\boldsymbol{\mu})^{\mathsf T}
+\boldsymbol{\Sigma}^{-1}
+(\mathbf{x}-\boldsymbol{\mu})}.
 $$
 
+非牛顿流变代理采用 Carreau–Yasuda 形式：
+
 $$
-\Sigma_ypprox J\Sigma_	heta J^\mathsf T+\Sigma_{sample}+\Sigma_{model}+\Sigma_{transfer}
+\eta(\dot\gamma)=
+\eta_\infty+
+(\eta_0-\eta_\infty)
+\left[1+(\lambda\dot\gamma)^a\right]^{(n-1)/a}.
+$$
+
+决策观测量的不确定度预算保持参数、采样、模型和尺度迁移项分离：
+
+$$
+\boldsymbol{\Sigma}_y
+\approx
+\mathbf{J}\boldsymbol{\Sigma}_\theta\mathbf{J}^{\mathsf T}
++
+\boldsymbol{\Sigma}_{\mathrm{sample}}
++
+\boldsymbol{\Sigma}_{\mathrm{model}}
++
+\boldsymbol{\Sigma}_{\mathrm{transfer}}.
+$$
+
+科学图表只有在数值有限、语义标签完整、ECharts 完成绘制且 Canvas 非空时才进入验收：
+
+$$
+C_{\mathrm{figure}}
+=
+C_{\mathrm{finite}}
+\land C_{\mathrm{labeled}}
+\land C_{\mathrm{finished}}
+\land C_{\mathrm{nonblank}}.
 $$
 
 ## 使用策略
 
 1. 先校验数据 Schema、单位、标准、温度、来源和证据等级。
 2. 只对有限且量纲一致的数据执行统计、拟合和材料筛选。
-3. 区分观测值、拟合值、代理量和情景预测。
+3. 区分观测值、拟合值、代理量和情景预测，统计关联不得升级为因果结论。
 4. 聚合物或 LAMMPS 模板必须经外部力场、平衡态和实验验证后才能形成科学结论。
-5. 中文界面与科研图表必须通过 CJK 字体、ECharts 完成事件、非空 Canvas 和 PNG 证据门。
+5. 中文界面与科研图表必须通过 CJK 字体、ECharts `finished` 事件、非空 Canvas 和 PNG 证据门。
+6. README、SVG 和翻译资源统一接受 UTF-8、Unicode、控制字符、CJK 字体和本地图片路径审计。
 
 ## 验收
 
@@ -51,3 +83,5 @@ npm run test:unit
 npm run build
 npm run test:ui
 ```
+
+软件验收只覆盖数据合同、计算实现、界面显示和可重复证据；牌号放行、实验真实性、力场适用性和工业决策仍需独立资格证据。
