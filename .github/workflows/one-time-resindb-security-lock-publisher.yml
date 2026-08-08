@@ -3,6 +3,10 @@ name: One-time ResinDB acceptance finalizer
 on:
   issue_comment:
     types: [created]
+  push:
+    branches: [main]
+    paths:
+      - .github/resindb-final-acceptance.trigger
 
 permissions:
   actions: read
@@ -11,13 +15,13 @@ permissions:
 
 concurrency:
   group: resindb-final-acceptance-publisher
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   publish:
     if: >-
-      github.event.issue.number == 35 &&
-      github.event.comment.body == '/finalize-resindb-acceptance'
+      github.event_name == 'push' ||
+      (github.event.issue.number == 35 && github.event.comment.body == '/finalize-resindb-acceptance')
     runs-on: ubuntu-latest
     timeout-minutes: 150
     steps:
@@ -242,6 +246,7 @@ Windows uses the governed fallback chain headed by Microsoft YaHei; Linux uses N
           git fetch origin main
           git switch --force-create main origin/main
           git rm -f --ignore-unmatch \
+            .github/resindb-final-acceptance.trigger \
             .github/workflows/one-time-resindb-security-lock-publisher.yml \
             .github/workflows/one-time-resindb-security-lock-finalizer.yml \
             .github/workflows/one-time-resindb-security-observer.yml \
