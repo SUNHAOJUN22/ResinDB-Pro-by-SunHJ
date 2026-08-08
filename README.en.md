@@ -19,25 +19,57 @@ ResinDB Pro joins resin grades, experimental/reference properties, statistical m
 
 ## Mathematical core
 
-$$
-D_M(\mathbf x)=\sqrt{(\mathbf x-oldsymbol\mu)^\mathsf T\Sigma^{-1}(\mathbf x-oldsymbol\mu)}
-$$
+Multivariate anomaly magnitude uses the Mahalanobis distance:
 
 $$
-\eta(\dot\gamma)=\eta_\infty+(\eta_0-\eta_\infty)\left[1+(\lambda\dot\gamma)^aight]^{(n-1)/a}
+D_M(\mathbf{x})=
+\sqrt{(\mathbf{x}-\boldsymbol{\mu})^{\mathsf T}
+\boldsymbol{\Sigma}^{-1}
+(\mathbf{x}-\boldsymbol{\mu})}.
 $$
 
+A non-Newtonian rheology proxy uses the Carreau–Yasuda form:
+
 $$
-\Sigma_ypprox J\Sigma_	heta J^\mathsf T+\Sigma_{sample}+\Sigma_{model}+\Sigma_{transfer}
+\eta(\dot\gamma)=
+\eta_\infty+
+(\eta_0-\eta_\infty)
+\left[1+(\lambda\dot\gamma)^a\right]^{(n-1)/a}.
+$$
+
+The decision-observable uncertainty budget keeps parameter, sampling, model-form and scale-transfer terms distinct:
+
+$$
+\boldsymbol{\Sigma}_y
+\approx
+\mathbf{J}\boldsymbol{\Sigma}_\theta\mathbf{J}^{\mathsf T}
++
+\boldsymbol{\Sigma}_{\mathrm{sample}}
++
+\boldsymbol{\Sigma}_{\mathrm{model}}
++
+\boldsymbol{\Sigma}_{\mathrm{transfer}}.
+$$
+
+A scientific figure is accepted only when values are finite, semantics are labelled, ECharts has completed rendering and the Canvas is non-blank:
+
+$$
+C_{\mathrm{figure}}
+=
+C_{\mathrm{finite}}
+\land C_{\mathrm{labeled}}
+\land C_{\mathrm{finished}}
+\land C_{\mathrm{nonblank}}.
 $$
 
 ## Operating strategy
 
 1. Validate Schema, units, standards, temperature, provenance and evidence class first.
 2. Run statistics, fitting and material screening only on finite, dimensionally compatible data.
-3. Keep observations, fits, proxies and scenario projections distinct.
+3. Keep observations, fits, proxies and scenario projections distinct; association must not be promoted to causation.
 4. Polymer/LAMMPS templates require external force-field, equilibration and experimental validation before supporting scientific conclusions.
-5. Scientific figures must pass font readiness, ECharts completion, non-blank Canvas and PNG evidence gates.
+5. Scientific figures must pass CJK/font readiness where relevant, the ECharts `finished` event, non-blank Canvas and PNG evidence gates.
+6. READMEs, SVGs and translations are audited for UTF-8, Unicode controls, CJK fallbacks and local-image integrity.
 
 ## Acceptance
 
@@ -51,3 +83,5 @@ npm run test:unit
 npm run build
 npm run test:ui
 ```
+
+Software acceptance covers data contracts, implemented computations, interface rendering and reproducible evidence. Grade release, experimental truth, force-field applicability and industrial decisions still require independent qualification.
