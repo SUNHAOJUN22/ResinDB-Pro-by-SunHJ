@@ -14,7 +14,8 @@ describe('stage-one Node-only tooling', () => {
 
   it('uses Node.js for the governed validation commands', () => {
     expect(packageJson.scripts).toMatchObject({
-      'validate:docs': 'node scripts/validate-repository-docs.mjs',
+      'validate:docs': 'node scripts/validate-repository-docs.mjs && node scripts/validate-i18n-visuals.mjs',
+      'validate:i18n-visuals': 'node scripts/validate-i18n-visuals.mjs',
       'validate:source': 'node scripts/validate-source-hygiene.mjs',
       'validate:compute': 'node scripts/validate-compute-surface.mjs',
       'validate:data': 'node scripts/validate-data.mjs',
