@@ -26,6 +26,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install CJK fonts for deterministic visual evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+          fc-match 'Noto Sans CJK SC'
+          fc-list :lang=zh | grep -q .
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

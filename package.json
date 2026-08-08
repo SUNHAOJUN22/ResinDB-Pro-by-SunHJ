@@ -26,7 +26,8 @@
     "metrics:build": "node scripts/build-metrics.mjs",
     "metrics:coverage": "node scripts/coverage-metrics.mjs",
     "report:validation": "node scripts/generate-validation-dashboard.mjs",
-    "validate:docs": "node scripts/validate-repository-docs.mjs",
+    "validate:docs": "node scripts/validate-repository-docs.mjs && node scripts/validate-i18n-visuals.mjs",
+    "validate:i18n-visuals": "node scripts/validate-i18n-visuals.mjs",
     "validate:source": "node scripts/validate-source-hygiene.mjs",
     "audit:all": "npm audit --audit-level=high",
     "report:pdf": "node scripts/generate-validation-pdf.mjs",
@@ -81,6 +82,10 @@
     "typescript-eslint": "8.65.0",
     "vite": "^7.2.2",
     "vitest": "^4.1.5"
+  },
+  "overrides": {
+    "dompurify": "3.4.13",
+    "nanoid": "3.3.17"
   },
   "engines": {
     "node": ">=22.12.0 <23"

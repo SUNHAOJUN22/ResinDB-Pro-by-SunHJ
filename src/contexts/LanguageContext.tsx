@@ -1,6 +1,94 @@
-import React,{createContext,useContext,useState,ReactNode} from 'react';
-import {Language} from '@/types/index'; import {translations,propertyMap} from '@/config/i18n'; import {scientificUiOverrides} from '@/config/scientificUiOverrides'; import {safeStorage} from '@/lib/utils';
-interface LanguageContextType{language:Language;setLanguage:(lang:Language)=>void;toggleLanguage:()=>void;t:(key:string,fallback?:string)=>string;tProp:(key:string)=>string}
-const LanguageContext=createContext<LanguageContextType|undefined>(undefined);
-export const LanguageProvider:React.FC<{children:ReactNode}>=({children})=>{const[language,setLanguage]=useState<Language>(()=>{const saved=safeStorage.local.getItem('resindb-language');return saved==='en'||saved==='zh'?saved:'zh';});React.useEffect(()=>{document.documentElement.lang=language==='zh'?'zh-CN':'en';safeStorage.local.setItem('resindb-language',language);},[language]);React.useEffect(()=>{const handler=(event:Event)=>{const next=(event as CustomEvent<Language>).detail;if(next==='zh'||next==='en')setLanguage(next);};window.addEventListener('resindb-language-change',handler);return()=>window.removeEventListener('resindb-language-change',handler);},[]);const t=React.useCallback((key:string,fallback?:string)=>{const override=scientificUiOverrides[language][key];if(override!==undefined)return override;const map=translations[language];const value=map[key as keyof typeof map];if(value!==undefined)return value;if(language==='zh'&&/[\u4e00-\u9fa5]/.test(key))return key;return fallback||key;},[language]);const tProp=React.useCallback((key:string)=>language==='zh'?key:propertyMap[key]||key,[language]);const toggleLanguage=React.useCallback(()=>setLanguage(prev=>prev==='zh'?'en':'zh'),[]);const value=React.useMemo(()=>({language,setLanguage,toggleLanguage,t,tProp}),[language,toggleLanguage,t,tProp]);return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;};
-export const useLanguage=()=>{const context=useContext(LanguageContext);if(!context)throw new Error('useLanguage must be used within a LanguageProvider');return context;};
+import React, {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import { propertyMap, translations } from '@/config/i18n';
+import { scientificUiOverrides } from '@/config/scientificUiOverrides';
+import {
+  humanizeTranslationKey,
+  LANGUAGE_STORAGE_KEY,
+  languageTag,
+  normalizeLanguage,
+  normalizeUiText,
+  parseLanguage,
+} from '@/i18n/runtime';
+import { safeStorage } from '@/lib/utils';
+import type { Language } from '@/types/index';
+
+interface LanguageContextType {
+  language: Language;
+  setLanguage: (language: Language) => void;
+  toggleLanguage: () => void;
+  t: (key: string, fallback?: string) => string;
+  tProp: (key: string) => string;
+}
+
+const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+const HAN_PATTERN = /\p{Script=Han}/u;
+
+function initialLanguage(): Language {
+  return normalizeLanguage(safeStorage.local.getItem(LANGUAGE_STORAGE_KEY));
+}
+
+export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [language, setLanguageState] = useState<Language>(initialLanguage);
+
+  const setLanguage = useCallback((nextLanguage: Language) => {
+    setLanguageState(normalizeLanguage(nextLanguage));
+  }, []);
+
+  const toggleLanguage = useCallback(() => {
+    setLanguageState((previous) => (previous === 'zh' ? 'en' : 'zh'));
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = languageTag(language);
+    document.documentElement.dir = 'ltr';
+    safeStorage.local.setItem(LANGUAGE_STORAGE_KEY, language);
+  }, [language]);
+
+  useEffect(() => {
+    const handleLanguageChange = (event: Event) => {
+      const parsed = parseLanguage((event as CustomEvent<unknown>).detail);
+      if (parsed) setLanguageState(parsed);
+    };
+    window.addEventListener('resindb-language-change', handleLanguageChange);
+    return () => window.removeEventListener('resindb-language-change', handleLanguageChange);
+  }, []);
+
+  const t = useCallback((key: string, fallback?: string) => {
+    const override = scientificUiOverrides[language][key];
+    const map = translations[language];
+    const translated = map[key as keyof typeof map];
+    const readableFallback = fallback
+      ?? (language === 'zh' && HAN_PATTERN.test(key) ? key : humanizeTranslationKey(key));
+    return normalizeUiText(override ?? translated, readableFallback);
+  }, [language]);
+
+  const tProp = useCallback((key: string) => {
+    const readableFallback = humanizeTranslationKey(key);
+    const translated = language === 'zh' ? key : propertyMap[key] ?? readableFallback;
+    return normalizeUiText(translated, readableFallback);
+  }, [language]);
+
+  const value = useMemo<LanguageContextType>(() => ({
+    language,
+    setLanguage,
+    toggleLanguage,
+    t,
+    tProp,
+  }), [language, setLanguage, t, tProp, toggleLanguage]);
+
+  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+};
+
+export function useLanguage(): LanguageContextType {
+  const context = useContext(LanguageContext);
+  if (!context) throw new Error('useLanguage must be used within a LanguageProvider');
+  return context;
+}

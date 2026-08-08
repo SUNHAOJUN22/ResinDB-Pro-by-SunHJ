@@ -259,6 +259,27 @@ try {
   await session.command('Page.reload', { ignoreCache: true });
   const bodyText = await waitForDashboard(session);
 
+  const cjkFontEvidence = await evaluate(
+    session,
+    `(async () => {
+      if (!document.fonts) return { available: false, family: null, status: 'unsupported' };
+      await document.fonts.ready;
+      const sample = '树脂数据库科学图表中文验收';
+      const candidates = [
+        'Noto Sans CJK SC',
+        'Noto Sans SC',
+        'Microsoft YaHei',
+        'PingFang SC',
+        'WenQuanYi Micro Hei'
+      ];
+      const family = candidates.find((name) => document.fonts.check('16px "' + name + '"', sample)) || null;
+      return { available: Boolean(family), family, status: document.fonts.status };
+    })()`,
+  );
+  if (!cjkFontEvidence.available) {
+    throw new Error(`No usable CJK font is available to Chromium: ${JSON.stringify(cjkFontEvidence)}`);
+  }
+
   const runtimeErrors = session.events.filter(
     (event) =>
       event.method === 'Runtime.exceptionThrown' ||
@@ -311,7 +332,67 @@ try {
 
   await clickButtonByTitle(session, ['科研可视化', 'Scientific Visualization']);
   await waitForCondition(session, `document.body.innerText.includes('科学图表') || document.body.innerText.includes('Scientific Charts')`, 'scientific analytics view');
-  await waitForCondition(session, `document.querySelectorAll('canvas, svg').length > 0`, 'analytics visualization surface');
+  const rheologyActivated = await evaluate(session, `(() => {
+    const button = Array.from(document.querySelectorAll('button'))
+      .find((candidate) => /RHEOLOGY/i.test(candidate.textContent || ''));
+    if (!button) return false;
+    button.click();
+    return true;
+  })()`);
+  if (!rheologyActivated) throw new Error('Unable to activate the rheology scientific chart');
+  await waitForCondition(
+    session,
+    `(() => {
+      const figure = Array.from(document.querySelectorAll('[data-scientific-figure="true"]'))
+        .find((candidate) => candidate.dataset.scientificFigureState === 'ready'
+          && Number(candidate.dataset.scientificFigurePoints || 0) > 0);
+      const surface = figure?.querySelector('[data-scientific-chart-rendered="true"]');
+      const canvas = surface?.querySelector('canvas');
+      return Boolean(canvas && canvas.width >= 500 && canvas.height >= 250);
+    })()`,
+    'completed non-empty rheology chart rendering',
+    160,
+  );
+  const analyticsEvidence = await evaluate(session, `(() => {
+    const figure = Array.from(document.querySelectorAll('[data-scientific-figure="true"]'))
+      .find((candidate) => candidate.dataset.scientificFigureState === 'ready'
+        && Number(candidate.dataset.scientificFigurePoints || 0) > 0);
+    const canvas = figure?.querySelector('[data-scientific-chart-rendered="true"] canvas');
+    if (!canvas) return { ready: false, reason: 'canvas-missing' };
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return { ready: false, reason: '2d-context-missing' };
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    const pixelCount = canvas.width * canvas.height;
+    const stride = Math.max(1, Math.floor(Math.sqrt(pixelCount / 120000)));
+    let sampled = 0;
+    let nonBackground = 0;
+    let chromatic = 0;
+    for (let y = 0; y < canvas.height; y += stride) {
+      for (let x = 0; x < canvas.width; x += stride) {
+        const index = (y * canvas.width + x) * 4;
+        const red = pixels[index];
+        const green = pixels[index + 1];
+        const blue = pixels[index + 2];
+        const alpha = pixels[index + 3];
+        sampled += 1;
+        if (alpha > 8 && Math.min(red, green, blue) < 242) nonBackground += 1;
+        if (alpha > 8 && Math.max(red, green, blue) - Math.min(red, green, blue) > 12) chromatic += 1;
+      }
+    }
+    return {
+      ready: nonBackground > 500 && chromatic > 50,
+      width: canvas.width,
+      height: canvas.height,
+      sampled,
+      nonBackground,
+      chromatic,
+      points: Number(figure.dataset.scientificFigurePoints || 0)
+    };
+  })()`);
+  if (!analyticsEvidence.ready) {
+    throw new Error(`Scientific chart canvas is blank or lacks plotted signal: ${JSON.stringify(analyticsEvidence)}`);
+  }
+  await sleep(250);
   await capture(session, screenshotPaths.analytics);
 
   await clickButtonByTitle(session, ['依赖网络谱图', 'Dependency']);
@@ -410,20 +491,24 @@ try {
   }
 
   const artifactManifest = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: new Date().toISOString(),
     appUrl,
     recordCount: bodyText.includes('13 RECORDS') ? 13 : null,
     screenshots: Object.fromEntries(Object.entries(screenshotPaths).map(([name, file]) => [name, path.basename(file)])),
     preferences: savedPreferences,
+    cjkFont: cjkFontEvidence,
+    scientificCanvas: analyticsEvidence,
   };
   writeFileSync(path.join(artifactDir, 'ui-smoke-manifest.json'), `${JSON.stringify(artifactManifest, null, 2)}
 `);
   session.close();
 
   console.log(
-    `UI smoke test passed: dashboard, empty state, product details, analytics, dependency map, responsive layout and preferences are interactive.`,
+    'UI smoke test passed: readable CJK typography, dashboard, empty state, product details, non-blank scientific chart, dependency map, responsive layout and preferences are interactive.',
   );
+  console.log(`CJK font: ${cjkFontEvidence.family}`);
+  console.log(`Scientific canvas evidence: ${JSON.stringify(analyticsEvidence)}`);
   console.log(`Screenshots: ${Object.values(screenshotPaths).join(', ')}`);
 } catch (error) {
   const diagnostics = [
