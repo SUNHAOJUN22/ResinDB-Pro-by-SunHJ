@@ -199,10 +199,13 @@ function validateLocaleMaps() {
 }
 
 function readmeLocalImages() {
-  const readme = readUtf8(join(ROOT, 'README.md'));
-  return [...readme.matchAll(/!\[[^\n]*?\]\(([^)\n]+)\)/gu)]
-    .map((match) => match[1].trim().split(/[?#]/u, 1)[0])
-    .filter((target) => target && !/^(?:https?:|data:)/u.test(target));
+  const readmePaths = ['README.md', 'README.zh-CN.md', 'README.en.md'];
+  return readmePaths.flatMap((relativePath) => {
+    const readme = readUtf8(join(ROOT, relativePath));
+    return [...readme.matchAll(/!\[[^\n]*?\]\(([^)\n]+)\)/gu)]
+      .map((match) => match[1].trim().split(/[?#]/u, 1)[0])
+      .filter((target) => target && !/^(?:https?:|data:)/u.test(target));
+  });
 }
 
 function validateSvg(path) {
@@ -241,6 +244,8 @@ function validateVisualAssets() {
 const textFiles = [
   ...SCAN_ROOTS.flatMap((directory) => walk(join(ROOT, directory))),
   join(ROOT, 'README.md'),
+  join(ROOT, 'README.zh-CN.md'),
+  join(ROOT, 'README.en.md'),
   join(ROOT, 'package.json'),
 ].filter((path) => TEXT_EXTENSIONS.has(extname(path).toLowerCase()));
 for (const path of [...new Set(textFiles)].sort()) readUtf8(path);

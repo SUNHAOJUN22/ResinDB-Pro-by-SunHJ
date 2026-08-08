@@ -1,5 +1,8 @@
 # ResinDB Pro by SunHJ
 
+<!-- LOCALIZED_README_LINKS -->
+<p align="center"><strong><a href="README.zh-CN.md">中文设计版</a> · <a href="README.en.md">English design edition</a></strong></p>
+
 <p align="center">
   <a href="https://github.com/SUNHAOJUN22/ResinDB-Pro-by-SunHJ/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/SUNHAOJUN22/ResinDB-Pro-by-SunHJ/actions/workflows/ci.yml/badge.svg?branch=main" /></a>
   <img alt="Node.js 22" src="https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white" />
