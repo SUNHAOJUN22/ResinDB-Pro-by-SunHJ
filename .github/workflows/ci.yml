@@ -16,6 +16,75 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  security-lock:
+    name: Patched transitive dependency lock
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Generate exact patched lock with registry fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          generated=0
+          for registry in https://registry.npmjs.org https://registry.npmmirror.com; do
+            for attempt in 1 2 3; do
+              echo "lock registry=${registry} attempt=${attempt}"
+              if npm install --package-lock-only --ignore-scripts --no-audit --no-fund --registry="$registry"; then
+                generated=1
+                break 2
+              fi
+              sleep $((attempt * 10))
+            done
+          done
+          test "$generated" -eq 1
+          node <<'NODE'
+          const lock = require('./package-lock.json');
+          const dompurify = lock.packages?.['node_modules/dompurify']?.version;
+          const nanoid = lock.packages?.['node_modules/nanoid']?.version;
+          if (dompurify !== '3.4.13' || nanoid !== '3.3.17') {
+            throw new Error(`patched lock mismatch: dompurify=${dompurify}, nanoid=${nanoid}`);
+          }
+          NODE
+
+      - name: Install, inspect paths and prove zero-vulnerability audits
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          mkdir -p artifacts/security-lock
+          npm ls dompurify nanoid --all --json > artifacts/security-lock/dependency-paths.json
+          npm audit --omit=dev --audit-level=high --json > artifacts/security-lock/npm-audit-prod.json
+          npm audit --audit-level=high --json > artifacts/security-lock/npm-audit-all.json
+          jq '.metadata.vulnerabilities' artifacts/security-lock/npm-audit-prod.json
+          jq '.metadata.vulnerabilities' artifacts/security-lock/npm-audit-all.json
+          test "$(jq '.metadata.vulnerabilities.total' artifacts/security-lock/npm-audit-prod.json)" -eq 0
+          test "$(jq '.metadata.vulnerabilities.total' artifacts/security-lock/npm-audit-all.json)" -eq 0
+          npm run validate:docs
+          npm run lint
+          npm run typecheck
+          npm run test:unit
+
+      - name: Upload audited package lock
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resindb-security-lock-${{ github.sha }}
+          path: |
+            package-lock.json
+            artifacts/security-lock/
+          if-no-files-found: error
+          retention-days: 5
+
   validate:
     name: Exact-tree validation, browser evidence and reports
     runs-on: ubuntu-latest
