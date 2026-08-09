@@ -1,0 +1,130 @@
+name: V4 fail-closed hardening once
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: v4-fail-closed-hardening-once
+  cancel-in-progress: false
+
+jobs:
+  harden:
+    if: >-
+      github.event.issue.pull_request == null &&
+      github.event.comment.user.login == github.repository_owner &&
+      contains(github.event.comment.body, '/v4-fail-closed-hardening')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install deterministic CJK fonts
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk fonts-noto-core
+          fc-cache -f
+          fc-match 'Noto Sans CJK SC'
+          fc-list :lang=zh | grep -q .
+      - name: Install exact dependencies without manifest drift
+        run: |
+          set -euo pipefail
+          cp package.json /tmp/resindb-v4-package.json
+          cp package-lock.json /tmp/resindb-v4-package-lock.json
+          restore_manifests() {
+            cp /tmp/resindb-v4-package.json package.json
+            cp /tmp/resindb-v4-package-lock.json package-lock.json
+          }
+          trap restore_manifests EXIT
+          node scripts/prepare-ci-manifest.mjs
+          installed=0
+          for registry in https://registry.npmjs.org https://registry.npmmirror.com; do
+            for attempt in 1 2 3; do
+              if npm ci --registry="$registry"; then
+                installed=1
+                break 2
+              fi
+              sleep $((attempt * 10))
+            done
+          done
+          test "$installed" -eq 1
+          restore_manifests
+          trap - EXIT
+      - name: Pin setup action, remove masked branch proof and self-delete
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/ci.yml')
+          text = path.read_text(encoding='utf-8')
+          old_action = '      - name: Set up Node.js\n        uses: actions/setup-node@v4\n'
+          new_action = (
+              '      - name: Set up Node.js\n'
+              '        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4\n'
+          )
+          if text.count(old_action) != 1:
+              raise SystemExit(f'expected exactly one unpinned setup-node block, found {text.count(old_action)}')
+          text = text.replace(old_action, new_action, 1)
+          old_proof = "          test \"$(grep -c 'refs/heads/main$' artifacts/branch-proof.txt || true)\" -eq 1\n"
+          new_proof = "          test \"$(awk '/refs\\/heads\\/main$/ {count += 1} END {print count + 0}' artifacts/branch-proof.txt)\" -eq 1\n"
+          if text.count(old_proof) != 1:
+              raise SystemExit(f'expected exactly one masked branch proof, found {text.count(old_proof)}')
+          text = text.replace(old_proof, new_proof, 1)
+          if 'actions/setup-node@v4' in text:
+              raise SystemExit('unpinned setup-node action remains')
+          if '|| true' in text:
+              raise SystemExit('masked shell failure remains in CI workflow')
+          path.write_text(text, encoding='utf-8', newline='\n')
+          PY
+          rm .github/workflows/v4-fail-closed-hardening-once.yml
+          git diff --check
+      - name: Create exact controller-free candidate
+        id: candidate
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A .github/workflows/ci.yml .github/workflows/v4-fail-closed-hardening-once.yml
+          git commit -m 'ci: pin Node setup and make branch proof fail closed'
+          echo 'sha='"$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Run complete UTF-8, bilingual, numerical, browser and audit qualification
+        run: |
+          set -euo pipefail
+          node scripts/refresh-current-main-readme.mjs --check
+          npm run validate:ci
+          git diff --exit-code
+          git diff --check
+      - name: Publish exact qualified candidate
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          expected_parent="$(git rev-parse HEAD^)"
+          remote_main="$(git rev-parse origin/main)"
+          if [[ "$expected_parent" != "$remote_main" ]]; then
+            echo "STALE_MAIN expected_parent=$expected_parent remote_main=$remote_main" >&2
+            exit 3
+          fi
+          git push origin HEAD:main
+      - name: Publish machine result
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+          OUTCOME: ${{ job.status }}
+          CANDIDATE: ${{ steps.candidate.outputs.sha }}
+        run: |
+          gh issue comment "$ISSUE" --body "V4_FAIL_CLOSED_HARDENING outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} controller=self_removed utf8=fatal bilingual=isolated browser=chromium charts=nonblank"
