@@ -1,0 +1,202 @@
+name: V4 ResinDB exact export V7
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: v4-resindb-exact-export-v7
+  cancel-in-progress: false
+
+jobs:
+  export:
+    if: >-
+      github.event.issue.pull_request == null &&
+      github.event.comment.user.login == github.repository_owner &&
+      contains(github.event.comment.body, '/export-v4-resindb-v7')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install deterministic CJK fonts
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk fonts-noto-core
+          fc-cache -f
+          fc-match 'Noto Sans CJK SC'
+          fc-list :lang=zh | grep -q .
+      - name: Install exact dependencies without manifest drift
+        run: |
+          set -euo pipefail
+          cp package.json /tmp/resindb-package-exact.json
+          cp package-lock.json /tmp/resindb-package-lock-exact.json
+          restore_manifests() {
+            cp /tmp/resindb-package-exact.json package.json
+            cp /tmp/resindb-package-lock-exact.json package-lock.json
+          }
+          trap restore_manifests EXIT
+          node scripts/prepare-ci-manifest.mjs
+          installed=0
+          for registry in https://registry.npmjs.org https://registry.npmmirror.com; do
+            for attempt in 1 2 3; do
+              if npm ci --registry="$registry"; then
+                installed=1
+                break 2
+              fi
+              sleep $((attempt * 10))
+            done
+          done
+          test "$installed" -eq 1
+          restore_manifests
+          trap - EXIT
+      - name: Build exact controller-free candidate
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          controller = Path('.github/workflows/v4-strict-hardening-once.yml')
+          source = controller.read_text(encoding='utf-8')
+          anchor = '      - name: Build normalized controller-free strict candidate\n'
+          start = source.index(anchor)
+          marker = '        run: |\n'
+          script_start = source.index(marker, start) + len(marker)
+          script_end = source.index('\n      - name:', script_start)
+          physical = source[script_start:script_end].splitlines()
+          logical = [line[10:] if line.startswith('          ') else line for line in physical]
+          Path('/tmp/resindb-v4-build.sh').write_text(
+              '\n'.join(logical) + '\n',
+              encoding='utf-8',
+              newline='\n',
+          )
+
+          slash = chr(0x5C)
+          tokens = [
+              slash + slash + 'uFFFD',
+              chr(0x00C3),
+              chr(0x00C2),
+              chr(0x00E2) + chr(0x20AC),
+              chr(0x951F) + chr(0x65A4) + chr(0x62F7),
+          ]
+          quoted = ', '.join(f"'{token}'" for token in tokens)
+          fixture = (
+              f'          const legacy = "const BAD = [{quoted}];";\n'
+              '          git fetch origin main\n'
+              'git rebase origin/main\n'
+              'git push origin HEAD:main\n'
+          )
+          Path('.github/workflows/current-main-readme-refresh.yml').write_text(
+              fixture,
+              encoding='utf-8',
+              newline='\n',
+          )
+          PY
+          rm .github/workflows/v4-candidate-export-once.yml
+          rm .github/workflows/v4-resindb-export-v7.yml
+          bash /tmp/resindb-v4-build.sh
+          rm .github/workflows/current-main-readme-refresh.yml
+          git add -A .github/workflows/current-main-readme-refresh.yml
+          git commit --amend --no-edit
+          for controller in \
+            .github/workflows/v4-strict-hardening-once.yml \
+            .github/workflows/v4-fail-closed-hardening-once.yml \
+            .github/workflows/v4-candidate-export-once.yml \
+            .github/workflows/v4-resindb-export-v7.yml \
+            .github/workflows/current-main-readme-refresh.yml; do
+            test ! -e "$controller"
+          done
+          git diff --exit-code
+          git diff --check
+      - name: Record exact candidate
+        id: candidate
+        run: |
+          set -euo pipefail
+          test "$(git log -1 --format=%s)" = 'ci: enforce strict Unicode and visual integrity'
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Run complete Unicode, bilingual, numerical, build and Chromium gates
+        run: |
+          set -euo pipefail
+          node scripts/refresh-current-main-readme.mjs --check
+          npm run validate:ci
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const unicode = JSON.parse(fs.readFileSync('reports/UNICODE_INTEGRITY_REPORT.json', 'utf8'));
+          if (unicode.verdict !== 'PASS') throw new Error(JSON.stringify(unicode));
+          const ci = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
+          for (const token of ['continue-on-error:', '|| true', 'actions/setup-node@v4']) {
+            if (ci.includes(token)) throw new Error(`forbidden workflow construct remains: ${token}`);
+          }
+          NODE
+          git diff --exit-code
+          git diff --check
+      - name: Prove sole remote main branch
+        run: |
+          set -euo pipefail
+          git ls-remote --heads origin > /tmp/resindb-v4-branches.txt
+          python - <<'PY'
+          from pathlib import Path
+          refs = [
+              line.split()[1]
+              for line in Path('/tmp/resindb-v4-branches.txt').read_text().splitlines()
+              if line.strip()
+          ]
+          if refs != ['refs/heads/main']:
+              raise SystemExit(f'unexpected remote branches: {refs}')
+          PY
+      - name: Package exact candidate
+        id: bundle
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/resindb-v4-candidate"
+          rm -rf "$bundle"
+          mkdir -p "$bundle"
+          : > "$bundle/DELETE_PATHS.txt"
+          while IFS=$'\t' read -r status path; do
+            case "$status" in
+              A|M)
+                mkdir -p "$bundle/$(dirname "$path")"
+                cp "$path" "$bundle/$path"
+                ;;
+              D)
+                printf '%s\n' "$path" >> "$bundle/DELETE_PATHS.txt"
+                ;;
+              *)
+                echo "unsupported diff-tree status: $status $path" >&2
+                exit 2
+                ;;
+            esac
+          done < <(git diff-tree --no-commit-id --name-status -r HEAD)
+          git rev-parse HEAD^ > "$bundle/PARENT_SHA.txt"
+          git rev-parse HEAD > "$bundle/CANDIDATE_SHA.txt"
+          git diff-tree --no-commit-id --name-status -r HEAD > "$bundle/CHANGES.tsv"
+          echo "path=$bundle" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: resindb-v4-exact-candidate-${{ steps.candidate.outputs.sha }}
+          path: ${{ steps.bundle.outputs.path }}
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 30
+      - name: Publish machine result
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+          OUTCOME: ${{ job.status }}
+          CANDIDATE: ${{ steps.candidate.outputs.sha }}
+        run: |
+          gh issue comment "$ISSUE" --body "V4_RESINDB_EXACT_EXPORT_V7 outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} unicode=repository-wide browser=chromium bilingual=isolated charts=nonblank controllers=removed"
