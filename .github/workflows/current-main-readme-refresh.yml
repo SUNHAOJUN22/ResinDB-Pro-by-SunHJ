@@ -53,6 +53,27 @@ jobs:
           npm ci
           restore_manifests
           trap - EXIT
+      - name: Remove literal bad-encoding fixtures from production generator source
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'scripts/refresh-current-main-readme.mjs';
+          const source = fs.readFileSync(path, 'utf8');
+          const legacy = "const BAD = ['\\uFFFD', 'Ã', 'Â', 'â€', '锟斤拷'];";
+          const replacement = [
+            'const BAD = [',
+            '  String.fromCodePoint(0xfffd),',
+            '  String.fromCodePoint(0x00c3),',
+            '  String.fromCodePoint(0x00c2),',
+            '  String.fromCodePoint(0x00e2, 0x20ac),',
+            '  String.fromCodePoint(0x951f, 0x65a4, 0x62f7),',
+            '];',
+          ].join('\n');
+          if (!source.includes(legacy) && !source.includes(replacement)) {
+            throw new Error('expected BAD-token declaration was not found');
+          }
+          fs.writeFileSync(path, source.replace(legacy, replacement), 'utf8');
+          NODE
       - name: Generate localized code-bound README architecture
         run: |
           node scripts/refresh-current-main-readme.mjs --write
@@ -66,6 +87,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add \
+            scripts/refresh-current-main-readme.mjs \
             README.md \
             README.zh-CN.md \
             README.en.md \
