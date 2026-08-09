@@ -1,0 +1,198 @@
+name: V4 Unicode and visual hardening once
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: v4-strict-hardening-once
+  cancel-in-progress: false
+
+jobs:
+  harden:
+    if: >-
+      github.event.issue.pull_request == null &&
+      github.event.comment.user.login == github.repository_owner &&
+      contains(github.event.comment.body, '/run-v4-strict-hardening')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install deterministic CJK fonts
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk fonts-noto-core
+          fc-cache -f
+          fc-match 'Noto Sans CJK SC'
+          fc-list :lang=zh | grep -q .
+      - name: Install exact dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp package.json /tmp/resindb-package-exact.json
+          cp package-lock.json /tmp/resindb-package-lock-exact.json
+          restore_manifests() {
+            cp /tmp/resindb-package-exact.json package.json
+            cp /tmp/resindb-package-lock-exact.json package-lock.json
+          }
+          trap restore_manifests EXIT
+          node scripts/prepare-ci-manifest.mjs
+          npm ci
+          restore_manifests
+          trap - EXIT
+      - name: Build strict controller-free candidate
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly one match, found {count}')
+              return text.replace(old, new, 1)
+
+          validator = Path('scripts/validate-i18n-visuals.mjs')
+          text = validator.read_text(encoding='utf-8')
+          text = replace_once(
+              text,
+              "const ARTIFACT_ROOT = join(ROOT, 'artifacts');\n",
+              "const ARTIFACT_ROOT = join(ROOT, 'artifacts');\nconst REPORT_ROOT = join(ROOT, 'reports');\n",
+              'report root',
+          )
+          text = replace_once(
+              text,
+              "  '.css',\n",
+              "  '.css',\n  '.cfg',\n  '.cjs',\n  '.csv',\n  '.ini',\n  '.jsx',\n  '.mdx',\n  '.ps1',\n  '.py',\n  '.pyi',\n  '.scss',\n  '.sh',\n  '.sql',\n  '.toml',\n  '.tsv',\n  '.xml',\n",
+              'text extension coverage',
+          )
+          text = replace_once(
+              text,
+              "const SCAN_ROOTS = ['src', 'scripts', 'docs', 'data', 'schemas'];\n",
+              "const SCAN_ROOTS = ['.'];\nconst EXCLUDED_FILES = new Set(['reports/UNICODE_INTEGRITY_REPORT.json']);\n",
+              'repository-wide scan roots',
+          )
+          text = replace_once(
+              text,
+              "    else files.push(path);\n",
+              "    else if (!EXCLUDED_FILES.has(repositoryPath(path))) files.push(path);\n",
+              'self-report exclusion',
+          )
+          text = replace_once(
+              text,
+              "  if (text.charCodeAt(0) === 0xfeff) warnings.push(`${label}: UTF-8 BOM present`);\n",
+              "  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {\n    failures.push(`${label}: UTF-8 BOM is forbidden`);\n  }\n  if (bytes.includes(0x0d)) failures.push(`${label}: CR or CRLF line endings are forbidden`);\n  if (bytes.length > 0 && bytes.at(-1) !== 0x0a) {\n    failures.push(`${label}: text file must end with LF`);\n  }\n  if (bytes.length > 1 && bytes.at(-2) === 0x0a) {\n    failures.push(`${label}: text file must end with exactly one LF`);\n  }\n",
+              'strict byte-level Unicode contract',
+          )
+          text = replace_once(
+              text,
+              "mkdirSync(ARTIFACT_ROOT, { recursive: true });\nwriteFileSync(\n  join(ARTIFACT_ROOT, 'i18n-visual-audit.json'),\n  `${JSON.stringify(report, null, 2)}\\n`,\n);\nconsole.log(JSON.stringify(report, null, 2));\n",
+              "const unicodeFailures = failures.filter((failure) =>\n  /UTF-8|mojibake|NFC|control character|BOM|CR or CRLF|end with LF/u.test(failure),\n);\nconst unicodeReport = {\n  schemaVersion: 'resindb-unicode-integrity-1.0.0',\n  scannedTextFiles: report.scannedTextFiles,\n  invalidUtf8OrReplacement: unicodeFailures.filter((failure) => /UTF-8|replacement/u.test(failure)),\n  nfcFailures: unicodeFailures.filter((failure) => /NFC/u.test(failure)),\n  bomFailures: unicodeFailures.filter((failure) => /BOM/u.test(failure)),\n  lineEndingFailures: unicodeFailures.filter((failure) => /CR or CRLF|end with LF/u.test(failure)),\n  controlCharacterFailures: unicodeFailures.filter((failure) => /control character/u.test(failure)),\n  mojibakeFailures: unicodeFailures.filter((failure) => /mojibake/u.test(failure)),\n  failures: unicodeFailures,\n  verdict: unicodeFailures.length ? 'FAIL' : 'PASS',\n};\nmkdirSync(ARTIFACT_ROOT, { recursive: true });\nmkdirSync(REPORT_ROOT, { recursive: true });\nwriteFileSync(\n  join(ARTIFACT_ROOT, 'i18n-visual-audit.json'),\n  `${JSON.stringify(report, null, 2)}\\n`,\n);\nwriteFileSync(\n  join(REPORT_ROOT, 'UNICODE_INTEGRITY_REPORT.json'),\n  `${JSON.stringify(unicodeReport, null, 2)}\\n`,\n);\nconsole.log(JSON.stringify(report, null, 2));\n",
+              'machine Unicode report',
+          )
+          validator.write_text(text, encoding='utf-8', newline='\n')
+
+          workflow = Path('.github/workflows/ci.yml')
+          ci = workflow.read_text(encoding='utf-8')
+          ci = replace_once(
+              ci,
+              '        uses: actions/setup-node@v4\n',
+              '        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\n',
+              'immutable setup-node pin',
+          )
+          ci = replace_once(
+              ci,
+              "          test \"$(grep -c 'refs/heads/main$' artifacts/branch-proof.txt || true)\" -eq 1\n",
+              "          python - <<'PY'\n          from pathlib import Path\n          refs = [line.split()[1] for line in Path('artifacts/branch-proof.txt').read_text().splitlines() if line.strip()]\n          if refs != ['refs/heads/main']:\n              raise SystemExit(f'unexpected remote branches: {refs}')\n          PY\n",
+              'fail-closed branch proof',
+          )
+          ci = replace_once(
+              ci,
+              "            artifacts/\n            FINAL_CODE_AUDIT.md\n",
+              "            artifacts/\n            reports/UNICODE_INTEGRITY_REPORT.json\n            FINAL_CODE_AUDIT.md\n",
+              'Unicode evidence upload',
+          )
+          workflow.write_text(ci, encoding='utf-8', newline='\n')
+          Path('.github/workflows/v4-strict-hardening-once.yml').unlink()
+          PY
+          node scripts/validate-i18n-visuals.mjs
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A \
+            .github/workflows/ci.yml \
+            .github/workflows/v4-strict-hardening-once.yml \
+            scripts/validate-i18n-visuals.mjs \
+            reports/UNICODE_INTEGRITY_REPORT.json
+          git commit -m 'ci: enforce strict Unicode and visual integrity'
+          echo "candidate_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Run complete code, data, numerical, build and Chromium gates
+        run: |
+          set -euo pipefail
+          node scripts/refresh-current-main-readme.mjs --check
+          npm run validate
+          npm run benchmark:kmeans:smoke
+          npm run test:unit
+          npm run test:science
+          npm run test:coverage
+          npm run test:ui
+          npm run audit:all
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync('reports/UNICODE_INTEGRITY_REPORT.json', 'utf8'));
+          if (report.verdict !== 'PASS') throw new Error(JSON.stringify(report));
+          const workflow = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
+          for (const token of ['continue-on-error:', '|| true', 'actions/setup-node@v4']) {
+            if (workflow.includes(token)) throw new Error(`forbidden workflow construct remains: ${token}`);
+          }
+          NODE
+          git diff --exit-code
+          git diff --check
+      - name: Prove sole remote main branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-remote --heads origin > /tmp/branches.txt
+          python - <<'PY'
+          from pathlib import Path
+          refs = [line.split()[1] for line in Path('/tmp/branches.txt').read_text().splitlines() if line.strip()]
+          if refs != ['refs/heads/main']:
+              raise SystemExit(f'unexpected remote branches: {refs}')
+          PY
+      - name: Publish exact qualified candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          expected_parent="$(git rev-parse HEAD^)"
+          remote_main="$(git rev-parse origin/main)"
+          if [[ "$expected_parent" != "$remote_main" ]]; then
+            echo "STALE_MAIN expected_parent=$expected_parent remote_main=$remote_main" >&2
+            exit 3
+          fi
+          git push origin HEAD:main
+      - name: Publish machine result
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number }}
+          OUTCOME: ${{ job.status }}
+          CANDIDATE: ${{ steps.candidate.outputs.candidate_sha }}
+        run: |
+          gh issue comment "$ISSUE" --body "V4_STRICT_HARDENING outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} controller=self_removed unicode=strict browser=chromium-bilingual-science branch=main-only"
