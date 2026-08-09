@@ -7,7 +7,7 @@ import {
   readdirSync,
   writeFileSync,
 } from 'node:fs';
-import { extname, join, relative, resolve, sep } from 'node:path';
+import { basename, extname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
@@ -38,6 +38,7 @@ const EXCLUDED_DIRECTORIES = new Set([
 const MOJIBAKE_PATTERN = /\uFFFD|\u00C3[\u0080-\u00BF]|\u00C2[\u0080-\u00BF]|\u00E2[\u0080-\u00BF]{1,2}|\u00F0\u0178|\u00EF\u00BB\u00BF|\u951F\u65A4\u62F7/u;
 const HAN_PATTERN = /\p{Script=Han}/u;
 const CJK_FONT_PATTERN = /Noto Sans (?:SC|CJK)|Microsoft YaHei|PingFang SC|WenQuanYi Micro Hei/u;
+const LOCALIZED_VISUAL_PATTERN = /(?:docs\/localized-vision\/|docs\/current-main\/).+-(?:zh|en)\.svg$/u;
 const REQUIRED_LOCALIZED_KEYS = [
   'chart_feature_importance',
   'desc_feature_importance',
@@ -47,6 +48,8 @@ const REQUIRED_LOCALIZED_KEYS = [
   'sysHealthNoEvents',
   'sysHealthSubtitle',
 ];
+const README_PATHS = ['README.md', 'README.zh-CN.md', 'README.en.md'];
+const fatalUtf8Decoder = new TextDecoder('utf-8', { fatal: true });
 
 const failures = [];
 const warnings = [];
@@ -84,14 +87,23 @@ function hasForbiddenControlCharacter(value) {
   return false;
 }
 
-function readUtf8(path) {
+function readUtf8(path, options = {}) {
   const bytes = readFileSync(path);
-  const text = bytes.toString('utf8');
   const label = repositoryPath(path);
+  let text;
+  try {
+    text = fatalUtf8Decoder.decode(bytes);
+  } catch (error) {
+    failures.push(`${label}: invalid UTF-8 byte sequence (${String(error)})`);
+    text = bytes.toString('utf8');
+  }
   if (text.includes('\uFFFD')) failures.push(`${label}: invalid UTF-8 replacement character`);
   if (MOJIBAKE_PATTERN.test(text)) failures.push(`${label}: probable mojibake sequence`);
   if (hasForbiddenControlCharacter(text)) failures.push(`${label}: forbidden control character`);
   if (text.charCodeAt(0) === 0xfeff) warnings.push(`${label}: UTF-8 BOM present`);
+  if (options.requireNfc && text !== text.normalize('NFC')) {
+    failures.push(`${label}: user-facing text is not NFC-normalized`);
+  }
   return text;
 }
 
@@ -127,10 +139,10 @@ function exportedLocaleMap(path, variableName) {
   }
   if (!rootObject) {
     failures.push(`${repositoryPath(path)}: ${variableName} object was not found`);
-    return { zh: new Map(), en: new Map() };
+    return { zh: new Map(), en: new Map(), nfkcDifferences: 0 };
   }
 
-  const output = { zh: new Map(), en: new Map() };
+  const output = { zh: new Map(), en: new Map(), nfkcDifferences: 0 };
   for (const localeProperty of rootObject.properties) {
     if (!ts.isPropertyAssignment(localeProperty)) continue;
     const locale = propertyName(localeProperty.name);
@@ -150,7 +162,12 @@ function exportedLocaleMap(path, variableName) {
         );
         continue;
       }
-      output[locale].set(key, entry.initializer.text.normalize('NFC'));
+      const raw = entry.initializer.text;
+      if (raw !== raw.normalize('NFC')) {
+        failures.push(`${variableName}.${locale}.${key}: value is not NFC-normalized`);
+      }
+      if (raw !== raw.normalize('NFKC')) output.nfkcDifferences += 1;
+      output[locale].set(key, raw.normalize('NFC'));
     }
   }
   return output;
@@ -195,41 +212,123 @@ function validateLocaleMaps() {
     translationKeys: zhKeys.length,
     overrideKeys: overrideZhKeys.length,
     requiredLocalizedKeys: REQUIRED_LOCALIZED_KEYS.length,
+    nfkcCompatibilityDifferences:
+      translations.nfkcDifferences + overrides.nfkcDifferences,
   };
 }
 
-function readmeLocalImages() {
-  const readmePaths = ['README.md', 'README.zh-CN.md', 'README.en.md'];
-  return readmePaths.flatMap((relativePath) => {
-    const readme = readUtf8(join(ROOT, relativePath));
-    const markdownTargets = [...readme.matchAll(/!\[[^\n]*?\]\(([^)\n]+)\)/gu)]
-      .map((match) => match[1]);
-    const htmlTargets = [...readme.matchAll(/<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/giu)]
-      .map((match) => match[1]);
-    return [...markdownTargets, ...htmlTargets]
-      .map((target) => target.trim().split(/[?#]/u, 1)[0])
-      .filter((target) => target && !/^(?:https?:|data:)/u.test(target));
+function readmeImageRecords() {
+  return README_PATHS.flatMap((relativePath) => {
+    const readme = readUtf8(join(ROOT, relativePath), { requireNfc: true });
+    const records = [];
+    for (const match of readme.matchAll(/!\[([^\n]*?)\]\(([^)\n]+)\)/gu)) {
+      records.push({
+        readme: relativePath,
+        kind: 'markdown',
+        alt: match[1].trim(),
+        target: match[2].trim().split(/[?#]/u, 1)[0],
+      });
+    }
+    for (const match of readme.matchAll(/<img\b([^>]*)>/giu)) {
+      const attributes = match[1];
+      const src = attributes.match(/\bsrc=["']([^"']+)["']/iu)?.[1] ?? '';
+      const alt = attributes.match(/\balt=["']([^"']*)["']/iu)?.[1] ?? '';
+      records.push({
+        readme: relativePath,
+        kind: 'html',
+        alt: alt.trim(),
+        target: src.trim().split(/[?#]/u, 1)[0],
+      });
+    }
+    return records.filter((record) => record.target);
   });
 }
 
+function validateLocalizedReadmeSeparation(records) {
+  let localizedReferences = 0;
+  for (const record of records) {
+    if (!record.alt) {
+      failures.push(`${record.readme}: ${record.kind} image has empty alt text`);
+    }
+    if (!LOCALIZED_VISUAL_PATTERN.test(record.target)) continue;
+    localizedReferences += 1;
+    if (record.readme === 'README.zh-CN.md' && /-en\.svg$/u.test(record.target)) {
+      failures.push(`${record.readme}: English localized visual referenced: ${record.target}`);
+    }
+    if (record.readme === 'README.en.md' && /-zh\.svg$/u.test(record.target)) {
+      failures.push(`${record.readme}: Chinese localized visual referenced: ${record.target}`);
+    }
+  }
+  const zhLocalized = records.filter(
+    (record) => record.readme === 'README.zh-CN.md' && /-zh\.svg$/u.test(record.target),
+  );
+  const enLocalized = records.filter(
+    (record) => record.readme === 'README.en.md' && /-en\.svg$/u.test(record.target),
+  );
+  if (!zhLocalized.length) failures.push('README.zh-CN.md: Chinese localized visual is missing');
+  if (!enLocalized.length) failures.push('README.en.md: English localized visual is missing');
+  return { localizedReferences };
+}
+
+function svgAttribute(attributes, name) {
+  const match = attributes.match(new RegExp(`\\b${name}=["']([^"']+)["']`, 'iu'));
+  return match?.[1] ?? '';
+}
+
 function validateSvg(path) {
-  const text = readUtf8(path);
+  const text = readUtf8(path, { requireNfc: true });
   const label = repositoryPath(path);
-  if (!/<svg\b/u.test(text)) failures.push(`${label}: SVG root is missing`);
-  if (!/\bviewBox=/u.test(text)) failures.push(`${label}: SVG viewBox is missing`);
-  if (!/<title(?:\s|>)/u.test(text)) failures.push(`${label}: accessible title is missing`);
-  if (!/<desc(?:\s|>)/u.test(text)) failures.push(`${label}: accessible description is missing`);
+  const rootMatch = text.match(/<svg\b([^>]*)>/iu);
+  if (!rootMatch) {
+    failures.push(`${label}: SVG root is missing`);
+    return;
+  }
+  const attributes = rootMatch[1];
+  const viewBox = svgAttribute(attributes, 'viewBox');
+  const role = svgAttribute(attributes, 'role');
+  const ariaLabelledBy = svgAttribute(attributes, 'aria-labelledby');
+  const localized = label.includes('/localized-vision/') || label.includes('/current-main/');
+  if (!viewBox) failures.push(`${label}: SVG viewBox is missing`);
+  if (localized && viewBox !== '0 0 1600 900') {
+    failures.push(`${label}: localized SVG viewBox must be 0 0 1600 900`);
+  }
+  if (localized && role !== 'img') failures.push(`${label}: localized SVG requires role="img"`);
+  if (localized && !ariaLabelledBy) {
+    failures.push(`${label}: localized SVG requires aria-labelledby`);
+  }
+  const title = text.match(/<title(?:\s[^>]*)?>([\s\S]*?)<\/title>/iu)?.[1].trim() ?? '';
+  const desc = text.match(/<desc(?:\s[^>]*)?>([\s\S]*?)<\/desc>/iu)?.[1].trim() ?? '';
+  if (!title) failures.push(`${label}: accessible title is missing or empty`);
+  if (!desc) failures.push(`${label}: accessible description is missing or empty`);
   if (HAN_PATTERN.test(text) && !CJK_FONT_PATTERN.test(text)) {
     failures.push(`${label}: CJK text lacks an explicit CJK font fallback`);
   }
-  if (/<script\b|javascript:/iu.test(text)) {
-    failures.push(`${label}: active script content is forbidden`);
+  if (/<script\b|<foreignObject\b|javascript:/iu.test(text)) {
+    failures.push(`${label}: active or foreign content is forbidden`);
+  }
+  if (/\son[a-z]+\s*=/iu.test(text)) failures.push(`${label}: event handler is forbidden`);
+  if (/(?:href|xlink:href)\s*=\s*["'](?:https?:|\/\/|data:)/iu.test(text)) {
+    failures.push(`${label}: external or data URI resource is forbidden`);
+  }
+  if (/@import\b|url\(\s*["']?(?:https?:|\/\/|data:)/iu.test(text)) {
+    failures.push(`${label}: external stylesheet or resource is forbidden`);
+  }
+  const name = basename(path);
+  if (/-zh\.svg$/u.test(name) && !HAN_PATTERN.test(text)) {
+    failures.push(`${label}: Chinese localized SVG lacks Chinese text`);
+  }
+  if (/-en\.svg$/u.test(name) && HAN_PATTERN.test(text)) {
+    failures.push(`${label}: English localized SVG leaks Chinese text`);
   }
 }
 
 function validateVisualAssets() {
-  const images = readmeLocalImages();
-  const unique = [...new Set(images)].sort();
+  const records = readmeImageRecords();
+  const localRecords = records.filter(
+    (record) => record.target && !/^(?:https?:|data:)/u.test(record.target),
+  );
+  const separationMetrics = validateLocalizedReadmeSeparation(records);
+  const unique = [...new Set(localRecords.map((record) => record.target))].sort();
   for (const target of unique) {
     const path = resolve(ROOT, target);
     if (!path.startsWith(ROOT + sep) || !existsSync(path)) {
@@ -239,17 +338,17 @@ function validateVisualAssets() {
     if (extname(path).toLowerCase() === '.svg') validateSvg(path);
   }
   return {
-    readmeLocalImages: images.length,
+    readmeImages: records.length,
+    localReadmeImages: localRecords.length,
     uniqueReadmeLocalImages: unique.length,
     readmeSvgImages: unique.filter((target) => extname(target).toLowerCase() === '.svg').length,
+    ...separationMetrics,
   };
 }
 
 const textFiles = [
   ...SCAN_ROOTS.flatMap((directory) => walk(join(ROOT, directory))),
-  join(ROOT, 'README.md'),
-  join(ROOT, 'README.zh-CN.md'),
-  join(ROOT, 'README.en.md'),
+  ...README_PATHS.map((path) => join(ROOT, path)),
   join(ROOT, 'package.json'),
 ].filter((path) => TEXT_EXTENSIONS.has(extname(path).toLowerCase()));
 for (const path of [...new Set(textFiles)].sort()) readUtf8(path);
@@ -257,7 +356,7 @@ for (const path of [...new Set(textFiles)].sort()) readUtf8(path);
 const localeMetrics = validateLocaleMaps();
 const visualMetrics = validateVisualAssets();
 const report = {
-  schemaVersion: 'resindb-i18n-visual-audit-1.0.0',
+  schemaVersion: 'resindb-i18n-visual-audit-2.0.0',
   scannedTextFiles: [...new Set(textFiles)].length,
   ...localeMetrics,
   ...visualMetrics,
