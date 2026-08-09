@@ -122,7 +122,10 @@ jobs:
           rm .github/workflows/v4-candidate-export-once.yml
           bash /tmp/resindb-v4-build.sh
           rm .github/workflows/current-main-readme-refresh.yml
-          test -z "$(git status --porcelain --untracked-files=all | grep 'current-main-readme-refresh.yml' || :)"
+          if git status --porcelain --untracked-files=all | grep -F 'current-main-readme-refresh.yml'; then
+            echo 'ephemeral README fixture remains in worktree' >&2
+            exit 1
+          fi
           git diff --exit-code
           git diff --check
       - name: Record controller-free exact candidate
