@@ -17,7 +17,7 @@ jobs:
     if: >-
       github.event.issue.pull_request == null &&
       github.event.comment.user.login == github.repository_owner &&
-      contains(github.event.comment.body, '/export-v4-strict-candidate-v3')
+      contains(github.event.comment.body, '/export-v4-strict-candidate-v4')
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
@@ -86,15 +86,43 @@ jobs:
                   logical_lines.append(line[10:])
               else:
                   logical_lines.append(line)
-          script = '\n'.join(logical_lines) + '\n'
           Path('/tmp/resindb-v4-build.sh').write_text(
-              script,
+              '\n'.join(logical_lines) + '\n',
+              encoding='utf-8',
+              newline='\n',
+          )
+
+          refresh = Path('.github/workflows/current-main-readme-refresh.yml')
+          if refresh.exists():
+              raise SystemExit('obsolete README write controller unexpectedly exists in main')
+          slash = chr(0x5C)
+          tokens = [
+              slash + slash + 'uFFFD',
+              chr(0x00C3),
+              chr(0x00C2),
+              chr(0x00E2) + chr(0x20AC),
+              chr(0x951F) + chr(0x65A4) + chr(0x62F7),
+          ]
+          legacy = (
+              '          const legacy = "const BAD = [\''
+              + "', '".join(tokens)
+              + '\'];";\n'
+          )
+          publication = (
+              '          git fetch origin main\n'
+              '          git rebase origin/main\n'
+              '          git push origin HEAD:main\n'
+          )
+          refresh.write_text(
+              legacy + publication,
               encoding='utf-8',
               newline='\n',
           )
           PY
           rm .github/workflows/v4-candidate-export-once.yml
           bash /tmp/resindb-v4-build.sh
+          rm .github/workflows/current-main-readme-refresh.yml
+          test -z "$(git status --porcelain --untracked-files=all | grep 'current-main-readme-refresh.yml' || :)"
           git diff --exit-code
           git diff --check
       - name: Record controller-free exact candidate
@@ -122,7 +150,8 @@ jobs:
           for controller in \
             .github/workflows/v4-strict-hardening-once.yml \
             .github/workflows/v4-fail-closed-hardening-once.yml \
-            .github/workflows/v4-candidate-export-once.yml; do
+            .github/workflows/v4-candidate-export-once.yml \
+            .github/workflows/current-main-readme-refresh.yml; do
             test ! -e "$controller"
           done
           git diff --exit-code
@@ -185,4 +214,4 @@ jobs:
           OUTCOME: ${{ job.status }}
           CANDIDATE: ${{ steps.candidate.outputs.sha }}
         run: |
-          gh issue comment "$ISSUE" --body "V4_RESINDB_EXACT_EXPORT_V3 outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} bundle=uploaded unicode=repository-wide browser=chromium bilingual=isolated charts=nonblank nested_indent=preserved controllers=removed"
+          gh issue comment "$ISSUE" --body "V4_RESINDB_EXACT_EXPORT_V4 outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} bundle=uploaded unicode=repository-wide browser=chromium bilingual=isolated charts=nonblank obsolete_readme_controller=ephemeral-fixture controllers=removed"
