@@ -17,7 +17,7 @@ jobs:
     if: >-
       github.event.issue.pull_request == null &&
       github.event.comment.user.login == github.repository_owner &&
-      contains(github.event.comment.body, '/export-v4-strict-candidate-v6')
+      contains(github.event.comment.body, '/export-v4-strict-candidate-v7')
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
@@ -73,6 +73,24 @@ jobs:
           from pathlib import Path
 
           controller = Path('.github/workflows/v4-strict-hardening-once.yml')
+          text = controller.read_text(encoding='utf-8')
+          old_block = """          refresh_text = replace_once(
+              refresh_text,
+              old_publish,
+              new_publish,
+              'exact-parent README publication',
+          )
+"""
+          new_block = """          if old_publish in refresh_text:
+              refresh_text = refresh_text.replace(old_publish, new_publish, 1)
+          elif new_publish not in refresh_text:
+              raise SystemExit('exact-parent README publication contract is missing')
+"""
+          if text.count(old_block) != 1:
+              raise SystemExit(f'exact-parent builder patch count: {text.count(old_block)}')
+          text = text.replace(old_block, new_block, 1)
+          controller.write_text(text, encoding='utf-8', newline='\n')
+
           text = controller.read_text(encoding='utf-8')
           anchor = '      - name: Build normalized controller-free strict candidate\n'
           step_start = text.index(anchor)
@@ -215,4 +233,4 @@ jobs:
           OUTCOME: ${{ job.status }}
           CANDIDATE: ${{ steps.candidate.outputs.sha }}
         run: |
-          gh issue comment "$ISSUE" --body "V4_RESINDB_EXACT_EXPORT_V6 outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} bundle=uploaded unicode=repository-wide browser=chromium bilingual=isolated charts=nonblank write_controllers=removed"
+          gh issue comment "$ISSUE" --body "V4_RESINDB_EXACT_EXPORT_V7 outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} bundle=uploaded unicode=repository-wide browser=chromium bilingual=isolated charts=nonblank exact_parent=idempotent controllers=removed"
