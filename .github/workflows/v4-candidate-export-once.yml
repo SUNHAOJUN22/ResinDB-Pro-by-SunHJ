@@ -17,7 +17,7 @@ jobs:
     if: >-
       github.event.issue.pull_request == null &&
       github.event.comment.user.login == github.repository_owner &&
-      contains(github.event.comment.body, '/export-v4-strict-candidate-v5')
+      contains(github.event.comment.body, '/export-v4-strict-candidate-v6')
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
@@ -65,7 +65,7 @@ jobs:
           test "$installed" -eq 1
           restore_manifests
           trap - EXIT
-      - name: Execute the reviewed strict candidate builder intact
+      - name: Execute reviewed strict builder and commit controller removal
         shell: bash
         run: |
           set -euo pipefail
@@ -121,10 +121,9 @@ jobs:
           rm .github/workflows/v4-candidate-export-once.yml
           bash /tmp/resindb-v4-build.sh
           rm .github/workflows/current-main-readme-refresh.yml
-          if git status --porcelain --untracked-files=all | grep -F 'current-main-readme-refresh.yml'; then
-            echo 'README controller remains in worktree' >&2
-            exit 1
-          fi
+          git add -A .github/workflows/current-main-readme-refresh.yml
+          git commit --amend --no-edit
+          test ! -e .github/workflows/current-main-readme-refresh.yml
           git diff --exit-code
           git diff --check
       - name: Record controller-free exact candidate
@@ -216,4 +215,4 @@ jobs:
           OUTCOME: ${{ job.status }}
           CANDIDATE: ${{ steps.candidate.outputs.sha }}
         run: |
-          gh issue comment "$ISSUE" --body "V4_RESINDB_EXACT_EXPORT_V5 outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} bundle=uploaded unicode=repository-wide browser=chromium bilingual=isolated charts=nonblank readme_controller=existing-or-fixture controllers=removed"
+          gh issue comment "$ISSUE" --body "V4_RESINDB_EXACT_EXPORT_V6 outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} bundle=uploaded unicode=repository-wide browser=chromium bilingual=isolated charts=nonblank write_controllers=removed"
