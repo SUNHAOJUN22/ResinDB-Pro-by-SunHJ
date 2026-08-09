@@ -17,9 +17,9 @@ jobs:
     if: >-
       github.event.issue.pull_request == null &&
       github.event.comment.user.login == github.repository_owner &&
-      contains(github.event.comment.body, '/run-v4-strict-hardening')
+      contains(github.event.comment.body, '/run-v4-strict-hardening-v2')
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -39,7 +39,7 @@ jobs:
           fc-cache -f
           fc-match 'Noto Sans CJK SC'
           fc-list :lang=zh | grep -q .
-      - name: Install exact dependencies
+      - name: Install exact dependencies without manifest drift
         shell: bash
         run: |
           set -euo pipefail
@@ -54,13 +54,24 @@ jobs:
           npm ci
           restore_manifests
           trap - EXIT
-      - name: Build strict controller-free candidate
+      - name: Build normalized controller-free strict candidate
         id: candidate
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
+          from __future__ import annotations
+
+          import subprocess
+          import unicodedata
           from pathlib import Path
+
+          TEXT_EXTENSIONS = {
+              '.cfg', '.cjs', '.css', '.csv', '.html', '.ini', '.js', '.jsx',
+              '.json', '.jsonl', '.md', '.mdx', '.mjs', '.ps1', '.py', '.pyi',
+              '.scss', '.sh', '.sql', '.svg', '.toml', '.ts', '.tsx', '.tsv',
+              '.txt', '.xml', '.yaml', '.yml',
+          }
 
           def replace_once(text: str, old: str, new: str, label: str) -> str:
               count = text.count(old)
@@ -108,6 +119,75 @@ jobs:
           )
           validator.write_text(text, encoding='utf-8', newline='\n')
 
+          runtime_test = Path('tests/unit/i18nRuntime.test.ts')
+          test_text = runtime_test.read_text(encoding='utf-8')
+          old_test = """  test('blocks replacement characters, control characters and common mojibake', () => {
+    expect(hasCorruptedUnicode('damaged � text')).toBe(true);
+    expect(hasCorruptedUnicode('temperature Â°C')).toBe(true);
+    expect(hasCorruptedUnicode('safe 中文 and English')).toBe(false);
+    expect(normalizeUiText('damaged � text', '安全回退')).toBe('安全回退');
+    expect(normalizeUiText('finite scientific label', 'fallback')).toBe('finite scientific label');
+  });
+"""
+          new_test = """  test('blocks replacement characters, control characters and common mojibake', () => {
+    const replacementCharacter = String.fromCodePoint(0xfffd);
+    const damaged = `damaged ${replacementCharacter} text`;
+    const mojibakeDegree = `temperature ${String.fromCodePoint(0x00c2)}°C`;
+    expect(hasCorruptedUnicode(damaged)).toBe(true);
+    expect(hasCorruptedUnicode(mojibakeDegree)).toBe(true);
+    expect(hasCorruptedUnicode('safe 中文 and English')).toBe(false);
+    expect(normalizeUiText(damaged, '安全回退')).toBe('安全回退');
+    expect(normalizeUiText('finite scientific label', 'fallback')).toBe('finite scientific label');
+  });
+"""
+          test_text = replace_once(
+              test_text,
+              old_test,
+              new_test,
+              'runtime corrupted-Unicode fixture construction',
+          )
+          runtime_test.write_text(test_text, encoding='utf-8', newline='\n')
+
+          refresh = Path('.github/workflows/current-main-readme-refresh.yml')
+          refresh_text = refresh.read_text(encoding='utf-8')
+          old_legacy = "          const legacy = \"const BAD = ['\\\\uFFFD', 'Ã', 'Â', 'â€', '锟斤拷'];\";\n"
+          new_legacy = """          const replacementEscape = ['\\\\', 'u', 'F', 'F', 'F', 'D'].join('');
+          const legacyTokens = [
+            replacementEscape,
+            String.fromCodePoint(0x00c3),
+            String.fromCodePoint(0x00c2),
+            String.fromCodePoint(0x00e2, 0x20ac),
+            String.fromCodePoint(0x951f, 0x65a4, 0x62f7),
+          ];
+          const legacy = `const BAD = [${legacyTokens.map((token) => `'${token}'`).join(', ')}];`;
+"""
+          refresh_text = replace_once(
+              refresh_text,
+              old_legacy,
+              new_legacy,
+              'workflow bad-token fixture construction',
+          )
+          old_publish = """          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
+"""
+          new_publish = """          git fetch origin main
+          expected_parent="$(git rev-parse HEAD^)"
+          remote_main="$(git rev-parse origin/main)"
+          if [[ "$expected_parent" != "$remote_main" ]]; then
+            echo "STALE_MAIN expected_parent=$expected_parent remote_main=$remote_main" >&2
+            exit 3
+          fi
+          git push origin HEAD:main
+"""
+          refresh_text = replace_once(
+              refresh_text,
+              old_publish,
+              new_publish,
+              'exact-parent README publication',
+          )
+          refresh.write_text(refresh_text, encoding='utf-8', newline='\n')
+
           workflow = Path('.github/workflows/ci.yml')
           ci = workflow.read_text(encoding='utf-8')
           ci = replace_once(
@@ -129,30 +209,52 @@ jobs:
               'Unicode evidence upload',
           )
           workflow.write_text(ci, encoding='utf-8', newline='\n')
-          Path('.github/workflows/v4-strict-hardening-once.yml').unlink()
+
+          for controller in (
+              Path('.github/workflows/v4-strict-hardening-once.yml'),
+              Path('.github/workflows/v4-fail-closed-hardening-once.yml'),
+          ):
+              controller.unlink(missing_ok=False)
+
+          tracked = subprocess.run(
+              ['git', 'ls-files', '-z'],
+              check=True,
+              capture_output=True,
+          ).stdout.split(b'\0')
+          normalized_count = 0
+          for raw in tracked:
+              if not raw:
+                  continue
+              relative = raw.decode('utf-8', errors='strict')
+              path = Path(relative)
+              if path.suffix.lower() not in TEXT_EXTENSIONS or not path.is_file():
+                  continue
+              data = path.read_bytes()
+              decoded = data.decode('utf-8', errors='strict')
+              if decoded.startswith('\ufeff'):
+                  decoded = decoded[1:]
+              normalized = unicodedata.normalize(
+                  'NFC', decoded.replace('\r\n', '\n').replace('\r', '\n')
+              ).rstrip('\n') + '\n'
+              encoded = normalized.encode('utf-8')
+              if encoded != data:
+                  path.write_bytes(encoded)
+                  normalized_count += 1
+          print(f'normalized_tracked_text_files={normalized_count}')
           PY
           node scripts/validate-i18n-visuals.mjs
           git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A \
-            .github/workflows/ci.yml \
-            .github/workflows/v4-strict-hardening-once.yml \
-            scripts/validate-i18n-visuals.mjs \
-            reports/UNICODE_INTEGRITY_REPORT.json
+          git add -u
+          git add reports/UNICODE_INTEGRITY_REPORT.json
           git commit -m 'ci: enforce strict Unicode and visual integrity'
           echo "candidate_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Run complete code, data, numerical, build and Chromium gates
         run: |
           set -euo pipefail
           node scripts/refresh-current-main-readme.mjs --check
-          npm run validate
-          npm run benchmark:kmeans:smoke
-          npm run test:unit
-          npm run test:science
-          npm run test:coverage
-          npm run test:ui
-          npm run audit:all
+          npm run validate:ci
           node - <<'NODE'
           const fs = require('node:fs');
           const report = JSON.parse(fs.readFileSync('reports/UNICODE_INTEGRITY_REPORT.json', 'utf8'));
@@ -162,6 +264,8 @@ jobs:
             if (workflow.includes(token)) throw new Error(`forbidden workflow construct remains: ${token}`);
           }
           NODE
+          test ! -e .github/workflows/v4-strict-hardening-once.yml
+          test ! -e .github/workflows/v4-fail-closed-hardening-once.yml
           git diff --exit-code
           git diff --check
       - name: Prove sole remote main branch
@@ -195,4 +299,4 @@ jobs:
           OUTCOME: ${{ job.status }}
           CANDIDATE: ${{ steps.candidate.outputs.candidate_sha }}
         run: |
-          gh issue comment "$ISSUE" --body "V4_STRICT_HARDENING outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} controller=self_removed unicode=strict browser=chromium-bilingual-science branch=main-only"
+          gh issue comment "$ISSUE" --body "V4_STRICT_HARDENING_V2 outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} controller=self_removed unicode=whole-tree-strict browser=chromium-bilingual-science publication=exact-parent branch=main-only"
