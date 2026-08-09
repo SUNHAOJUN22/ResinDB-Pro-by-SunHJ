@@ -1,0 +1,109 @@
+name: Current-main README and visual refresh
+
+on:
+  workflow_dispatch:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: current-main-readme-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.pull_request == null &&
+       github.event.comment.user.login == github.repository_owner &&
+       contains(github.event.comment.body, '/refresh-current-main-readme-v2'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Install deterministic CJK fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+          fc-match 'Noto Sans CJK SC'
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install exact dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp package.json /tmp/resindb-package-exact.json
+          cp package-lock.json /tmp/resindb-package-lock-exact.json
+          restore_manifests() {
+            cp /tmp/resindb-package-exact.json package.json
+            cp /tmp/resindb-package-lock-exact.json package-lock.json
+          }
+          trap restore_manifests EXIT
+          node scripts/prepare-ci-manifest.mjs
+          npm ci
+          restore_manifests
+          trap - EXIT
+      - name: Generate localized code-bound README architecture
+        run: |
+          node scripts/refresh-current-main-readme.mjs --write
+          node scripts/refresh-current-main-readme.mjs --check
+          git diff --check
+      - name: Create local exact-tree candidate
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            README.md \
+            README.zh-CN.md \
+            README.en.md \
+            docs/CURRENT_MAIN_ACCEPTANCE.md \
+            docs/current-main
+          if git diff --cached --quiet; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+          else
+            git commit -m 'docs: refresh current-main bilingual acceptance design'
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Run encoding, language, figure, compute and source gates
+        run: |
+          set -euo pipefail
+          node scripts/refresh-current-main-readme.mjs --check
+          npm run validate:docs
+          npm run validate:source
+          npm run validate:data
+          npm run validate:compute
+          npm run validate:scientific-ui
+          npm run lint
+          npm run typecheck
+          npm run test:unit
+          npm run test:science
+          npm run build
+      - name: Rebase and publish candidate
+        if: steps.candidate.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
+      - name: Publish refresh result to issue
+        if: always() && github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number }}
+          OUTCOME: ${{ job.status }}
+          CHANGED: ${{ steps.candidate.outputs.changed }}
+        run: |
+          gh issue comment "$ISSUE" --body "CURRENT_MAIN_README_REFRESH_V2 outcome=${OUTCOME} changed=${CHANGED:-unknown} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} utf8=strict localized_visuals=separate"
