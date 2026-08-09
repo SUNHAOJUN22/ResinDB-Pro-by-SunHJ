@@ -1,4 +1,4 @@
-name: V4 ResinDB exact export V7
+name: V4 ResinDB exact export V8
 
 on:
   issue_comment:
@@ -9,7 +9,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: v4-resindb-exact-export-v7
+  group: v4-resindb-exact-export-v8
   cancel-in-progress: false
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
     if: >-
       github.event.issue.pull_request == null &&
       github.event.comment.user.login == github.repository_owner &&
-      contains(github.event.comment.body, '/export-v4-resindb-v7')
+      contains(github.event.comment.body, '/export-v4-resindb-v8')
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
@@ -108,8 +108,31 @@ jobs:
           rm .github/workflows/v4-candidate-export-once.yml
           rm .github/workflows/v4-resindb-export-v7.yml
           bash /tmp/resindb-v4-build.sh
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/ci.yml')
+          text = path.read_text(encoding='utf-8')
+          old = """          python - <<'PY'
+          from pathlib import Path
+          refs = [line.split()[1] for line in Path('artifacts/branch-proof.txt').read_text().splitlines() if line.strip()]
+          if refs != ['refs/heads/main']:
+              raise SystemExit(f'unexpected remote branches: {refs}')
+          PY
+"""
+          new = """          awk 'END {exit !(NR == 1 && $2 == "refs/heads/main")}' artifacts/branch-proof.txt
+"""
+          if text.count(old) != 1:
+              raise SystemExit(f'Python branch-proof block count: {text.count(old)}')
+          text = text.replace(old, new, 1)
+          if "python - <<'PY'" in text:
+              raise SystemExit('permanent CI still depends on Python')
+          path.write_text(text, encoding='utf-8', newline='\n')
+          PY
           rm .github/workflows/current-main-readme-refresh.yml
-          git add -A .github/workflows/current-main-readme-refresh.yml
+          git add -A \
+            .github/workflows/ci.yml \
+            .github/workflows/current-main-readme-refresh.yml
           git commit --amend --no-edit
           for controller in \
             .github/workflows/v4-strict-hardening-once.yml \
@@ -137,7 +160,7 @@ jobs:
           const unicode = JSON.parse(fs.readFileSync('reports/UNICODE_INTEGRITY_REPORT.json', 'utf8'));
           if (unicode.verdict !== 'PASS') throw new Error(JSON.stringify(unicode));
           const ci = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
-          for (const token of ['continue-on-error:', '|| true', 'actions/setup-node@v4']) {
+          for (const token of ['continue-on-error:', '|| true', 'actions/setup-node@v4', "python - <<'PY'"]) {
             if (ci.includes(token)) throw new Error(`forbidden workflow construct remains: ${token}`);
           }
           NODE
@@ -147,16 +170,7 @@ jobs:
         run: |
           set -euo pipefail
           git ls-remote --heads origin > /tmp/resindb-v4-branches.txt
-          python - <<'PY'
-          from pathlib import Path
-          refs = [
-              line.split()[1]
-              for line in Path('/tmp/resindb-v4-branches.txt').read_text().splitlines()
-              if line.strip()
-          ]
-          if refs != ['refs/heads/main']:
-              raise SystemExit(f'unexpected remote branches: {refs}')
-          PY
+          awk 'END {exit !(NR == 1 && $2 == "refs/heads/main")}' /tmp/resindb-v4-branches.txt
       - name: Package exact candidate
         id: bundle
         run: |
@@ -199,4 +213,4 @@ jobs:
           OUTCOME: ${{ job.status }}
           CANDIDATE: ${{ steps.candidate.outputs.sha }}
         run: |
-          gh issue comment "$ISSUE" --body "V4_RESINDB_EXACT_EXPORT_V7 outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} unicode=repository-wide browser=chromium bilingual=isolated charts=nonblank controllers=removed"
+          gh issue comment "$ISSUE" --body "V4_RESINDB_EXACT_EXPORT_V8 outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} unicode=repository-wide browser=chromium bilingual=isolated charts=nonblank permanent_ci=shell-only controllers=removed"
