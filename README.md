@@ -1098,3 +1098,34 @@ fc-cache -f
 ```
 
 Windows uses the governed fallback chain headed by Microsoft YaHei; Linux uses Noto Sans CJK SC/Noto Sans SC. README screenshots are regenerated from the same production build after these checks.
+
+<!-- CURRENT_MAIN_ACCEPTANCE_V2:START -->
+## Current `main` / 当前主线：数据—计算—图形—证据闭环
+
+<p align="center">
+  <img src="docs/current-main/resindb-current-main-zh.svg" width="49%" alt="ResinDB Pro 当前主线中文数据计算图形证据架构">
+  <img src="docs/current-main/resindb-current-main-en.svg" width="49%" alt="ResinDB Pro current-main English data compute figure evidence architecture">
+</p>
+
+> 中文与英文视觉资产分别生成、分别进行 UTF-8、语言隔离、SVG 安全、可访问性与公式合同验证。
+> Chinese and English visual assets are generated separately and independently checked for UTF-8, language isolation, SVG safety, accessibility and formula contracts.
+
+### Mathematical contracts / 数理合同
+
+$$
+C_figure = C_finite ∧ C_labeled ∧ C_finished ∧ C_nonblank
+$$
+
+$$
+d_M(x, μ) = √((x − μ)ᵀ Σ⁻¹ (x − μ))
+$$
+
+$$
+u_c² = u_data² + u_model² + u_scale²
+$$
+
+- ResinDB Pro 是本地优先的科学数据与分析工作台，不是经认证的 LIMS/ERP、商业力场、工业牌号放行系统或自动科研批准器。
+- ResinDB Pro is a local-first scientific data and analysis workbench, not a certified LIMS/ERP, commercial force field, industrial grade-release system or automatic scientific approval engine.
+
+[SIX_REPOSITORY_PARALLEL_6H_ACCEPTANCE_PROMPT_V2.md](docs/SIX_REPOSITORY_PARALLEL_6H_ACCEPTANCE_PROMPT_V2.md)
+<!-- CURRENT_MAIN_ACCEPTANCE_V2:END -->

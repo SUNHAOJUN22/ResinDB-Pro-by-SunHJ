@@ -27,7 +27,13 @@ const P = {
 };
 const START = '<!-- CURRENT_MAIN_ACCEPTANCE_V2:START -->';
 const END = '<!-- CURRENT_MAIN_ACCEPTANCE_V2:END -->';
-const BAD = ['\uFFFD', 'Ã', 'Â', 'â€', '锟斤拷'];
+const BAD = [
+  String.fromCodePoint(0xfffd),
+  String.fromCodePoint(0x00c3),
+  String.fromCodePoint(0x00c2),
+  String.fromCodePoint(0x00e2, 0x20ac),
+  String.fromCodePoint(0x951f, 0x65a4, 0x62f7),
+];
 const nfc = (v) => v.normalize('NFC');
 const esc = (v) => v.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&apos;');
 

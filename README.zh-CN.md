@@ -85,3 +85,36 @@ npm run test:ui
 ```
 
 软件验收只覆盖数据合同、计算实现、界面显示和可重复证据；牌号放行、实验真实性、力场适用性和工业决策仍需独立资格证据。
+
+<!-- CURRENT_MAIN_ACCEPTANCE_V2:START -->
+## 当前 `main`：数据—计算—图形—证据闭环
+
+<p align="center"><img src="docs/current-main/resindb-current-main-zh.svg" width="100%" alt="当前 `main`：数据—计算—图形—证据闭环"></p>
+
+> 该图由当前代码合同生成，是科学软件概念设计，不是树脂数据库测量结果。
+
+### 核心数理合同
+
+$$
+C_figure = C_finite ∧ C_labeled ∧ C_finished ∧ C_nonblank
+$$
+
+$$
+d_M(x, μ) = √((x − μ)ᵀ Σ⁻¹ (x − μ))
+$$
+
+$$
+u_c² = u_data² + u_model² + u_scale²
+$$
+
+### 使用策略
+
+1. 导入时先验证 Schema、来源类型、记录状态、单位和有限值。
+2. 相似度、回归、聚类与 UQ 必须显式处理缺失数据、尺度和适用域。
+3. 浏览器图形只有在 ECharts finished、Canvas 非空且标签完整时才可导出。
+4. 中文与英文 README、SVG 和界面字符串分别验收，禁止语言串扰和乱码。
+
+> **责任边界：** ResinDB Pro 是本地优先的科学数据与分析工作台，不是经认证的 LIMS/ERP、商业力场、工业牌号放行系统或自动科研批准器。
+
+执行提示词: [SIX_REPOSITORY_PARALLEL_6H_ACCEPTANCE_PROMPT_V2.md](docs/SIX_REPOSITORY_PARALLEL_6H_ACCEPTANCE_PROMPT_V2.md)
+<!-- CURRENT_MAIN_ACCEPTANCE_V2:END -->

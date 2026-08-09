@@ -85,3 +85,36 @@ npm run test:ui
 ```
 
 Software acceptance covers data contracts, implemented computations, interface rendering and reproducible evidence. Grade release, experimental truth, force-field applicability and industrial decisions still require independent qualification.
+
+<!-- CURRENT_MAIN_ACCEPTANCE_V2:START -->
+## Current `main`: data–compute–figure–evidence loop
+
+<p align="center"><img src="docs/current-main/resindb-current-main-en.svg" width="100%" alt="Current `main`: data–compute–figure–evidence loop"></p>
+
+> This figure is generated from current code contracts and is scientific-software conceptual design, not measured resin-database output.
+
+### Core mathematical contracts
+
+$$
+C_figure = C_finite ∧ C_labeled ∧ C_finished ∧ C_nonblank
+$$
+
+$$
+d_M(x, μ) = √((x − μ)ᵀ Σ⁻¹ (x − μ))
+$$
+
+$$
+u_c² = u_data² + u_model² + u_scale²
+$$
+
+### Usage strategy
+
+1. Validate Schema, source type, record status, units and finite values at import.
+2. Similarity, regression, clustering and UQ must expose missing-data, scaling and applicability handling.
+3. Browser figures are exportable only after ECharts finished, nonblank canvas and complete labels.
+4. Chinese and English README, SVG and UI strings are qualified separately; language leakage and mojibake are rejected.
+
+> **Responsibility boundary：** ResinDB Pro is a local-first scientific data and analysis workbench, not a certified LIMS/ERP, commercial force field, industrial grade-release system or automatic scientific approval engine.
+
+Execution prompt: [SIX_REPOSITORY_PARALLEL_6H_ACCEPTANCE_PROMPT_V2.md](docs/SIX_REPOSITORY_PARALLEL_6H_ACCEPTANCE_PROMPT_V2.md)
+<!-- CURRENT_MAIN_ACCEPTANCE_V2:END -->
