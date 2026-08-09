@@ -17,7 +17,7 @@ jobs:
     if: >-
       github.event.issue.pull_request == null &&
       github.event.comment.user.login == github.repository_owner &&
-      contains(github.event.comment.body, '/export-v4-strict-candidate-v2')
+      contains(github.event.comment.body, '/export-v4-strict-candidate-v3')
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
@@ -81,15 +81,11 @@ jobs:
           script_end = text.index('\n      - name:', script_start)
           physical_lines = text[script_start:script_end].splitlines()
           logical_lines: list[str] = []
-          for line_number, line in enumerate(physical_lines, start=1):
-              if not line:
-                  logical_lines.append('')
-                  continue
-              if not line.startswith('          '):
-                  raise SystemExit(
-                      f'unexpected candidate-step indentation at line {line_number}: {line!r}'
-                  )
-              logical_lines.append(line[10:])
+          for line in physical_lines:
+              if line.startswith('          '):
+                  logical_lines.append(line[10:])
+              else:
+                  logical_lines.append(line)
           script = '\n'.join(logical_lines) + '\n'
           Path('/tmp/resindb-v4-build.sh').write_text(
               script,
@@ -189,4 +185,4 @@ jobs:
           OUTCOME: ${{ job.status }}
           CANDIDATE: ${{ steps.candidate.outputs.sha }}
         run: |
-          gh issue comment "$ISSUE" --body "V4_RESINDB_EXACT_EXPORT_V2 outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} bundle=uploaded unicode=repository-wide browser=chromium bilingual=isolated charts=nonblank controllers=removed"
+          gh issue comment "$ISSUE" --body "V4_RESINDB_EXACT_EXPORT_V3 outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} bundle=uploaded unicode=repository-wide browser=chromium bilingual=isolated charts=nonblank nested_indent=preserved controllers=removed"
