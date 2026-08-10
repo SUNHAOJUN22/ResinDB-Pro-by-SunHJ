@@ -2,10 +2,8 @@ name: Current main qualification once
 # Exact rerun with Unicode evidence fixed point established after the report enters the candidate index.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/current-main-qualification-once.yml
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: write
@@ -17,11 +15,16 @@ concurrency:
 
 jobs:
   qualify:
+    if: >-
+      github.event.issue.number == 38 &&
+      github.event.comment.user.login == github.repository_owner &&
+      contains(github.event.comment.body, '/qualify-current-main')
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: main
           fetch-depth: 0
           persist-credentials: true
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -79,8 +82,6 @@ jobs:
           set -euo pipefail
           node scripts/validate-repository-unicode.mjs --normalize
           git add -A
-          # The report is new on this clean candidate. Rebuild only after it is in the
-          # index so the scanner's tracked-file universe is identical to the final tree.
           node scripts/validate-repository-unicode.mjs --write
           git add reports/UNICODE_INTEGRITY_REPORT.json
           node scripts/validate-repository-unicode.mjs --check
