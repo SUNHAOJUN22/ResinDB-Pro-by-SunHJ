@@ -1,0 +1,143 @@
+name: Current main qualification once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/current-main-qualification-once.yml
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: resindb-current-main-qualification-once
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install deterministic CJK fonts
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk fonts-noto-core
+          fc-cache -f
+          fc-list :lang=zh | grep -q .
+      - name: Remove one-time controller from qualified tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/current-main-qualification-once.yml
+      - name: Install exact dependencies without manifest drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp package.json /tmp/resindb-package-exact.json
+          cp package-lock.json /tmp/resindb-package-lock-exact.json
+          restore_manifests() {
+            cp /tmp/resindb-package-exact.json package.json
+            cp /tmp/resindb-package-lock-exact.json package-lock.json
+          }
+          trap restore_manifests EXIT
+          node scripts/prepare-ci-manifest.mjs
+          installed=0
+          for registry in https://registry.npmjs.org https://registry.npmmirror.com; do
+            for attempt in 1 2 3; do
+              if npm ci --registry="$registry"; then
+                installed=1
+                break 2
+              fi
+              sleep $((attempt * 10))
+            done
+          done
+          test "$installed" -eq 1
+          restore_manifests
+          trap - EXIT
+      - name: Build exact Unicode evidence and verify permanent CI policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/validate-repository-unicode.mjs --write
+          node scripts/validate-repository-unicode.mjs --check
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync('reports/UNICODE_INTEGRITY_REPORT.json', 'utf8'));
+          if (report.verdict !== 'PASS' || report.scannedTextFiles <= 0 || report.failures.length !== 0) {
+            throw new Error(JSON.stringify(report));
+          }
+          const ci = fs.readFileSync('.github/workflows/ci.yml', 'utf8');
+          for (const token of ['continue-on-error:', 'actions/setup-node@v4', 'set +e', '|| true']) {
+            if (ci.includes(token)) throw new Error(`forbidden permanent CI construct: ${token}`);
+          }
+          NODE
+          for obsolete in \
+            .github/workflows/v4-direct-finalize-once.yml \
+            .github/workflows/v4-candidate-export-once.yml \
+            .github/workflows/v4-strict-hardening-once.yml \
+            .github/workflows/v4-fail-closed-hardening-once.yml \
+            .github/workflows/current-main-readme-refresh.yml \
+            .github/v4-resindb-export-trigger \
+            .github/v4-direct-finalize-trigger; do
+            test ! -e "$obsolete"
+          done
+      - name: Run complete code, numerical, bilingual, build, coverage, browser and audit gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/refresh-current-main-readme.mjs --check
+          npm run validate:ci
+          node scripts/validate-repository-unicode.mjs --check
+          git diff --check
+      - name: Prove sole remote main branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-remote --heads origin > /tmp/resindb-branches.txt
+          python - <<'PY'
+          from pathlib import Path
+          refs = [line.split()[1] for line in Path('/tmp/resindb-branches.txt').read_text().splitlines() if line.strip()]
+          if refs != ['refs/heads/main']:
+              raise SystemExit(f'unexpected remote branches: {refs}')
+          PY
+      - name: Publish exact qualified clean tree
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add reports/UNICODE_INTEGRITY_REPORT.json
+          staged="$(git diff --cached --name-only)"
+          expected=$'.github/workflows/current-main-qualification-once.yml\nreports/UNICODE_INTEGRITY_REPORT.json'
+          test "$staged" = "$expected"
+          git diff --cached --check
+          parent="$GITHUB_SHA"
+          remote_sha="$(git ls-remote origin refs/heads/main | cut -f1)"
+          test "$remote_sha" = "$parent"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore(ci): bind Unicode evidence to final clean ResinDB tree'
+          qualified="$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD^)" = "$parent"
+          git push origin HEAD:main
+          echo "qualified=$qualified" >> "$GITHUB_OUTPUT"
+      - name: Record machine result
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUTCOME: ${{ job.status }}
+          QUALIFIED: ${{ steps.publish.outputs.qualified }}
+        shell: bash
+        run: |
+          gh issue comment 38 --body "CURRENT_MAIN_EXACT_QUALIFICATION outcome=${OUTCOME} tested_parent=${GITHUB_SHA} qualified=${QUALIFIED:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} unicode=tracked-utf8+nfc+mojibake bilingual=strict charts=chromium-nonblank coverage=blocking audit=blocking controllers=self-removed branch=main-only"
