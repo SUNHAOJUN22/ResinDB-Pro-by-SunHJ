@@ -114,6 +114,84 @@ jobs:
               )
           PY
           bash /tmp/resindb-v4-build.sh
+      - name: Close permanent dependency-audit fail-open gaps
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/ci.yml')
+          text = path.read_text(encoding='utf-8')
+
+          replacements = [
+              (
+                  """          set +e
+          npm audit --omit=dev --audit-level=high --json > artifacts/npm-audit-prod.json
+          code=$?
+          set -e
+          jq '.metadata.vulnerabilities' artifacts/npm-audit-prod.json
+          exit \"$code\"
+""",
+                  """          npm audit --omit=dev --audit-level=high --json \\
+            | tee artifacts/npm-audit-prod.json
+          jq '.metadata.vulnerabilities' artifacts/npm-audit-prod.json
+""",
+                  'production audit direct propagation',
+              ),
+              (
+                  """          set +e
+          npm audit --audit-level=high --json > artifacts/npm-audit-all.json
+          code=$?
+          set -e
+          jq '.metadata.vulnerabilities' artifacts/npm-audit-all.json
+          exit \"$code\"
+""",
+                  """          npm audit --audit-level=high --json \\
+            | tee artifacts/npm-audit-all.json
+          jq '.metadata.vulnerabilities' artifacts/npm-audit-all.json
+""",
+                  'complete audit direct propagation',
+              ),
+              (
+                  """          mkdir -p artifacts
+          set +e
+          npm outdated --json > artifacts/npm-outdated.json
+          code=$?
+          set -e
+          if [ ! -s artifacts/npm-outdated.json ]; then printf '{}\\n' > artifacts/npm-outdated.json; fi
+          printf '%s\\n' \"$code\" > artifacts/npm-outdated-exit-code.txt
+          jq . artifacts/npm-outdated.json
+""",
+                  """          set -euo pipefail
+          mkdir -p artifacts
+          code=0
+          if npm outdated --json > artifacts/npm-outdated.json; then
+            code=0
+          else
+            code=$?
+          fi
+          if [ ! -s artifacts/npm-outdated.json ]; then printf '{}\\n' > artifacts/npm-outdated.json; fi
+          printf '%s\\n' \"$code\" > artifacts/npm-outdated-exit-code.txt
+          jq . artifacts/npm-outdated.json
+""",
+                  'dependency freshness explicit status',
+              ),
+          ]
+
+          for old, new, label in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected one match, found {count}')
+              text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding='utf-8', newline='\n')
+          PY
+          if grep -R -n -E 'continue-on-error:|actions/setup-node@v4|set \+e|\|\| true' .github/workflows/ci.yml; then
+            echo 'forbidden permanent-CI construct remains' >&2
+            exit 1
+          fi
+          git diff --check
       - name: Remove all migration and trigger scaffolding
         id: candidate
         shell: bash
@@ -198,4 +276,4 @@ jobs:
           CANDIDATE: ${{ steps.candidate.outputs.sha }}
         shell: bash
         run: |
-          gh issue comment 38 --body "V4_RESINDB_DIRECT_EXPORT outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} source=${GITHUB_SHA} bundle=uploaded finalizer=self-delete"
+          gh issue comment 38 --body "V4_RESINDB_DIRECT_EXPORT outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} source=${GITHUB_SHA} bundle=uploaded finalizer=self-delete audit=direct-fail-closed"
