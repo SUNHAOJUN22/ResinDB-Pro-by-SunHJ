@@ -1,5 +1,5 @@
 name: Current main qualification once
-# Exact rerun after updating the fail-closed audit contract test.
+# Exact rerun with Unicode evidence fixed point established after the report enters the candidate index.
 
 on:
   push:
@@ -73,11 +73,16 @@ jobs:
           test "$installed" -eq 1
           restore_manifests
           trap - EXIT
-      - name: Normalize text and build strict Unicode evidence
+      - name: Normalize text and establish strict Unicode evidence fixed point
         shell: bash
         run: |
           set -euo pipefail
           node scripts/validate-repository-unicode.mjs --normalize
+          git add -A
+          # The report is new on this clean candidate. Rebuild only after it is in the
+          # index so the scanner's tracked-file universe is identical to the final tree.
+          node scripts/validate-repository-unicode.mjs --write
+          git add reports/UNICODE_INTEGRITY_REPORT.json
           node scripts/validate-repository-unicode.mjs --check
           node - <<'NODE'
           const fs = require('node:fs');
@@ -90,7 +95,6 @@ jobs:
             if (ci.includes(token)) throw new Error(`forbidden permanent CI construct: ${token}`);
           }
           NODE
-          git add -A
           git diff --cached --check
           git status --porcelain=v1 > /tmp/resindb-candidate-before.txt
       - name: README and bilingual visual contracts
@@ -191,4 +195,4 @@ jobs:
           QUALIFIED: ${{ steps.publish.outputs.qualified }}
         shell: bash
         run: |
-          gh issue comment 38 --body "CURRENT_MAIN_EXACT_QUALIFICATION outcome=${OUTCOME} tested_parent=${GITHUB_SHA} qualified=${QUALIFIED:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} unicode=normalized-mechanical+semantic-fail-closed migration_debris=removed docs=strict scientific_ui=strict compute=strict data=strict tests=full coverage=blocking chromium=nonblank audit=blocking workflow_inventory=ci-only branch=main-only"
+          gh issue comment 38 --body "CURRENT_MAIN_EXACT_QUALIFICATION outcome=${OUTCOME} tested_parent=${GITHUB_SHA} qualified=${QUALIFIED:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} unicode=fixed-point+semantic-fail-closed migration_debris=removed docs=strict scientific_ui=strict compute=strict data=strict tests=full coverage=blocking chromium=nonblank audit=blocking workflow_inventory=ci-only branch=main-only"
