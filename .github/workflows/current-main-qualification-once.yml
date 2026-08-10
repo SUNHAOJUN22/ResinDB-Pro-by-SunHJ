@@ -36,11 +36,19 @@ jobs:
           sudo apt-get install -y --no-install-recommends fonts-noto-cjk fonts-noto-core
           fc-cache -f
           fc-list :lang=zh | grep -q .
-      - name: Remove one-time controller from qualified tree
+      - name: Remove qualifier and obsolete migration debris from candidate tree
         shell: bash
         run: |
           set -euo pipefail
           git rm .github/workflows/current-main-qualification-once.yml
+          git rm -r --ignore-unmatch \
+            .github/pass10-delivery \
+            .github/pass10-final-delivery
+          git rm --ignore-unmatch \
+            scripts/.phase2l-payload-* \
+            scripts/phase2l-apply-final.mjs \
+            scripts/ui-phase2l-scientific-smoke-v2.mjs
+          git diff --cached --check
       - name: Install exact dependencies without manifest drift
         shell: bash
         run: |
@@ -66,11 +74,11 @@ jobs:
           test "$installed" -eq 1
           restore_manifests
           trap - EXIT
-      - name: Build exact Unicode evidence and verify permanent CI policy
+      - name: Mechanically normalize tracked text and build strict Unicode evidence
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/validate-repository-unicode.mjs --write
+          node scripts/validate-repository-unicode.mjs --normalize
           node scripts/validate-repository-unicode.mjs --check
           node - <<'NODE'
           const fs = require('node:fs');
@@ -83,16 +91,9 @@ jobs:
             if (ci.includes(token)) throw new Error(`forbidden permanent CI construct: ${token}`);
           }
           NODE
-          for obsolete in \
-            .github/workflows/v4-direct-finalize-once.yml \
-            .github/workflows/v4-candidate-export-once.yml \
-            .github/workflows/v4-strict-hardening-once.yml \
-            .github/workflows/v4-fail-closed-hardening-once.yml \
-            .github/workflows/current-main-readme-refresh.yml \
-            .github/v4-resindb-export-trigger \
-            .github/v4-direct-finalize-trigger; do
-            test ! -e "$obsolete"
-          done
+          git add -A
+          git diff --cached --check
+          git status --porcelain=v1 > /tmp/resindb-candidate-before.txt
       - name: Run complete code, numerical, bilingual, build, coverage, browser and audit gates
         shell: bash
         run: |
@@ -101,7 +102,10 @@ jobs:
           npm run validate:ci
           node scripts/validate-repository-unicode.mjs --check
           git diff --check
-      - name: Prove sole remote main branch
+          git add -A
+          git status --porcelain=v1 > /tmp/resindb-candidate-after.txt
+          diff -u /tmp/resindb-candidate-before.txt /tmp/resindb-candidate-after.txt
+      - name: Prove sole remote main branch and clean workflow inventory
         shell: bash
         run: |
           set -euo pipefail
@@ -112,22 +116,21 @@ jobs:
           if refs != ['refs/heads/main']:
               raise SystemExit(f'unexpected remote branches: {refs}')
           PY
+          test -f .github/workflows/ci.yml
+          test "$(find .github/workflows -maxdepth 1 -type f -name '*.yml' -print | wc -l | tr -d ' ')" -eq 1
       - name: Publish exact qualified clean tree
         id: publish
         shell: bash
         run: |
           set -euo pipefail
-          git add reports/UNICODE_INTEGRITY_REPORT.json
-          staged="$(git diff --cached --name-only)"
-          expected=$'.github/workflows/current-main-qualification-once.yml\nreports/UNICODE_INTEGRITY_REPORT.json'
-          test "$staged" = "$expected"
+          git add -A
           git diff --cached --check
           parent="$GITHUB_SHA"
           remote_sha="$(git ls-remote origin refs/heads/main | cut -f1)"
           test "$remote_sha" = "$parent"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'chore(ci): bind Unicode evidence to final clean ResinDB tree'
+          git commit -m 'chore(repo): normalize text and retire migration scaffolding'
           qualified="$(git rev-parse HEAD)"
           test "$(git rev-parse HEAD^)" = "$parent"
           git push origin HEAD:main
@@ -140,4 +143,4 @@ jobs:
           QUALIFIED: ${{ steps.publish.outputs.qualified }}
         shell: bash
         run: |
-          gh issue comment 38 --body "CURRENT_MAIN_EXACT_QUALIFICATION outcome=${OUTCOME} tested_parent=${GITHUB_SHA} qualified=${QUALIFIED:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} unicode=tracked-utf8+nfc+mojibake bilingual=strict charts=chromium-nonblank coverage=blocking audit=blocking controllers=self-removed branch=main-only"
+          gh issue comment 38 --body "CURRENT_MAIN_EXACT_QUALIFICATION outcome=${OUTCOME} tested_parent=${GITHUB_SHA} qualified=${QUALIFIED:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} unicode=normalized-mechanical+semantic-fail-closed migration_debris=removed bilingual=strict charts=chromium-nonblank coverage=blocking audit=blocking workflow_inventory=ci-only branch=main-only"
