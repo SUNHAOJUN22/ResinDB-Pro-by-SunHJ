@@ -111,7 +111,20 @@ jobs:
       - name: TypeScript
         run: npm run typecheck
       - name: Complete regression tests
-        run: npm test
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee /tmp/resindb-regression.log
+      - name: Report regression diagnostic
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tail -n 120 /tmp/resindb-regression.log > /tmp/resindb-regression-tail.log
+          body=$(printf 'REGRESSION_DIAGNOSTIC run=%s\n```text\n%s\n```' "$GITHUB_RUN_ID" "$(cat /tmp/resindb-regression-tail.log)")
+          gh issue comment 38 --body "$body"
       - name: Production build
         run: npm run build
       - name: HTTP smoke
