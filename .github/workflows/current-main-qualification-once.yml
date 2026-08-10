@@ -1,4 +1,5 @@
 name: Current main qualification once
+# Exact rerun after updating the fail-closed audit contract test.
 
 on:
   push:
