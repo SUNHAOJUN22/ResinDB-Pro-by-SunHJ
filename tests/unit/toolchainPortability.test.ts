@@ -88,14 +88,16 @@ describe('stage-one Node-only tooling', () => {
     }
   })
 
-  it('writes machine-readable audit JSON without npm-run banner noise', () => {
+  it('streams machine-readable audit JSON while preserving fail-closed exit status', () => {
     const workflow = readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8')
     expect(workflow).toContain(
-      'npm audit --omit=dev --audit-level=high --json > artifacts/npm-audit-prod.json',
+      'npm audit --omit=dev --audit-level=high --json | tee artifacts/npm-audit-prod.json',
     )
     expect(workflow).toContain(
-      'npm audit --audit-level=high --json > artifacts/npm-audit-all.json',
+      'npm audit --audit-level=high --json | tee artifacts/npm-audit-all.json',
     )
+    expect(workflow).toContain('set -euo pipefail')
+    expect(workflow).not.toContain('set +e')
     expect(workflow).not.toContain('npm run audit:prod -- --json')
     expect(workflow).not.toContain('npm run audit:all -- --json')
   })
