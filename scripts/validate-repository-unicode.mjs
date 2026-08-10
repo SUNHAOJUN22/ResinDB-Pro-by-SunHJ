@@ -85,6 +85,31 @@ export function auditBytes(relative, data) {
   return failures;
 }
 
+export function normalizeBytes(data) {
+  let text = new TextDecoder('utf-8', { fatal: true }).decode(data);
+  if (text.startsWith(String.fromCodePoint(0xfeff))) text = text.slice(1);
+  text = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n').normalize('NFC');
+  return Buffer.from(`${text.replace(/\n+$/u, '')}\n`, 'utf8');
+}
+
+export function normalizeTrackedText() {
+  let changed = 0;
+  for (const relative of trackedTextFiles()) {
+    const absolute = path.join(ROOT, relative);
+    const stat = fs.lstatSync(absolute);
+    if (!stat.isFile() || stat.isSymbolicLink()) {
+      throw new Error(`unsafe tracked text path: ${relative}`);
+    }
+    const before = fs.readFileSync(absolute);
+    const after = normalizeBytes(before);
+    if (!before.equals(after)) {
+      fs.writeFileSync(absolute, after, { mode: stat.mode });
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
 export function auditTrackedText() {
   const failures = [];
   const files = trackedTextFiles();
@@ -116,9 +141,11 @@ function render(report) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const mode = process.argv[2] ?? '--audit';
+  let normalizedFiles = 0;
+  if (mode === '--normalize') normalizedFiles = normalizeTrackedText();
   const report = auditTrackedText();
   const rendered = render(report);
-  if (mode === '--write') {
+  if (mode === '--write' || mode === '--normalize') {
     fs.mkdirSync(path.dirname(REPORT), { recursive: true });
     fs.writeFileSync(REPORT, rendered, 'utf8');
   } else if (mode === '--check') {
@@ -128,5 +155,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     throw new Error(`unsupported mode: ${mode}`);
   }
   process.stdout.write(rendered);
+  if (mode === '--normalize') process.stdout.write(`normalizedTextFiles=${normalizedFiles}\n`);
   if (report.verdict !== 'PASS') process.exitCode = 1;
 }
