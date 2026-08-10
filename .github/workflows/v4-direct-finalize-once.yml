@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
   issues: write
 
 concurrency:
@@ -21,7 +21,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version-file: .nvmrc
@@ -115,6 +115,7 @@ jobs:
           PY
           bash /tmp/resindb-v4-build.sh
       - name: Remove all migration and trigger scaffolding
+        id: candidate
         shell: bash
         run: |
           set -euo pipefail
@@ -129,6 +130,7 @@ jobs:
           git add -A
           git commit --amend --no-edit
           git diff --check
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Run complete permanent product qualification
         shell: bash
         run: |
@@ -146,7 +148,8 @@ jobs:
           NODE
           git diff --exit-code
           git diff --check
-      - name: Prove sole branch and exact-parent publish
+      - name: Prove sole branch, exact parent and package candidate
+        id: bundle
         shell: bash
         run: |
           set -euo pipefail
@@ -157,14 +160,42 @@ jobs:
           if refs != ['refs/heads/main']:
               raise SystemExit(f'unexpected remote branches: {refs}')
           PY
+          test "$(git rev-parse HEAD^)" = "$GITHUB_SHA"
           remote_sha="$(git ls-remote origin refs/heads/main | cut -f1)"
           test "$remote_sha" = "$GITHUB_SHA"
-          git push origin HEAD:main
+          bundle="$RUNNER_TEMP/resindb-v4-direct-candidate"
+          rm -rf "$bundle"
+          mkdir -p "$bundle"
+          : > "$bundle/DELETE_PATHS.txt"
+          while IFS=$'\t' read -r status path; do
+            case "$status" in
+              A|M)
+                mkdir -p "$bundle/$(dirname "$path")"
+                cp "$path" "$bundle/$path"
+                ;;
+              D)
+                printf '%s\n' "$path" >> "$bundle/DELETE_PATHS.txt"
+                ;;
+              *) exit 2 ;;
+            esac
+          done < <(git diff-tree --no-commit-id --name-status -r HEAD)
+          git rev-parse HEAD^ > "$bundle/PARENT_SHA.txt"
+          git rev-parse HEAD > "$bundle/CANDIDATE_SHA.txt"
+          git diff-tree --no-commit-id --name-status -r HEAD > "$bundle/CHANGES.tsv"
+          echo "path=$bundle" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: resindb-v4-direct-${{ steps.candidate.outputs.sha }}
+          path: ${{ steps.bundle.outputs.path }}
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 30
       - name: Publish machine result
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
           OUTCOME: ${{ job.status }}
+          CANDIDATE: ${{ steps.candidate.outputs.sha }}
         shell: bash
         run: |
-          gh issue comment 38 --body "V4_RESINDB_DIRECT_FINALIZER outcome=${OUTCOME} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} source=${GITHUB_SHA} finalizer=self-delete"
+          gh issue comment 38 --body "V4_RESINDB_DIRECT_EXPORT outcome=${OUTCOME} candidate=${CANDIDATE:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} source=${GITHUB_SHA} bundle=uploaded finalizer=self-delete"
