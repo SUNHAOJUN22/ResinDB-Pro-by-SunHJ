@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { auditBytes } from '../../scripts/validate-repository-unicode.mjs';
+import { auditBytes, normalizeBytes } from '../../scripts/validate-repository-unicode.mjs';
 
 const encode = (text) => Buffer.from(text, 'utf8');
 const token = (...values) => String.fromCodePoint(...values);
@@ -33,5 +33,22 @@ describe('repository Unicode integrity', () => {
     for (const [name, bytes, category] of cases) {
       expect(auditBytes(name, bytes).some((row) => row.category === category), `${name}:${category}`).toBe(true);
     }
+  });
+
+  it('normalizes only mechanical text properties', () => {
+    const raw = Buffer.concat([
+      Buffer.from([0xef, 0xbb, 0xbf]),
+      encode(`caf${token(0x65, 0x0301)}\r\n\r\n`),
+    ]);
+    const normalized = normalizeBytes(raw);
+    expect(normalized.toString('utf8')).toBe(`caf${token(0x00e9)}\n`);
+    expect(auditBytes('normalized.md', normalized)).toEqual([]);
+
+    const semanticCorruption = normalizeBytes(encode(`bad ${token(0xfffd)} text\r\n`));
+    expect(
+      auditBytes('semantic.md', semanticCorruption).some(
+        (row) => row.category === 'replacement_character',
+      ),
+    ).toBe(true);
   });
 });
