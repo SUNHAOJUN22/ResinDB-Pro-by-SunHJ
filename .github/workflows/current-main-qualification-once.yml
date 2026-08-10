@@ -41,9 +41,7 @@ jobs:
         run: |
           set -euo pipefail
           git rm .github/workflows/current-main-qualification-once.yml
-          git rm -r --ignore-unmatch \
-            .github/pass10-delivery \
-            .github/pass10-final-delivery
+          git rm -r --ignore-unmatch .github/pass10-delivery .github/pass10-final-delivery
           git rm --ignore-unmatch \
             scripts/.phase2l-payload-* \
             scripts/phase2l-apply-final.mjs \
@@ -74,7 +72,7 @@ jobs:
           test "$installed" -eq 1
           restore_manifests
           trap - EXIT
-      - name: Mechanically normalize tracked text and build strict Unicode evidence
+      - name: Normalize text and build strict Unicode evidence
         shell: bash
         run: |
           set -euo pipefail
@@ -94,12 +92,48 @@ jobs:
           git add -A
           git diff --cached --check
           git status --porcelain=v1 > /tmp/resindb-candidate-before.txt
-      - name: Run complete code, numerical, bilingual, build, coverage, browser and audit gates
+      - name: README and bilingual visual contracts
+        run: |
+          node scripts/refresh-current-main-readme.mjs --check
+          npm run validate:docs
+      - name: Repository Unicode audit
+        run: npm run validate:unicode
+      - name: Source hygiene
+        run: npm run validate:source
+      - name: Scientific UI semantics
+        run: npm run validate:scientific-ui
+      - name: Compute surface
+        run: npm run validate:compute
+      - name: Governed data
+        run: npm run validate:data
+      - name: ESLint
+        run: npm run lint
+      - name: TypeScript
+        run: npm run typecheck
+      - name: Complete regression tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: HTTP smoke
+        run: npm run smoke
+      - name: K-Means backend benchmark smoke
+        run: npm run benchmark:kmeans:smoke
+      - name: Isolated unit tests
+        run: npm run test:unit
+      - name: Isolated science and worker tests
+        run: npm run test:science
+      - name: Whole-production-source coverage
+        run: npm run test:coverage
+      - name: Chromium bilingual nonblank UI suite
+        run: npm run test:ui
+      - name: Production dependency audit
+        run: npm run audit:prod
+      - name: Complete dependency audit
+        run: npm run audit:all
+      - name: Recheck Unicode and candidate immutability
         shell: bash
         run: |
           set -euo pipefail
-          node scripts/refresh-current-main-readme.mjs --check
-          npm run validate:ci
           node scripts/validate-repository-unicode.mjs --check
           git diff --check
           git add -A
@@ -143,4 +177,4 @@ jobs:
           QUALIFIED: ${{ steps.publish.outputs.qualified }}
         shell: bash
         run: |
-          gh issue comment 38 --body "CURRENT_MAIN_EXACT_QUALIFICATION outcome=${OUTCOME} tested_parent=${GITHUB_SHA} qualified=${QUALIFIED:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} unicode=normalized-mechanical+semantic-fail-closed migration_debris=removed bilingual=strict charts=chromium-nonblank coverage=blocking audit=blocking workflow_inventory=ci-only branch=main-only"
+          gh issue comment 38 --body "CURRENT_MAIN_EXACT_QUALIFICATION outcome=${OUTCOME} tested_parent=${GITHUB_SHA} qualified=${QUALIFIED:-UNPUBLISHED} run=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} unicode=normalized-mechanical+semantic-fail-closed migration_debris=removed docs=strict scientific_ui=strict compute=strict data=strict tests=full coverage=blocking chromium=nonblank audit=blocking workflow_inventory=ci-only branch=main-only"
