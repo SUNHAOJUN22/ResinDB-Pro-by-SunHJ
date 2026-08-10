@@ -1,1 +1,0 @@
-Pass 10 direct tree is being assembled from locally validated source files.

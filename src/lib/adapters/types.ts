@@ -40,4 +40,3 @@ export interface IProductAdapter {
   exportReport(products: Product[], format: 'csv' | 'json' | 'xml'): Promise<Blob>;
   restoreSnapshot(products: Product[]): Promise<void>;
 }
-

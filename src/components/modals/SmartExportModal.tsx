@@ -257,4 +257,3 @@ const FormatCard = ({
     </motion.button>
   );
 };
-

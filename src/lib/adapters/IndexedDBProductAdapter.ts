@@ -596,4 +596,3 @@ ${props}
     this.rebuildIndices();
   }
 }
-
