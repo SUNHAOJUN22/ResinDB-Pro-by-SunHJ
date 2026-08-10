@@ -37,7 +37,7 @@ jobs:
           fc-list :lang=zh | grep -q .
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -83,6 +83,8 @@ jobs:
 
       - name: Documentation and deterministic scientific visuals
         run: npm run validate:docs
+      - name: Repository-wide UTF-8, NFC and mojibake integrity
+        run: node scripts/validate-repository-unicode.mjs --write
       - name: Production source hygiene
         run: npm run validate:source
       - name: Governed external data
@@ -117,33 +119,28 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          set +e
-          npm audit --omit=dev --audit-level=high --json > artifacts/npm-audit-prod.json
-          code=$?
-          set -e
+          npm audit --omit=dev --audit-level=high --json | tee artifacts/npm-audit-prod.json
           jq '.metadata.vulnerabilities' artifacts/npm-audit-prod.json
-          exit "$code"
 
       - name: Complete dependency audit
         shell: bash
         run: |
           set -euo pipefail
-          set +e
-          npm audit --audit-level=high --json > artifacts/npm-audit-all.json
-          code=$?
-          set -e
+          npm audit --audit-level=high --json | tee artifacts/npm-audit-all.json
           jq '.metadata.vulnerabilities' artifacts/npm-audit-all.json
-          exit "$code"
 
       - name: Record dependency freshness
         if: always()
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p artifacts
-          set +e
-          npm outdated --json > artifacts/npm-outdated.json
-          code=$?
-          set -e
+          code=0
+          if npm outdated --json > artifacts/npm-outdated.json; then
+            code=0
+          else
+            code=$?
+          fi
           if [ ! -s artifacts/npm-outdated.json ]; then printf '{}\n' > artifacts/npm-outdated.json; fi
           printf '%s\n' "$code" > artifacts/npm-outdated-exit-code.txt
           jq . artifacts/npm-outdated.json
@@ -155,7 +152,7 @@ jobs:
           set -euo pipefail
           git ls-remote --heads origin | tee artifacts/branch-proof.txt
           test "$(wc -l < artifacts/branch-proof.txt | tr -d ' ')" -eq 1
-          test "$(grep -c 'refs/heads/main$' artifacts/branch-proof.txt || true)" -eq 1
+          test "$(grep -c 'refs/heads/main$' artifacts/branch-proof.txt)" -eq 1
 
       - name: Bundle deterministic exact tracked tree
         shell: bash
@@ -179,6 +176,7 @@ jobs:
           const tests = JSON.parse(fs.readFileSync('artifacts/test-results.json', 'utf8'));
           const gates = [
             'docs',
+            'unicode-integrity',
             'source-hygiene',
             'governed-data',
             'compute-surface',
@@ -249,6 +247,7 @@ jobs:
           path: |
             coverage/
             artifacts/
+            reports/UNICODE_INTEGRITY_REPORT.json
             FINAL_CODE_AUDIT.md
             FINAL_RELEASE_REPORT.md
           if-no-files-found: warn
