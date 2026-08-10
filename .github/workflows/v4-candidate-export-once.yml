@@ -1,12 +1,10 @@
 name: V4 exact candidate export once
 
 on:
-  issue_comment:
-    types: [created]
   push:
     branches: [main]
     paths:
-      - .github/workflows/v4-candidate-export-once.yml
+      - .github/v4-resindb-export-trigger
 
 permissions:
   contents: read
@@ -18,11 +16,6 @@ concurrency:
 
 jobs:
   export:
-    if: >-
-      github.event_name == 'push' ||
-      (github.event.issue.pull_request == null &&
-      github.event.comment.user.login == github.repository_owner &&
-      contains(github.event.comment.body, '/export-v4-strict-candidate-v7'))
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
@@ -143,9 +136,11 @@ jobs:
           PY
           rm .github/workflows/v4-candidate-export-once.yml
           bash /tmp/resindb-v4-build.sh
+          rm -f .github/v4-resindb-export-trigger
           rm .github/workflows/current-main-readme-refresh.yml
-          git add -A .github/workflows/current-main-readme-refresh.yml
+          git add -A .github/v4-resindb-export-trigger .github/workflows/current-main-readme-refresh.yml
           git commit --amend --no-edit
+          test ! -e .github/v4-resindb-export-trigger
           test ! -e .github/workflows/current-main-readme-refresh.yml
           git diff --exit-code
           git diff --check
@@ -175,7 +170,8 @@ jobs:
             .github/workflows/v4-strict-hardening-once.yml \
             .github/workflows/v4-fail-closed-hardening-once.yml \
             .github/workflows/v4-candidate-export-once.yml \
-            .github/workflows/current-main-readme-refresh.yml; do
+            .github/workflows/current-main-readme-refresh.yml \
+            .github/v4-resindb-export-trigger; do
             test ! -e "$controller"
           done
           git diff --exit-code
