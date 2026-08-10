@@ -3,8 +3,6 @@ name: V4 strict direct finalizer once
 on:
   push:
     branches: [main]
-    paths:
-      - .github/v4-direct-finalize-trigger
 
 permissions:
   contents: write
