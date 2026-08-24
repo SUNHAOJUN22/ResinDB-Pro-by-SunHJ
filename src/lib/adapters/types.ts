@@ -63,4 +63,5 @@ export interface IProductAdapter {
   batchCreate(products: Partial<Product>[]): Promise<Product[]>;
   delete(ids: string[]): Promise<void>;
   exportReport(products: Product[], format: 'csv' | 'json' | 'xml'): Promise<Blob>;
+  restoreSnapshot(products: Product[]): Promise<void>;
 }
