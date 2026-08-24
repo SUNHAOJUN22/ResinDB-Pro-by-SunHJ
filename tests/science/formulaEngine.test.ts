@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { FormulaEngine } from '../../src/lib/formulaParser';
-import { FormulaConfig, Product } from '../../src/types/index';
+import type { FormulaConfig, Product } from '../../src/types/index';
 
 function createProduct(properties: Product['properties']): Product {
   return {
@@ -23,7 +23,7 @@ describe('FormulaEngine scientific calculations and parser safety', () => {
       const dependencies = engine.extractDependencies(
         "Props['密度'] * 100 + props['MFR'] / Props['弯曲模量']",
       );
-      expect(dependencies).toEqual(['密度', 'MFR', '弯曲模量']);
+      expect(dependencies).toEqual(['MFR', '密度', '弯曲模量']);
     });
 
     test('returns an empty list when no property references exist', () => {
@@ -32,15 +32,15 @@ describe('FormulaEngine scientific calculations and parser safety', () => {
   });
 
   describe('formula-editor preview normalization', () => {
-    test('converts property brackets to internal dictionary accesses', () => {
+    test('converts property brackets without inserting zero defaults', () => {
       expect(engine.sanitize("Props['Density'] * props['MFR']")).toBe(
-        "(p['Density'] || 0) * (p['MFR'] || 0)",
+        "p['Density'] * p['MFR']",
       );
     });
 
     test('adds Math prefixes to supported bare functions', () => {
       expect(engine.sanitize("sqrt(pow(Props['Density'], 2) + abs(-4))")).toBe(
-        "Math.sqrt(Math.pow((p['Density'] || 0), 2) + Math.abs(-4))",
+        "Math.sqrt(Math.pow(p['Density'], 2) + Math.abs(-4))",
       );
     });
   });
@@ -48,8 +48,8 @@ describe('FormulaEngine scientific calculations and parser safety', () => {
   describe('topological ordering', () => {
     test('sorts formulas by dependency hierarchy', () => {
       const formulas: FormulaConfig[] = [
-        { id: 'f1', name: 'VolumeScore', expression: "Props['Density'] * 10", unit: '' },
-        { id: 'f2', name: 'CompositeScore', expression: "Props['VolumeScore'] + Props['Density']", unit: '' },
+        { id: 'f1', name: 'VolumeScore', expression: "Props['Density'] * 10", unit: '1' },
+        { id: 'f2', name: 'CompositeScore', expression: "Props['VolumeScore'] + Props['Density']", unit: '1' },
       ];
 
       expect(engine.buildTopologicalOrder(formulas).map((formula) => formula.id)).toEqual(['f1', 'f2']);
@@ -57,8 +57,8 @@ describe('FormulaEngine scientific calculations and parser safety', () => {
 
     test('rejects cyclical references', () => {
       const formulas: FormulaConfig[] = [
-        { id: 'f1', name: 'A', expression: "Props['B'] * 2", unit: '' },
-        { id: 'f2', name: 'B', expression: "Props['A'] + 1", unit: '' },
+        { id: 'f1', name: 'A', expression: "Props['B'] * 2", unit: '1' },
+        { id: 'f2', name: 'B', expression: "Props['A'] + 1", unit: '1' },
       ];
       expect(() => engine.buildTopologicalOrder(formulas)).toThrow('Cyclic dependency detected');
     });
@@ -93,8 +93,8 @@ describe('FormulaEngine scientific calculations and parser safety', () => {
   describe('compiled execution plan', () => {
     test('computes dependent formulas in sequence', () => {
       const formulas: FormulaConfig[] = [
-        { id: 'f1', name: 'DoubleDensity', expression: "Props['密度'] * 2", unit: '' },
-        { id: 'f2', name: 'TripleDensity', expression: "Props['DoubleDensity'] + Props['密度']", unit: '' },
+        { id: 'f1', name: 'DoubleDensity', expression: "Props['密度'] * 2", unit: 'g/cm³' },
+        { id: 'f2', name: 'TripleDensity', expression: "Props['DoubleDensity'] + Props['密度']", unit: 'g/cm³' },
       ];
 
       const results = engine.compileGraph(formulas)(
@@ -104,29 +104,33 @@ describe('FormulaEngine scientific calculations and parser safety', () => {
       expect(results.f2).toBeCloseTo(2.7);
     });
 
-    test('normalizes non-finite results to zero', () => {
+    test('preserves domain and non-finite failures as INVALID rather than zero', () => {
       const formulas: FormulaConfig[] = [
-        { id: 'division', name: 'Division', expression: '1 / 0', unit: '' },
-        { id: 'sqrt', name: 'Sqrt', expression: 'sqrt(-1)', unit: '' },
+        { id: 'division', name: 'Division', expression: '1 / 0', unit: '1' },
+        { id: 'sqrt', name: 'Sqrt', expression: 'sqrt(-1)', unit: '1' },
       ];
-      expect(engine.compileGraph(formulas)(createProduct({}))).toEqual({ division: 0, sqrt: 0 });
+      expect(engine.compileGraph(formulas)(createProduct({}))).toEqual({});
+      const detailed = engine.compileResultGraph(formulas)(createProduct({}));
+      expect(detailed.division.status).toBe('INVALID');
+      expect(detailed.sqrt.status).toBe('INVALID');
     });
   });
 });
 
-describe('logical fallback operators and isolated formula failures', () => {
+describe('logical operators and isolated formula failures', () => {
   const logicalEngine = new FormulaEngine();
 
-  test('supports || and && with numeric short-circuit semantics', () => {
+  test('supports logical expressions without creating a missing-property zero default', () => {
     const executor = logicalEngine.compileGraph([
-      { id: 'or', name: 'Fallback', expression: "(props['A'] || props['B'] || 0) / 2", unit: '' },
-      { id: 'and', name: 'Guarded', expression: "props['A'] && props['B']", unit: '' },
+      { id: 'or', name: 'Fallback', expression: "(props['A'] || props['B'] || 0) / 2", unit: '1' },
+      { id: 'and', name: 'Guarded', expression: "props['A'] && props['B']", unit: '1' },
     ]);
 
     const result = executor({
       id: 'logical',
       gradeName: 'Logical',
       manufacturer: 'Test',
+      manufacturerId: 'm1',
       categoryIds: [],
       properties: { A: { value: 0, unit: '' }, B: { value: 10, unit: '' } },
       createdAt: '',
@@ -137,23 +141,24 @@ describe('logical fallback operators and isolated formula failures', () => {
     expect(result.and).toBe(0);
   });
 
-  test('isolates a malformed formula without blocking valid formulas', () => {
+  test('isolates a malformed formula without fabricating zero', () => {
     const executor = logicalEngine.compileGraph([
-      { id: 'bad', name: 'Malformed', expression: "props['A'] + )", unit: '' },
-      { id: 'good', name: 'Valid', expression: "props['A'] * 2", unit: '' },
+      { id: 'bad', name: 'Malformed', expression: "props['A'] + )", unit: '1' },
+      { id: 'good', name: 'Valid', expression: "props['A'] * 2", unit: '1' },
     ]);
 
     const result = executor({
       id: 'fault-tolerance',
       gradeName: 'Fault tolerance',
       manufacturer: 'Test',
+      manufacturerId: 'm1',
       categoryIds: [],
       properties: { A: { value: 4, unit: '' } },
       createdAt: '',
       updatedAt: '',
     });
 
-    expect(result.bad).toBe(0);
+    expect(result).not.toHaveProperty('bad');
     expect(result.good).toBe(8);
   });
 });
