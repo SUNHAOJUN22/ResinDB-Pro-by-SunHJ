@@ -6,6 +6,13 @@ import {
 } from '@/lib/quantityRecord';
 
 const CORE_KEYS = new Set(['density', 'mfr', 'tensileYield', 'flexuralModulus', 'izodImpact']);
+const PHYSICAL_RANGES: Readonly<Record<string, { min: number; max: number }>> = Object.freeze({
+  density: { min: 0.8, max: 3.0 },
+  mfr: { min: 0, max: 1_000_000 },
+  tensileYield: { min: 0, max: 500 },
+  flexuralModulus: { min: 0, max: 50_000 },
+  izodImpact: { min: 0, max: 150 },
+});
 
 function cloneRecord(record: MaterialRecord): MaterialRecord | null {
   try {
@@ -45,17 +52,30 @@ function propertyProvenance(property: MaterialPropertyValue): string[] {
 
 function governedProperty(key: string, property: MaterialPropertyValue): MaterialPropertyValue {
   const result = canonicalizeCoreProperty(key, toRaw(property), propertyProvenance(property));
+  const reasonCodes = [...result.reasonCodes];
+  let status = result.status;
+  let canonical = result.canonical;
+  if (canonical && status === 'VALID') {
+    const range = PHYSICAL_RANGES[key];
+    if (range && (canonical.value < range.min || canonical.value > range.max)) {
+      status = 'INVALID';
+      reasonCodes.push('OUTSIDE_SUPPORTED_PHYSICAL_RANGE');
+      canonical = undefined;
+    }
+  }
   const base: MaterialPropertyValue = {
     ...property,
     raw: result.raw,
-    status: result.status,
-    reasonCodes: result.reasonCodes,
+    status,
+    reasonCodes: [...new Set(reasonCodes)].sort(),
     provenanceRefs: result.provenanceRefs,
   };
-  if (result.canonical) {
-    base.canonical = result.canonical;
-    base.value = result.canonical.value;
-    base.unit = result.canonical.unit;
+  if (canonical) {
+    base.canonical = canonical;
+    base.value = canonical.value;
+    base.unit = canonical.unit;
+  } else {
+    delete base.canonical;
   }
   return base;
 }
@@ -72,6 +92,7 @@ export class PolymerDataValidator {
     cleaned.properties = cleaned.properties ?? {};
 
     let validCount = 0;
+    let invalidCount = 0;
     const reasons = new Set<string>();
     for (const [key, rawProperty] of Object.entries(cleaned.properties)) {
       if (!rawProperty || typeof rawProperty !== 'object') {
@@ -92,10 +113,15 @@ export class PolymerDataValidator {
       const governed = governedProperty(resolved, rawProperty);
       cleaned.properties[key] = governed;
       if (governed.status === 'VALID') validCount += 1;
-      else for (const code of governed.reasonCodes ?? []) reasons.add(`${resolved}:${code}`);
+      if (governed.status === 'INVALID') invalidCount += 1;
+      if (governed.status !== 'VALID') {
+        for (const code of governed.reasonCodes ?? []) reasons.add(`${resolved}:${code}`);
+      }
     }
 
-    if (validCount >= 2) {
+    if (invalidCount > 0) {
+      cleaned.validationStatus = 'INVALID';
+    } else if (validCount >= 2) {
       cleaned.validationStatus = 'VALID';
     } else {
       cleaned.validationStatus = 'HOLD';
