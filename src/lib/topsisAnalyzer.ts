@@ -50,6 +50,18 @@ function finite(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+function finiteExtent(values: readonly number[]): { minimum: number; maximum: number } | null {
+  if (values.length === 0) return null;
+  let minimum = values[0];
+  let maximum = values[0];
+  for (let index = 1; index < values.length; index += 1) {
+    const value = values[index];
+    if (value < minimum) minimum = value;
+    if (value > maximum) maximum = value;
+  }
+  return { minimum, maximum };
+}
+
 function validateColumns(columns: TopsisColumn[]): void {
   const keys = new Set<string>();
   for (const column of columns) {
@@ -141,9 +153,9 @@ export function calculateTopsisDetailed<T extends { id: string }>(
   const normalizedWeights = rawWeights.map((value) => value / totalWeight);
 
   const criterionMetadata: TopsisCriterionMetadata[] = columns.map((column, index) => {
-    const values = eligibleRows.map((row) => row.values[index]);
-    const minimum = values.length > 0 ? Math.min(...values) : null;
-    const maximum = values.length > 0 ? Math.max(...values) : null;
+    const extent = finiteExtent(eligibleRows.map((row) => row.values[index]));
+    const minimum = extent?.minimum ?? null;
+    const maximum = extent?.maximum ?? null;
     const constant = minimum === null || maximum === null || maximum === minimum;
     return {
       key: column.key,
