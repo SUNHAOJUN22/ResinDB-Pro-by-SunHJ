@@ -1,25 +1,51 @@
-import { Product, ProductUpdates } from '@/types/index';
+import type {
+  DataGovernanceMetadata,
+  Product,
+  ProductUpdates,
+  QuantityRecord,
+} from '@/types/index';
 
-// 统一的物性快照结构，供开源数据与实验数据共同遵守
-export interface MaterialPhysicsSpecs {
-  density?: { value: number; unit: string; standard?: string };       // 密度 (ISO 1183)
-  mfr?: { value: number; unit: string; standard?: string; temp?: string; load?: string }; // 熔指 (ISO 1133)
-  tensileYield?: { value: number; unit: string; standard?: string };  // 拉伸产量强度 (ISO 527)
-  flexuralModulus?: { value: number; unit: string; standard?: string };// 弯曲模量 (ISO 178)
-  izodImpact?: { value: number; unit: string; standard?: string };     // 缺口冲击强度 (ISO 179/180)
+export interface MaterialPropertyValue {
+  value: unknown;
+  unit?: string;
+  standard?: string;
+  method?: string;
+  temp?: string | number;
+  temperature?: string | number;
+  load?: string | number;
+  sampleId?: string;
+  batchId?: string;
+  referenceId?: string;
+  sourceUrl?: string;
+  raw?: QuantityRecord['raw'];
+  canonical?: QuantityRecord['canonical'];
+  status?: QuantityRecord['status'];
+  reasonCodes?: string[];
+  provenanceRefs?: string[];
 }
 
-// 独立的牌号/实验数据模型
+export interface MaterialPhysicsSpecs {
+  density?: MaterialPropertyValue;
+  mfr?: MaterialPropertyValue;
+  tensileYield?: MaterialPropertyValue;
+  flexuralModulus?: MaterialPropertyValue;
+  izodImpact?: MaterialPropertyValue;
+  [property: string]: MaterialPropertyValue | undefined;
+}
+
 export interface MaterialRecord {
-  id: string;               // 唯一标示 (如 "EX-HDPE-2026-001")
-  source: 'open_market' | 'my_lab'; // 数据源标记：开源专业大盘 vs 我的实验室数据
-  batchNo?: string;         // 实验批次号（开源数据可为空）
-  category: string;         // 树脂大类 (如 "HDPE", "PP", "ABS")
-  grade: string;            // 牌号名称 (如 "5000S", "实验改性料-A1")
-  manufacturer: string;     // 生产商 / 研发组
-  description?: string;     // 备注说明
-  properties: MaterialPhysicsSpecs; // 核心力学/物理指标
-  timestamp: number;        // 录入/测试时间戳
+  id: string;
+  source: 'open_market' | 'my_lab';
+  batchNo?: string;
+  category: string;
+  grade: string;
+  manufacturer: string;
+  description?: string;
+  properties: MaterialPhysicsSpecs;
+  timestamp: number;
+  governance?: DataGovernanceMetadata;
+  validationStatus?: 'VALID' | 'HOLD' | 'INVALID';
+  validationReasonCodes?: string[];
 }
 
 export interface HistoryRecord {
@@ -29,7 +55,6 @@ export interface HistoryRecord {
   snapshot: Product[];
 }
 
-
 export interface IProductAdapter {
   search(query: string, categoryId: string | null): Promise<Product[]>;
   create(product: Partial<Product>): Promise<Product>;
@@ -38,5 +63,4 @@ export interface IProductAdapter {
   batchCreate(products: Partial<Product>[]): Promise<Product[]>;
   delete(ids: string[]): Promise<void>;
   exportReport(products: Product[], format: 'csv' | 'json' | 'xml'): Promise<Blob>;
-  restoreSnapshot(products: Product[]): Promise<void>;
 }
