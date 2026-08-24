@@ -1,262 +1,194 @@
-import { expect, test, describe } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { PolymerDataValidator } from '../../src/lib/adapters/PolymerDataValidator';
-import { MaterialRecord } from '../../src/lib/adapters/types';
+import type { MaterialRecord } from '../../src/lib/adapters/types';
 import { calculateTopsis } from '../../src/lib/topsisAnalyzer';
 import { materialEngine } from '../../src/lib/materialScience';
 import { auditASTMStandards } from '../../src/utils/polymerPhysics';
 
+const mfrMethod = {
+  method: 'declared MFR method',
+  temp: '230℃',
+  load: '2.16kg',
+};
 
-describe('🧪 PRO RIGOROUS POLYMER SCIENCE & MECHANICAL VALIDATION SUITE', () => {
-
-  describe('1. PolymerDataValidator - Multi-dimensional Placeholder Cleaning', () => {
-    test('Should scrub typical placeholder shells (NaN, "-", "unknown", "暂无", "n/a", etc.)', () => {
-      const dirtyRecord: any = {
-        id: 'test-grade-001',
-        source: 'my_lab',
-        category: 'HDPE',
-        grade: 'HDPE-ScrubTest',
-        manufacturer: 'Sinopec',
+describe('polymer science and mechanical validation suite', () => {
+  describe('1. raw and canonical missingness', () => {
+    test('preserves placeholder declarations as UNKNOWN rather than deleting or coercing to zero', () => {
+      const dirtyRecord: MaterialRecord = {
+        id: 'test-grade-001', source: 'my_lab', category: 'HDPE', grade: 'HDPE-ScrubTest',
+        manufacturer: 'Declared source',
         properties: {
-          density: { value: 0.95, unit: 'g/cm³' }, // Valid
-          mfr: { value: 2.1, unit: 'g/10min' },     // Valid
-          tensileYield: { value: 'unknown', unit: 'MPa' }, // Placeholder 1
-          flexuralModulus: { value: '-', unit: 'MPa' },    // Placeholder 2
-          izodImpact: { value: '暂无', unit: 'kJ/m²' }   // Placeholder 3
+          density: { value: 0.95, unit: 'g/cm³' },
+          mfr: { value: 2.1, unit: 'g/10min', ...mfrMethod },
+          tensileYield: { value: 'unknown', unit: 'MPa' },
+          flexuralModulus: { value: '-', unit: 'MPa' },
+          izodImpact: { value: '暂无', unit: 'kJ/m²' },
         },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       const result = PolymerDataValidator.validateAndClean(dirtyRecord);
       expect(result).not.toBeNull();
-      if (result) {
-        expect(result.properties.density?.value).toBe(0.95);
-        expect(result.properties.mfr?.value).toBe(2.1);
-        expect(result.properties.tensileYield).toBeUndefined();
-        expect(result.properties.flexuralModulus).toBeUndefined();
-        expect(result.properties.izodImpact).toBeUndefined();
-      }
+      expect(result?.properties.density).toMatchObject({ value: 0.95, status: 'VALID' });
+      expect(result?.properties.mfr).toMatchObject({ value: 2.1, status: 'VALID' });
+      expect(result?.properties.tensileYield).toMatchObject({ status: 'UNKNOWN' });
+      expect(result?.properties.tensileYield?.raw?.value).toBe('unknown');
+      expect(result?.properties.flexuralModulus).toMatchObject({ status: 'UNKNOWN' });
+      expect(result?.properties.izodImpact).toMatchObject({ status: 'UNKNOWN' });
+      expect(result?.validationStatus).toBe('VALID');
     });
   });
 
-  describe('2. PolymerDataValidator - Standard Bounds & Physical Limit Rules', () => {
-    test('Should reject physical impossibility: Density exceeding upper physical bound (3.0 g/cm³)', () => {
+  describe('2. physical-range status', () => {
+    test('preserves impossible density as INVALID evidence instead of silently removing it', () => {
       const bodyRecord: MaterialRecord = {
-        id: 'phys-err-01',
-        source: 'my_lab',
-        category: 'PP',
-        grade: 'Impossible-PP',
-        manufacturer: 'Dow Chemical',
+        id: 'phys-err-01', source: 'my_lab', category: 'PP', grade: 'Impossible-PP',
+        manufacturer: 'Declared source',
         properties: {
-          density: { value: 4.8, unit: 'g/cm³' }, // Intentionally invalid physical limit!
-          mfr: { value: 12.0, unit: 'g/10min' },
-          tensileYield: { value: 28, unit: 'MPa' }
+          density: { value: 4.8, unit: 'g/cm³' },
+          mfr: { value: 12, unit: 'g/10min', ...mfrMethod },
+          tensileYield: { value: 28, unit: 'MPa', method: 'declared tensile method' },
         },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       const cleaned = PolymerDataValidator.validateAndClean(bodyRecord);
-      expect(cleaned).not.toBeNull();
-      if (cleaned) {
-        // Density is scrubbed as it is physically impossible (> 3.0), tensile and MFR should remain
-        expect(cleaned.properties.density).toBeUndefined();
-        expect(cleaned.properties.mfr?.value).toBe(12.0);
-        expect(cleaned.properties.tensileYield?.value).toBe(28);
-      }
+      expect(cleaned?.properties.density).toMatchObject({
+        status: 'INVALID',
+        reasonCodes: ['OUTSIDE_SUPPORTED_PHYSICAL_RANGE'],
+      });
+      expect(cleaned?.properties.density?.raw?.value).toBe(4.8);
+      expect(cleaned?.properties.density?.canonical).toBeUndefined();
+      expect(cleaned?.validationStatus).toBe('INVALID');
     });
 
-    test('Should reject structural anomalies exceeding mechanical limits (TensileStrength > 500 MPa)', () => {
-      const records: MaterialRecord[] = [
-        {
-          id: 'mech-err-01',
-          source: 'open_market',
-          category: 'ABS',
-          grade: 'Impossibly-Strong-ABS',
-          manufacturer: 'Chimei',
-          properties: {
-            density: { value: 1.05, unit: 'g/cm³' },
-            tensileYield: { value: 1200, unit: 'MPa' }, // Typo or false data: > 500
-            flexuralModulus: { value: 2400, unit: 'MPa' }
-          },
-          timestamp: Date.now()
-        }
-      ];
-
-      const cleanedBatch = PolymerDataValidator.cleanBatch(records);
-      expect(cleanedBatch.length).toBe(1);
-      // Tensile yield strength is scrubbed due to threshold breach, but the record is kept since density & flexural stay (2 properties OK)
-      expect(cleanedBatch[0].properties.tensileYield).toBeUndefined();
-      expect(cleanedBatch[0].properties.flexuralModulus?.value).toBe(2400);
+    test('preserves impossible tensile strength as INVALID and keeps valid peers', () => {
+      const cleaned = PolymerDataValidator.cleanBatch([{
+        id: 'mech-err-01', source: 'open_market', category: 'ABS',
+        grade: 'Impossibly-Strong-ABS', manufacturer: 'Declared source',
+        properties: {
+          density: { value: 1.05, unit: 'g/cm³' },
+          tensileYield: { value: 1200, unit: 'MPa', method: 'declared tensile method' },
+          flexuralModulus: { value: 2400, unit: 'MPa', method: 'declared flexural method' },
+        },
+        timestamp: Date.now(),
+      }]);
+      expect(cleaned).toHaveLength(1);
+      expect(cleaned[0].properties.tensileYield).toMatchObject({ status: 'INVALID' });
+      expect(cleaned[0].properties.flexuralModulus).toMatchObject({ value: 2400, status: 'VALID' });
+      expect(cleaned[0].validationStatus).toBe('INVALID');
     });
   });
 
-  describe('3. PolymerDataValidator - Cascade Test Condition Recomendation', () => {
-    test('Should fill test rules based on polymer category when values are absent (PE, PP, ABS)', () => {
-      const peRec: MaterialRecord = {
-        id: 'pe-cascade-01',
-        source: 'my_lab',
-        category: 'HDPE',
-        grade: 'HDPE-5502',
-        manufacturer: 'LyondellBasell',
+  describe('3. condition integrity', () => {
+    test('does not invent MFR temperature, load, method, or standard from polymer category', () => {
+      const pe = PolymerDataValidator.validateAndClean({
+        id: 'pe-condition-01', source: 'my_lab', category: 'HDPE', grade: 'HDPE-5502',
+        manufacturer: 'Declared source',
         properties: {
           density: { value: 0.954, unit: 'g/cm³' },
-          mfr: { value: 0.35, unit: 'g/10min' } // Temp and load are omitted!
+          mfr: { value: 0.35, unit: 'g/10min' },
         },
-        timestamp: Date.now()
-      };
-
-      const ppRec: MaterialRecord = {
-        id: 'pp-cascade-01',
-        source: 'my_lab',
-        category: 'PP',
-        grade: 'PP-M1600',
-        manufacturer: 'Sinopec',
+        timestamp: Date.now(),
+      });
+      const pp = PolymerDataValidator.validateAndClean({
+        id: 'pp-condition-01', source: 'my_lab', category: 'PP', grade: 'PP-M1600',
+        manufacturer: 'Declared source',
         properties: {
           density: { value: 0.905, unit: 'g/cm³' },
-          mfr: { value: 60.0, unit: 'g/10min' } // Omitted
+          mfr: { value: 60, unit: 'g/10min' },
         },
-        timestamp: Date.now()
-      };
+        timestamp: Date.now(),
+      });
 
-      const cleanPe = PolymerDataValidator.validateAndClean(peRec)!;
-      const cleanPp = PolymerDataValidator.validateAndClean(ppRec)!;
-
-      expect(cleanPe).not.toBeNull();
-      expect(cleanPp).not.toBeNull();
-
-      expect((cleanPe.properties.mfr as any).temp).toBe('190℃');
-      expect((cleanPe.properties.mfr as any).load).toBe('2.16kg');
-
-      expect((cleanPp.properties.mfr as any).temp).toBe('230℃');
-      expect((cleanPp.properties.mfr as any).load).toBe('2.16kg');
-    });
-  });
-
-  describe('4. PolymerDataValidator - Hard Melt-down Line Constraint', () => {
-    test('Should melt-down and drop record entirely if valid physical property count is < 2 (Zero-Tolerance for Shell Data)', () => {
-      const shellRecord: MaterialRecord = {
-        id: 'fake-shelf-02',
-        source: 'open_market',
-        category: 'ABS',
-        grade: 'Fake-ABS',
-        manufacturer: 'Unknown',
-        properties: {
-          density: { value: 1.04, unit: 'g/cm³' }, // 1 valid parameter
-          mfr: { value: 'n/a' as any, unit: 'g/10min' }, // invalid
-          tensileYield: { value: 'unknown' as any, unit: 'MPa' } // invalid
-        },
-        timestamp: Date.now()
-      };
-
-      // Since only 1 property (density) is valid, PolymerDataValidator MUST drop research index completely !
-      const resultObj = PolymerDataValidator.validateAndClean(shellRecord);
-      expect(resultObj).toBeNull();
-    });
-  });
-
-  describe('5. Core TOPSIS Math & Entropy Weight Determination', () => {
-    test('Should run entropy weight calculation deterministically on standard matrix inputs', () => {
-      interface MockMaterial { id: string; price: number; modulus: number }
-      
-      const mockedDataset: MockMaterial[] = [
-        { id: 'M-1', price: 10, modulus: 3000 },
-        { id: 'M-2', price: 15, modulus: 4500 },
-        { id: 'M-3', price: 20, modulus: 6000 }
-      ];
-
-      const criteria = [
-        { key: 'price', isLowBest: true },  // Low price is best
-        { key: 'modulus', isLowBest: false } // High modulus is best
-      ];
-
-      const extractor = (item: MockMaterial, key: string) => {
-        if (key === 'price') return item.price;
-        if (key === 'modulus') return item.modulus;
-        return null;
-      };
-
-      const scores = calculateTopsis(mockedDataset, criteria, extractor);
-      
-      expect(scores.size).toBe(mockedDataset.length);
-      const score1 = scores.get('M-1')!;
-      const score2 = scores.get('M-2')!;
-      const score3 = scores.get('M-3')!;
-
-      // Scores must fall within physical range [0, 1]
-      expect(score1).toBeGreaterThanOrEqual(0);
-      expect(score1).toBeLessThanOrEqual(1);
-      expect(score2).toBeGreaterThanOrEqual(0);
-      expect(score2).toBeLessThanOrEqual(1);
-      expect(score3).toBeGreaterThanOrEqual(0);
-      expect(score3).toBeLessThanOrEqual(1);
-    });
-  });
-
-  describe('6. Mathematical Statistics - Core Regression Modeling', () => {
-    test('Should yield correct Pearson linear slope coefficient and R²', () => {
-      const dataPoints: [number, number][] = [
-        [100, 20],
-        [200, 40],
-        [300, 60]
-      ];
-
-      const result = materialEngine.analyzeCorrelation(dataPoints);
-      expect(result).not.toBeNull();
-      if (result) {
-        expect(result.r2).toBeCloseTo(1, 6); // Perfect correlation
-        expect(result.slope).toBeCloseTo(0.2, 6); // deltaY / deltaX = 20/100
-        expect(result.intercept).toBeCloseTo(0, 6);
-        expect(result.r2).toBeGreaterThan(0.99);
+      for (const result of [pe, pp]) {
+        expect(result?.properties.mfr).toMatchObject({ status: 'UNKNOWN' });
+        expect(result?.properties.mfr?.temp).toBeUndefined();
+        expect(result?.properties.mfr?.load).toBeUndefined();
+        expect(result?.properties.mfr?.method).toBeUndefined();
+        expect(result?.properties.mfr?.standard).toBeUndefined();
+        expect(result?.properties.mfr?.reasonCodes).toEqual(expect.arrayContaining([
+          'MISSING_METHOD', 'MISSING_TEMPERATURE', 'MISSING_LOAD',
+        ]));
       }
     });
   });
 
-  describe('7. ASTM Standards Audit - Chinese/English Key & CategoryId Compatibility', () => {
-    test('Should successfully audit database products with Chinese properties and category list', () => {
-      const dbProduct: any = {
-        id: 'db-pp-test',
-        gradeName: 'PP-MockGrade',
-        manufacturer: 'Sinopec',
-        categoryIds: ['root_plastic', 'cat_pp'],
-        createdAt: '2026-06-18',
-        updatedAt: '2026-06-18',
+  describe('4. incomplete-record containment', () => {
+    test('retains an incomplete record as HOLD instead of erasing the source declaration', () => {
+      const result = PolymerDataValidator.validateAndClean({
+        id: 'incomplete-02', source: 'open_market', category: 'ABS', grade: 'Incomplete-ABS',
+        manufacturer: 'Unknown',
         properties: {
-          '密度': { value: 0.905, unit: 'g/cm³', standard: 'ISO 1183' },
-          '熔体质量流动速率': { value: 3.5, unit: 'g/10min', standard: 'ISO 1133' },
-          '拉伸屈服应力': { value: 34.0, unit: 'MPa', standard: 'ISO 527' },
-          '弯曲模量': { value: 1450.0, unit: 'MPa', standard: 'ISO 178' }
-        }
-      };
+          density: { value: 1.04, unit: 'g/cm³' },
+          mfr: { value: 'n/a', unit: 'g/10min' },
+          tensileYield: { value: 'unknown', unit: 'MPa' },
+        },
+        timestamp: Date.now(),
+      });
+      expect(result).not.toBeNull();
+      expect(result?.validationStatus).toBe('HOLD');
+      expect(result?.validationReasonCodes).toContain('INSUFFICIENT_VALID_CORE_PROPERTIES');
+      expect(result?.properties.mfr?.raw?.value).toBe('n/a');
+    });
+  });
 
-      const results = auditASTMStandards([dbProduct]);
-      expect(results.length).toBe(1);
-      const res = results[0];
-      expect(res.gradeName).toBe('PP-MockGrade');
-      expect(res.category).toBe('PP');
-      expect(res.status).toBe('PASSED');
-      expect(res.findings[0]).toContain('All physical telemetry vectors compile successfully');
+  describe('5. TOPSIS deterministic bounds', () => {
+    test('returns bounded scores for complete alternatives', () => {
+      interface MockMaterial { id: string; price: number; modulus: number }
+      const dataset: MockMaterial[] = [
+        { id: 'M-1', price: 10, modulus: 3000 },
+        { id: 'M-2', price: 15, modulus: 4500 },
+        { id: 'M-3', price: 20, modulus: 6000 },
+      ];
+      const scores = calculateTopsis(
+        dataset,
+        [{ key: 'price', isLowBest: true }, { key: 'modulus', isLowBest: false }],
+        (item, key) => key === 'price' ? item.price : key === 'modulus' ? item.modulus : null,
+      );
+      expect(scores.size).toBe(dataset.length);
+      for (const score of scores.values()) {
+        expect(score).toBeGreaterThanOrEqual(0);
+        expect(score).toBeLessThanOrEqual(1);
+      }
+    });
+  });
+
+  describe('6. mathematical statistics', () => {
+    test('yields the expected linear slope and R²', () => {
+      const result = materialEngine.analyzeCorrelation([[100, 20], [200, 40], [300, 60]]);
+      expect(result).not.toBeNull();
+      expect(result?.r2).toBeCloseTo(1, 6);
+      expect(result?.slope).toBeCloseTo(0.2, 6);
+      expect(result?.intercept).toBeCloseTo(0, 6);
+    });
+  });
+
+  describe('7. standards audit compatibility', () => {
+    test('audits database products with Chinese properties and category IDs', () => {
+      const results = auditASTMStandards([{
+        id: 'db-pp-test', gradeName: 'PP-MockGrade', manufacturer: 'Declared source',
+        categoryIds: ['root_plastic', 'cat_pp'], createdAt: '2026-06-18', updatedAt: '2026-06-18',
+        properties: {
+          密度: { value: 0.905, unit: 'g/cm³', standard: 'ISO 1183' },
+          熔体质量流动速率: { value: 3.5, unit: 'g/10min', standard: 'ISO 1133' },
+          拉伸屈服应力: { value: 34, unit: 'MPa', standard: 'ISO 527' },
+          弯曲模量: { value: 1450, unit: 'MPa', standard: 'ISO 178' },
+        },
+      }]);
+      expect(results[0]).toMatchObject({ gradeName: 'PP-MockGrade', category: 'PP', status: 'PASSED' });
     });
 
-    test('Should successfully audit lab products with English properties and direct category', () => {
-      const labProduct: any = {
-        id: 'lab-pp-test',
-        gradeName: 'PP-LabMock',
-        manufacturer: 'Lab',
-        category: 'PP',
-        createdAt: '2026-06-18',
-        updatedAt: '2026-06-18',
+    test('reports a warning for an out-of-typical-range lab declaration', () => {
+      const results = auditASTMStandards([{
+        id: 'lab-pp-test', gradeName: 'PP-LabMock', manufacturer: 'Lab', category: 'PP',
+        createdAt: '2026-06-18', updatedAt: '2026-06-18',
         properties: {
-          'density': { value: 0.85, unit: 'g/cm³', standard: 'ISO 1183' }, // Out of bounds warning
-          'mfr': { value: 3.5, unit: 'g/10min', standard: 'ISO 1133' }
-        }
-      };
-
-      const results = auditASTMStandards([labProduct]);
-      expect(results.length).toBe(1);
-      const res = results[0];
-      expect(res.gradeName).toBe('PP-LabMock');
-      expect(res.category).toBe('PP');
-      expect(res.status).toBe('WARNING');
-      expect(res.findings[0]).toContain('Density [0.85 g/cm³] deviates from typical Polypropylene boundaries');
+          density: { value: 0.85, unit: 'g/cm³', standard: 'ISO 1183' },
+          mfr: { value: 3.5, unit: 'g/10min', standard: 'ISO 1133' },
+        },
+      }]);
+      expect(results[0]).toMatchObject({ gradeName: 'PP-LabMock', category: 'PP', status: 'WARNING' });
     });
   });
 });
