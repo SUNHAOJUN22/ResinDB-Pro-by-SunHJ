@@ -1,4 +1,3 @@
-
 export type Language = 'zh' | 'en';
 
 export interface User {
@@ -31,45 +30,111 @@ export interface Manufacturer {
   country?: string;
 }
 
+export type QuantityStatus = 'VALID' | 'UNKNOWN' | 'INVALID';
+
+export interface RawQuantity {
+  value: unknown;
+  unit?: string;
+  method?: string;
+  standard?: string;
+  conditions?: Record<string, unknown>;
+  temperature?: string | number;
+  temp?: string | number;
+  load?: string | number;
+  sampleId?: string;
+  batchId?: string;
+  referenceId?: string;
+  sourceUrl?: string;
+}
+
+export interface CanonicalQuantity {
+  value: number;
+  unit: string;
+  dimension: string;
+}
+
+export interface QuantityRecord {
+  raw: RawQuantity;
+  canonical?: CanonicalQuantity;
+  status: QuantityStatus;
+  reasonCodes: string[];
+  provenanceRefs: string[];
+}
+
+export type ResinSourceType =
+  | 'DEMO'
+  | 'SYNTHETIC'
+  | 'REFERENCE'
+  | 'MEASURED'
+  | 'IMPORTED'
+  | 'UNKNOWN';
+
+export type ResinGovernedRecordStatus =
+  | 'DEMO'
+  | 'SYNTHETIC'
+  | 'REFERENCE'
+  | 'MEASURED'
+  | 'IMPORTED'
+  | 'NOT_FOR_RELEASE'
+  | 'UNKNOWN';
+
+export type ResinConfidentiality = 'PUBLIC' | 'INTERNAL' | 'RESTRICTED' | 'UNKNOWN';
+
+export interface DataGovernanceMetadata {
+  sourceType: ResinSourceType;
+  recordStatus: ResinGovernedRecordStatus;
+  confidentiality: ResinConfidentiality;
+  license: string;
+  provenanceRefs: string[];
+  lastVerifiedAt?: string;
+}
+
 export interface PropertyValue {
   value: string | number;
   unit?: string;
-  // 二维描述扩展
-  standard?: string;    // 测试标准
-  temperature?: string | number; // 测试温度
-  referenceId?: string; // 参考文献ID (Data Source)
-  instrument?: string;  // 来源仪器/设备 (Source Machine)
-  sourceUrl?: string;   // 来源链接 (Website Link)
-  annotation?: string;  // 中文标注
-  // 统计学数据扩展
+  method?: string;
+  sampleId?: string;
+  batchId?: string;
+  provenanceRefs?: string[];
+  quantity?: QuantityRecord;
+  standard?: string;
+  temperature?: string | number;
+  referenceId?: string;
+  instrument?: string;
+  sourceUrl?: string;
+  annotation?: string;
   mean?: number;
   stdDev?: number;
   min?: number;
   max?: number;
   count?: number;
-  // MFR-specific parameters
   temp?: string;
-  load?: string;
+  load?: string | number;
 }
 
 export interface Product {
   id: string;
-  gradeName: string; 
-  manufacturerId: string; // 关联厂家ID
-  manufacturer: string;   // 冗余显示名
-  categoryIds: string[]; 
+  gradeName: string;
+  manufacturerId: string;
+  manufacturer: string;
+  categoryIds: string[];
   properties: Record<string, PropertyValue>;
   createdAt: string;
   updatedAt: string;
-  isExperimental?: boolean; // Label for self-tested custom experimental data
+  isExperimental?: boolean;
   tags?: string[];
   priority?: number;
+  governance?: DataGovernanceMetadata;
 }
 
 export type ViewMode = 'grid' | 'chart';
 export type AppView = 'dashboard' | 'analytics' | 'pivot' | 'dependencies' | 'settings' | 'beta-sandbox';
 
-export interface Toast { id: string; type: 'success' | 'error' | 'info'; message: string; }
+export interface Toast {
+  id: string;
+  type: 'success' | 'error' | 'info';
+  message: string;
+}
 
 export interface FormulaHistory {
   date: string;
@@ -82,7 +147,7 @@ export interface FormulaHistory {
 export interface FormulaConfig {
   id: string;
   name: string;
-  expression: string; // e.g., "props['Density'] * props['Tensile']"
+  expression: string;
   unit?: string;
   description?: string;
   history?: FormulaHistory[];
@@ -119,7 +184,7 @@ export interface ColumnConfig {
   type?: 'string' | 'number';
   formulaId?: string;
   unit?: string;
-  isPinned?: boolean; // New: Support for sticky columns
+  isPinned?: boolean;
 }
 
 export interface SortConfig {
@@ -127,7 +192,17 @@ export interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
-export type FilterOperator = 'contains' | 'equals' | 'startsWith' | 'endsWith' | 'gt' | 'lt' | 'gte' | 'lte' | 'isEmpty' | 'isNotEmpty';
+export type FilterOperator =
+  | 'contains'
+  | 'equals'
+  | 'startsWith'
+  | 'endsWith'
+  | 'gt'
+  | 'lt'
+  | 'gte'
+  | 'lte'
+  | 'isEmpty'
+  | 'isNotEmpty';
 
 export interface FilterCondition {
   id: string;
@@ -157,9 +232,6 @@ export interface AiAction {
   label: string;
 }
 
-/**
- * Describes the result of a batch update operation.
- */
 export interface BatchUpdateResult {
   ids: string[];
   updates: ProductUpdates;
