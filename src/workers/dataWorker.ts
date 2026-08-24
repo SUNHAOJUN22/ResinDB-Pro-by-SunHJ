@@ -6,17 +6,18 @@ import { calculateTopsis } from '@/lib/topsisAnalyzer';
 const formulaEngine = new FormulaEngine();
 
 function parseFiniteNumeric(value: unknown): number | null {
+  if (typeof value === 'boolean') return null;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (typeof value !== 'string' || value.trim() === '') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export type WorkerMessage = 
+export type WorkerMessage =
   | { type: 'INIT_DATA', payload: { allProducts: Product[], formulas: FormulaConfig[], columns: ColumnConfig[] } }
   | { type: 'QUERY', payload: { activeFilters: FilterItem[], sortConfig: SortConfig[], useTopsis?: boolean, detectAnomaliesKey?: string } };
 
-export type WorkerResponse = 
+export type WorkerResponse =
   | { type: 'INIT_SUCCESS' }
   | { type: 'QUERY_RESULT', payload: { resultIds: string[], topsisTop3Ids?: string[], outliers?: string[] } }
   | { type: 'ERROR', payload: { message: string } };
@@ -25,7 +26,6 @@ let data: Product[] = [];
 let columns: ColumnConfig[] = [];
 let formulas: FormulaConfig[] = [];
 
-// The main message handler for the worker
 self.onmessage = (e: MessageEvent<WorkerMessage>) => {
   try {
     const msg = e.data;
@@ -35,82 +35,70 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
         data = msg.payload.allProducts;
         formulas = msg.payload.formulas;
         columns = msg.payload.columns;
-        
         self.postMessage({ type: 'INIT_SUCCESS' } as WorkerResponse);
         break;
       }
-      
       case 'QUERY': {
         const { activeFilters, sortConfig } = msg.payload;
-        
-        // 1. Filter
         let filteredData = data;
         if (activeFilters && activeFilters.length > 0) {
-          filteredData = data.filter(product => {
-            return activeFilters.every(filter => {
-              if (filter.type === 'search') {
-                const searchLower = filter.label.toLowerCase();
-                
-                if (product.gradeName.toLowerCase().includes(searchLower)) return true;
-                if (product.manufacturer.toLowerCase().includes(searchLower)) return true;
-                
-                const props = product.properties;
-                for (const key in props) {
-                   if (String(props[key].value).toLowerCase().includes(searchLower)) return true;
-                }
-                return false;
-              }
-              return true;
-            });
-          });
+          filteredData = data.filter(product => activeFilters.every(filter => {
+            if (filter.type !== 'search') return true;
+            const searchLower = filter.label.toLowerCase();
+            if (product.gradeName.toLowerCase().includes(searchLower)) return true;
+            if (product.manufacturer.toLowerCase().includes(searchLower)) return true;
+            return Object.values(product.properties).some(property =>
+              String(property.value).toLowerCase().includes(searchLower));
+          }));
         }
 
-        // 2. Sort
         let sortedData = filteredData;
         const formulaExecutor = formulaEngine.compileGraph(formulas);
         let topsisTop3Ids: string[] = [];
 
         if (msg.payload.useTopsis && filteredData.length > 0) {
-           const activeCols = columns.filter(c => c.type === 'number' || c.isComputed);
-           const topsisCols = activeCols.map(c => ({
-              key: c.key,
-              isLowBest: isLowBest(c.key)
-           }));
-
-           const scores = calculateTopsis(filteredData, topsisCols, (item, key) => {
-              const col = columns.find(c => c.key === key);
-              if (col?.isComputed && col.formulaId) {
-                 return formulaExecutor(item)[col.formulaId] || 0;
-              }
-              const value = item.properties[key]?.value ?? (item as unknown as Record<string, unknown>)[key];
-              return parseFiniteNumeric(value);
-           });
-
-           sortedData = [...filteredData].sort((a, b) => {
-              const sA = scores.get(a.id) || 0;
-              const sB = scores.get(b.id) || 0;
-              return sB - sA;
-           });
-           
-           topsisTop3Ids = sortedData.slice(0, 3).map(p => p.id);
-        } else if (sortConfig.length > 0) {
-          // Pre-calculate completeness if needed
-          const precalculatedScores = new Map<string, number>();
-          if (sortConfig.some(s => s.key === 'completeness')) {
-            filteredData.forEach(p => {
-              precalculatedScores.set(p.id, calculateCompleteness(p));
-            });
-          }
+          const activeCols = columns.filter(c => c.type === 'number' || c.isComputed);
+          const topsisCols = activeCols.map(c => ({
+            key: c.key,
+            isLowBest: isLowBest(c.key),
+            unit: c.unit,
+          }));
+          const scores = calculateTopsis(filteredData, topsisCols, (item, key) => {
+            const col = columns.find(c => c.key === key);
+            if (col?.isComputed && col.formulaId) {
+              return parseFiniteNumeric(formulaExecutor(item)[col.formulaId]);
+            }
+            const property = item.properties[key];
+            const governed = property?.quantity;
+            if (governed?.status === 'VALID' && governed.canonical) {
+              return governed.canonical.value;
+            }
+            const value = property?.value ?? (item as unknown as Record<string, unknown>)[key];
+            return parseFiniteNumeric(value);
+          });
 
           sortedData = [...filteredData].sort((a, b) => {
-             for (const sort of sortConfig) {
-               let aVal: unknown;
-               let bVal: unknown;
-       
-               if (sort.key === 'completeness') {
-                 aVal = precalculatedScores.get(a.id);
-                 bVal = precalculatedScores.get(b.id);
-               } else {
+            const sA = scores.get(a.id);
+            const sB = scores.get(b.id);
+            if (sA === undefined && sB === undefined) return a.id.localeCompare(b.id);
+            if (sA === undefined) return 1;
+            if (sB === undefined) return -1;
+            return sB - sA;
+          });
+          topsisTop3Ids = sortedData.filter(product => scores.has(product.id)).slice(0, 3).map(product => product.id);
+        } else if (sortConfig.length > 0) {
+          const precalculatedScores = new Map<string, number>();
+          if (sortConfig.some(s => s.key === 'completeness')) {
+            filteredData.forEach(product => precalculatedScores.set(product.id, calculateCompleteness(product)));
+          }
+          sortedData = [...filteredData].sort((a, b) => {
+            for (const sort of sortConfig) {
+              let aVal: unknown;
+              let bVal: unknown;
+              if (sort.key === 'completeness') {
+                aVal = precalculatedScores.get(a.id);
+                bVal = precalculatedScores.get(b.id);
+              } else {
                 const col = columns.find(c => c.key === sort.key);
                 if (col?.isComputed && col.formulaId) {
                   aVal = formulaExecutor(a)[col.formulaId];
@@ -122,83 +110,65 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
               }
 
               if (aVal === bVal) continue;
-              
               if (aVal === undefined || aVal === null) return 1;
               if (bVal === undefined || bVal === null) return -1;
 
-              const isLow = isLowBest(sort.key);
-              const m = sort.direction === 'asc' ? 1 : -1;
-              const revM = isLow ? -m : m;
-
+              const lowBest = isLowBest(sort.key);
+              const direction = sort.direction === 'asc' ? 1 : -1;
+              const multiplier = lowBest ? -direction : direction;
               if (typeof aVal === 'number' && typeof bVal === 'number') {
-                return (aVal - bVal) * revM;
+                return (aVal - bVal) * multiplier;
               }
-
-              const sA = String(aVal).toLowerCase();
-              const sB = String(bVal).toLowerCase();
-              
-              if (sA < sB) return -m;
-              if (sA > sB) return m;
+              const left = String(aVal).toLowerCase();
+              const right = String(bVal).toLowerCase();
+              if (left < right) return -direction;
+              if (left > right) return direction;
             }
             return 0;
           });
         } else {
-          // Default sort by priority (user-controlled, smaller priority first, unprioritized items last)
           sortedData = [...filteredData].sort((a, b) => {
-            const pA = a.priority !== undefined ? a.priority : 1000000;
-            const pB = b.priority !== undefined ? b.priority : 1000000;
-            return pA - pB;
+            const left = a.priority !== undefined ? a.priority : 1_000_000;
+            const right = b.priority !== undefined ? b.priority : 1_000_000;
+            return left - right;
           });
         }
 
-        // 3. Anomaly Detection
         let outliers: string[] = [];
         if (msg.payload.detectAnomaliesKey && filteredData.length > 0) {
           const key = msg.payload.detectAnomaliesKey;
-          const vals: { id: string, val: number }[] = [];
-          let sum = 0;
-          let count = 0;
-          
-          filteredData.forEach(p => {
-             let v: unknown;
-             const col = columns.find(c => c.key === key);
-             if (col?.isComputed && col.formulaId) {
-                v = formulaExecutor(p)[col.formulaId];
-             } else {
-                v = p.properties[key]?.value ?? (p as unknown as Record<string, unknown>)[key];
-             }
-             const numeric = parseFiniteNumeric(v);
-             if (numeric !== null) {
-                vals.push({ id: p.id, val: numeric });
-                sum += numeric;
-                count++;
-             }
-          });
-
-          if (count > 0) {
-             const mean = sum / count;
-             let sqDiffSum = 0;
-             vals.forEach(v => {
-                sqDiffSum += Math.pow(v.val - mean, 2);
-             });
-             const stdDev = Math.sqrt(sqDiffSum / count);
-             
-             if (stdDev > 0) {
-                outliers = vals.filter(v => Math.abs((v.val - mean) / stdDev) > 3).map(v => v.id);
-             }
+          const values: { id: string, value: number }[] = [];
+          for (const product of filteredData) {
+            const col = columns.find(c => c.key === key);
+            const raw = col?.isComputed && col.formulaId
+              ? formulaExecutor(product)[col.formulaId]
+              : product.properties[key]?.value ?? (product as unknown as Record<string, unknown>)[key];
+            const numeric = parseFiniteNumeric(raw);
+            if (numeric !== null) values.push({ id: product.id, value: numeric });
+          }
+          if (values.length > 0) {
+            const mean = values.reduce((sum, item) => sum + item.value, 0) / values.length;
+            const variance = values.reduce((sum, item) => sum + (item.value - mean) ** 2, 0) / values.length;
+            const standardDeviation = Math.sqrt(variance);
+            if (standardDeviation > 0) {
+              outliers = values
+                .filter(item => Math.abs((item.value - mean) / standardDeviation) > 3)
+                .map(item => item.id);
+            }
           }
         }
 
-        // 4. Return IDs
-        const resultIds = sortedData.map(p => p.id);
-        self.postMessage({ type: 'QUERY_RESULT', payload: { resultIds, topsisTop3Ids, outliers } } as WorkerResponse);
+        self.postMessage({
+          type: 'QUERY_RESULT',
+          payload: { resultIds: sortedData.map(product => product.id), topsisTop3Ids, outliers },
+        } as WorkerResponse);
         break;
       }
     }
-  } catch (err) {
-    self.postMessage({ 
-      type: 'ERROR', 
-      payload: { message: err instanceof Error ? err.message : 'Unknown Worker Error' } 
+  } catch (error) {
+    self.postMessage({
+      type: 'ERROR',
+      payload: { message: error instanceof Error ? error.message : 'Unknown Worker Error' },
     } as WorkerResponse);
   }
 };
