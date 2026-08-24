@@ -1,5 +1,4 @@
-import { MaterialRecord, MaterialPhysicsSpecs } from './types';
-import { Product, PropertyValue } from '@/types/index';
+import type { DataGovernanceMetadata, Product, PropertyValue, QuantityRecord } from '@/types/index';
 import {
   LAB_RECORDS,
   OPEN_MARKET_RECORDS,
@@ -8,15 +7,129 @@ import {
   categoryNameFromId,
 } from '@/data/resinData';
 import { PolymerDataValidator } from './PolymerDataValidator';
+import type { MaterialPropertyValue, MaterialRecord, MaterialPhysicsSpecs } from './types';
 
 function normalizedRecordKey(record: Pick<MaterialRecord, 'grade' | 'manufacturer'>): string {
   return `${record.grade.trim().toLowerCase()}::${record.manufacturer.trim().toLowerCase()}`;
 }
 
-function toFiniteNumber(value: unknown): number | null {
-  if (value === '' || value === null || value === undefined) return null;
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : null;
+function finiteDisplayValue(value: unknown): string | number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 'UNKNOWN';
+  if (typeof value === 'string') return value;
+  return 'UNKNOWN';
+}
+
+function conservativeGovernance(record: MaterialRecord): DataGovernanceMetadata {
+  if (record.governance) {
+    return {
+      ...record.governance,
+      provenanceRefs: [...record.governance.provenanceRefs],
+    };
+  }
+  return {
+    sourceType: 'UNKNOWN',
+    recordStatus: 'UNKNOWN',
+    confidentiality: 'UNKNOWN',
+    license: 'UNSPECIFIED',
+    provenanceRefs: [],
+  };
+}
+
+function quantityFromMaterialProperty(property: MaterialPropertyValue): QuantityRecord {
+  return {
+    raw: property.raw ?? {
+      value: property.value,
+      unit: property.unit,
+      method: property.method,
+      standard: property.standard,
+      temperature: property.temperature,
+      temp: property.temp,
+      load: property.load,
+      sampleId: property.sampleId,
+      batchId: property.batchId,
+      referenceId: property.referenceId,
+      sourceUrl: property.sourceUrl,
+    },
+    canonical: property.canonical,
+    status: property.status ?? 'UNKNOWN',
+    reasonCodes: [...(property.reasonCodes ?? ['UNVALIDATED_LEGACY_PROPERTY'])],
+    provenanceRefs: [...(property.provenanceRefs ?? [])],
+  };
+}
+
+function materialToProductProperty(property: MaterialPropertyValue): PropertyValue {
+  const quantity = quantityFromMaterialProperty(property);
+  const displayValue = quantity.status === 'VALID' && quantity.canonical
+    ? quantity.canonical.value
+    : finiteDisplayValue(quantity.raw.value);
+  return {
+    value: displayValue,
+    unit: quantity.canonical?.unit ?? quantity.raw.unit,
+    method: quantity.raw.method,
+    standard: quantity.raw.standard,
+    temperature: quantity.raw.temperature ?? quantity.raw.temp,
+    temp: typeof quantity.raw.temp === 'string' ? quantity.raw.temp : undefined,
+    load: quantity.raw.load,
+    sampleId: quantity.raw.sampleId,
+    batchId: quantity.raw.batchId,
+    referenceId: quantity.raw.referenceId,
+    sourceUrl: quantity.raw.sourceUrl,
+    provenanceRefs: quantity.provenanceRefs,
+    quantity,
+  };
+}
+
+function productToMaterialProperty(property: PropertyValue): MaterialPropertyValue {
+  const quantity = property.quantity;
+  if (quantity) {
+    return {
+      value: quantity.raw.value,
+      unit: quantity.raw.unit,
+      method: quantity.raw.method,
+      standard: quantity.raw.standard,
+      temperature: quantity.raw.temperature,
+      temp: quantity.raw.temp,
+      load: quantity.raw.load,
+      sampleId: quantity.raw.sampleId,
+      batchId: quantity.raw.batchId,
+      referenceId: quantity.raw.referenceId,
+      sourceUrl: quantity.raw.sourceUrl,
+      raw: { ...quantity.raw, conditions: quantity.raw.conditions ? { ...quantity.raw.conditions } : undefined },
+      canonical: quantity.canonical ? { ...quantity.canonical } : undefined,
+      status: quantity.status,
+      reasonCodes: [...quantity.reasonCodes],
+      provenanceRefs: [...quantity.provenanceRefs],
+    };
+  }
+  return {
+    value: property.value,
+    unit: property.unit,
+    method: property.method,
+    standard: property.standard,
+    temperature: property.temperature,
+    temp: property.temp,
+    load: property.load,
+    sampleId: property.sampleId,
+    batchId: property.batchId,
+    referenceId: property.referenceId,
+    sourceUrl: property.sourceUrl,
+    raw: {
+      value: property.value,
+      unit: property.unit,
+      method: property.method,
+      standard: property.standard,
+      temperature: property.temperature,
+      temp: property.temp,
+      load: property.load,
+      sampleId: property.sampleId,
+      batchId: property.batchId,
+      referenceId: property.referenceId,
+      sourceUrl: property.sourceUrl,
+    },
+    status: 'UNKNOWN',
+    reasonCodes: ['UNVALIDATED_LEGACY_PROPERTY'],
+    provenanceRefs: [...(property.provenanceRefs ?? [])],
+  };
 }
 
 export class UniversalStorageBridge {
@@ -38,20 +151,12 @@ export class UniversalStorageBridge {
 
   public static saveLabRecord(record: MaterialRecord): void {
     const validated = PolymerDataValidator.validateAndClean(record);
-    if (!validated) {
-      console.error('[Polymer Validator Rejected] Save operation aborted. Record is lacking minimum core physical properties.');
-      throw new Error('validationErrorMinProps');
-    }
-    try {
-      const records = this.getLabRecords();
-      const index = records.findIndex((candidate) => candidate.id === validated.id);
-      if (index >= 0) records[index] = validated;
-      else records.push(validated);
-      localStorage.setItem(this.LAB_STORAGE_KEY, JSON.stringify(records));
-    } catch (error) {
-      console.error('Failed to save lab record to storage:', error);
-      throw error;
-    }
+    if (!validated) throw new Error('INVALID_MATERIAL_RECORD');
+    const records = this.getLabRecords();
+    const index = records.findIndex((candidate) => candidate.id === validated.id);
+    if (index >= 0) records[index] = validated;
+    else records.push(validated);
+    localStorage.setItem(this.LAB_STORAGE_KEY, JSON.stringify(records));
   }
 
   public static deleteLabRecord(id: string): void {
@@ -97,36 +202,27 @@ export class UniversalStorageBridge {
       localStorage.setItem(this.OPEN_STORAGE_KEY, JSON.stringify(cleaned));
       return cleaned;
     } catch (error) {
-      console.error('Failed to read open market records:', error);
+      console.error('Failed to read open market records from storage:', error);
       return PolymerDataValidator.cleanBatch(OPEN_MARKET_RECORDS);
     }
   }
 
   public static saveOpenMarketRecord(record: MaterialRecord): void {
     const validated = PolymerDataValidator.validateAndClean(record);
-    if (!validated) {
-      console.error('[Polymer Validator Rejected] Open Market Save aborted. Minimum property-count validation failed.');
-      throw new Error('validationErrorMeltdown');
-    }
-    try {
-      const records = this.getOpenMarketRecords();
-      const key = normalizedRecordKey(validated);
-      const index = records.findIndex((candidate) =>
-        candidate.id === validated.id || normalizedRecordKey(candidate) === key,
-      );
-      if (index >= 0) records[index] = validated;
-      else records.push(validated);
-      localStorage.setItem(this.OPEN_STORAGE_KEY, JSON.stringify(records));
-    } catch (error) {
-      console.error('Failed to save open market record to storage:', error);
-      throw error;
-    }
+    if (!validated) throw new Error('INVALID_MATERIAL_RECORD');
+    const records = this.getOpenMarketRecords();
+    const key = normalizedRecordKey(validated);
+    const index = records.findIndex((candidate) =>
+      candidate.id === validated.id || normalizedRecordKey(candidate) === key,
+    );
+    if (index >= 0) records[index] = validated;
+    else records.push(validated);
+    localStorage.setItem(this.OPEN_STORAGE_KEY, JSON.stringify(records));
   }
 
   public static findOpenMarketGrade(category: string, grade: string): MaterialRecord | null {
     const normalizedGrade = grade.toLowerCase().trim();
     if (!normalizedGrade) return null;
-
     const list = this.getOpenMarketRecords();
     const normalizedCategory = category.toLowerCase().trim();
     if (normalizedCategory) {
@@ -137,10 +233,8 @@ export class UniversalStorageBridge {
       );
       if (exactCategoryMatch) return exactCategoryMatch;
     }
-
     const exactGradeMatch = list.find((record) => record.grade.toLowerCase() === normalizedGrade);
     if (exactGradeMatch) return exactGradeMatch;
-
     return list.find((record) => {
       const candidate = record.grade.toLowerCase();
       return candidate.includes(normalizedGrade) || normalizedGrade.includes(candidate);
@@ -152,45 +246,11 @@ export class UniversalStorageBridge {
     const date = new Date(timestamp).toISOString().split('T')[0];
     const properties: Record<string, PropertyValue> = {};
     const specs = record.properties;
-
-    if (specs.density) {
-      properties['密度'] = {
-        value: specs.density.value,
-        unit: specs.density.unit,
-        standard: specs.density.standard,
-      };
-    }
-    if (specs.mfr) {
-      properties['熔体质量流动速率'] = {
-        value: specs.mfr.value,
-        unit: specs.mfr.unit,
-        standard: specs.mfr.standard,
-        temperature: specs.mfr.temp,
-        load: specs.mfr.load,
-      };
-    }
-    if (specs.tensileYield) {
-      properties['拉伸屈服应力'] = {
-        value: specs.tensileYield.value,
-        unit: specs.tensileYield.unit,
-        standard: specs.tensileYield.standard,
-      };
-    }
-    if (specs.flexuralModulus) {
-      properties['弯曲模量'] = {
-        value: specs.flexuralModulus.value,
-        unit: specs.flexuralModulus.unit,
-        standard: specs.flexuralModulus.standard,
-      };
-    }
-    if (specs.izodImpact) {
-      properties['悬臂梁缺口冲击强度'] = {
-        value: specs.izodImpact.value,
-        unit: specs.izodImpact.unit,
-        standard: specs.izodImpact.standard,
-      };
-    }
-
+    if (specs.density) properties['密度'] = materialToProductProperty(specs.density);
+    if (specs.mfr) properties['熔体质量流动速率'] = materialToProductProperty(specs.mfr);
+    if (specs.tensileYield) properties['拉伸屈服应力'] = materialToProductProperty(specs.tensileYield);
+    if (specs.flexuralModulus) properties['弯曲模量'] = materialToProductProperty(specs.flexuralModulus);
+    if (specs.izodImpact) properties['悬臂梁缺口冲击强度'] = materialToProductProperty(specs.izodImpact);
     return {
       id: record.id,
       gradeName: record.grade,
@@ -201,6 +261,7 @@ export class UniversalStorageBridge {
       createdAt: date,
       updatedAt: date,
       isExperimental: record.source === 'my_lab',
+      governance: conservativeGovernance(record),
     };
   }
 
@@ -213,72 +274,33 @@ export class UniversalStorageBridge {
     const mfr = props['熔体质量流动速率'] || props.MFR;
     const tensile = props['拉伸屈服应力'] || props.Tensile;
     const modulus = props['弯曲模量'] || props.Modulus;
-    const impact =
-      props['悬臂梁缺口冲击强度'] ||
-      props['简支梁缺口冲击强度'] ||
-      props['Izod Impact'];
-
-    const category = categoryNameFromId(product.categoryIds?.[0] || 'root_plastic');
-    const defaultMfrTemperature = category.startsWith('PP') ? '230℃' : '190℃';
+    const impact = props['悬臂梁缺口冲击强度'] || props['简支梁缺口冲击强度'] || props['Izod Impact'];
     const specs: MaterialPhysicsSpecs = {};
-
-    const densityValue = toFiniteNumber(density?.value);
-    if (densityValue !== null) {
-      specs.density = {
-        value: densityValue,
-        unit: density?.unit || 'g/cm³',
-        standard: density?.standard || 'ISO 1183',
-      };
-    }
-
-    const mfrValue = toFiniteNumber(mfr?.value);
-    if (mfrValue !== null) {
-      specs.mfr = {
-        value: mfrValue,
-        unit: mfr?.unit || 'g/10min',
-        standard: mfr?.standard || 'ISO 1133',
-        temp: String(mfr?.temperature ?? mfr?.temp ?? defaultMfrTemperature),
-        load: mfr?.load || '2.16kg',
-      };
-    }
-
-    const tensileValue = toFiniteNumber(tensile?.value);
-    if (tensileValue !== null) {
-      specs.tensileYield = {
-        value: tensileValue,
-        unit: tensile?.unit || 'MPa',
-        standard: tensile?.standard || 'ISO 527',
-      };
-    }
-
-    const modulusValue = toFiniteNumber(modulus?.value);
-    if (modulusValue !== null) {
-      specs.flexuralModulus = {
-        value: modulusValue,
-        unit: modulus?.unit || 'MPa',
-        standard: modulus?.standard || 'ISO 178',
-      };
-    }
-
-    const impactValue = toFiniteNumber(impact?.value);
-    if (impactValue !== null) {
-      specs.izodImpact = {
-        value: impactValue,
-        unit: impact?.unit || 'kJ/m²',
-        standard: impact?.standard || 'ISO 180',
-      };
-    }
+    if (density) specs.density = productToMaterialProperty(density);
+    if (mfr) specs.mfr = productToMaterialProperty(mfr);
+    if (tensile) specs.tensileYield = productToMaterialProperty(tensile);
+    if (modulus) specs.flexuralModulus = productToMaterialProperty(modulus);
+    if (impact) specs.izodImpact = productToMaterialProperty(impact);
 
     const createdTimestamp = product.createdAt ? Date.parse(product.createdAt) : Number.NaN;
+    const source = product.isExperimental ? 'my_lab' : defaultSource;
     return {
       id: product.id,
-      source: product.isExperimental ? 'my_lab' : defaultSource,
-      batchNo: product.isExperimental ? `BATCH-${product.id.split('-').pop()}` : undefined,
-      category,
+      source,
+      category: categoryNameFromId(product.categoryIds?.[0] || 'root_plastic'),
       grade: product.gradeName,
       manufacturer: product.manufacturer,
       properties: specs,
       timestamp: Number.isFinite(createdTimestamp) ? createdTimestamp : Date.now(),
+      governance: product.governance
+        ? { ...product.governance, provenanceRefs: [...product.governance.provenanceRefs] }
+        : {
+            sourceType: 'UNKNOWN',
+            recordStatus: 'UNKNOWN',
+            confidentiality: 'UNKNOWN',
+            license: 'UNSPECIFIED',
+            provenanceRefs: [],
+          },
     };
   }
 }
