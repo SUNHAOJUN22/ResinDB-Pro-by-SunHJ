@@ -53,7 +53,12 @@ export default defineConfig(({ mode }) => {
         reporter: ['text', 'json', 'json-summary'],
         all: true,
         include: ['src/**/*.{ts,tsx}'],
-        exclude: ['src/**/*.d.ts'],
+        exclude: [
+          'src/**/*.d.ts',
+          'src/**/__tests__/**',
+          'src/**/__mocks__/**',
+          'src/**/*.{test,spec}.{ts,tsx}',
+        ],
         thresholds: { statements: 24, branches: 12, functions: 14, lines: 24 },
       },
     },
