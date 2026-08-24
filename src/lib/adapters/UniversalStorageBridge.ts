@@ -242,26 +242,27 @@ export class UniversalStorageBridge {
   }
 
   public static recordToProduct(record: MaterialRecord): Product {
-    const timestamp = Number.isFinite(record.timestamp) ? record.timestamp : Date.now();
+    const governed = PolymerDataValidator.validateAndClean(record) ?? record;
+    const timestamp = Number.isFinite(governed.timestamp) ? governed.timestamp : Date.now();
     const date = new Date(timestamp).toISOString().split('T')[0];
     const properties: Record<string, PropertyValue> = {};
-    const specs = record.properties;
+    const specs = governed.properties;
     if (specs.density) properties['密度'] = materialToProductProperty(specs.density);
     if (specs.mfr) properties['熔体质量流动速率'] = materialToProductProperty(specs.mfr);
     if (specs.tensileYield) properties['拉伸屈服应力'] = materialToProductProperty(specs.tensileYield);
     if (specs.flexuralModulus) properties['弯曲模量'] = materialToProductProperty(specs.flexuralModulus);
     if (specs.izodImpact) properties['悬臂梁缺口冲击强度'] = materialToProductProperty(specs.izodImpact);
     return {
-      id: record.id,
-      gradeName: record.grade,
-      manufacturer: record.manufacturer,
-      manufacturerId: record.source === 'my_lab' ? 'm-exp-lab' : 'm-open-market',
-      categoryIds: [categoryIdFromText(record.category)],
+      id: governed.id,
+      gradeName: governed.grade,
+      manufacturer: governed.manufacturer,
+      manufacturerId: governed.source === 'my_lab' ? 'm-exp-lab' : 'm-open-market',
+      categoryIds: [categoryIdFromText(governed.category)],
       properties,
       createdAt: date,
       updatedAt: date,
-      isExperimental: record.source === 'my_lab',
-      governance: conservativeGovernance(record),
+      isExperimental: governed.source === 'my_lab',
+      governance: conservativeGovernance(governed),
     };
   }
 
