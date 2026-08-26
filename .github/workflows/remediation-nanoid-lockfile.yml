@@ -1,0 +1,67 @@
+name: One-shot nanoid lockfile remediation
+
+on:
+  push:
+    branches:
+      - remediation/nanoid-3.3.18
+
+permissions:
+  contents: write
+
+concurrency:
+  group: remediation-nanoid-lockfile
+  cancel-in-progress: false
+
+jobs:
+  rewrite-lockfile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact remediation branch
+        uses: actions/checkout@v4
+        with:
+          ref: remediation/nanoid-3.3.18
+          fetch-depth: 0
+
+      - name: Apply deterministic lockfile replacement
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+
+          package = Path("package.json")
+          lockfile = Path("package-lock.json")
+
+          package_data = json.loads(package.read_text(encoding="utf-8"))
+          assert package_data["overrides"]["nanoid"] == "3.3.18"
+
+          text = lockfile.read_text(encoding="utf-8")
+          replacements = {
+              '"version": "3.3.17"': '"version": "3.3.18"',
+              'https://registry.npmjs.org/nanoid/-/nanoid-3.3.17.tgz': 'https://registry.npmjs.org/nanoid/-/nanoid-3.3.18.tgz',
+              'sha512-xQLf0A3HOMlgHq0n247/LRuAOYmB7dXJ/DvAxGvsSBij45XtBSmQycu+F8ODbHwns/XyFZagyL1+J0Offw1E0g==': 'sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w==',
+          }
+          for old, new in replacements.items():
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"expected exactly one lockfile occurrence for {old!r}; found {count}")
+              text = text.replace(old, new)
+
+          lockfile.write_text(text, encoding="utf-8")
+          parsed = json.loads(lockfile.read_text(encoding="utf-8"))
+          nanoid = parsed["packages"]["node_modules/nanoid"]
+          assert nanoid["version"] == "3.3.18"
+          assert nanoid["resolved"].endswith("/nanoid-3.3.18.tgz")
+          assert nanoid["integrity"] == "sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w=="
+
+      - name: Commit generated lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git diff --cached --exit-code && { echo "No lockfile change produced" >&2; exit 1; } || true
+          git commit -m "fix(deps): refresh nanoid 3.3.18 lock entry"
+          git push origin HEAD:remediation/nanoid-3.3.18
