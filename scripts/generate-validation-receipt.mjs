@@ -3,6 +3,7 @@ import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
 const artifacts = path.join(root, 'artifacts');
+const COVERAGE_SCOPE = 'production-typescript-excluding-tests-and-declarations';
 
 async function readJson(name, fallback = null) {
   try { return JSON.parse(await readFile(path.join(artifacts, name), 'utf8')); }
@@ -70,7 +71,7 @@ function validKMeansBenchmark(report) {
 const checks = {
   coreGates: ciGates?.status === 'PASS',
   tests: Boolean(tests?.success) && tests?.numFailedTests === 0 && tests?.numTotalTests > 0,
-  wholeSourceCoverage: Boolean(coverage?.scopeComplete) && coverage?.coverageScope === 'all-production-typescript',
+  wholeSourceCoverage: Boolean(coverage?.scopeComplete) && coverage?.coverageScope === COVERAGE_SCOPE,
   buildBudgets: Boolean(build?.entry && build?.echarts) &&
     build.entry.gzipBytes <= build.budgets.entryGzipBytes &&
     build.echarts.bytes <= build.budgets.echartsRawBytes,
