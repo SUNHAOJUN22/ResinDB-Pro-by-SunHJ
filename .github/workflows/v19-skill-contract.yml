@@ -1,82 +1,108 @@
 name: V19 Skill contract
 
+# Temporary exact-branch finalizer. The clean commit restores the permanent workflow from main.
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
+    branches:
+      - remediation/nanoid-3.3.18
 
 permissions:
-  contents: read
-  statuses: write
+  contents: write
 
 concurrency:
-  group: v19-skill-contract-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: resindb-ai-types-finalize
+  cancel-in-progress: false
 
 jobs:
-  contract:
+  finalize-ai-types:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Check out exact Draft branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+          ref: remediation/nanoid-3.3.18
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version-file: .nvmrc
-      - name: Run V19 static routing and interoperability checks
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Repair governed AI call and quantity contracts
         shell: bash
         run: |
           set -euo pipefail
-          node --input-type=module <<'JS'
-          import { readFileSync } from 'node:fs';
-          const base = '.agents/skills/resindb-science-screening-audit/evals';
-          const load = (path) => JSON.parse(readFileSync(path, 'utf8'));
-          const status = load(`${base}/MODEL_EVAL_STATUS.json`);
-          const capture = load(`${base}/MODEL_CAPTURE_TEMPLATE.json`);
-          const document = load(`${base}/evals.json`);
-          const contract = load('.agents/skills/resindb-science-screening-audit/references/interoperability-v1.json');
-          const cases = document.cases;
-          const unique = new Set(cases.map((item) => item.id));
-          const languages = new Set(cases.map((item) => item.language));
-          const splits = new Set(cases.map((item) => item.split));
-          const categories = new Set(cases.map((item) => item.category));
-          if (status.status !== 'NOT_RUN' || capture.status !== 'NOT_RUN') throw new Error('model status is not truthful');
-          if (unique.size !== cases.length || cases.length < 6) throw new Error('invalid routing case identity');
-          if (![...['en','zh']].every((value) => languages.has(value))) throw new Error('language coverage missing');
-          if (![...['train','validation']].every((value) => splits.has(value))) throw new Error('split coverage missing');
-          if (![...['workflow','boundary','negative']].every((value) => categories.has(value))) throw new Error('category coverage missing');
-          if (contract.scientific_quantity.boolean_is_numeric !== false || contract.scientific_quantity.unknown_is_zero !== false) throw new Error('quantity truth boundary drift');
-          if (contract.status_lattice.software_pass_implies_external_acceptance !== false) throw new Error('acceptance boundary drift');
-          const source = readFileSync('src/lib/skillInteroperabilityV19.ts', 'utf8');
-          for (const symbol of ['isFiniteScientificNumber','aggregateStatus','mayClaimExternalAcceptance']) {
-            if (!source.includes(symbol)) throw new Error(`missing implementation symbol: ${symbol}`);
-          }
-          console.log(JSON.stringify({status:'PASS', cases:cases.length}));
-          JS
-      - name: Publish exact-SHA status
-        if: always() && github.event_name == 'push'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          TARGET_SHA: ${{ github.sha }}
-          JOB_STATUS: ${{ job.status }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          for relative in (
+              'src/components/modals/AddProductModal.tsx',
+              'src/components/modals/EditProductModal.tsx',
+          ):
+              path = Path(relative)
+              text = path.read_text(encoding='utf-8')
+              pattern = re.compile(
+                  r'const generated = await aiService\.generateProductProperties\(\s*'
+                  r'formData\.gradeName,\s*formData\.manufacturer \|\| ""\s*\);'
+              )
+              text, count = pattern.subn(
+                  'const generated = await aiService.generateProductProperties();',
+                  text,
+                  count=1,
+              )
+              if count != 1:
+                  raise SystemExit(f'expected one identity-bearing AI call in {relative}, found {count}')
+              path.write_text(text, encoding='utf-8')
+
+          service_path = Path('src/services/aiService.ts')
+          service = service_path.read_text(encoding='utf-8')
+          old = "...(property?.temperature ? { condition: property.temperature.slice(0, 80) } : {}),"
+          new = "...(property?.temperature !== undefined ? { condition: String(property.temperature).slice(0, 80) } : {}),"
+          if service.count(old) != 1:
+              raise SystemExit('expected exactly one unsafe temperature slice')
+          service_path.write_text(service.replace(old, new), encoding='utf-8')
+
+          workflow = Path('.github/workflows/v19-skill-contract.yml')
+          workflow.write_text(
+              __import__('subprocess').check_output(
+                  ['git', 'show', 'origin/main:.github/workflows/v19-skill-contract.yml'],
+                  text=True,
+              ),
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Run governed AI and production qualification
         shell: bash
         run: |
-          node --input-type=module <<'JS'
-          const state = process.env.JOB_STATUS === 'success' ? 'success' : 'failure';
-          const response = await fetch(`https://api.github.com/repos/${process.env.REPOSITORY}/statuses/${process.env.TARGET_SHA}`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${process.env.GH_TOKEN}`,
-              Accept: 'application/vnd.github+json',
-              'X-GitHub-Api-Version': '2022-11-28',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({state, context: 'v19/skill-contract', description: `V19 Skill and interoperability contract ${state}`, target_url: process.env.RUN_URL}),
-          });
-          if (!response.ok) throw new Error(`status API failed: ${response.status}`);
-          JS
+          set -euo pipefail
+          npm run test -- --run \
+            tests/unit/aiGovernance.test.ts \
+            tests/unit/aiEgressGovernance.test.ts \
+            tests/unit/aiService.test.ts \
+            tests/unit/toolchainPortability.test.ts
+          npm run validate:ai-egress
+          npm run lint
+          npm run typecheck
+          npm run build
+          git restore --worktree dist/assets 2>/dev/null || true
+          test ! -d .github/remediation
+          test -z "$(find .github/workflows -maxdepth 1 -type f -name 'remediation-*.yml' -print -quit)"
+          git diff --check
+
+      - name: Commit clean source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix(ai): align browser calls with governed proxy contract'
+          git push origin HEAD:remediation/nanoid-3.3.18
