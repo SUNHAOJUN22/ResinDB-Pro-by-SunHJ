@@ -79,6 +79,20 @@ jobs:
           find .github/workflows -maxdepth 1 -type f -name 'remediation-*.yml' -delete
           git show origin/main:.github/workflows/v19-skill-contract.yml > .github/workflows/v19-skill-contract.yml
 
+      - name: Commit clean governed source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f src/services/aiGovernance.ts
+          test -f tests/unit/aiEgressGovernance.test.ts
+          test -z "$(find .github/workflows -maxdepth 1 -type f -name 'remediation-*.yml' -print -quit)"
+          test ! -d .github/remediation
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix(ai): materialize same-origin governed egress'
+          git push origin HEAD:remediation/nanoid-3.3.18
+
       - name: Run focused and production qualification
         shell: bash
         run: |
@@ -94,17 +108,3 @@ jobs:
           npm run build
           git restore --worktree dist/assets 2>/dev/null || true
           git diff --check
-
-      - name: Commit clean source tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f src/services/aiGovernance.ts
-          test -f tests/unit/aiEgressGovernance.test.ts
-          test -z "$(find .github/workflows -maxdepth 1 -type f -name 'remediation-*.yml' -print -quit)"
-          test ! -d .github/remediation
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git commit -m 'fix(ai): enforce same-origin governed egress'
-          git push origin HEAD:remediation/nanoid-3.3.18
