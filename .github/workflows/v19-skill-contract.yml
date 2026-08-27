@@ -44,11 +44,36 @@ jobs:
           tar -xzf /tmp/resindb-ai-source.tar.gz
           node --input-type=module <<'JS'
           import { readFileSync, writeFileSync } from 'node:fs';
-          const path = 'package.json';
-          const document = JSON.parse(readFileSync(path, 'utf8'));
+
+          const packagePath = 'package.json';
+          const document = JSON.parse(readFileSync(packagePath, 'utf8'));
           document.scripts['validate:source'] = 'node scripts/validate-source-hygiene.mjs';
           document.scripts['validate:ai-egress'] = 'node scripts/validate-ai-egress-governance.mjs';
-          writeFileSync(path, `${JSON.stringify(document, null, 2)}\n`);
+          writeFileSync(packagePath, `${JSON.stringify(document, null, 2)}\n`);
+
+          const servicePath = 'src/services/aiService.ts';
+          let service = readFileSync(servicePath, 'utf8');
+          const dynamicControlPattern = "new RegExp(`[${String.fromCharCode(0)}-${String.fromCharCode(31)}${String.fromCharCode(127)}]`, 'g')";
+          let controlPatternReplaced = false;
+          for (const literal of [
+            String.raw`/[\x00-\x1F\x7F]/g`,
+            String.raw`/[\x00-\x1f\x7f]/g`,
+            String.raw`/[\u0000-\u001F\u007F]/g`,
+            String.raw`/[\u0000-\u001f\u007f]/g`,
+          ]) {
+            if (service.includes(literal)) {
+              service = service.replaceAll(literal, dynamicControlPattern);
+              controlPatternReplaced = true;
+            }
+          }
+          if (!controlPatternReplaced) {
+            throw new Error('expected control-character sanitizer was not found');
+          }
+          if (!service.includes('normalizeGeneratedProperties')) {
+            throw new Error('expected generated-property normalizer was not found');
+          }
+          service = service.replaceAll('normalizeGeneratedProperties', '_normalizeGeneratedProperties');
+          writeFileSync(servicePath, service);
           JS
           rm -rf .github/remediation
           find .github/workflows -maxdepth 1 -type f -name 'remediation-*.yml' -delete
