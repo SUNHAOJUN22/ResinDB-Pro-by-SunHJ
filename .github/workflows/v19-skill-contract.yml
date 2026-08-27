@@ -42,6 +42,14 @@ jobs:
             'bc819f30d61f97d6f56d076d7e2d33f4aea12a10f455a9ea6fc3e8d1ef0373e8' \
             /tmp/resindb-ai-source.tar.gz | sha256sum --check
           tar -xzf /tmp/resindb-ai-source.tar.gz
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const path = 'package.json';
+          const document = JSON.parse(readFileSync(path, 'utf8'));
+          document.scripts['validate:source'] = 'node scripts/validate-source-hygiene.mjs';
+          document.scripts['validate:ai-egress'] = 'node scripts/validate-ai-egress-governance.mjs';
+          writeFileSync(path, `${JSON.stringify(document, null, 2)}\n`);
+          JS
           rm -rf .github/remediation
           find .github/workflows -maxdepth 1 -type f -name 'remediation-*.yml' -delete
           git show origin/main:.github/workflows/v19-skill-contract.yml > .github/workflows/v19-skill-contract.yml
