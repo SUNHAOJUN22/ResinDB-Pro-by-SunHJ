@@ -1,0 +1,110 @@
+name: One-shot governed AI egress convergence v2
+
+on:
+  push:
+    branches:
+      - remediation/nanoid-3.3.18
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: resindb-ai-egress-convergence-v2
+  cancel-in-progress: false
+
+jobs:
+  apply-and-qualify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CI: "true"
+    steps:
+      - name: Check out exact Draft PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: remediation/nanoid-3.3.18
+          fetch-depth: 0
+
+      - name: Set up governed Node runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Reconstruct and apply idempotent security patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          chunks=(.github/remediation/resindb-ai-egress.patch.b64.*)
+          test "${#chunks[@]}" -gt 0
+          cat "${chunks[@]}" | tr -d '\r\n' > /tmp/resindb-ai-egress.patch.gz.b64
+          base64 --decode /tmp/resindb-ai-egress.patch.gz.b64 | gzip --decompress > /tmp/resindb-ai-egress.patch
+          test -s /tmp/resindb-ai-egress.patch
+          if git apply --check /tmp/resindb-ai-egress.patch; then
+            git apply /tmp/resindb-ai-egress.patch
+          elif git apply --reverse --check /tmp/resindb-ai-egress.patch; then
+            echo 'security patch already present in checked-out tree'
+          else
+            echo 'security patch is neither applicable nor already applied' >&2
+            exit 1
+          fi
+          rm -rf .github/remediation
+          rm -f \
+            .github/workflows/remediation-apply-ai-egress.yml \
+            .github/workflows/remediation-apply-ai-egress-v2.yml
+          git add -A
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Run repository-native deterministic gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          has_script() {
+            node -e "const p=require('./package.json'); process.exit(p.scripts && p.scripts['$1'] ? 0 : 1)"
+          }
+          for script in validate:docs validate:unicode validate:source validate:data validate:compute validate:scientific-ui lint typecheck test build smoke; do
+            if has_script "$script"; then
+              npm run "$script"
+            fi
+          done
+          if test -f scripts/check-ai-egress-governance.mjs; then
+            node scripts/check-ai-egress-governance.mjs
+          fi
+          git diff --check
+
+      - name: Verify required governance contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          rg -n --fixed-strings '/api/ai/proxy' src tests scripts
+          rg -n '65536|64 \* 1024|64_KIB|MAX_.*EGRESS' src tests scripts
+          rg -n 'authorization.*expires|expires.*authorization|five.minute|5 \* 60' src tests scripts
+          rg -n 'UUID|randomUUID|request.?id' src tests scripts
+          if rg -n --glob '*.{ts,tsx,js,mjs,cjs}' '(setItem|localStorage|sessionStorage).*?(api.?key|bearer|secret|token)' src; then
+            echo 'browser secret persistence remains' >&2
+            exit 1
+          fi
+
+      - name: Refresh validation receipt when producer is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f scripts/generate-validation-receipt.mjs; then
+            node scripts/generate-validation-receipt.mjs
+          fi
+          git add -A
+
+      - name: Commit exact review tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(ai): enforce same-origin governed egress"
+          git push origin HEAD:remediation/nanoid-3.3.18
