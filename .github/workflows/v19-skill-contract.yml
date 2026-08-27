@@ -16,7 +16,7 @@ jobs:
   finalize-ai-egress:
     if: github.actor != 'github-actions[bot]' && github.event.pull_request.head.ref == 'remediation/nanoid-3.3.18'
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Check out exact Draft branch
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -37,13 +37,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .github/remediation/resindb-ai-egress.patch.b64.* \
-            | base64 --decode \
-            | gzip --decompress > /tmp/resindb-ai-egress.patch
+          base64 --decode .github/remediation/resindb-ai-source.tar.gz.b64 > /tmp/resindb-ai-source.tar.gz
           printf '%s  %s\n' \
-            '7927c6cfdd4e79ac52d5566c618600dc7fbd2f2af7dc8add0b7f48b8a50fbfde' \
-            /tmp/resindb-ai-egress.patch | sha256sum --check
-          git apply --index /tmp/resindb-ai-egress.patch
+            'bc819f30d61f97d6f56d076d7e2d33f4aea12a10f455a9ea6fc3e8d1ef0373e8' \
+            /tmp/resindb-ai-source.tar.gz | sha256sum --check
+          tar -xzf /tmp/resindb-ai-source.tar.gz
           rm -rf .github/remediation
           find .github/workflows -maxdepth 1 -type f -name 'remediation-*.yml' -delete
           git show origin/main:.github/workflows/v19-skill-contract.yml > .github/workflows/v19-skill-contract.yml
@@ -57,7 +55,7 @@ jobs:
             tests/unit/aiEgressGovernance.test.ts \
             tests/unit/aiService.test.ts \
             tests/unit/toolchainPortability.test.ts
-          node scripts/validate-ai-egress-governance.mjs
+          npm run validate:ai-egress
           npm run lint
           npm run typecheck
           npm run build
