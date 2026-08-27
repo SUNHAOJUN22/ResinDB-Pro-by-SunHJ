@@ -1,0 +1,1 @@
+Temporary branch-only transport for governed AI-egress remediation. This directory is removed by the one-shot qualification workflow.
