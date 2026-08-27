@@ -138,7 +138,7 @@ function safeProperties(product: Product): Array<Record<string, unknown>> {
         value,
         ...(property?.unit ? { unit: property.unit.slice(0, 40) } : {}),
         ...(property?.standard ? { method: property.standard.slice(0, 120) } : {}),
-        ...(property?.temperature ? { condition: property.temperature.slice(0, 80) } : {}),
+        ...(property?.temperature !== undefined ? { condition: String(property.temperature).slice(0, 80) } : {}),
       }];
     });
 }
