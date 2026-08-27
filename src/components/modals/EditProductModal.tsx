@@ -81,10 +81,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = React.memo(({
     if (!formData.gradeName || isAiGenerating) return;
     setIsAiGenerating(true);
     try {
-      const generated = await aiService.generateProductProperties(
-        formData.gradeName,
-        formData.manufacturer || ""
-      );
+      const generated = await aiService.generateProductProperties();
 
       // Verify that there are valid properties
       let validCount = 0;

@@ -28,6 +28,10 @@ describe('stage-one Node-only tooling', () => {
     const receiptScript = readFileSync(resolve(root, 'scripts/generate-validation-receipt.mjs'), 'utf8')
     expect(receiptScript).toContain("const branchProofRequired = context.ref === 'refs/heads/main'")
     expect(receiptScript).toContain('singleMainBranch: !branchProofRequired || branchProofValid')
+    expect(receiptScript).toContain(
+      "const COVERAGE_SCOPE = 'production-typescript-excluding-tests-and-declarations'",
+    )
+    expect(receiptScript).toContain('coverage?.coverageScope === COVERAGE_SCOPE')
   })
 
   it('uses eight runtime screenshots plus four governed conceptual diagrams', () => {

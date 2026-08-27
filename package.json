@@ -34,7 +34,8 @@
     "report:pdf": "node scripts/generate-validation-pdf.mjs",
     "report:receipt": "npm run validate:compute && node scripts/generate-validation-receipt.mjs",
     "validate:scientific-ui": "node scripts/validate-scientific-ui.mjs",
-    "validate:compute": "node scripts/validate-compute-surface.mjs"
+    "validate:compute": "node scripts/validate-compute-surface.mjs",
+    "validate:ai-egress": "node scripts/validate-ai-egress-governance.mjs"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.24",
@@ -86,7 +87,7 @@
   },
   "overrides": {
     "dompurify": "3.4.13",
-    "nanoid": "3.3.17"
+    "nanoid": "3.3.18"
   },
   "engines": {
     "node": ">=22.12.0 <23"
