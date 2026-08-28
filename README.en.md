@@ -2,6 +2,16 @@
 
 [中文设计版](README.zh-CN.md) · [Complete bilingual technical documentation](README.md)
 
+
+<!-- CLOSURE_STATUS_START -->
+## Current qualification and operating boundary
+
+- `CI` is the authoritative full software gate; `contracts-v17` adds cross-platform screening regressions.
+- Redundant exact-tree, V19 custom-status, and duplicate full-qualification workflows were removed. The primary CI already emits exact-tree evidence.
+- Browser AI is restricted to the same-origin `/api/ai/proxy`, stores no provider key, and denies grade/vendor/formulation/free-text egress by default.
+- A software pass does not establish proxy deployment, key custody, privacy/legal approval, material release, regulatory compliance, or experimental truth.
+<!-- CLOSURE_STATUS_END -->
+
 <!-- LOCALIZED_VISION_EN:START -->
 ## Project vision: from resin data to material decisions and scientific visualization
 
