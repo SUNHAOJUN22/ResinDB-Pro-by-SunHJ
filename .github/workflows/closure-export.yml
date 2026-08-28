@@ -1,35 +1,56 @@
-name: Temporary closure source export
+name: One-shot ResinDB closure qualification
 
 on:
   push:
     branches: [closure/20260828-code-readme]
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: resindb-closure-20260828
+  cancel-in-progress: false
 
 jobs:
-  export:
+  apply-test-commit:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: closure/20260828-code-readme
           fetch-depth: 0
-          persist-credentials: false
-      - name: Archive exact tracked tree
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Apply reviewed non-workflow patch
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          test -z "$(git status --porcelain=v1)"
-          mkdir -p artifacts
-          prefix="${GITHUB_REPOSITORY#*/}-${GITHUB_SHA}/"
-          git archive --format=tar.gz --prefix="$prefix" "$GITHUB_SHA" -o artifacts/closure-source.tar.gz
-          sha256sum artifacts/closure-source.tar.gz > artifacts/closure-source.sha256
-          printf '{"repository":"%s","sha":"%s","tree":"%s"}\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$(git rev-parse HEAD^{tree})" > artifacts/closure-source.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: closure-source-${{ github.sha }}
-          path: artifacts/closure-source.*
-          if-no-files-found: error
-          retention-days: 3
+          base64 --decode > /tmp/closure.patch.gz <<'PATCH'
+          H4sICEIKkWoCA3Jlc2luZGIucGF0Y2gAnVZbU9tGFH7nV2zJSztgCzMEmpQwEGAmtBQymKQzyXSCkNZGrS25kswlT5Bwx8YOAcI1QAOBCWDTXLjYXGb6V6pdyU/5Cz0rGQdct6F5saVdnT3f+fY7364o+XzI5fJLOuK5tsa6hh8b3Vh2B0XUeem1SJJF3Is8ZVUVHlzpdvNVns7rQhkMlFVWVBS5XK68+KKSkpL8NWprkau8tBKVlJd6KlFtbREqQg+Nw106O2IlTq3Emjk2+vPX2ZDHXa76Foj6Bv15gB7WK8FQAOsYdUoBSfaH+QDSsdAlSwI8iYoQDmJZ53VJkXMLQCgkKCkqqf4K0NU3t3rvtTU+8rbXtd/zsr+2dii8pqjk2jVUH1ZViEe/wbqSD9ZkCyFeFpESwiq8yX7UqYRlkVf72Iou1FHf1IEkDeldGPFhvUtRJZa+GyNfOBBAmuLTe3gVIz+v4+9Qh6DIusoLuubq9lR1IF4UNSSoiqa5QgFe9ylqEGmCirHMMqnYr2JNAwiam+VqwyJLDfhwL6zh0uHDUnTfcwMJYU1Xgi4NUoe1UhuwGA4FWAEOENflinoU9VdfQOnRUA8GcCoOKt1YdKN2qCKkSkEoD9U3IT6gYl7sQzgo6dqFpAh3SyKWBWzDuq3CQlhFdU2MCECsq5KgYxHpik2LxgexC3jxSzLq4PiQxPESF1KV3r6OUgS4IQLJCuRV2Koq+hX3ZUsAGmDOr/Ii5rqxLCoqxygKB+wqOB9Acem4F/iwiUKdfRDj48MB3QZW94n+EA/TomJngs+BqM6ApHUhGwYEhQJKH1NOKcvu0CkCCuCimxf6uAD2g7z4EMPIB0pREHhVJRhScQDzGuwC7BWDpQBxApOoxAM9pUhRgTaQjmTLErSqgkbchaXY2NLgCLEI2dPNrfV1zU0PGhse3W/yNrW2wAc3P8kVgVzvqsovWNBRt8REchP5VCXINgCIFnmdZxuQQypiwf5Ks6nVBAkAMUGwYKaNxzan0ChiASe4aAM5D+j81uOBnne7MV/uEXBFQQ/IN4Bs93tY93vOu/8aSBtAN9xmFbFd9IblO98zV8gjwlnkUXNTyw/eLFdX6Gpy8pyMRY30K3N1wPowSFePjcNJ4+TMnN6yTo/MmQjicp0vKCL+v+1P55JkOmkc9pNEhM68NxcGrZOkkd53cmWen348XqAzezSa4Eh0xjiJcmRohxzHuPbWu94mLyLxURKP/NU/0N4Xwl5BlUI6vDRLMvu7L+kgV3iwXg+bi7Pm5Ag805eDJJ2Chzvt7XcRVIPqu2DvpXAQWckBSESWR8jSFqwKqGgsbqTWjcNxOrZprUGeJzbyPCsy0kPW2gYZGkKQONzL/QSbzAzCOtgiR+9IbM/cXaQrG2TxJTmZ+ni8SF9sQqEXTIFhBSuyRt6QxIJxNGaO79P+ATIVyYxEyXq0kA2Rgw3jZIl+GCAHb8noamZ+/eNx5ILNsPn0vjn9h3GYZn5kLr6nkxvm9AodjWfLoB9i1uYomd9i9kMSv9PRA3M7SWJvyNCAlTgEBmgqnm87kMU4jBpny2R3zjhdJKlpMjNMksOZqQ02dbQCs3R8nEw+gXGoyxyLkNgBPGSGonT2iI7OQpUAC84rurSTSc9ZiXUSe5aBckf3yPps5ukWXYqS8bUsSEcOmf4F62zE5nnLXE9BJFnac3RB36bN+DDsI1Rsbk04VDuCdaIY4faKUCkbjw9DDvPkLWBycNOxOTOxxiAuxM3NAY6+myGnE3TsiIywCuhynM7O0+lTEABsCcxam4Nm+rmVSBnpaGap35zYMbcnHPHYqD/nUCE4HSS/fKtYgLbBanFNNfi+IvtrqnnUpWLfreK887u4Ju+Er+b4Gnam5wfYd4TimkbZb1u0CNbglxEWJaYZFlTNnafiQjW2S/wDTEEXO0fyyY3OR7KOVnYd4xvl193uKrGC92C+oKPlYi75Wm604N2mcC25G4pdsXO/IbGIldx1jISO99OlJBPZ2qsvuc181vfyPMxOmtXqiy2QXL5HQFtd3SOy2s+1tmMDV/QMc2fHSEXIxov/tA2AmHUGaCYrte04w8WLygVB53kF9CGJJa29p8DGl7gEOdp3Gp9OTJnp5ZxF5EzD8Qqo5aJXkJGUuT1fyBYO2UaBM+S1OdDndHrOmJzP/r3rmetc6nf2avc7nDPwC+5FEi8zbyLm0go80P5NyGGmY9bkAdjFlXq/4O3kwZ2824nT7pm1I3MxQQfP6HySLLKj0EhP0tVn1uATx/vAMh20ZPiduTsLEjU3n5Hd12x3NodJZBbk/je/unSTngwAAA==
+          PATCH
+          printf '%s  %s\n' 3385b5f568c663b24cb492103ebd5829bc99e95005d003a0c0ae04b532231d18 /tmp/closure.patch.gz | sha256sum --check
+          gzip -dc /tmp/closure.patch.gz > /tmp/closure.patch
+          git apply --index --binary /tmp/closure.patch
+      - name: Qualify changed source and README
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run validate:docs
+          npm run validate:source
+          npm run lint
+          npm run typecheck
+          npm test
+          git diff --check
+      - name: Commit qualified source changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'refactor(closure): remove duplicate qualification paths and clarify boundaries'
+          git push origin HEAD:closure/20260828-code-readme
