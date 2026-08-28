@@ -1,6 +1,16 @@
 # ResinDB Pro by SunHJ
 
 <!-- LOCALIZED_README_LINKS -->
+
+<!-- CLOSURE_STATUS_START -->
+## 当前代码资格与使用边界 / Current code qualification and operating boundary
+
+- `CI` 是唯一完整的软件资格链：数据/单位/公式/TOPSIS 合同、TypeScript、Lint、Vitest、覆盖率、构建、HTTP 与 Chromium 证据均在同一提交上执行。
+- `contracts-v17` 仅补充 Linux/Windows 跨平台筛查回归；旧的 exact-tree、V19 自定义状态和重复 full-qualification 工作流已删除，exact-tree 工件由主 CI 直接生成。
+- 浏览器 AI 客户端只允许同源 `/api/ai/proxy`，不保存供应商密钥，也不把厂商、牌号、配方或自由文本默认发送到外部服务。
+- 软件通过仅表示本地数据治理与工程筛查代码通过；服务器代理部署、密钥托管、隐私/法律批准、材料放行和法规结论仍需独立证据。
+<!-- CLOSURE_STATUS_END -->
+
 <p align="center"><strong><a href="README.zh-CN.md">中文设计版</a> · <a href="README.en.md">English design edition</a></strong></p>
 
 <p align="center">

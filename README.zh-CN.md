@@ -2,6 +2,16 @@
 
 [English design edition](README.en.md) · [双语完整技术文档](README.md)
 
+
+<!-- CLOSURE_STATUS_START -->
+## 当前代码资格与使用边界
+
+- `CI` 是完整软件门；`contracts-v17` 只补充 Linux/Windows 跨平台筛查回归。
+- 已删除重复的 exact-tree、V19 自定义状态和第二套 full-qualification 工作流；主 CI 本身生成 exact-tree 证据。
+- 浏览器 AI 仅可调用同源 `/api/ai/proxy`，不保存供应商密钥，并默认拒绝牌号、厂商、配方和自由文本出站。
+- 软件通过不代表服务器代理已部署，也不代表密钥托管、隐私/法务、材料放行、法规合规或实验真实性已经获批。
+<!-- CLOSURE_STATUS_END -->
+
 <!-- LOCALIZED_VISION_ZH:START -->
 ## 中文项目愿景图：从树脂数据到材料决策与科学可视化
 
