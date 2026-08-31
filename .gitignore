@@ -3,6 +3,13 @@ node_modules/
 dist/
 coverage/
 
+# Python/runtime artifacts accidentally produced by maintenance scripts
+__pycache__/
+*.py[cod]
+.coverage
+coverage-final.json
+*.tsbuildinfo
+
 # Environment variables and secrets
 .env
 .env.*
