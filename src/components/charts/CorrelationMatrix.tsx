@@ -1,4 +1,5 @@
 import { logger } from '@/lib/logger';
+import { buildSpearmanPayload } from '@/lib/spearmanPayload';
 import React, { useEffect, useState, useRef } from 'react';
 import type { SpearmanMessage, SpearmanResponse } from '@/workers/spearmanWorker';
 import { Loader2 } from 'lucide-react';
@@ -36,18 +37,9 @@ export const CorrelationMatrix: React.FC<CorrelationMatrixProps> = ({ data, keys
     if (data.length === 0 || keys.length < 2 || !workerRef.current) return;
     setLoading(true);
 
-    const payloadData = data.map(d => {
-      const values: Record<string, number> = {};
-      keys.forEach(k => {
-        const v = parseFloat(String(d.properties?.[k]?.value));
-        values[k] = isNaN(v) ? 0 : v;
-      });
-      return { id: d.id, values };
-    });
-
     workerRef.current.postMessage({
       type: 'COMPUTE_SPEARMAN',
-      payload: { data: payloadData, keys }
+      payload: { data: buildSpearmanPayload(data, keys), keys }
     } as SpearmanMessage);
 
   }, [data, keys]);

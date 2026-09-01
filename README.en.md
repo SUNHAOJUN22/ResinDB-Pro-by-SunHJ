@@ -8,6 +8,7 @@
 
 - `CI` is the authoritative full software gate; `contracts-v17` adds cross-platform screening regressions.
 - Redundant exact-tree, V19 custom-status, and duplicate full-qualification workflows were removed. The primary CI already emits exact-tree evidence.
+- The Spearman correlation matrix uses the shared finite-number parser and complete-case selection; missing, blank, boolean, malformed and non-finite inputs remain unobserved rather than being silently rewritten as physical zeroes.
 - Browser AI is restricted to the same-origin `/api/ai/proxy`, stores no provider key, and denies grade/vendor/formulation/free-text egress by default.
 - A software pass does not establish proxy deployment, key custody, privacy/legal approval, material release, regulatory compliance, or experimental truth.
 <!-- CLOSURE_STATUS_END -->
@@ -124,7 +125,7 @@ $$
 3. Browser figures are exportable only after ECharts finished, nonblank canvas and complete labels.
 4. Chinese and English README, SVG and UI strings are qualified separately; language leakage and mojibake are rejected.
 
-> **Responsibility boundary：** ResinDB Pro is a local-first scientific data and analysis workbench, not a certified LIMS/ERP, commercial force field, industrial grade-release system or automatic scientific approval engine.
+> **Responsibility boundary:** ResinDB Pro is a local-first scientific data and analysis workbench, not a certified LIMS/ERP, commercial force field, industrial grade-release system or automatic scientific approval engine.
 
 Execution prompt: [SIX_REPOSITORY_PARALLEL_6H_ACCEPTANCE_PROMPT_V2.md](docs/SIX_REPOSITORY_PARALLEL_6H_ACCEPTANCE_PROMPT_V2.md)
 <!-- CURRENT_MAIN_ACCEPTANCE_V2:END -->

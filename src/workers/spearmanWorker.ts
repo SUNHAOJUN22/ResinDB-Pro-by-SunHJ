@@ -5,7 +5,7 @@ const SPEARMAN_MODEL_VERSION = 'average-rank-pearson-complete-cases-2.1.0';
 export type SpearmanMessage = {
   type: 'COMPUTE_SPEARMAN';
   payload: {
-    data: { id: string; values: Record<string, number> }[];
+    data: { id: string; values: Partial<Record<string, number>> }[];
     keys: string[];
   };
 };
@@ -65,7 +65,10 @@ self.onmessage = (event: MessageEvent<SpearmanMessage>) => {
     const validData = data.filter((item) => (
       item
       && item.values
-      && keys.every((key) => Number.isFinite(item.values[key]))
+      && keys.every((key) => {
+        const value = item.values[key];
+        return typeof value === 'number' && Number.isFinite(value);
+      })
     ));
     const observations = validData.length;
     if (observations < 2) {
@@ -81,7 +84,7 @@ self.onmessage = (event: MessageEvent<SpearmanMessage>) => {
     for (let keyIndex = 0; keyIndex < keys.length; keyIndex++) {
       const key = keys[keyIndex];
       for (let observation = 0; observation < observations; observation++) {
-        valueWorkspace[observation] = validData[observation].values[key];
+        valueWorkspace[observation] = validData[observation].values[key] as number;
       }
       const centeredRanks = new Float64Array(observations);
       fillAverageRanks(valueWorkspace, centeredRanks, orderWorkspace);
