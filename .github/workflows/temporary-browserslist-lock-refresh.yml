@@ -1,0 +1,64 @@
+name: Temporary browserslist lock refresh
+
+on:
+  push:
+    branches:
+      - closure/final-debug-20260902
+
+permissions:
+  contents: write
+
+concurrency:
+  group: browserslist-lock-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact closure branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: closure/final-debug-20260902
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Refresh only the governed lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --package-lock-only --ignore-scripts
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+          const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
+          if (pkg.overrides?.browserslist !== '4.28.8') {
+            throw new Error('package.json browserslist override is not 4.28.8');
+          }
+          const entry = lock.packages?.['node_modules/browserslist'];
+          if (!entry || entry.version !== '4.28.8') {
+            throw new Error(`unexpected browserslist lock entry: ${JSON.stringify(entry)}`);
+          }
+          JS
+          npm ci --ignore-scripts
+          npm audit --audit-level=high
+          git diff --check
+          changed=$(git diff --name-only)
+          test "$changed" = 'package-lock.json'
+
+      - name: Commit the deterministic lock refresh
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json
+          git commit -m 'fix(deps): refresh browserslist 4.28.8 lock entry'
+          git push origin HEAD:closure/final-debug-20260902
