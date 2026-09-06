@@ -44,6 +44,12 @@ describe('V19 Skill interoperability and routing contracts', () => {
     const evals = loadJson(`${base}/evals.json`);
     const status = loadJson(`${base}/MODEL_EVAL_STATUS.json`);
     const capture = loadJson(`${base}/MODEL_CAPTURE_TEMPLATE.json`);
+    const contract = loadJson('.agents/skills/resindb-science-screening-audit/references/interoperability-v1.json');
+    const quantity = contract.scientific_quantity as Record<string, unknown>;
+    const lattice = contract.status_lattice as Record<string, unknown>;
+    expect(quantity.boolean_is_numeric).toBe(false);
+    expect(quantity.unknown_is_zero).toBe(false);
+    expect(lattice.software_pass_implies_external_acceptance).toBe(false);
     const cases = evals.cases as Record<string, unknown>[];
     expect(cases).toHaveLength(6);
     expect(new Set(cases.map((item) => item.id)).size).toBe(6);

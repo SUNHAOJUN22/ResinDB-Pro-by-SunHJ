@@ -1,5 +1,6 @@
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { noHighAuditFindings, validateBranchProof, validBuildBudgets, validCiContext, validCoreGates, validTestEvidence } from './validation-receipt-contract.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const artifacts = path.join(root, 'artifacts');
@@ -43,19 +44,13 @@ const [
 let branchProof = '';
 try { branchProof = (await readFile(path.join(artifacts, 'branch-proof.txt'), 'utf8')).trim(); } catch {}
 const branchProofRequired = context.ref === 'refs/heads/main';
-const branchProofValid = branchProof.split(/\r?\n/).filter(Boolean).length === 1
-  && /refs\/heads\/main$/.test(branchProof);
+const branchProofValid = validateBranchProof(branchProof, context.sha);
 const screenshotEntries = Object.entries(ui?.screenshots ?? {});
 const screenshotChecks = await Promise.all(screenshotEntries.map(async ([scene, file]) => ({
   scene,
   file,
   exists: await exists(file),
 })));
-
-function noHighAuditFindings(audit) {
-  const summary = audit?.metadata?.vulnerabilities;
-  return Boolean(summary) && Number(summary.high ?? 0) === 0 && Number(summary.critical ?? 0) === 0;
-}
 
 function validKMeansBenchmark(report) {
   return report?.schemaVersion === 'kmeans-backend-benchmark-report-1.0.0'
@@ -69,13 +64,12 @@ function validKMeansBenchmark(report) {
 }
 
 const checks = {
-  coreGates: ciGates?.status === 'PASS',
-  tests: Boolean(tests?.success) && tests?.numFailedTests === 0 && tests?.numTotalTests > 0,
-  wholeSourceCoverage: Boolean(coverage?.scopeComplete) && coverage?.coverageScope === COVERAGE_SCOPE,
-  buildBudgets: Boolean(build?.entry && build?.echarts) &&
-    build.entry.gzipBytes <= build.budgets.entryGzipBytes &&
-    build.echarts.bytes <= build.budgets.echartsRawBytes,
-  externalData: Number(build?.externalResinDataBytes ?? 0) > 0,
+  context: validCiContext(context, {repository: process.env.GITHUB_REPOSITORY, sha: process.env.GITHUB_SHA, ref: process.env.GITHUB_REF}),
+  coreGates: validCoreGates(ciGates, branchProofRequired),
+  tests: validTestEvidence(tests),
+  wholeSourceCoverage: coverage?.scopeComplete === true && coverage?.coverageScope === COVERAGE_SCOPE,
+  buildBudgets: validBuildBudgets(build),
+  externalData: Number.isSafeInteger(build?.externalResinDataBytes) && build.externalResinDataBytes > 0,
   uiEvidence: screenshotChecks.length >= 7 && screenshotChecks.every((entry) => entry.exists),
   kmeansBenchmarkEvidence: validKMeansBenchmark(kmeansBenchmark),
   computeSurface: computeSurfaceAudit?.acceptance === 'PASS'

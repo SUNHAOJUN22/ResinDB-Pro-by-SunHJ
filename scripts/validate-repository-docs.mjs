@@ -26,6 +26,10 @@ const EXPECTED_AI_DIAGRAMS = [
   'ai-delivery-validation.svg',
 ].sort();
 const FORBIDDEN = [
+  '.github/workflows/v19-skill-contract.yml',
+  '.github/workflows/native-full-qualification.yml',
+  '.github/workflows/exact-tree-export.yml',
+  'scripts/prepare-ci-manifest.mjs',
   '.github/apply-final-v2.trigger', '.github/workflows/apply-final-v2.yml',
   '.github/apply-final-small.trigger', '.github/workflows/apply-final-small.yml',
   '.github/apply-final-optimization.trigger', '.github/workflows/apply-final-optimization.yml',
