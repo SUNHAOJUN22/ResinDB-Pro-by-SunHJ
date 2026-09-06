@@ -1,0 +1,66 @@
+name: Archive completed closure branches
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/archive-completed-closure-branches.yml]
+permissions:
+  contents: write
+  pull-requests: read
+jobs:
+  archive:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Preserve exact commits and remove only checked completed branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          import json, os, subprocess, urllib.request
+          expected = {
+              'closure/final-debug-20260902': '6743a155098a12fe780b47d1bc6a13e98e1c11ae',
+              'closure/final-debug-readme-20260901': '4d5437aa641bed61456928b092e6d9e1fd3104cb',
+              'closure/20260828-code-readme': '57c516a3aeb48b2c1a49e93844946e9a803824d6',
+              'closure/20260831-final-hygiene': '192dae818acf49fc9c185e1645b3be1d973e7a2f',
+          }
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+          heads = {line.split()[1]: line.split()[0] for line in git('ls-remote', '--heads', 'origin').splitlines()}
+          main = 'refs/heads/main'
+          if heads.get(main) != os.environ['GITHUB_SHA']:
+              raise SystemExit('main changed; refusing cleanup')
+          allowed = {main, *('refs/heads/' + name for name in expected)}
+          if set(heads) - allowed:
+              raise SystemExit('unrecognized branches; refusing cleanup')
+          request = urllib.request.Request(
+              os.environ['GITHUB_API_URL'] + '/repos/' + os.environ['GITHUB_REPOSITORY'] + '/pulls?state=open&per_page=100',
+              headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'},
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              if json.load(response):
+                  raise SystemExit('open pull requests exist; refusing cleanup')
+          tags = {name: 'refs/tags/archive/20260906/' + name for name in expected}
+          for name, sha in expected.items():
+              if heads.get('refs/heads/' + name, sha) != sha:
+                  raise SystemExit('branch changed; refusing cleanup: ' + name)
+              git('cat-file', '-e', sha + '^{commit}')
+              existing = git('ls-remote', '--tags', 'origin', tags[name])
+              if existing and existing.split()[0] != sha:
+                  raise SystemExit('archive tag collision: ' + name)
+          git('push', '--atomic', 'origin', *(sha + ':' + tags[name] for name, sha in expected.items()))
+          for name, sha in expected.items():
+              if git('ls-remote', '--tags', 'origin', tags[name]).split()[0] != sha:
+                  raise SystemExit('archive verification failed: ' + name)
+          present = [name for name in expected if 'refs/heads/' + name in heads]
+          if present:
+              git('push', '--atomic', *('--force-with-lease=refs/heads/' + name + ':' + expected[name] for name in present),
+                  'origin', *(':refs/heads/' + name for name in present))
+          remaining = git('ls-remote', '--heads', 'origin').splitlines()
+          if len(remaining) != 1 or remaining[0].split() != [os.environ['GITHUB_SHA'], main]:
+              raise SystemExit('single-main verification failed')
+          print(json.dumps({'status': 'PASS', 'main_sha': os.environ['GITHUB_SHA'],
+              'archives': [{'branch': name, 'sha': sha, 'tag': tags[name]} for name, sha in expected.items()],
+              'remaining_heads': remaining}, indent=2))
