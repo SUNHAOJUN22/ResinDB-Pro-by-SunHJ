@@ -19,7 +19,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - name: Install CJK fonts
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk
       - name: Apply checksum-bound candidate patch
         env:
           GH_TOKEN: ${{ github.token }}
@@ -50,6 +50,12 @@ jobs:
           pathlib.Path('/tmp/receipt-candidate.patch').write_bytes(patch)
           subprocess.run(['git', 'apply', '--check', '/tmp/receipt-candidate.patch'], check=True)
           subprocess.run(['git', 'apply', '/tmp/receipt-candidate.patch'], check=True)
+          old = 'validation-receipt-contract.test.mjs'
+          new = 'validation-receipt-contract.node.mjs'
+          pathlib.Path('scripts/tests/' + old).rename('scripts/tests/' + new)
+          for name in ('README.md', '.github/workflows/ci.yml'):
+              path = pathlib.Path(name)
+              path.write_text(path.read_text(encoding='utf-8').replace(old, new), encoding='utf-8')
           subprocess.run(['git', 'rm', '.github/workflows/archive-completed-closure-branches.yml'], check=True)
           subprocess.run(['git', 'add', '-A'], check=True)
       - name: Qualify candidate source without weakening native gates
@@ -59,8 +65,13 @@ jobs:
           node scripts/validate-repository-unicode.mjs --write
           npm ci
           npm ls --all >/dev/null
-          node --test scripts/tests/validation-receipt-contract.test.mjs
-          npm run validate:ci
+          node --test scripts/tests/validation-receipt-contract.node.mjs
+          if npm run validate:ci > "$RUNNER_TEMP/candidate-validation.log" 2>&1; then
+            tail -n 100 "$RUNNER_TEMP/candidate-validation.log"
+          else
+            tail -n 160 "$RUNNER_TEMP/candidate-validation.log"
+            exit 1
+          fi
           git diff --check
       - name: Commit only qualified non-workflow changes
         shell: python
@@ -71,7 +82,7 @@ jobs:
           allowed = {
               'README.md', 'reports/UNICODE_INTEGRITY_REPORT.json',
               'scripts/generate-validation-receipt.mjs', 'scripts/validation-receipt-contract.mjs',
-              'scripts/tests/validation-receipt-contract.test.mjs', 'scripts/validate-repository-docs.mjs',
+              'scripts/tests/validation-receipt-contract.node.mjs', 'scripts/validate-repository-docs.mjs',
               'scripts/prepare-ci-manifest.mjs', 'src/lib/__tests__/skillInteroperabilityV19.test.ts',
           }
           workflows = {
