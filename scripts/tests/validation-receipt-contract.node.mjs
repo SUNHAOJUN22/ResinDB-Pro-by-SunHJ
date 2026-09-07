@@ -36,6 +36,12 @@ test('context binds repository, exact SHA and ref independently of the receipt',
   assert.equal(validCiContext(context, {repository: 'other/repo'}), false);
   assert.equal(validCiContext(context, {ref: 'refs/pull/45/merge'}), false);
 });
+test('context rejects another run or attempt for the same commit', () => {
+  const identity = {sha, repository: context.repository, ref: context.ref, runId: 1, runAttempt: 1};
+  assert.equal(validCiContext(context, identity), true);
+  assert.equal(validCiContext(context, {...identity, runId: 2}), false);
+  assert.equal(validCiContext(context, {...identity, runAttempt: 2}), false);
+});
 for (const delta of [{}, {sha: 'local-worktree'}, {runId: true}, {runAttempt: 0}, {ref: ''}, {repository: 'local'}, {schemaVersion: '3'}]) {
   test(`malformed or incomplete CI context: ${JSON.stringify(delta)}`, () => {
     assert.equal(validCiContext(Object.keys(delta).length ? {...context, ...delta} : {}), false);
@@ -113,7 +119,7 @@ function runReceipt(t, override = {}) {
     cwd: root,
     encoding: 'utf8',
     timeout: 5000,
-    env: {...process.env, CI: '1', GITHUB_REPOSITORY: context.repository, GITHUB_SHA: sha, GITHUB_REF: context.ref},
+    env: {...process.env, CI: '1', GITHUB_REPOSITORY: context.repository, GITHUB_SHA: sha, GITHUB_REF: context.ref, GITHUB_RUN_ID: String(context.runId), GITHUB_RUN_ATTEMPT: String(context.runAttempt)},
   });
   assert.equal(result.error, undefined);
   return {...result, root};
@@ -124,8 +130,21 @@ test('receipt CLI emits PASS only with a complete synthetic contract fixture', (
   assert.equal(result.status, 0, result.stderr);
   const receipt = JSON.parse(readFileSync(join(result.root, 'artifacts/validation-receipt.json'), 'utf8'));
   assert.equal(receipt.acceptance, 'PASS');
+  assert.equal(receipt.runId, context.runId);
+  assert.equal(receipt.runAttempt, context.runAttempt);
   assert.equal(Object.values(receipt.checks).every((value) => value === true), true);
 });
+
+for (const field of ['runId', 'runAttempt']) {
+  test(`receipt CLI rejects stale ${field} despite a matching commit`, (t) => {
+    const stale = {...context, [field]: context[field] + 1};
+    const result = runReceipt(t, {'ci-context.json': JSON.stringify(stale)});
+    assert.equal(result.status, 1, result.stderr);
+    const receipt = JSON.parse(readFileSync(join(result.root, 'artifacts/validation-receipt.json'), 'utf8'));
+    assert.equal(receipt.acceptance, 'EVIDENCE_INCOMPLETE');
+    assert.equal(receipt.checks.context, false);
+  });
+}
 
 const requiredReports = {
   'ci-context.json': 'context',

@@ -68,7 +68,13 @@ function validKMeansBenchmark(report) {
 }
 
 const checks = {
-  context: validCiContext(context, {repository: process.env.GITHUB_REPOSITORY, sha: process.env.GITHUB_SHA, ref: process.env.GITHUB_REF}),
+  context: validCiContext(context, {
+    repository: process.env.GITHUB_REPOSITORY,
+    sha: process.env.GITHUB_SHA,
+    ref: process.env.GITHUB_REF,
+    runId: process.env.GITHUB_RUN_ID === undefined ? undefined : Number(process.env.GITHUB_RUN_ID),
+    runAttempt: process.env.GITHUB_RUN_ATTEMPT === undefined ? undefined : Number(process.env.GITHUB_RUN_ATTEMPT),
+  }),
   coreGates: validCoreGates(ciGates, branchProofRequired),
   tests: validTestEvidence(tests),
   wholeSourceCoverage: coverage?.scopeComplete === true && coverage?.coverageScope === COVERAGE_SCOPE,
@@ -90,6 +96,8 @@ const receipt = {
   generatedAt: new Date().toISOString(),
   repository: context.repository,
   sha: context.sha,
+  runId: context.runId,
+  runAttempt: context.runAttempt,
   acceptance: Object.values(checks).every(Boolean) ? 'PASS' : 'EVIDENCE_INCOMPLETE',
   checks,
   tests: tests ? {

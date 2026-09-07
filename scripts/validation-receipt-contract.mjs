@@ -28,7 +28,7 @@ export function validCiContext(context, expected = {}) {
     && (context.ref === 'refs/heads/main' || /^refs\/pull\/[1-9][0-9]*\/merge$/.test(context.ref))
     && count(context.runId) && context.runId > 0
     && count(context.runAttempt) && context.runAttempt > 0
-    && ['repository', 'sha', 'ref'].every((key) =>
+    && ['repository', 'sha', 'ref', 'runId', 'runAttempt'].every((key) =>
       expected[key] === undefined || expected[key] === context[key]);
 }
 
