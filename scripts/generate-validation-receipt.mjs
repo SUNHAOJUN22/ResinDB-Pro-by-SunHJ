@@ -1,6 +1,6 @@
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { noHighAuditFindings, validateBranchProof, validBuildBudgets, validCiContext, validCoreGates, validTestEvidence } from './validation-receipt-contract.mjs';
+import { noHighAuditFindings, validateBranchProof, validBuildBudgets, validCiContext, validCoreGates, validTestEvidence, validScreenshotManifest, validComputeSurface } from './validation-receipt-contract.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const artifacts = path.join(root, 'artifacts');
@@ -14,9 +14,11 @@ async function readJson(name, fallback = null) {
     return fallback;
   }
 }
-async function exists(name) {
-  try { await access(path.join(artifacts, name)); return true; }
-  catch { return false; }
+async function isScreenshotFile(name) {
+  try {
+    const info = await lstat(path.join(artifacts, name));
+    return info.isFile() && !info.isSymbolicLink() && info.size > 0;
+  } catch { return false; }
 }
 
 const [
@@ -49,11 +51,12 @@ let branchProof = '';
 try { branchProof = (await readFile(path.join(artifacts, 'branch-proof.txt'), 'utf8')).trim(); } catch {}
 const branchProofRequired = context.ref === 'refs/heads/main';
 const branchProofValid = validateBranchProof(branchProof, context.sha);
-const screenshotEntries = Object.entries(ui?.screenshots ?? {});
+const screenshotManifestValid = validScreenshotManifest(ui);
+const screenshotEntries = screenshotManifestValid ? Object.entries(ui.screenshots) : [];
 const screenshotChecks = await Promise.all(screenshotEntries.map(async ([scene, file]) => ({
   scene,
   file,
-  exists: await exists(file),
+  exists: await isScreenshotFile(file),
 })));
 
 function validKMeansBenchmark(report) {
@@ -80,11 +83,9 @@ const checks = {
   wholeSourceCoverage: coverage?.scopeComplete === true && coverage?.coverageScope === COVERAGE_SCOPE,
   buildBudgets: validBuildBudgets(build),
   externalData: Number.isSafeInteger(build?.externalResinDataBytes) && build.externalResinDataBytes > 0,
-  uiEvidence: screenshotChecks.length >= 7 && screenshotChecks.every((entry) => entry.exists),
+  uiEvidence: screenshotManifestValid && screenshotChecks.every((entry) => entry.exists),
   kmeansBenchmarkEvidence: validKMeansBenchmark(kmeansBenchmark),
-  computeSurface: computeSurfaceAudit?.acceptance === 'PASS'
-    && computeSurfaceAudit?.catalogModules === computeSurfaceAudit?.workerFiles
-    && computeSurfaceAudit?.workerFiles >= 26,
+  computeSurface: validComputeSurface(computeSurfaceAudit),
   scientificUi: scientificUiAudit?.acceptance === 'PASS',
   productionAudit: noHighAuditFindings(prodAudit),
   completeAudit: noHighAuditFindings(fullAudit),

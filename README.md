@@ -137,6 +137,10 @@ npm run validate:ai-egress
 
 *Receipt tests run explicitly with Node. Malformed or non-object evidence must produce `EVIDENCE_INCOMPLETE` and a nonzero CI exit, not an unhandled exception or a fabricated PASS.*
 
+截图证据必须是具名场景到不同 PNG 文件的映射；七个必需场景不可被任意键或数组替代。仅接受 artifacts 内的非空普通文件，拒绝目录、符号链接、绝对路径和路径穿越；Worker 与目录计数必须是整数，不能由数字字符串隐式转换。文件检查不替代 Chromium 的像素与交互验证。
+
+*Screenshot evidence binds required scene names to distinct, nonempty regular PNG files within artifacts. Arrays, missing scenes, duplicate paths, directories, symlinks and path traversal are rejected. Worker/catalog counts must be integers, not numeric strings. File checks do not replace Chromium pixel and interaction validation.*
+
 回执还将 `runId` 与 `runAttempt` 绑定到当前 GitHub 运行环境，并在输出中保留这两个字段。同一提交的其他运行或重试上下文不能冒充本次运行证据；离线查看历史回执不构成新一次 CI 验证。
 
 *Receipts bind `runId` and `runAttempt` to the current GitHub run and retain them in their output. A different run or retry for the same commit is not evidence for the current attempt; offline inspection of an old receipt is not a new CI qualification.*

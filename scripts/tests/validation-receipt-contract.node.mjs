@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -82,7 +82,7 @@ test('missing build budgets are rejected rather than crashing or coercing', () =
 });
 
 
-function runReceipt(t, override = {}) {
+function runReceipt(t, override = {}, prepare = () => {}) {
   const root = mkdtempSync(join(tmpdir(), 'resindb-receipt-'));
   t.after(() => rmSync(root, {recursive: true, force: true}));
   mkdirSync(join(root, 'scripts'));
@@ -90,7 +90,7 @@ function runReceipt(t, override = {}) {
   for (const name of ['generate-validation-receipt.mjs', 'validation-receipt-contract.mjs']) {
     copyFileSync(new URL(`../${name}`, import.meta.url), join(root, 'scripts', name));
   }
-  const screenshots = Object.fromEntries(Array.from({length: 7}, (_, i) => [`scene${i}`, `scene${i}.png`]));
+  const screenshots = Object.fromEntries(['dashboard', 'emptyState', 'productDetail', 'analytics', 'dependencyMap', 'dashboardEnDark', 'mobile'].map((scene, i) => [scene, `scene${i}.png`]));
   const fixtures = {
     'ci-context.json': context,
     'ci-gates.json': {schemaVersion: 1, status: 'PASS', gates: [...REQUIRED_CORE_GATES, 'single-main-branch']},
@@ -115,6 +115,7 @@ function runReceipt(t, override = {}) {
   for (const [name, raw] of Object.entries(override)) {
     writeFileSync(join(root, 'artifacts', name), raw);
   }
+  prepare(root);
   const result = spawnSync(process.execPath, [join(root, 'scripts/generate-validation-receipt.mjs')], {
     cwd: root,
     encoding: 'utf8',
@@ -171,4 +172,50 @@ for (const [name, check] of Object.entries(requiredReports)) {
       assert.equal(receipt.checks[check], false);
     });
   }
+}
+
+const sceneNames = ['dashboard', 'emptyState', 'productDetail', 'analytics', 'dependencyMap', 'dashboardEnDark', 'mobile'];
+const sceneManifest = () => Object.fromEntries(sceneNames.map((scene, i) => [scene, `scene${i}.png`]));
+
+for (const [label, screenshots] of [
+  ['array instead of a scene map', Array.from({length: 7}, (_, i) => `scene${i}.png`)],
+  ['unrecognized scenes instead of required scenes', Object.fromEntries(Array.from({length: 7}, (_, i) => [`unknown${i}`, `scene${i}.png`]))],
+  ['the same file reused for every scene', Object.fromEntries(sceneNames.map((scene) => [scene, 'scene0.png']))],
+  ['parent traversal to existing files', Object.fromEntries(sceneNames.map((scene, i) => [scene, `../artifacts/scene${i}.png`]))],
+  ['directories instead of screenshots', Object.fromEntries(sceneNames.map((scene) => [scene, '.']))],
+  ['numeric worker counts', null],
+]) {
+  test(`receipt rejects invalid nested evidence: ${label}`, (t) => {
+    const override = screenshots === null
+      ? {'compute-surface-audit.json': JSON.stringify({acceptance: 'PASS', catalogModules: '26', workerFiles: '26'})}
+      : {'ui-smoke-manifest.json': JSON.stringify({screenshots})};
+    const result = runReceipt(t, override);
+    assert.equal(result.status, 1, result.stdout);
+    const receipt = JSON.parse(readFileSync(join(result.root, 'artifacts/validation-receipt.json'), 'utf8'));
+    assert.equal(receipt.acceptance, 'EVIDENCE_INCOMPLETE');
+    assert.equal(receipt.checks[screenshots === null ? 'computeSurface' : 'uiEvidence'], false);
+  });
+}
+
+for (const kind of ['empty', 'directory', 'symlink', 'outside-absolute', 'wrong-extension']) {
+  test(`receipt requires nonempty regular in-artifact PNG paths: ${kind}`, (t) => {
+    const screenshots = sceneManifest();
+    if (kind === 'wrong-extension') screenshots.dashboard = 'ci-context.json';
+    const result = runReceipt(t, {'ui-smoke-manifest.json': JSON.stringify({screenshots})}, (root) => {
+      const image = join(root, 'artifacts/scene0.png');
+      if (kind === 'outside-absolute') {
+        screenshots.dashboard = image;
+        writeFileSync(join(root, 'artifacts/ui-smoke-manifest.json'), JSON.stringify({screenshots}));
+      } else if (kind !== 'wrong-extension') {
+        rmSync(image);
+        if (kind === 'empty') writeFileSync(image, '');
+        if (kind === 'directory') mkdirSync(image);
+        if (kind === 'symlink') symlinkSync('scene1.png', image);
+      }
+    });
+    assert.equal(result.status, 1, result.stdout);
+    const receipt = JSON.parse(readFileSync(join(result.root, 'artifacts/validation-receipt.json'), 'utf8'));
+    assert.equal(receipt.checks.uiEvidence, false);
+    assert.doesNotMatch(result.stderr, /TypeError|SyntaxError/);
+  });
 }
