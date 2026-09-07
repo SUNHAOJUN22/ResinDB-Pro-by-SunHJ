@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import {
   REQUIRED_CORE_GATES, noHighAuditFindings, validateBranchProof,
@@ -71,3 +74,82 @@ test('missing build budgets are rejected rather than crashing or coercing', () =
     assert.equal(validBuildBudgets(invalid), false);
   }
 });
+
+
+function runReceipt(t, override = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'resindb-receipt-'));
+  t.after(() => rmSync(root, {recursive: true, force: true}));
+  mkdirSync(join(root, 'scripts'));
+  mkdirSync(join(root, 'artifacts'));
+  for (const name of ['generate-validation-receipt.mjs', 'validation-receipt-contract.mjs']) {
+    copyFileSync(new URL(`../${name}`, import.meta.url), join(root, 'scripts', name));
+  }
+  const screenshots = Object.fromEntries(Array.from({length: 7}, (_, i) => [`scene${i}`, `scene${i}.png`]));
+  const fixtures = {
+    'ci-context.json': context,
+    'ci-gates.json': {schemaVersion: 1, status: 'PASS', gates: [...REQUIRED_CORE_GATES, 'single-main-branch']},
+    'test-results.json': {success: true, numTotalTests: 1, numPassedTests: 1, numFailedTests: 0},
+    'coverage-summary.json': {scopeComplete: true, coverageScope: 'production-typescript-excluding-tests-and-declarations'},
+    'build-metrics.json': {entry: {gzipBytes: 10}, echarts: {bytes: 20}, budgets: {entryGzipBytes: 10, echartsRawBytes: 20}, externalResinDataBytes: 1},
+    'ui-smoke-manifest.json': {screenshots},
+    'npm-audit-prod.json': {metadata: {vulnerabilities: {high: 0, critical: 0}}},
+    'npm-audit-all.json': {metadata: {vulnerabilities: {high: 0, critical: 0}}},
+    'kmeans-backend-benchmark.json': {schemaVersion: 'kmeans-backend-benchmark-report-1.0.0', timingGate: 'informational-only', equivalence: {status: 'PASS'}, cases: [{equivalence: 'PASS'}], reportDigest: 'a'.repeat(64)},
+    'compute-surface-audit.json': {acceptance: 'PASS', catalogModules: 26, workerFiles: 26},
+    'scientific-ui-audit.json': {acceptance: 'PASS'},
+  };
+  for (const [name, value] of Object.entries(fixtures)) {
+    writeFileSync(join(root, 'artifacts', name), JSON.stringify(value));
+  }
+  for (const file of Object.values(screenshots)) {
+    // The receipt checks presence; real image validation belongs to Chromium CI.
+    writeFileSync(join(root, 'artifacts', file), 'synthetic-presence-fixture');
+  }
+  writeFileSync(join(root, 'artifacts', 'branch-proof.txt'), proof);
+  for (const [name, raw] of Object.entries(override)) {
+    writeFileSync(join(root, 'artifacts', name), raw);
+  }
+  const result = spawnSync(process.execPath, [join(root, 'scripts/generate-validation-receipt.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 5000,
+    env: {...process.env, CI: '1', GITHUB_REPOSITORY: context.repository, GITHUB_SHA: sha, GITHUB_REF: context.ref},
+  });
+  assert.equal(result.error, undefined);
+  return {...result, root};
+}
+
+test('receipt CLI emits PASS only with a complete synthetic contract fixture', (t) => {
+  const result = runReceipt(t);
+  assert.equal(result.status, 0, result.stderr);
+  const receipt = JSON.parse(readFileSync(join(result.root, 'artifacts/validation-receipt.json'), 'utf8'));
+  assert.equal(receipt.acceptance, 'PASS');
+  assert.equal(Object.values(receipt.checks).every((value) => value === true), true);
+});
+
+const requiredReports = {
+  'ci-context.json': 'context',
+  'ci-gates.json': 'coreGates',
+  'test-results.json': 'tests',
+  'coverage-summary.json': 'wholeSourceCoverage',
+  'build-metrics.json': 'buildBudgets',
+  'ui-smoke-manifest.json': 'uiEvidence',
+  'npm-audit-prod.json': 'productionAudit',
+  'npm-audit-all.json': 'completeAudit',
+  'kmeans-backend-benchmark.json': 'kmeansBenchmarkEvidence',
+  'compute-surface-audit.json': 'computeSurface',
+  'scientific-ui-audit.json': 'scientificUi',
+};
+for (const [name, check] of Object.entries(requiredReports)) {
+  for (const raw of ['null', '[]', 'false', '42', '"PASS"', '{malformed']) {
+    test(`receipt CLI rejects ${name} with non-object or malformed JSON: ${raw}`, (t) => {
+      const result = runReceipt(t, {[name]: raw});
+      assert.equal(result.status, 1);
+      assert.match(result.stdout, /Validation receipt: EVIDENCE_INCOMPLETE/);
+      assert.doesNotMatch(result.stderr, /TypeError|SyntaxError/);
+      const receipt = JSON.parse(readFileSync(join(result.root, 'artifacts/validation-receipt.json'), 'utf8'));
+      assert.equal(receipt.acceptance, 'EVIDENCE_INCOMPLETE');
+      assert.equal(receipt.checks[check], false);
+    });
+  }
+}

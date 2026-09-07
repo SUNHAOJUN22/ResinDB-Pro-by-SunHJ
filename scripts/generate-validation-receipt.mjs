@@ -7,8 +7,12 @@ const artifacts = path.join(root, 'artifacts');
 const COVERAGE_SCOPE = 'production-typescript-excluding-tests-and-declarations';
 
 async function readJson(name, fallback = null) {
-  try { return JSON.parse(await readFile(path.join(artifacts, name), 'utf8')); }
-  catch { return fallback; }
+  try {
+    const value = JSON.parse(await readFile(path.join(artifacts, name), 'utf8'));
+    return value !== null && typeof value === 'object' && !Array.isArray(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
 }
 async function exists(name) {
   try { await access(path.join(artifacts, name)); return true; }
