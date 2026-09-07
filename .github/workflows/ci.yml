@@ -43,43 +43,11 @@ jobs:
           cache: npm
 
       - name: Install exact dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          : > /tmp/npm-ci.log
-          cp package.json /tmp/resindb-package-exact.json
-          cp package-lock.json /tmp/resindb-package-lock-exact.json
-          restore_manifests() {
-            cp /tmp/resindb-package-exact.json package.json
-            cp /tmp/resindb-package-lock-exact.json package-lock.json
-          }
-          trap restore_manifests EXIT
-          node scripts/prepare-ci-manifest.mjs | tee /tmp/ci-manifest-normalization.json
-          for registry in https://registry.npmjs.org https://registry.npmmirror.com; do
-            for attempt in 1 2 3; do
-              printf '\nregistry=%s attempt=%s\n' "$registry" "$attempt" | tee -a /tmp/npm-ci.log
-              if npm ci --registry="$registry" >> /tmp/npm-ci.log 2>&1; then
-                restore_manifests
-                trap - EXIT
-                cat /tmp/ci-manifest-normalization.json
-                cat /tmp/npm-ci.log
-                exit 0
-              fi
-              tail -n 200 /tmp/npm-ci.log
-              sleep $((attempt * 10))
-            done
-          done
-          exit 1
-
-      - name: Upload npm diagnostics
-        if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: npm-ci-diagnostics-${{ github.sha }}
-          path: |
-            /tmp/npm-ci.log
-            /tmp/ci-manifest-normalization.json
-          retention-days: 5
+        run: npm ci
+      - name: Validate installed dependency graph
+        run: npm ls --all
+      - name: Receipt contract regressions
+        run: node --test scripts/tests/validation-receipt-contract.node.mjs
 
       - name: Documentation and deterministic scientific visuals
         run: npm run validate:docs
@@ -146,13 +114,25 @@ jobs:
           jq . artifacts/npm-outdated.json
 
       - name: Prove main is the sole remote branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         shell: bash
         run: |
           set -euo pipefail
           git ls-remote --heads origin | tee artifacts/branch-proof.txt
-          test "$(wc -l < artifacts/branch-proof.txt | tr -d ' ')" -eq 1
-          test "$(grep -c 'refs/heads/main$' artifacts/branch-proof.txt)" -eq 1
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { validateBranchProof } from './scripts/validation-receipt-contract.mjs';
+          if (!validateBranchProof(readFileSync('artifacts/branch-proof.txt', 'utf8'), process.env.GITHUB_SHA)) {
+            throw new Error('Remote main proof does not match the exact tested commit');
+          }
+          NODE
+
+      - name: Verify tracked-source fixed point
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          git diff --cached --exit-code
 
       - name: Bundle deterministic exact tracked tree
         shell: bash
@@ -171,30 +151,12 @@ jobs:
       - name: Write exact-tree context and passed core gates
         shell: bash
         run: |
-          node <<'NODE'
-          const fs = require('node:fs');
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { REQUIRED_CORE_GATES } from './scripts/validation-receipt-contract.mjs';
           const tests = JSON.parse(fs.readFileSync('artifacts/test-results.json', 'utf8'));
-          const gates = [
-            'docs',
-            'unicode-integrity',
-            'source-hygiene',
-            'governed-data',
-            'compute-surface',
-            'scientific-ui',
-            'lint',
-            'typescript',
-            'regression',
-            'isolated-unit',
-            'isolated-science-workers',
-            'whole-source-coverage',
-            'build',
-            'http-smoke',
-            'chromium-ui',
-            'production-audit',
-            'complete-audit',
-            'deterministic-exact-tracked-tree',
-          ];
-          if (process.env.GITHUB_EVENT_NAME === 'push' && process.env.GITHUB_REF === 'refs/heads/main') {
+          const gates = [...REQUIRED_CORE_GATES];
+          if (process.env.GITHUB_REF === 'refs/heads/main') {
             gates.push('single-main-branch');
           }
           const context = {
