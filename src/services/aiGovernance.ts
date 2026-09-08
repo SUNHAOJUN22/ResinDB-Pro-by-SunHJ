@@ -144,8 +144,11 @@ export function buildGovernedAiEnvelope(input: {
     authorizedAt: authorization.authorizedAt,
     expiresAt: authorization.expiresAt,
     model,
-    payload: input.payload,
+    // Detach the validated request from mutable caller-owned objects.
+    payload: JSON.parse(JSON.stringify(input.payload)) as Record<string, unknown>,
   };
+  // Validate the detached snapshot as well: custom serialization must not add fields.
+  inspectPayload(envelope.payload, 'payload');
   const encoded = new TextEncoder().encode(JSON.stringify(envelope));
   if (encoded.byteLength > MAX_AI_REQUEST_BYTES) {
     throw new Error(`AI request exceeds the ${MAX_AI_REQUEST_BYTES}-byte governed limit`);
@@ -158,8 +161,8 @@ async function sha256Hex(value: string): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export async function buildAiAuditRecord(envelope: GovernedAiEnvelope): Promise<AiAuditRecord> {
-  const body = JSON.stringify(envelope);
+async function auditFixedBody(body: string): Promise<AiAuditRecord> {
+  const envelope = JSON.parse(body) as GovernedAiEnvelope;
   return {
     requestId: envelope.requestId,
     purpose: envelope.purpose,
@@ -172,6 +175,10 @@ export async function buildAiAuditRecord(envelope: GovernedAiEnvelope): Promise<
   };
 }
 
+export async function buildAiAuditRecord(envelope: GovernedAiEnvelope): Promise<AiAuditRecord> {
+  return auditFixedBody(JSON.stringify(envelope));
+}
+
 export async function governedAiFetch(input: {
   model: string;
   purpose: AiPurpose;
@@ -181,7 +188,9 @@ export async function governedAiFetch(input: {
   fetchImpl?: typeof fetch;
 }): Promise<Response> {
   const envelope = buildGovernedAiEnvelope(input);
-  const audit = await buildAiAuditRecord(envelope);
+  // Size, audit digest and network transmission share these exact immutable bytes.
+  const body = JSON.stringify(envelope);
+  const audit = await auditFixedBody(body);
   logger.info('Governed AI egress request', audit);
   const fetchImpl = input.fetchImpl ?? globalThis.fetch;
   return fetchImpl(GOVERNED_AI_PROXY_PATH, {
@@ -193,7 +202,7 @@ export async function governedAiFetch(input: {
       'X-ResinDB-Request-Id': envelope.requestId,
       'X-ResinDB-Purpose': envelope.purpose,
     },
-    body: JSON.stringify(envelope),
+    body,
     signal: input.signal,
   });
 }
