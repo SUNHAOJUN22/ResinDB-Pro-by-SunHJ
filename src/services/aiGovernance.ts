@@ -38,6 +38,11 @@ export interface AiAuditRecord {
   payloadBytes: number;
 }
 
+const AI_PURPOSES: ReadonlySet<string> = new Set([
+  'connectivity', 'material-summary', 'material-comparison',
+  'formulation-hypothesis', 'record-analysis',
+]);
+
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FORBIDDEN_FIELD_NAMES = new Set([
   'apikey', 'authorization', 'bearer', 'token', 'secret',
@@ -111,10 +116,11 @@ export function validateAiAuthorization(
   now = new Date(),
 ): void {
   if (!UUID_V4.test(authorization.requestId)) throw new Error('AI request identity must be UUIDv4');
-  if (!authorization.purpose) throw new Error('AI request purpose is required');
+  if (!AI_PURPOSES.has(authorization.purpose)) throw new Error('AI request purpose is unsupported');
   const authorizedAt = parseInstant(authorization.authorizedAt, 'authorizedAt');
   const expiresAt = parseInstant(authorization.expiresAt, 'expiresAt');
   const current = now.getTime();
+  if (!Number.isFinite(current)) throw new Error('AI authorization clock is invalid');
   if (authorizedAt > current) throw new Error('AI authorization is future-dated');
   if (expiresAt <= current) throw new Error('AI authorization has expired');
   if (expiresAt <= authorizedAt) throw new Error('AI authorization interval is invalid');
@@ -148,6 +154,7 @@ export function buildGovernedAiEnvelope(input: {
     payload: JSON.parse(JSON.stringify(input.payload)) as Record<string, unknown>,
   };
   // Validate the detached snapshot as well: custom serialization must not add fields.
+  assertJsonObject(envelope.payload, 'payload');
   inspectPayload(envelope.payload, 'payload');
   const encoded = new TextEncoder().encode(JSON.stringify(envelope));
   if (encoded.byteLength > MAX_AI_REQUEST_BYTES) {
@@ -191,6 +198,8 @@ export async function governedAiFetch(input: {
   // Size, audit digest and network transmission share these exact immutable bytes.
   const body = JSON.stringify(envelope);
   const audit = await auditFixedBody(body);
+  // Hashing is asynchronous; authorization must still be live at transmission.
+  validateAiAuthorization(envelope);
   logger.info('Governed AI egress request', audit);
   const fetchImpl = input.fetchImpl ?? globalThis.fetch;
   return fetchImpl(GOVERNED_AI_PROXY_PATH, {
