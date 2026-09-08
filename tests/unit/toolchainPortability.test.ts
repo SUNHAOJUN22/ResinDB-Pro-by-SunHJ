@@ -16,7 +16,8 @@ describe('stage-one Node-only tooling', () => {
     expect(packageJson.scripts).toMatchObject({
       'validate:docs': 'node scripts/validate-repository-docs.mjs && node scripts/validate-i18n-visuals.mjs',
       'validate:i18n-visuals': 'node scripts/validate-i18n-visuals.mjs',
-      'validate:source': 'node scripts/validate-source-hygiene.mjs',
+      'validate:source': 'node scripts/validate-source-hygiene.mjs && npm run validate:ai-egress',
+      'validate:ai-egress': 'node scripts/validate-ai-egress-governance.mjs',
       'validate:compute': 'node scripts/validate-compute-surface.mjs',
       'validate:data': 'node scripts/validate-data.mjs',
       'report:pdf': 'node scripts/generate-validation-pdf.mjs',
