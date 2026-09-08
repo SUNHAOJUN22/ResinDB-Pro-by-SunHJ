@@ -134,7 +134,7 @@ for (const phrase of [
 const requiredScripts = {
   'validate:docs': 'node scripts/validate-repository-docs.mjs && node scripts/validate-i18n-visuals.mjs',
   'validate:i18n-visuals': 'node scripts/validate-i18n-visuals.mjs',
-  'validate:source': 'node scripts/validate-source-hygiene.mjs',
+  'validate:source': 'node scripts/validate-source-hygiene.mjs && npm run validate:ai-egress',
   'validate:compute': 'node scripts/validate-compute-surface.mjs',
   'audit:all': 'npm audit --audit-level=high',
   'report:pdf': 'node scripts/generate-validation-pdf.mjs',
