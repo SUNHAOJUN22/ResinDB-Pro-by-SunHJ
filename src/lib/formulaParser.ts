@@ -149,9 +149,15 @@ export class FormulaEngine {
     const properties: PropertyDictionary = {};
     for (const [key, property] of Object.entries(product.properties)) {
       const governed = property.quantity;
-      const numericValue = governed?.status === 'VALID' && governed.canonical
-        ? governed.canonical.value
-        : finiteNumeric(property.value);
+      // An explicit quantity status is authoritative; never revive rejected raw data.
+      if (governed !== undefined) {
+        const canonical = governed?.status === 'VALID' ? governed.canonical : undefined;
+        if (canonical && typeof canonical.value === 'number' && Number.isFinite(canonical.value)) {
+          properties[key] = canonical.value;
+        }
+        continue;
+      }
+      const numericValue = finiteNumeric(property.value);
       if (numericValue !== null) properties[key] = numericValue;
     }
     return properties;

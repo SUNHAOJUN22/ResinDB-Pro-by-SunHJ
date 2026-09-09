@@ -157,3 +157,99 @@ describe('FormulaEngine plan and result isolation', () => {
     expect(execute({ A: 4 })['F-1']).toMatchObject({ status: 'OK', value: 0.25, dependencies: ['A'] });
   });
 });
+
+describe('FormulaEngine governed quantity admission', () => {
+  const formulas: FormulaConfig[] = [
+    { id: 'F-Q', name: 'DerivedQ', expression: "p['A'] * 2", unit: '1' },
+    { id: 'F-Q2', name: 'DerivedQ2', expression: "p['DerivedQ'] + 1", unit: '1' },
+  ];
+  const quantity = (
+    status: 'VALID' | 'UNKNOWN' | 'INVALID',
+    canonical?: { value: number; unit: string; dimension: string },
+  ): NonNullable<Product['properties'][string]['quantity']> => ({
+    raw: { value: 950, unit: 'unresolved' },
+    status, canonical, reasonCodes: [], provenanceRefs: [],
+  });
+
+  it.each(['UNKNOWN', 'INVALID'] as const)(
+    'does not revive raw values or a leftover canonical value when status is %s',
+    (status) => {
+      for (const canonical of [undefined, { value: 3, unit: '1', dimension: 'dimensionless' }]) {
+        const engine = new FormulaEngine();
+        const source = product({ A: { value: 950, quantity: quantity(status, canonical) } });
+        expect(engine.createPropertyDictionary(source)).toEqual({});
+        const results = engine.compileResultGraph(formulas)(source);
+        expect(results['F-Q'].status).toBe('UNKNOWN');
+        expect(results['F-Q2'].status).toBe('UNKNOWN');
+        expect(engine.compileGraph(formulas)(source)).toEqual({});
+      }
+    },
+  );
+
+  it('rejects a VALID record without a canonical number instead of using raw data', () => {
+    const source = product({ A: { value: 950, quantity: quantity('VALID') } });
+    expect(new FormulaEngine().createPropertyDictionary(source)).toEqual({});
+  });
+
+  it.each([Number.NaN, Infinity, -Infinity, '3', true])(
+    'excludes the malformed canonical value %s from the numeric dictionary',
+    (value) => {
+      const canonical = { value, unit: '1', dimension: 'dimensionless' };
+      const governed = {
+        ...quantity('VALID'), canonical,
+      } as unknown as NonNullable<Product['properties'][string]['quantity']>;
+      const source = product({ A: { value: 950, quantity: governed } });
+      const engine = new FormulaEngine();
+      expect(engine.createPropertyDictionary(source)).toEqual({});
+      expect(engine.compileGraph(formulas)(source)).toEqual({});
+    },
+  );
+
+  it('does not treat an explicit null quantity as a legacy property', () => {
+    const malformed = { value: 950, quantity: null } as unknown as Product['properties'][string];
+    expect(new FormulaEngine().createPropertyDictionary(product({ A: malformed }))).toEqual({});
+  });
+
+  it('uses the valid canonical value, not the raw value', () => {
+    const source = product({
+      A: { value: 950, quantity: quantity('VALID', { value: 0.95, unit: 'g/cm3', dimension: 'mass_density' }) },
+    });
+    expect(new FormulaEngine().compileGraph(formulas)(source)).toEqual({ 'F-Q': 1.9, 'F-Q2': 2.9 });
+  });
+
+  it('keeps canonical zero valid and propagates it', () => {
+    const source = product({
+      A: { value: 950, quantity: quantity('VALID', { value: 0, unit: '1', dimension: 'dimensionless' }) },
+    });
+    expect(new FormulaEngine().compileGraph(formulas)(source)).toEqual({ 'F-Q': 0, 'F-Q2': 1 });
+  });
+
+  it('preserves legacy finite numeric input without a quantity record', () => {
+    const source = product({
+      A: { value: '2.5' }, B: { value: 0 }, C: { value: ' ' }, D: { value: Infinity },
+    });
+    expect(new FormulaEngine().createPropertyDictionary(source)).toEqual({ A: 2.5, B: 0 });
+  });
+
+  it('rechecks quantity status on each invocation of the same executor', () => {
+    const engine = new FormulaEngine();
+    const run = engine.compileResultGraph(formulas);
+    const governed = quantity('VALID', { value: 4, unit: '1', dimension: 'dimensionless' });
+    const source = product({ A: { value: 950, quantity: governed } });
+    expect(run(source)['F-Q'].value).toBe(8);
+    governed.status = 'INVALID';
+    expect(run(source)['F-Q'].status).toBe('UNKNOWN');
+    governed.status = 'VALID';
+    expect(run(source)['F-Q'].value).toBe(8);
+  });
+
+  it('leaves frozen source quantities untouched', () => {
+    const governed = quantity('UNKNOWN', { value: 4, unit: '1', dimension: 'dimensionless' });
+    Object.freeze(governed.canonical);
+    Object.freeze(governed);
+    const source = product(Object.freeze({ A: Object.freeze({ value: 950, quantity: governed }) }));
+    const before = JSON.stringify(source);
+    new FormulaEngine().compileResultGraph(formulas)(source);
+    expect(JSON.stringify(source)).toBe(before);
+  });
+});
