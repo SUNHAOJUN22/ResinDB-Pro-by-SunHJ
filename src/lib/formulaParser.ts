@@ -29,7 +29,7 @@ interface CompiledStep {
 }
 
 interface CompiledFormulaPlan {
-  formulasRef: FormulaConfig[];
+  formulasSnapshot: FormulaConfig[];
   productExecutor: (product: Product) => Record<string, number>;
   propertyExecutor: PropertyGraphExecutor;
   productResultExecutor: (product: Product) => FormulaResultMap;
@@ -177,22 +177,26 @@ export class FormulaEngine {
     };
     const productResultExecutor = (product: Product) => propertyResultExecutor(this.createPropertyDictionary(product));
     const propertyExecutor: PropertyGraphExecutor = (properties, results = {}) => {
+      // Invalid plans must not preserve an earlier successful numeric result.
+      for (const formula of formulas) delete results[formula.id];
       propertyResultExecutor(properties);
       return results;
     };
     const productExecutor = (product: Product) => propertyExecutor(this.createPropertyDictionary(product));
-    return { formulasRef: formulas, productExecutor, propertyExecutor, productResultExecutor, propertyResultExecutor };
+    return { formulasSnapshot: formulas, productExecutor, propertyExecutor, productResultExecutor, propertyResultExecutor };
   }
 
   private compilePlan(formulas: FormulaConfig[]): CompiledFormulaPlan {
-    if (this.cachedPlan && (this.cachedPlan.formulasRef === formulas || this.areFormulasEqual(this.cachedPlan.formulasRef, formulas))) {
+    if (this.cachedPlan && this.areFormulasEqual(this.cachedPlan.formulasSnapshot, formulas)) {
       return this.cachedPlan;
     }
+    // Caller-owned arrays and records may be edited in place between compilations.
+    const formulasSnapshot = formulas.map((formula) => ({ ...formula }));
     let ordered: FormulaConfig[];
     try {
-      ordered = this.buildTopologicalOrder(formulas);
+      ordered = this.buildTopologicalOrder(formulasSnapshot);
     } catch (error) {
-      this.cachedPlan = this.invalidPlan(formulas, errorMessage(error));
+      this.cachedPlan = this.invalidPlan(formulasSnapshot, errorMessage(error));
       return this.cachedPlan;
     }
 
@@ -208,23 +212,25 @@ export class FormulaEngine {
 
     const propertyResultExecutor: PropertyResultGraphExecutor = (input, results = {}) => {
       const properties: PropertyDictionary = { ...input };
+      // Derived names belong to this graph, not to stale values in the input.
+      for (const step of steps) delete properties[step.name];
       for (const step of steps) {
         if (!step.unit) {
           results[step.id] = {
-            status: 'INVALID', value: null, reason: 'MISSING_OUTPUT_UNIT', dependencies: step.dependencies,
+            status: 'INVALID', value: null, reason: 'MISSING_OUTPUT_UNIT', dependencies: [...step.dependencies],
           };
           continue;
         }
         if (step.compileError || !step.evaluator) {
           results[step.id] = {
-            status: 'INVALID', value: null, reason: `PARSE_ERROR:${step.compileError ?? 'unknown'}`, dependencies: step.dependencies,
+            status: 'INVALID', value: null, reason: `PARSE_ERROR:${step.compileError ?? 'unknown'}`, dependencies: [...step.dependencies],
           };
           continue;
         }
         const missing = step.dependencies.filter((dependency) => !Number.isFinite(properties[dependency]));
         if (missing.length > 0) {
           results[step.id] = {
-            status: 'UNKNOWN', value: null, reason: `MISSING_DEPENDENCY:${missing.join(',')}`, dependencies: step.dependencies,
+            status: 'UNKNOWN', value: null, reason: `MISSING_DEPENDENCY:${missing.join(',')}`, dependencies: [...step.dependencies],
           };
           continue;
         }
@@ -232,17 +238,17 @@ export class FormulaEngine {
           const calculated = step.evaluator(properties);
           if (!Number.isFinite(calculated)) {
             results[step.id] = {
-              status: 'INVALID', value: null, reason: 'NONFINITE_OR_DOMAIN_ERROR', dependencies: step.dependencies,
+              status: 'INVALID', value: null, reason: 'NONFINITE_OR_DOMAIN_ERROR', dependencies: [...step.dependencies],
             };
             continue;
           }
           properties[step.name] = calculated;
           results[step.id] = {
-            status: 'OK', value: calculated, unit: step.unit, dependencies: step.dependencies,
+            status: 'OK', value: calculated, unit: step.unit, dependencies: [...step.dependencies],
           };
         } catch (error) {
           results[step.id] = {
-            status: 'INVALID', value: null, reason: `EVALUATION_ERROR:${errorMessage(error)}`, dependencies: step.dependencies,
+            status: 'INVALID', value: null, reason: `EVALUATION_ERROR:${errorMessage(error)}`, dependencies: [...step.dependencies],
           };
         }
       }
@@ -254,11 +260,12 @@ export class FormulaEngine {
       const detailed = propertyResultExecutor(properties);
       for (const [id, result] of Object.entries(detailed)) {
         if (result.status === 'OK') results[id] = result.value;
+        else delete results[id];
       }
       return results;
     };
     const productExecutor = (product: Product) => propertyExecutor(this.createPropertyDictionary(product));
-    this.cachedPlan = { formulasRef: formulas, productExecutor, propertyExecutor, productResultExecutor, propertyResultExecutor };
+    this.cachedPlan = { formulasSnapshot, productExecutor, propertyExecutor, productResultExecutor, propertyResultExecutor };
     return this.cachedPlan;
   }
 
