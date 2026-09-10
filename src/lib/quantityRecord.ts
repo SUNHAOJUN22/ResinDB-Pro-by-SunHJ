@@ -81,6 +81,17 @@ function nonEmpty(value: unknown): boolean {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function conditionReason(value: unknown, field: 'TEMPERATURE' | 'LOAD'): string | null {
+  if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+    return `MISSING_${field}`;
+  }
+  // Non-empty strings remain declarations, not parsed or scientifically verified conditions.
+  if (typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value))) {
+    return null;
+  }
+  return `INVALID_${field}`;
+}
+
 function deduplicate(values: string[]): string[] {
   return [...new Set(values)].sort();
 }
@@ -249,15 +260,17 @@ export function canonicalizeQuantity(
   const method = raw.method ?? raw.standard;
   if (contract.requiresMethod && !nonEmpty(method)) reasonCodes.push('MISSING_METHOD');
   const temperature = raw.temperature ?? raw.temp ?? raw.conditions?.temperature;
-  if (contract.requiresTemperature && (temperature === undefined || temperature === null || temperature === '')) {
-    reasonCodes.push('MISSING_TEMPERATURE');
+  if (contract.requiresTemperature) {
+    const reason = conditionReason(temperature, 'TEMPERATURE');
+    if (reason) reasonCodes.push(reason);
   }
   const load = raw.load ?? raw.conditions?.load;
-  if (contract.requiresLoad && (load === undefined || load === null || load === '')) {
-    reasonCodes.push('MISSING_LOAD');
+  if (contract.requiresLoad) {
+    const reason = conditionReason(load, 'LOAD');
+    if (reason) reasonCodes.push(reason);
   }
 
-  const invalidReasons = reasonCodes.filter((code) => code.startsWith('VALUE_'));
+  const invalidReasons = reasonCodes.filter((code) => code.startsWith('VALUE_') || code.startsWith('INVALID_'));
   if (invalidReasons.length > 0) {
     return {
       raw,

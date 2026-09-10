@@ -72,3 +72,72 @@ describe('strict quantity contract', () => {
     expect(missing.canonical).toBeUndefined();
   });
 });
+
+
+describe('required measurement condition admission', () => {
+  for (const field of ['temperature', 'load'] as const) {
+    it.each(['', ' ', '\t\n'])('keeps blank %s unknown for '+field, (value) => {
+      const result = canonicalizeCoreProperty('MFR', {
+        value: 12, unit: 'g/10 min', method,
+        conditions: { temperature: 230, load: 2.16, [field]: value },
+      });
+      expect(result.status).toBe('UNKNOWN');
+      expect(result.canonical).toBeUndefined();
+      expect(result.reasonCodes).toContain(`MISSING_${field.toUpperCase()}`);
+      expect(result.raw.conditions?.[field]).toBe(value);
+    });
+
+    it.each([true, false, Number.NaN, Infinity, -Infinity, {}, []])(
+      'rejects malformed condition %j for '+field, (value) => {
+        const result = canonicalizeCoreProperty('MFR', {
+          value: 12, unit: 'g/10 min', method,
+          conditions: { temperature: 230, load: 2.16, [field]: value },
+        });
+        expect(result.status).toBe('INVALID');
+        expect(result.canonical).toBeUndefined();
+        expect(result.reasonCodes).toContain(`INVALID_${field.toUpperCase()}`);
+        expect(result.raw.conditions?.[field]).toBe(value);
+      },
+    );
+  }
+
+  it.each([0, -20, 230, '230', '230 °C'])('preserves declared temperature %j', (temperature) => {
+    const result = canonicalizeCoreProperty('MFR', {
+      value: 12, unit: 'g/10 min', method, temperature, load: '2.16 kg',
+    });
+    expect(result.status).toBe('VALID');
+    expect(result.canonical?.value).toBe(12);
+    expect(result.raw.temperature).toBe(temperature);
+  });
+
+  it('checks top-level temperature and the legacy temp alias', () => {
+    for (const temperatureField of ['temperature', 'temp'] as const) {
+      const result = canonicalizeCoreProperty('MFR', {
+        value: 12, unit: 'g/10 min', method, load: 2.16,
+        [temperatureField]: Number.NaN,
+        conditions: { temperature: 230 },
+      });
+      expect(result.status).toBe('INVALID');
+      expect(result.reasonCodes).toContain('INVALID_TEMPERATURE');
+    }
+  });
+
+  it('checks top-level load without falling back from an invalid declaration', () => {
+    const result = canonicalizeCoreProperty('MFR', {
+      value: 12, unit: 'g/10 min', method, temperature: 230, load: Infinity,
+      conditions: { load: 2.16 },
+    });
+    expect(result.status).toBe('INVALID');
+    expect(result.reasonCodes).toContain('INVALID_LOAD');
+  });
+
+  it('preserves optional-condition and nullish fallback behavior', () => {
+    expect(canonicalizeCoreProperty('density', {
+      value: 905, unit: 'kg/m3', conditions: { temperature: true },
+    }).status).toBe('VALID');
+    expect(canonicalizeCoreProperty('MFR', {
+      value: 12, unit: 'g/10 min', method,
+      conditions: { temperature: 230, load: 2.16 },
+    }).status).toBe('VALID');
+  });
+});
