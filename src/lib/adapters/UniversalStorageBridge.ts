@@ -252,6 +252,7 @@ export class UniversalStorageBridge {
     if (specs.tensileYield) properties['拉伸屈服应力'] = materialToProductProperty(specs.tensileYield);
     if (specs.flexuralModulus) properties['弯曲模量'] = materialToProductProperty(specs.flexuralModulus);
     if (specs.izodImpact) properties['悬臂梁缺口冲击强度'] = materialToProductProperty(specs.izodImpact);
+    if (specs.charpyImpact) properties['简支梁缺口冲击强度'] = materialToProductProperty(specs.charpyImpact);
     return {
       id: governed.id,
       gradeName: governed.grade,
@@ -275,13 +276,15 @@ export class UniversalStorageBridge {
     const mfr = props['熔体质量流动速率'] || props.MFR;
     const tensile = props['拉伸屈服应力'] || props.Tensile;
     const modulus = props['弯曲模量'] || props.Modulus;
-    const impact = props['悬臂梁缺口冲击强度'] || props['简支梁缺口冲击强度'] || props['Izod Impact'];
+    const izodImpact = props['悬臂梁缺口冲击强度'] || props['Izod Impact'] || props.izodImpact;
+    const charpyImpact = props['简支梁缺口冲击强度'] || props['Charpy Impact'] || props.charpyImpact;
     const specs: MaterialPhysicsSpecs = {};
     if (density) specs.density = productToMaterialProperty(density);
     if (mfr) specs.mfr = productToMaterialProperty(mfr);
     if (tensile) specs.tensileYield = productToMaterialProperty(tensile);
     if (modulus) specs.flexuralModulus = productToMaterialProperty(modulus);
-    if (impact) specs.izodImpact = productToMaterialProperty(impact);
+    if (izodImpact) specs.izodImpact = productToMaterialProperty(izodImpact);
+    if (charpyImpact) specs.charpyImpact = productToMaterialProperty(charpyImpact);
 
     const createdTimestamp = product.createdAt ? Date.parse(product.createdAt) : Number.NaN;
     const source = product.isExperimental ? 'my_lab' : defaultSource;
@@ -305,3 +308,4 @@ export class UniversalStorageBridge {
     };
   }
 }
+

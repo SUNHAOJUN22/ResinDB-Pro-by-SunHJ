@@ -189,3 +189,28 @@ describe('explicit quantity registry membership', () => {
     expect(result.canonical?.value).toBe(2);
   });
 });
+
+
+describe('impact test-family identity', () => {
+  it.each(['charpyImpact', 'Charpy Impact', 'CHARPY_IMPACT', 'Ｃｈａｒｐｙ Ｉｍｐａｃｔ', '简支梁缺口冲击强度'])(
+    'resolves %s as Charpy, never as Izod', (name) => {
+      expect(resolveCorePropertyKey(name)).toBe('charpyImpact');
+      expect(canonicalizeCoreProperty(name, { value: 12000, unit: 'J/m²', method: 'ISO 179-1' }))
+        .toMatchObject({ status: 'VALID', canonical: { value: 12, unit: 'kJ/m²' } });
+    },
+  );
+
+  it.each(['izodImpact', 'Izod Impact', 'IZOD_IMPACT', '悬臂梁缺口冲击强度'])(
+    'keeps %s in the Izod family', (name) => {
+      expect(resolveCorePropertyKey(name)).toBe('izodImpact');
+      expect(canonicalizeCoreProperty(name, { value: 7, unit: 'kJ/m²', method: 'ISO 180' }))
+        .toMatchObject({ status: 'VALID', canonical: { value: 7 } });
+    },
+  );
+
+  it.each(['Charpy Impact', 'Izod Impact'])('retains unit and method checks for %s', (name) => {
+    expect(canonicalizeCoreProperty(name, { value: 2, unit: 'J/m', method }).status).toBe('INVALID');
+    expect(canonicalizeCoreProperty(name, { value: 2, unit: 'kJ/m²' }).status).toBe('UNKNOWN');
+    expect(canonicalizeCoreProperty(name, { value: 0, unit: 'kJ/m²', method }).canonical?.value).toBe(0);
+  });
+});

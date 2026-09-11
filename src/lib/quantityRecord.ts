@@ -155,6 +155,15 @@ export const CORE_QUANTITY_CONTRACTS = Object.freeze({
     nonNegative: true,
     requiresMethod: true,
   },
+  // ISO 179 Charpy and ISO 180 Izod are distinct tests, not property aliases.
+  charpyImpact: {
+    key: 'charpyImpact',
+    dimension: 'impact_energy_per_area',
+    canonicalUnit: 'kJ/m²',
+    factors: IMPACT_AREA_FACTORS,
+    nonNegative: true,
+    requiresMethod: true,
+  },
   izodImpact: {
     key: 'izodImpact',
     dimension: 'impact_energy_per_area',
@@ -185,7 +194,9 @@ const PROPERTY_ALIASES: Readonly<Record<string, keyof typeof CORE_QUANTITY_CONTR
   izodimpact: 'izodImpact',
   'izod impact': 'izodImpact',
   '悬臂梁缺口冲击强度': 'izodImpact',
-  '简支梁缺口冲击强度': 'izodImpact',
+  charpyimpact: 'charpyImpact',
+  'charpy impact': 'charpyImpact',
+  '简支梁缺口冲击强度': 'charpyImpact',
 });
 
 export function resolveCorePropertyKey(

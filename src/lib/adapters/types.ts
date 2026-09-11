@@ -30,6 +30,7 @@ export interface MaterialPhysicsSpecs {
   tensileYield?: MaterialPropertyValue;
   flexuralModulus?: MaterialPropertyValue;
   izodImpact?: MaterialPropertyValue;
+  charpyImpact?: MaterialPropertyValue;
   [property: string]: MaterialPropertyValue | undefined;
 }
 

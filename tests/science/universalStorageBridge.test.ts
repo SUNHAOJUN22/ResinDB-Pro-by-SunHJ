@@ -131,3 +131,51 @@ describe('UniversalStorageBridge scientific conversion', () => {
     expect(UniversalStorageBridge.findOpenMarketGrade('PP', 'SAME')?.id).toBe('pp-same');
   });
 });
+
+
+describe('independent Charpy and Izod storage', () => {
+  it.each([
+    ['简支梁缺口冲击强度', 'charpyImpact', 'izodImpact', 'ISO 179-1'],
+    ['Charpy Impact', 'charpyImpact', 'izodImpact', 'ISO 179-1'],
+    ['charpyImpact', 'charpyImpact', 'izodImpact', 'ISO 179-1'],
+    ['悬臂梁缺口冲击强度', 'izodImpact', 'charpyImpact', 'ISO 180'],
+    ['Izod Impact', 'izodImpact', 'charpyImpact', 'ISO 180'],
+    ['izodImpact', 'izodImpact', 'charpyImpact', 'ISO 180'],
+  ])('stores %s only in its own family', (name, own, other, standard) => {
+    const converted = UniversalStorageBridge.productToRecord(product({
+      properties: { [name]: { value: 8, unit: 'kJ/m²', standard, referenceId: 'SOURCE-IMPACT' } },
+    }));
+    expect(converted.properties[own]?.raw).toMatchObject({ value: 8, standard, referenceId: 'SOURCE-IMPACT' });
+    expect(converted.properties[other]).toBeUndefined();
+  });
+
+  it('round-trips both families without selecting or overwriting either one', () => {
+    const initial = product({ properties: {
+      'Charpy Impact': { value: 12000, unit: 'J/m²', standard: 'ISO 179-1', referenceId: 'CHARPY-1' },
+      'Izod Impact': { value: 7, unit: 'kJ/m²', standard: 'ISO 180', referenceId: 'IZOD-1' },
+    } });
+    const material = UniversalStorageBridge.productToRecord(initial);
+    const roundtrip = UniversalStorageBridge.recordToProduct(material);
+    expect(roundtrip.properties['简支梁缺口冲击强度'].quantity).toMatchObject({
+      status: 'VALID', canonical: { value: 12, unit: 'kJ/m²' },
+      raw: { value: 12000, unit: 'J/m²', standard: 'ISO 179-1', referenceId: 'CHARPY-1' },
+    });
+    expect(roundtrip.properties['悬臂梁缺口冲击强度'].quantity).toMatchObject({
+      status: 'VALID', canonical: { value: 7 }, raw: { standard: 'ISO 180', referenceId: 'IZOD-1' },
+    });
+    expect(UniversalStorageBridge.productToRecord(roundtrip).properties.charpyImpact?.raw?.value).toBe(12000);
+    expect(initial.properties['Charpy Impact'].value).toBe(12000);
+  });
+
+  it('preserves zero and missing Charpy method without borrowing Izod evidence', () => {
+    const p = UniversalStorageBridge.recordToProduct(record({ properties: {
+      charpyImpact: { value: 0, unit: 'kJ/m²' },
+      izodImpact: { value: 9, unit: 'kJ/m²', standard: 'ISO 180' },
+    } }));
+    expect(p.properties['简支梁缺口冲击强度'].quantity).toMatchObject({
+      status: 'UNKNOWN', reasonCodes: ['MISSING_METHOD'], raw: { value: 0 },
+    });
+    expect(p.properties['简支梁缺口冲击强度'].quantity?.canonical).toBeUndefined();
+    expect(p.properties['悬臂梁缺口冲击强度'].quantity?.canonical?.value).toBe(9);
+  });
+});

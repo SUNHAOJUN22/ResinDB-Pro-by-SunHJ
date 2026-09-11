@@ -1,11 +1,12 @@
 import type { MaterialPropertyValue, MaterialRecord } from './types';
 import {
+  CORE_QUANTITY_CONTRACTS,
   canonicalizeCoreProperty,
   resolveCorePropertyKey,
   type RawQuantity,
 } from '@/lib/quantityRecord';
 
-const CORE_KEYS = new Set(['density', 'mfr', 'tensileYield', 'flexuralModulus', 'izodImpact']);
+const CORE_KEYS = new Set(Object.keys(CORE_QUANTITY_CONTRACTS));
 const PHYSICAL_RANGES: Readonly<Record<string, { min: number; max: number }>> = Object.freeze({
   density: { min: 0.8, max: 3.0 },
   mfr: { min: 0, max: 1_000_000 },
