@@ -308,4 +308,3 @@ export class UniversalStorageBridge {
     };
   }
 }
-
