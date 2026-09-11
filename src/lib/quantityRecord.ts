@@ -193,7 +193,9 @@ export function resolveCorePropertyKey(
 ): keyof typeof CORE_QUANTITY_CONTRACTS | null {
   const normalized = key.normalize('NFKC').trim().toLowerCase().replace(/[\s_-]+/g, ' ');
   const compact = normalized.replace(/\s+/g, '');
-  return PROPERTY_ALIASES[normalized] ?? PROPERTY_ALIASES[compact] ?? null;
+  if (Object.hasOwn(PROPERTY_ALIASES, normalized)) return PROPERTY_ALIASES[normalized];
+  if (Object.hasOwn(PROPERTY_ALIASES, compact)) return PROPERTY_ALIASES[compact];
+  return null;
 }
 
 function cloneRaw(raw: RawQuantity): RawQuantity {
@@ -235,7 +237,9 @@ export function canonicalizeQuantity(
   }
 
   const normalizedUnit = normalizeUnit(String(raw.unit));
-  const factor = contract.factors[normalizedUnit];
+  const factor = Object.hasOwn(contract.factors, normalizedUnit)
+    ? contract.factors[normalizedUnit]
+    : undefined;
   if (factor === undefined || !Number.isFinite(factor) || factor <= 0) {
     return {
       raw,

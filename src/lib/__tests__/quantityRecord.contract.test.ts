@@ -4,6 +4,7 @@ import {
   canonicalizeCoreProperty,
   canonicalizeQuantity,
   parseFiniteReal,
+  resolveCorePropertyKey,
 } from '@/lib/quantityRecord';
 
 const method = 'declared test method';
@@ -139,5 +140,52 @@ describe('required measurement condition admission', () => {
       value: 12, unit: 'g/10 min', method,
       conditions: { temperature: 230, load: 2.16 },
     }).status).toBe('VALID');
+  });
+});
+
+
+describe('explicit quantity registry membership', () => {
+  it.each(['constructor', 'CONSTRUCTOR', ' constructor ', 'con_struct_or', 'ｃｏｎｓｔｒｕｃｔｏｒ'])(
+    'keeps the undeclared property %s unknown without invoking an inherited member',
+    (key) => {
+      expect(resolveCorePropertyKey(key)).toBeNull();
+      const raw = { value: 1, unit: 'g/cm³' };
+      const result = canonicalizeCoreProperty(key, raw, ['source:1']);
+      expect(result.status).toBe('UNKNOWN');
+      expect(result.reasonCodes).toEqual(['UNSUPPORTED_PROPERTY_CONTRACT']);
+      expect(result.canonical).toBeUndefined();
+      expect(result.raw).toEqual(raw);
+      expect(result.provenanceRefs).toEqual(['source:1']);
+    },
+  );
+
+  it.each([
+    ['density', 'density'],
+    ['密度', 'density'],
+    ['MELT_MASS_FLOW_RATE', 'mfr'],
+    ['tensile-yield', 'tensileYield'],
+    ['ＦＬＥＸＵＲＡＬ　ＭＯＤＵＬＵＳ', 'flexuralModulus'],
+  ])('preserves the explicitly declared alias %s', (key, expected) => {
+    expect(resolveCorePropertyKey(key)).toBe(expected);
+  });
+
+  it('rejects a conversion factor supplied only by the prototype', () => {
+    const factors: Record<string, number> = Object.create({ mpa: 1 });
+    const contract = { ...CORE_QUANTITY_CONTRACTS.tensileYield, factors };
+    const result = canonicalizeQuantity({ value: 2, unit: 'MPa', method }, contract);
+    expect(result.status).toBe('INVALID');
+    expect(result.reasonCodes).toEqual(['UNKNOWN_OR_INCOMPATIBLE_UNIT']);
+    expect(result.canonical).toBeUndefined();
+  });
+
+  it('accepts an own factor without falling through to a different inherited value', () => {
+    const factors: Record<string, number> = Object.create({ mpa: 1000 });
+    factors.mpa = 1;
+    const result = canonicalizeQuantity(
+      { value: 2, unit: 'MPa', method },
+      { ...CORE_QUANTITY_CONTRACTS.tensileYield, factors },
+    );
+    expect(result.status).toBe('VALID');
+    expect(result.canonical?.value).toBe(2);
   });
 });
