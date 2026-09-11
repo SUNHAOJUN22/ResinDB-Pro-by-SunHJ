@@ -269,6 +269,14 @@ export function canonicalizeQuantity(
       provenanceRefs: provenance,
     };
   }
+  if (value !== 0 && canonicalValue === 0) {
+    return {
+      raw,
+      status: 'INVALID',
+      reasonCodes: ['CONVERSION_UNDERFLOW'],
+      provenanceRefs: provenance,
+    };
+  }
   if (contract.strictlyPositive && canonicalValue <= 0) reasonCodes.push('VALUE_MUST_BE_POSITIVE');
   if (contract.nonNegative && canonicalValue < 0) reasonCodes.push('VALUE_MUST_BE_NONNEGATIVE');
 
