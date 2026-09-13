@@ -67,6 +67,11 @@ function normalizeUnit(unit: string): string {
     .replace(/cm\^3/g, 'cm³');
 }
 
+function numericTextRoundedToZero(text: string, parsed: number): boolean {
+  // The exponent may contain nonzero digits even when the significand is zero.
+  return parsed === 0 && /[1-9]/.test(text.split(/[eE]/, 1)[0]);
+}
+
 export function parseFiniteReal(value: unknown): number | null {
   if (typeof value === 'boolean' || value === null || value === undefined) return null;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
@@ -74,7 +79,7 @@ export function parseFiniteReal(value: unknown): number | null {
   const text = value.trim();
   if (!NUMERIC_TEXT.test(text)) return null;
   const parsed = Number(text);
-  return Number.isFinite(parsed) ? parsed : null;
+  return Number.isFinite(parsed) && !numericTextRoundedToZero(text, parsed) ? parsed : null;
 }
 
 function nonEmpty(value: unknown): boolean {
@@ -229,6 +234,15 @@ export function canonicalizeQuantity(
 
   const value = parseFiniteReal(raw.value);
   if (value === null) {
+    const text = typeof raw.value === 'string' ? raw.value.trim() : '';
+    if (NUMERIC_TEXT.test(text) && numericTextRoundedToZero(text, Number(text))) {
+      return {
+        raw,
+        status: 'INVALID',
+        reasonCodes: ['PARSING_UNDERFLOW'],
+        provenanceRefs: provenance,
+      };
+    }
     const nonFinite = typeof raw.value === 'number' && !Number.isFinite(raw.value);
     return {
       raw,
