@@ -136,14 +136,61 @@ export class UniversalStorageBridge {
   private static readonly LAB_STORAGE_KEY = 'resindb_pro_my_lab_data';
   private static readonly OPEN_STORAGE_KEY = 'resindb_pro_open_market_data';
 
+  /**
+   * Read once without modifying persistent data. Keep the original records for
+   * mutation and separate governed copies for display; never silently drop rows.
+   * Only an absent key may select seed data. A corrupt/unreadable existing key
+   * must block a mutation instead of being replaced with a display fallback.
+   */
+  private static readCollection(
+    key: string,
+    defaults: () => MaterialRecord[],
+  ): { originals: MaterialRecord[]; cleaned: MaterialRecord[] } {
+    const data = localStorage.getItem(key);
+    const records: unknown = data === null ? defaults() : JSON.parse(data);
+    if (!Array.isArray(records)) throw new Error('INVALID_STORED_MATERIAL_COLLECTION');
+    const originals: MaterialRecord[] = [];
+    const cleaned: MaterialRecord[] = [];
+    for (const value of records) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new Error('INVALID_STORED_MATERIAL_RECORD');
+      }
+      const record = value as MaterialRecord;
+      const governed = PolymerDataValidator.validateAndClean(record);
+      if (!governed) throw new Error('INVALID_STORED_MATERIAL_RECORD');
+      originals.push(record);
+      cleaned.push(governed);
+    }
+    return { originals, cleaned };
+  }
+
+  private static defaultOpenMarketRecords(): MaterialRecord[] {
+    const merged: MaterialRecord[] = [];
+    const seen = new Set<string>();
+    for (const sourceRecord of OPEN_MARKET_RECORDS) {
+      const key = normalizedRecordKey(sourceRecord);
+      if (!seen.has(key)) {
+        merged.push(sourceRecord);
+        seen.add(key);
+      }
+    }
+    for (const catalogRecord of PRODUCT_CATALOG.map((product) =>
+      this.productToRecord(product, 'open_market'),
+    )) {
+      const key = normalizedRecordKey(catalogRecord);
+      if (!seen.has(key)) {
+        merged.push(catalogRecord);
+        seen.add(key);
+      }
+    }
+    return merged;
+  }
+
   public static getLabRecords(): MaterialRecord[] {
     try {
-      const data = localStorage.getItem(this.LAB_STORAGE_KEY);
-      const records: MaterialRecord[] = data ? JSON.parse(data) : LAB_RECORDS;
-      const cleaned = PolymerDataValidator.cleanBatch(records);
-      localStorage.setItem(this.LAB_STORAGE_KEY, JSON.stringify(cleaned));
-      return cleaned;
+      return this.readCollection(this.LAB_STORAGE_KEY, () => LAB_RECORDS).cleaned;
     } catch (error) {
+      // Legacy display recovery only: saving/deleting never calls this fallback.
       console.error('Failed to read lab records from storage:', error);
       return PolymerDataValidator.cleanBatch(LAB_RECORDS);
     }
@@ -152,7 +199,7 @@ export class UniversalStorageBridge {
   public static saveLabRecord(record: MaterialRecord): void {
     const validated = PolymerDataValidator.validateAndClean(record);
     if (!validated) throw new Error('INVALID_MATERIAL_RECORD');
-    const records = this.getLabRecords();
+    const { originals: records } = this.readCollection(this.LAB_STORAGE_KEY, () => LAB_RECORDS);
     const index = records.findIndex((candidate) => candidate.id === validated.id);
     if (index >= 0) records[index] = validated;
     else records.push(validated);
@@ -160,47 +207,17 @@ export class UniversalStorageBridge {
   }
 
   public static deleteLabRecord(id: string): void {
-    try {
-      const records = this.getLabRecords();
-      localStorage.setItem(
-        this.LAB_STORAGE_KEY,
-        JSON.stringify(records.filter((record) => record.id !== id)),
-      );
-    } catch (error) {
-      console.error('Failed to delete lab record:', error);
-    }
+    const { originals: records } = this.readCollection(this.LAB_STORAGE_KEY, () => LAB_RECORDS);
+    // Let persistence errors reach the caller; a failed deletion is not success.
+    localStorage.setItem(
+      this.LAB_STORAGE_KEY,
+      JSON.stringify(records.filter((record) => record.id !== id)),
+    );
   }
 
   public static getOpenMarketRecords(): MaterialRecord[] {
     try {
-      const data = localStorage.getItem(this.OPEN_STORAGE_KEY);
-      let records: MaterialRecord[];
-      if (data) {
-        records = JSON.parse(data);
-      } else {
-        const merged: MaterialRecord[] = [];
-        const seen = new Set<string>();
-        for (const sourceRecord of OPEN_MARKET_RECORDS) {
-          const key = normalizedRecordKey(sourceRecord);
-          if (!seen.has(key)) {
-            merged.push(sourceRecord);
-            seen.add(key);
-          }
-        }
-        for (const catalogRecord of PRODUCT_CATALOG.map((product) =>
-          this.productToRecord(product, 'open_market'),
-        )) {
-          const key = normalizedRecordKey(catalogRecord);
-          if (!seen.has(key)) {
-            merged.push(catalogRecord);
-            seen.add(key);
-          }
-        }
-        records = merged;
-      }
-      const cleaned = PolymerDataValidator.cleanBatch(records);
-      localStorage.setItem(this.OPEN_STORAGE_KEY, JSON.stringify(cleaned));
-      return cleaned;
+      return this.readCollection(this.OPEN_STORAGE_KEY, () => this.defaultOpenMarketRecords()).cleaned;
     } catch (error) {
       console.error('Failed to read open market records from storage:', error);
       return PolymerDataValidator.cleanBatch(OPEN_MARKET_RECORDS);
@@ -210,7 +227,9 @@ export class UniversalStorageBridge {
   public static saveOpenMarketRecord(record: MaterialRecord): void {
     const validated = PolymerDataValidator.validateAndClean(record);
     if (!validated) throw new Error('INVALID_MATERIAL_RECORD');
-    const records = this.getOpenMarketRecords();
+    const { originals: records } = this.readCollection(
+      this.OPEN_STORAGE_KEY, () => this.defaultOpenMarketRecords(),
+    );
     const key = normalizedRecordKey(validated);
     const index = records.findIndex((candidate) =>
       candidate.id === validated.id || normalizedRecordKey(candidate) === key,
