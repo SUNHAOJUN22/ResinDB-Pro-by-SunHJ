@@ -74,6 +74,61 @@ describe('finite radar projection', () => {
     expect(result.values).toEqual([4, 5, 6]);
   });
 
+  it('treats governed quantity status as authoritative and uses only VALID canonical values', () => {
+    const fixture = product({ InvalidRaw: 10, Canonical: 'not-a-number', RealZero: 0, UnknownRaw: 4, Legacy: 1 });
+    fixture.properties.InvalidRaw.quantity = {
+      raw: { value: 10, unit: 'MPa' },
+      status: 'INVALID',
+      reasonCodes: ['synthetic-invalid'],
+      provenanceRefs: [],
+    };
+    fixture.properties.Canonical.quantity = {
+      raw: { value: 'not-a-number', unit: 'MPa' },
+      canonical: { value: 2.5, unit: 'MPa', dimension: 'pressure' },
+      status: 'VALID',
+      reasonCodes: [],
+      provenanceRefs: ['synthetic:test'],
+    };
+    fixture.properties.UnknownRaw.quantity = {
+      raw: { value: 4, unit: 'MPa' },
+      status: 'UNKNOWN',
+      reasonCodes: ['synthetic-unknown'],
+      provenanceRefs: [],
+    };
+
+    const result = buildFiniteRadarProjection(fixture, {
+      preferredKeys: ['InvalidRaw', 'Canonical', 'RealZero', 'UnknownRaw', 'Legacy'],
+      minimumDimensions: 3,
+      maximumDimensions: 5,
+    });
+
+    expect(result.status).toBe('OK');
+    expect(result.keys).toEqual(['Canonical', 'RealZero', 'Legacy']);
+    expect(result.values).toEqual([2.5, 0, 1]);
+    expect(result.omittedKeys).toEqual(['InvalidRaw', 'UnknownRaw']);
+  });
+
+  it('rejects VALID governed quantities that lack a finite canonical value instead of falling back', () => {
+    const fixture = product({ A: 7, B: 2, C: 3, D: 4 });
+    fixture.properties.A.quantity = {
+      raw: { value: 7 },
+      status: 'VALID',
+      reasonCodes: [],
+      provenanceRefs: [],
+    };
+
+    const result = buildFiniteRadarProjection(fixture, {
+      preferredKeys: ['A', 'B', 'C', 'D'],
+      minimumDimensions: 3,
+      maximumDimensions: 4,
+    });
+
+    expect(result.status).toBe('OK');
+    expect(result.keys).toEqual(['B', 'C', 'D']);
+    expect(result.values).toEqual([2, 3, 4]);
+    expect(result.omittedKeys).toEqual(['A']);
+  });
+
   it('rejects inconsistent dimension limits', () => {
     expect(() =>
       buildFiniteRadarProjection(product({ A: 1 }), {

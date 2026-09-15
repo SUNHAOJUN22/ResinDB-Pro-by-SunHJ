@@ -1,4 +1,4 @@
-import type { Product } from '@/types/index';
+import type { Product, PropertyValue } from '@/types/index';
 import { parseFiniteNumericValue } from '@/services/mathUtils';
 import { RADAR_KEYS } from '@/utils/productUtils';
 
@@ -13,11 +13,31 @@ export interface FiniteRadarProjection {
 }
 
 /**
- * Builds a radar-series projection without converting missing or malformed
- * scientific values into physical zero.
+ * Resolve a property through the governed quantity contract when one exists.
+ * UNKNOWN/INVALID quantities are authoritative and must not fall back to the
+ * display/raw value. Legacy properties without a quantity record retain strict
+ * finite-decimal parsing for backwards compatibility.
+ */
+function finitePropertyValue(property: PropertyValue | undefined): number | null {
+  if (!property) return null;
+  if (property.quantity !== undefined) {
+    if (property.quantity.status !== 'VALID') return null;
+    const canonicalValue = property.quantity.canonical?.value;
+    return typeof canonicalValue === 'number' && Number.isFinite(canonicalValue)
+      ? canonicalValue
+      : null;
+  }
+  return parseFiniteNumericValue(property.value);
+}
+
+/**
+ * Builds a radar-series projection without converting missing, malformed or
+ * explicitly rejected scientific values into physical zero.
  *
  * Preferred keys keep their declared order. Additional finite properties are
  * appended deterministically by key only when the preferred set is too small.
+ * When a governed quantity record is present, only a VALID finite canonical
+ * value may enter the projection; UNKNOWN/INVALID never falls back to raw data.
  */
 export function buildFiniteRadarProjection(
   product: Pick<Product, 'properties'>,
@@ -45,7 +65,7 @@ export function buildFiniteRadarProjection(
 
   const consider = (key: string): void => {
     if (selectedKeys.has(key) || selected.length >= maximumDimensions) return;
-    const value = parseFiniteNumericValue(properties[key]?.value);
+    const value = finitePropertyValue(properties[key]);
     if (value === null) {
       if (Object.prototype.hasOwnProperty.call(properties, key)) omittedKeys.push(key);
       return;

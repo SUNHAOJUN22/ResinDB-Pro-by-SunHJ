@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from "react";
 import { Product, ColumnConfig } from '@/types/index';
-import { RADAR_KEYS } from '@/utils/productUtils';
+import { RADAR_DEFAULT_MAX } from '@/utils/productUtils';
+import { buildFiniteRadarProjection } from '@/utils/radarProjection';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Search, RotateCcw } from "lucide-react";
 import type { ECharts } from "@/lib/echarts";
@@ -95,30 +96,26 @@ export const QuickRadarPopup: React.FC<{
         echartsLib.getInstanceByDom(chartRef.current) ||
         echartsLib.init(chartRef.current);
 
-      // Filter RADAR_KEYS to only include properties that exist on this product
-      let availableProps = RADAR_KEYS.filter(
-        (p) => product.properties?.[p] !== undefined,
-      );
-
-      // If less than 3 properties match, try to find any numeric properties
-      if (availableProps.length < 3) {
-        const numericProps = Object.keys(product.properties).filter((k) => {
-          const val = product.properties?.[k]?.value;
-          return typeof val === "number" || !isNaN(parseFloat(String(val)));
-        });
-        availableProps = numericProps.slice(0, 5); // Take up to 5 numeric properties
+      const projection = buildFiniteRadarProjection(product);
+      if (projection.status !== 'OK') {
+        myChart.clear();
+        return;
       }
 
-      const props = availableProps.length >= 3 ? availableProps : RADAR_KEYS;
-
-      const values = props.map((p) => {
-        const v = product.properties?.[p]?.value;
-        return typeof v === "number" ? v : parseFloat(String(v)) || 0;
-      });
+      const props = projection.keys;
+      const values = projection.values;
 
       myChart.setOption({
         radar: {
-          indicator: props.map((p) => ({ name: tProp(p).slice(0, 8) })),
+          indicator: props.map((p, index) => {
+            const value = values[index];
+            const defaultMax = RADAR_DEFAULT_MAX[p] ?? 0;
+            return {
+              name: tProp(p).slice(0, 8),
+              min: value < 0 ? value * 1.1 : 0,
+              max: Math.max(value > 0 ? value * 1.1 : 0, defaultMax, 1),
+            };
+          }),
           shape: "circle",
           splitNumber: 3,
           axisName: { fontSize: 8, color: "#94a3b8" },
