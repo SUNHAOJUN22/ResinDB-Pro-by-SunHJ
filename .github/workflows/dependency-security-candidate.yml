@@ -18,8 +18,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
-    # Only needed to store two validated Git blobs. No ref, branch, commit or package
-    # is published by this job. Final publication is an explicit reviewed operation.
+    # This job stores validated Git blobs only; it never updates any Git ref.
     permissions:
       contents: write
     steps:
@@ -36,7 +35,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends fonts-noto-cjk
           fc-cache -f
-      - name: Prepare a compatible security candidate without lifecycle scripts
+      - name: Prepare the reviewed security candidate without lifecycle scripts
         shell: bash
         run: |
           set -euo pipefail
@@ -44,15 +43,14 @@ jobs:
           exec > >(tee "$RUNNER_TEMP/dependency-candidate/preparation.log") 2>&1
           git rev-parse HEAD > "$RUNNER_TEMP/dependency-candidate/base-sha.txt"
           node --version
-          # npm 10.9.2 crashes in Arborist edgesOut while updating this peer graph.
-          # This is a pinned resolver, not a change to the application's Node runtime.
           npm install --global npm@11.6.4 --ignore-scripts
           npm --version
           npm ci --ignore-scripts
           npm view dompurify@3.4.16 version dist.integrity --json > "$RUNNER_TEMP/dependency-candidate/dompurify-registry.json"
-          npm pkg set overrides.dompurify=3.4.16
+          npm view vitest@4.1.11 version dist.integrity --json > "$RUNNER_TEMP/dependency-candidate/vitest-registry.json"
+          npm pkg set overrides.dompurify=3.4.16 devDependencies.vitest=4.1.11 'devDependencies.@vitest/coverage-v8=4.1.11'
           npm install --package-lock-only --ignore-scripts --no-audit
-          npm update --package-lock-only --ignore-scripts --no-audit brace-expansion undici fflate vitest @vitest/coverage-v8 @vitest/mocker dompurify
+          npm update --package-lock-only --ignore-scripts --no-audit brace-expansion undici fflate
           cp package.json package-lock.json "$RUNNER_TEMP/dependency-candidate/"
           git diff -- package.json package-lock.json > "$RUNNER_TEMP/dependency-candidate/dependency.patch"
       - name: Install exact candidate and execute full production validation
@@ -72,7 +70,7 @@ jobs:
               raise SystemExit('Unexpected source changes: ' + repr(sorted(changed)))
           subprocess.run(['git', 'diff', '--cached', '--exit-code'], check=True)
           PY
-      - name: Store only the two validated blobs for explicit reviewed publication
+      - name: Store only two validated blobs for explicit reviewed publication
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -92,10 +90,9 @@ jobs:
               data = pathlib.Path(name).read_bytes()
               if data != (output / name).read_bytes():
                   raise SystemExit('Candidate changed during validation: ' + name)
-              content = data.decode('utf-8', errors='strict')
               request = urllib.request.Request(
                   'https://api.github.com/repos/' + repository + '/git/blobs',
-                  data=json.dumps({'content': content, 'encoding': 'utf-8'}).encode(),
+                  data=json.dumps({'content': data.decode('utf-8', errors='strict'), 'encoding': 'utf-8'}).encode(),
                   headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28'},
                   method='POST',
               )
@@ -108,7 +105,7 @@ jobs:
           (output / 'candidate-blobs.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
           print(json.dumps(result, indent=2))
           PY
-      - name: Preserve candidate diagnostics and hashes even after failure
+      - name: Preserve candidate diagnostics even after failure
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:

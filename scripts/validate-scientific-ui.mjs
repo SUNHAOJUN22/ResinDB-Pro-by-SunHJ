@@ -1,10 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -17,22 +11,18 @@ function walk(directory) {
     .flatMap((entry) => {
       const target = join(directory, entry.name);
       return entry.isDirectory() ? walk(target) : [target];
-    })
-    .sort();
+    }).sort();
 }
 
-const sourceFiles = walk(sourceRoot)
-  .filter((file) => ['.ts', '.tsx'].includes(extname(file)));
+const sourceFiles = walk(sourceRoot).filter((file) => ['.ts', '.tsx'].includes(extname(file)));
 const failures = [];
 const read = (path) => readFileSync(join(root, path), 'utf8');
 
 for (const file of sourceFiles) {
   const repositoryPath = relative(root, file);
   const text = readFileSync(file, 'utf8');
-  if (
-    (repositoryPath.startsWith('src/compute/') || repositoryPath.startsWith('src/workers/'))
-    && /Math\.random\s*\(/.test(text)
-  ) {
+  if ((repositoryPath.startsWith('src/compute/') || repositoryPath.startsWith('src/workers/'))
+    && /Math\.random\s*\(/.test(text)) {
     failures.push(`${repositoryPath}: scientific compute path uses Math.random`);
   }
 }
@@ -46,82 +36,39 @@ function requireText(path, text, message) {
 }
 
 function prohibitText(path, text, message) {
-  if (existsSync(join(root, path)) && read(path).includes(text)) {
-    failures.push(`${path}: ${message}`);
-  }
+  if (existsSync(join(root, path)) && read(path).includes(text)) failures.push(`${path}: ${message}`);
 }
 
-requireText(
-  'src/components/charts/scientificFigurePolicy.ts',
-  'scientific-figure-policy-1.1.0',
-  'current figure policy missing',
-);
-requireText(
-  'src/components/charts/scientificFigurePolicy.ts',
-  'SCIENTIFIC_FONT_FAMILY',
-  'CJK-safe scientific typography missing',
-);
-requireText(
-  'src/components/charts/ScientificEChart.tsx',
-  'useDirtyRect: true',
-  'shared dirty-rect chart host missing',
-);
-requireText(
-  'src/components/charts/ScientificEChart.tsx',
-  'useLanguage',
-  'scientific chart states are not localized',
-);
-requireText(
-  'src/components/charts/ScientificEChart.tsx',
-  "typeof ResizeObserver === 'undefined'",
-  'scientific chart resize fallback missing',
-);
-requireText(
-  'src/components/charts/GpcDistribution.ts',
-  'not measured GPC data',
-  'GPC proxy boundary missing',
-);
-requireText(
-  'src/components/charts/RheologyCurve.ts',
-  'not fitted rheometry',
-  'rheology proxy boundary missing',
-);
-requireText(
-  'src/components/charts/FeatureImportanceChart.tsx',
-  'not causality or SHAP',
-  'ridge boundary missing',
-);
-requireText(
-  'src/components/charts/WeibullChart.tsx',
-  'not MLE',
-  'Weibull estimator boundary missing',
-);
-requireText(
-  'src/components/charts/DataVisualizer.tsx',
-  'Ridge attribution is associative',
-  'workspace scientific boundary missing',
-);
-requireText(
-  'src/components/features/Analytics/ResinCapacityForecast.tsx',
-  'not 95% confidence intervals',
-  'capacity boundary missing',
-);
+const policyPath = 'src/components/charts/scientificFigurePolicy.ts';
+requireText(policyPath, 'scientific-figure-policy-1.2.0', 'current figure policy missing');
+requireText(policyPath, 'SCIENTIFIC_FONT_FAMILY', 'CJK-safe scientific typography missing');
+requireText(policyPath, 'Noto Sans CJK SC', 'CJK-first font family missing');
+if (existsSync(join(root, policyPath))) {
+  const policy = read(policyPath);
+  if (policy.indexOf('Noto Sans CJK SC') > policy.indexOf("'Inter'")) {
+    failures.push(`${policyPath}: Latin fonts precede the scientific CJK font`);
+  }
+}
+requireText('src/components/charts/ScientificEChart.tsx', 'useDirtyRect: true', 'shared dirty-rect chart host missing');
+requireText('src/components/charts/ScientificEChart.tsx', 'useLanguage', 'scientific chart states are not localized');
+requireText('src/components/charts/ScientificEChart.tsx', "typeof ResizeObserver === 'undefined'", 'scientific chart resize fallback missing');
+requireText('src/components/charts/GpcDistribution.ts', 'not measured GPC data', 'GPC proxy boundary missing');
+requireText('src/components/charts/RheologyCurve.ts', 'not fitted rheometry', 'rheology proxy boundary missing');
+requireText('src/components/charts/FeatureImportanceChart.tsx', 'not causality or SHAP', 'ridge boundary missing');
+requireText('src/components/charts/WeibullChart.tsx', 'not MLE', 'Weibull estimator boundary missing');
+requireText('src/components/charts/DataVisualizer.tsx', 'Ridge attribution is associative', 'workspace scientific boundary missing');
+requireText('src/components/features/Analytics/ResinCapacityForecast.tsx', 'not 95% confidence intervals', 'capacity boundary missing');
+requireText('src/lib/math/scatterGeometry.ts', 'MAX_DEPTH = 32', 'bounded coincident-point index missing');
+requireText('src/components/charts/CanvasScatterGraph.tsx', 'scatterFraction', 'finite scatter projection missing');
+requireText('src/components/charts/CanvasScatterGraph.tsx', "?? '—'", 'zero-preserving tooltip contract missing');
 
 const phase2lTargets = [
-  {
-    name: 'DependencyHeatmap',
-    path: 'src/components/features/Product/DependencyHeatmap.tsx',
+  { name: 'DependencyHeatmap', path: 'src/components/features/Product/DependencyHeatmap.tsx',
     legacyPath: 'src/components/features/Product/DependencyHeatmapLegacy.tsx',
-    boundary: 'not statistical association or causal attribution',
-    missingContract: 'unavailable (not zero)',
-  },
-  {
-    name: 'RheologyGraph',
-    path: 'src/components/charts/RheologyGraph.tsx',
+    boundary: 'not statistical association or causal attribution', missingContract: 'unavailable (not zero)' },
+  { name: 'RheologyGraph', path: 'src/components/charts/RheologyGraph.tsx',
     legacyPath: 'src/components/charts/RheologyGraphLegacy.tsx',
-    boundary: 'not measured rheology',
-    missingContract: 'sanitizePositiveRheologyPoints',
-  },
+    boundary: 'not measured rheology', missingContract: 'sanitizePositiveRheologyPoints' },
 ];
 
 const phase2lMigrations = phase2lTargets.map((target) => {
@@ -139,41 +86,19 @@ const phase2lMigrations = phase2lTargets.map((target) => {
   if (legacyExists) blockers.push('legacy-source-still-present');
   for (const blocker of blockers) failures.push(`${target.path}: ${blocker}`);
   return {
-    name: target.name,
-    status: blockers.length === 0 ? 'migrated' : 'blocker',
+    name: target.name, status: blockers.length === 0 ? 'migrated' : 'blocker',
     sharedScientificEChart: source.includes('ScientificEChart'),
     scientificBoundaryEmbedded: source.includes('data-scientific-boundary'),
-    legacySourceRemoved: !legacyExists,
-    blockers,
+    legacySourceRemoved: !legacyExists, blockers,
   };
 });
 
 const remainingCompatibilityWrappers = [
-  {
-    name: 'DataVisualizer',
-    wrapper: 'src/components/charts/DataVisualizer.tsx',
-    legacy: 'src/components/charts/DataVisualizerLegacy.tsx',
-  },
-  {
-    name: 'FormulaEditorModal',
-    wrapper: 'src/components/modals/FormulaEditorModal.tsx',
-    legacy: 'src/components/modals/FormulaEditorModalLegacy.tsx',
-  },
-  {
-    name: 'PredictiveTrends',
-    wrapper: 'src/components/features/Analytics/PredictiveTrends.tsx',
-    legacy: 'src/components/features/Analytics/PredictiveTrendsLegacy.tsx',
-  },
-  {
-    name: 'MaterialTrendForecaster',
-    wrapper: 'src/components/features/Analytics/MaterialTrendForecaster.tsx',
-    legacy: 'src/components/features/Analytics/MaterialTrendForecasterLegacy.tsx',
-  },
-  {
-    name: 'ResinCapacityForecast',
-    wrapper: 'src/components/features/Analytics/ResinCapacityForecast.tsx',
-    legacy: 'src/components/features/Analytics/ResinCapacityForecastLegacy.tsx',
-  },
+  { name: 'DataVisualizer', wrapper: 'src/components/charts/DataVisualizer.tsx', legacy: 'src/components/charts/DataVisualizerLegacy.tsx' },
+  { name: 'FormulaEditorModal', wrapper: 'src/components/modals/FormulaEditorModal.tsx', legacy: 'src/components/modals/FormulaEditorModalLegacy.tsx' },
+  { name: 'PredictiveTrends', wrapper: 'src/components/features/Analytics/PredictiveTrends.tsx', legacy: 'src/components/features/Analytics/PredictiveTrendsLegacy.tsx' },
+  { name: 'MaterialTrendForecaster', wrapper: 'src/components/features/Analytics/MaterialTrendForecaster.tsx', legacy: 'src/components/features/Analytics/MaterialTrendForecasterLegacy.tsx' },
+  { name: 'ResinCapacityForecast', wrapper: 'src/components/features/Analytics/ResinCapacityForecast.tsx', legacy: 'src/components/features/Analytics/ResinCapacityForecastLegacy.tsx' },
 ];
 
 for (const wrapper of remainingCompatibilityWrappers) {
@@ -184,9 +109,7 @@ for (const wrapper of remainingCompatibilityWrappers) {
   if (wrapperExists) {
     const wrapperSource = read(wrapper.wrapper);
     const legacyStem = wrapper.legacy.split('/').at(-1)?.replace(/\.tsx$/, '') ?? '';
-    if (!wrapperSource.includes(legacyStem)) {
-      failures.push(`${wrapper.wrapper}: compatibility wrapper no longer imports ${legacyStem}`);
-    }
+    if (!wrapperSource.includes(legacyStem)) failures.push(`${wrapper.wrapper}: compatibility wrapper no longer imports ${legacyStem}`);
   }
 }
 
@@ -195,36 +118,17 @@ for (const target of phase2lTargets) {
   prohibitText(target.path, 'LegacyRheologyGraph', 'target still imports RheologyGraph Legacy runtime');
 }
 
-const chartFiles = sourceFiles.filter((file) => (
-  file.includes(`${join('src', 'components', 'charts')}`)
-  && !file.endsWith('Legacy.tsx')
-));
-const directEchartsInitFiles = chartFiles
-  .filter((file) => /echarts\.init\s*\(/.test(readFileSync(file, 'utf8')))
-  .map((file) => relative(root, file));
-
+const chartFiles = sourceFiles.filter((file) => file.includes(`${join('src', 'components', 'charts')}`) && !file.endsWith('Legacy.tsx'));
+const directEchartsInitFiles = chartFiles.filter((file) => /echarts\.init\s*\(/.test(readFileSync(file, 'utf8'))).map((file) => relative(root, file));
 const metrics = {
-  schemaVersion: 'scientific-ui-audit-1.3.0',
-  productionTypeScriptFiles: sourceFiles.length,
-  chartFiles: chartFiles.length,
-  directEchartsInitFiles,
-  phase2lMigrations,
+  schemaVersion: 'scientific-ui-audit-1.4.0', productionTypeScriptFiles: sourceFiles.length,
+  chartFiles: chartFiles.length, directEchartsInitFiles, phase2lMigrations,
   legacyCompatibilityWrappers: remainingCompatibilityWrappers.map((entry) => entry.name),
-  migratedCompatibilityWrappers: phase2lMigrations
-    .filter((entry) => entry.status === 'migrated')
-    .map((entry) => entry.name),
-  localizedScientificFigureStates: true,
-  cjkSafeScientificTypography: true,
-  failures,
-  acceptance: failures.length ? 'FAIL' : 'PASS',
+  migratedCompatibilityWrappers: phase2lMigrations.filter((entry) => entry.status === 'migrated').map((entry) => entry.name),
+  localizedScientificFigureStates: true, cjkSafeScientificTypography: true,
+  failures, acceptance: failures.length ? 'FAIL' : 'PASS',
 };
-
 mkdirSync(artifactRoot, { recursive: true });
-writeFileSync(
-  join(artifactRoot, 'scientific-ui-audit.json'),
-  `${JSON.stringify(metrics, null, 2)}\n`,
-);
+writeFileSync(join(artifactRoot, 'scientific-ui-audit.json'), `${JSON.stringify(metrics, null, 2)}\n`);
 console.log(JSON.stringify(metrics, null, 2));
-if (failures.length) {
-  throw new Error(`scientific UI audit failed:\n${failures.join('\n')}`);
-}
+if (failures.length) throw new Error(`scientific UI audit failed:\n${failures.join('\n')}`);
