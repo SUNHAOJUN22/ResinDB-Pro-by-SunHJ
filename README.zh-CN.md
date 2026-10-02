@@ -73,6 +73,44 @@ C_{\mathrm{finite}}
 \land C_{\mathrm{nonblank}}.
 $$
 
+以上分项直接相加，以及概念图中的平方和预算，要求各项已映射到同一观测量、采用一致单位且互不相关。相关输入应保留交叉协方差；一般的一阶传播为 $u_y^2\approx\sum_{i,j}J_iJ_j\operatorname{Cov}(x_i,x_j)$。这些预算公式说明建模条件，不宣称软件已经验证任意材料系统的不确定度。
+
+## 相似度与雷达图：已实现的数值合同
+
+对应实现为 `src/services/mathUtils.ts`，永久回归位于 `tests/unit/mathUtils.test.ts`。先统一单位，再解析完整十进制或科学计数法；空字符串、布尔值、部分数字字符串、NaN 和无穷均不作为观测值。
+
+对有限特征的最小值 $a$、最大值 $b$，常规归一化为 $z=(x-a)/(b-a)$。有限的异号端点仍可能使浮点差值 $b-a$ 溢出；此时先取 $s=\max(|a|,|b|)$，采用等价形式：
+
+$$
+z=\frac{x/s-a/s}{b/s-a/s}.
+$$
+
+结果限制在 $[0,1]$。现有常量特征判据保持不变：数值范围必须大于 $32\epsilon\max(1,|a|,|b|)$，并至少存在两个有限观测；这个阈值是软件的数值筛选规则，不是测量仪器分辨率。
+
+令 $q$ 为目标的可比较有效特征数，$m$ 为候选与目标的共同有效特征数。候选必须满足 $m\ge2$，评分为：
+
+$$
+S=\operatorname{round}\left[
+100\frac{m}{q}\max\left(0,1-
+\sqrt{\frac{1}{m}\sum_{j=1}^{m}(z_{tj}-z_{pj})^2}
+\right)\right].
+$$
+
+缺失维度通过 $m/q$ 降低可信覆盖度，不填充为零。雷达图使用同一组全局范围，显示 $100z$，且只保留所有选中牌号都有有限值的维度。
+
+欧氏距离以逐项 `Math.hypot` 累积，避免直接平方把可表示的距离变成无穷或零。若真实距离本身超过浮点表示范围，调用方仍须拒绝非有限结果进入图形。特征统计使用无原型字典，`__proto__`、`constructor` 和 `toString` 不再与对象继承属性混淆。
+
+定向复现命令（先安装锁定依赖）：
+
+```bash
+npm ci
+npx vitest run tests/unit/mathUtils.test.ts --pool=forks --maxWorkers=1
+npm run validate:unicode
+npm run validate:scientific-ui
+```
+
+回归覆盖大数、极小数、601 个数量级、极大异号范围、保留属性名、普通覆盖度评分和雷达坐标。定向回归通过不等于完整 CI、浏览器视觉验收或六小时耐久测试通过。
+
 ## 使用策略
 
 1. 先校验数据 Schema、单位、标准、温度、来源和证据等级。
