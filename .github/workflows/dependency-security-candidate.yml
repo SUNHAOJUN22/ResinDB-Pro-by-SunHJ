@@ -1,0 +1,111 @@
+name: Dependency security candidate
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/dependency-security-candidate.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-security-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    # Only needed to store the two validated Git blobs. This job never updates a ref,
+    # creates a branch or commit, pushes, publishes a package, or edits repository settings.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+      - name: Install scientific display fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+      - name: Prepare a compatible security candidate without lifecycle scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/dependency-candidate"
+          git rev-parse HEAD > "$RUNNER_TEMP/dependency-candidate/base-sha.txt"
+          npm view dompurify@3.4.16 version dist.integrity --json > "$RUNNER_TEMP/dependency-candidate/dompurify-registry.json"
+          npm pkg set overrides.dompurify=3.4.16
+          npm audit fix --package-lock-only --ignore-scripts --json > "$RUNNER_TEMP/dependency-candidate/audit-fix.json"
+          cp package.json package-lock.json "$RUNNER_TEMP/dependency-candidate/"
+          git diff -- package.json package-lock.json > "$RUNNER_TEMP/dependency-candidate/dependency.patch"
+      - name: Install exact candidate and execute full production validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          exec > >(tee "$RUNNER_TEMP/dependency-candidate/validation.log") 2>&1
+          npm ci
+          npm ls --all
+          node --test scripts/tests/validation-receipt-contract.node.mjs
+          npm run validate:ci
+          npm audit --json > "$RUNNER_TEMP/dependency-candidate/audit-final.json"
+          # No unrelated tracked source change is acceptable.
+          python - <<'PY'
+          import subprocess
+          changed = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines())
+          if not changed <= {'package.json', 'package-lock.json'}:
+              raise SystemExit('Unexpected source changes: ' + repr(sorted(changed)))
+          subprocess.run(['git', 'diff', '--cached', '--exit-code'], check=True)
+          PY
+      - name: Store only the two validated blobs for explicit reviewed publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import urllib.request
+          repository = os.environ['GITHUB_REPOSITORY']
+          if repository != 'SUNHAOJUN22/ResinDB-Pro-by-SunHJ':
+              raise SystemExit('Unexpected repository')
+          output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'dependency-candidate'
+          result = {'base_sha': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'], 'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'], 'validation': 'PASS', 'publication': 'NOT_PUBLISHED', 'files': []}
+          for name in ('package.json', 'package-lock.json'):
+              data = pathlib.Path(name).read_bytes()
+              if data != (output / name).read_bytes():
+                  raise SystemExit('Candidate changed during validation: ' + name)
+              content = data.decode('utf-8', errors='strict')
+              request = urllib.request.Request(
+                  'https://api.github.com/repos/' + repository + '/git/blobs',
+                  data=json.dumps({'content': content, 'encoding': 'utf-8'}).encode(),
+                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28'},
+                  method='POST',
+              )
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  sha = json.load(response)['sha']
+              expected = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+              if sha != expected:
+                  raise SystemExit('Git blob identity mismatch')
+              result['files'].append({'path': name, 'sha': sha, 'sha256': hashlib.sha256(data).hexdigest(), 'size': len(data)})
+          (output / 'candidate-blobs.json').write_text(json.dumps(result, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(result, indent=2))
+          PY
+      - name: Preserve candidate diagnostics and hashes even after failure
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: dependency-candidate-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/dependency-candidate
+          if-no-files-found: error
+          retention-days: 14
