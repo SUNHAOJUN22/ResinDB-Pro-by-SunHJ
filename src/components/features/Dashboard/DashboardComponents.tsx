@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { AppView } from '@/types/index';
 import { UserAvatar } from '@/components/ui/UserAvatar';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 // --- Summary Card ---
 interface SummaryCardProps {
@@ -120,7 +121,9 @@ interface WelcomeBannerProps {
 export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
   userName,
   onDismiss,
-}) => (
+}) => {
+  const { t } = useLanguage();
+  return (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -140,7 +143,7 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
           <div>
             <div className="flex items-center gap-2 mb-0.5">
               <span className="text-[8px] md:text-[10px] font-black text-primary-400 uppercase tracking-[0.3em]">
-                Local workspace
+                {t("localWorkspace")}
               </span>
               <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
             </div>
@@ -150,12 +153,12 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
               </span>
             </h2>
             <p className="text-slate-500 text-[8px] md:text-[10px] font-mono uppercase tracking-[0.2em] md:tracking-[0.4em] mt-1 truncate">
-              Browser-based materials data workspace
+              {t("browserMaterialsWorkspace")}
             </p>
           </div>
         </div>
         <p className="max-w-xl text-xs font-medium leading-relaxed text-slate-400 md:text-sm">
-          ResinDB is running in the current browser. Review live record counts, data provenance, units, and test conditions before drawing conclusions from the workspace.
+          {t("workspaceDataNotice")}
         </p>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 md:gap-4 pt-2 md:pt-3">
           <motion.button
@@ -164,11 +167,11 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
             onClick={onDismiss}
             className="px-6 md:px-7 py-3 bg-white text-slate-950 rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-[0.2em] transition-all shadow-[0_10px_20px_rgba(255,255,255,0.15)] hover:shadow-[0_15px_30px_rgba(255,255,255,0.25)] flex items-center justify-center gap-3 whitespace-nowrap"
           >
-            INITIATE SESSION
+            {t("initiateSession")}
             <ChevronRight size={14} strokeWidth={3} />
           </motion.button>
           <span className="px-6 py-3 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
-            Demo workspace · verify source data
+            {t("demoWorkspaceNotice")}
           </span>
         </div>
       </div>
@@ -195,6 +198,7 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
           whileHover={{ scale: 1.1, backgroundColor: "rgba(244, 63, 94, 0.1)" }}
           whileTap={{ scale: 0.9 }}
           onClick={onDismiss}
+          aria-label={t("dismissWelcome")}
           className="absolute -top-4 -right-4 p-2 bg-slate-800 hover:bg-rose-600 text-white border border-slate-700 rounded-xl transition-all shadow-xl z-20 group-hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/50"
         >
           <X size={16} strokeWidth={3} />
@@ -202,26 +206,23 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
       </div>
     </div>
   </motion.div>
-);
+  );
+};
 
 // --- Breadcrumbs ---
 export const Breadcrumbs: React.FC<{ view: AppView }> = ({ view }) => {
+  const { t } = useLanguage();
   return (
     <div className="flex items-center gap-2 text-[9px] font-black tracking-[0.2em] overflow-x-auto custom-scrollbar-horizontal pb-1">
       <motion.div
-        whileHover={{
-          scale: 1.02,
-          x: 2,
-          backgroundColor: "rgba(255, 255, 255, 1)",
-        }}
-        whileTap={{ scale: 0.95 }}
-        className="flex items-center text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer transition-all px-3 py-1.5 bg-slate-100/40 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-800 rounded-xl border border-slate-200/50 dark:border-slate-800/50 group whitespace-nowrap shadow-sm"
+        whileHover={{ x: 2 }}
+        className="flex items-center text-slate-400 dark:text-slate-500 hover:text-primary-600 dark:hover:text-primary-400 cursor-pointer transition-all px-3 py-1.5 bg-slate-100/40 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-800 rounded-xl border border-slate-200/50 dark:border-slate-800/50 group whitespace-nowrap shadow-sm"
       >
         <Home
           size={10}
           className="mr-2 text-primary-500 group-hover:scale-110 transition-transform"
         />
-        <span>ROOT / RESIN.DB</span>
+        <span>{t("workspaceRoot")}</span>
       </motion.div>
 
       <ChevronRight
@@ -234,14 +235,14 @@ export const Breadcrumbs: React.FC<{ view: AppView }> = ({ view }) => {
           <>
             <LayoutDashboard size={10} className="text-primary-500" />
             <span className="text-slate-900 dark:text-white font-black uppercase">
-              DATA WAREHOUSE / 数据中心
+              {t("workspaceWarehouse")}
             </span>
           </>
         ) : (
           <>
             <PieChart size={10} className="text-indigo-500" />
             <span className="text-slate-900 dark:text-white font-black uppercase">
-              RESEARCH ANALYSIS / 科研分析
+              {t("workspaceAnalysis")}
             </span>
           </>
         )}
@@ -268,7 +269,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 pb-4 border-b border-white/20 dark:border-white/5">
       <motion.div
         initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         className="flex items-center gap-4"
       >
