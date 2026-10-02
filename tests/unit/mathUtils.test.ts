@@ -60,6 +60,22 @@ describe('matrix normalization statistics', () => {
     expect(summary.mins.A).toBe(1);
     expect(summary.maxes.A).toBe(3);
   });
+
+  it('treats reserved object-property names as ordinary scientific features', () => {
+    const keys = ['__proto__', 'constructor', 'toString'];
+    const first = product('first', {});
+    const second = product('second', {});
+    first.properties = Object.fromEntries(keys.map((key, index) => [key, { value: index + 1 }]));
+    second.properties = Object.fromEntries(keys.map((key, index) => [key, { value: index + 2 }]));
+    const summary = normalizeMatrixMinMax([first, second], extractor);
+    expect(summary.activeKeys).toHaveLength(3);
+    keys.forEach((key, index) => {
+      expect(summary.counts[key]).toBe(2);
+      expect(summary.mins[key]).toBe(index + 1);
+      expect(summary.maxes[key]).toBe(index + 2);
+    });
+    expect(Object.getPrototypeOf(summary.counts)).toBeNull();
+  });
 });
 
 describe('Euclidean distance contract', () => {
@@ -71,6 +87,29 @@ describe('Euclidean distance contract', () => {
   it('rejects dimension mismatch and non-finite coordinates', () => {
     expect(() => euclideanDistance([1], [1, 2])).toThrow(RangeError);
     expect(() => euclideanDistance([1, Number.NaN], [1, 2])).toThrow(TypeError);
+  });
+
+  it('avoids squaring overflow when the final norm is representable', () => {
+    const result = euclideanDistance([3e200, 4e200], [0, 0]);
+    expect(Number.isFinite(result)).toBe(true);
+    expect(result / 5e200).toBeCloseTo(1, 14);
+  });
+
+  it('avoids squaring underflow when the final norm is nonzero', () => {
+    const result = euclideanDistance([3e-200, 4e-200], [0, 0]);
+    expect(result).toBeGreaterThan(0);
+    expect(result / 5e-200).toBeCloseTo(1, 14);
+  });
+
+  it('matches a scaled reference across 601 orders of magnitude', () => {
+    for (let exponent = -300; exponent <= 300; exponent += 1) {
+      const scale = 10 ** exponent;
+      const vector = [0.3 * scale, -0.4 * scale, 0.2 * scale];
+      const zeros = [0, 0, 0];
+      const actual = euclideanDistance(vector, zeros);
+      expect(actual / Math.hypot(...vector)).toBeCloseTo(1, 12);
+      expect(actual).toBe(euclideanDistance(zeros, vector));
+    }
   });
 });
 
@@ -144,6 +183,31 @@ describe('normalized radar comparison profile', () => {
     expect(aPoint.normalized.target).toBe(0);
     expect(aPoint.normalized.candidate_0).toBe(50);
     expect(aPoint.raw.candidate_0).toBe(5);
+  });
+
+  it('preserves finite scores and radar coordinates across overflowing signed ranges', () => {
+    for (const magnitude of [1e308, Number.MAX_VALUE]) {
+      const target = product('target', { A: 0, B: 0 });
+      const minimum = product('minimum', { A: -magnitude, B: -magnitude });
+      const maximum = product('maximum', { A: magnitude, B: magnitude });
+      const same = product('same', { A: 0, B: 0 });
+      const references = [target, minimum, maximum, same];
+      const ranked = findSimilarProducts(target, references, extractor);
+      expect(ranked.find((entry) => entry.product.id === 'same')?.score).toBe(100);
+      const upper = ranked.find((entry) => entry.product.id === 'maximum')!;
+      expect(upper.score).toBe(50);
+      ranked.forEach((entry) => {
+        expect(Number.isFinite(entry.distance)).toBe(true);
+        expect(Number.isFinite(entry.normalizedDistance)).toBe(true);
+        expect(Number.isFinite(entry.score)).toBe(true);
+      });
+      const profile = buildNormalizedComparisonProfile(target, [upper], references, extractor);
+      expect(profile.points).toHaveLength(2);
+      profile.points.forEach((point) => {
+        expect(point.normalized.target).toBe(50);
+        expect(point.normalized.candidate_0).toBe(100);
+      });
+    }
   });
 
   it('requires a positive integer feature limit', () => {
