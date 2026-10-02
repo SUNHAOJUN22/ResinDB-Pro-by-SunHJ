@@ -72,7 +72,14 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const tProp = useCallback((key: string) => {
     const readableFallback = humanizeTranslationKey(key);
-    const translated = language === 'zh' ? key : propertyMap[key] ?? readableFallback;
+    // Metadata fields (gradeName, manufacturer, ...) use the same locale map
+    // as ordinary UI labels; scientific property names retain their fallback.
+    const labels = translations[language];
+    const metadataLabel = Object.prototype.hasOwnProperty.call(labels, key)
+      ? labels[key as keyof typeof labels]
+      : undefined;
+    const translated = metadataLabel
+      ?? (language === 'zh' ? key : propertyMap[key] ?? readableFallback);
     return normalizeUiText(translated, readableFallback);
   }, [language]);
 
