@@ -36,7 +36,9 @@ function hasForbiddenControlCharacter(value: string): boolean {
 export function parseLanguage(value: unknown): Language | null {
   if (typeof value !== 'string') return null;
   const normalized = value.normalize('NFKC').trim().toLowerCase();
-  return LANGUAGE_ALIASES[normalized] ?? null;
+  return Object.prototype.hasOwnProperty.call(LANGUAGE_ALIASES, normalized)
+    ? LANGUAGE_ALIASES[normalized]
+    : null;
 }
 
 export function normalizeLanguage(value: unknown, fallback: Language = 'zh'): Language {

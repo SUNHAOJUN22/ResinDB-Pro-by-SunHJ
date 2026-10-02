@@ -21,6 +21,13 @@ describe('Unicode-safe language runtime', () => {
     expect(languageTag('en')).toBe('en');
   });
 
+  test.each(['constructor', '__proto__', 'CONSTRUCTOR', '  __proto__  '])(
+    'rejects inherited object keys as language values: %s', (value) => {
+      expect(parseLanguage(value)).toBeNull();
+      expect(normalizeLanguage(value)).toBe('zh');
+    },
+  );
+
   test('blocks replacement characters, control characters and common mojibake', () => {
     const replacement = codepoints(0xfffd);
     const latin1Degree = codepoints(0x00c2, 0x00b0);
