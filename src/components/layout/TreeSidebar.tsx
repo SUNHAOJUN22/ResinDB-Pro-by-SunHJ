@@ -109,11 +109,12 @@ export const TreeSidebar: React.FC<TreeSidebarProps> = ({
         </div>
 
         {/* Search Input */}
-        <div className="relative group/search mt-2 mb-4">
+        <div className="relative group">
           <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors z-10"
             size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within/search:text-primary-500 transition-colors z-10"
           />
+          <div className="absolute inset-0 bg-primary-500/10 rounded-lg blur opacity-0 group-focus-within:opacity-100 transition-opacity duration-500 pointer-events-none" />
           <input
             type="text"
             placeholder={t("searchCategories")}
@@ -214,7 +215,7 @@ export const TreeSidebar: React.FC<TreeSidebarProps> = ({
             <motion.div
               initial={false}
               animate={{ width: `${minCompleteness}%` }}
-              className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary-400 to-primary-600 rounded-full shadow-[0_0_12px_rgba(14,165,233,0.4)] group-hover/slider:shadow-[0_0_15px_30px_rgba(14,165,233,0.6)] transition-shadow"
+              className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary-400 to-primary-600 rounded-full shadow-[0_0_12px_rgba(14,165,233,0.4)] group-hover/slider:shadow-[0_0_15px_rgba(14,165,233,0.6)] transition-shadow"
             />
             <input
               type="range"
