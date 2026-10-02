@@ -44,6 +44,9 @@ jobs:
           exec > >(tee "$RUNNER_TEMP/dependency-candidate/preparation.log") 2>&1
           git rev-parse HEAD > "$RUNNER_TEMP/dependency-candidate/base-sha.txt"
           node --version
+          # npm 10.9.2 crashes in Arborist edgesOut while updating this peer graph.
+          # This is a pinned resolver, not a change to the application's Node runtime.
+          npm install --global npm@11.6.4 --ignore-scripts
           npm --version
           npm ci --ignore-scripts
           npm view dompurify@3.4.16 version dist.integrity --json > "$RUNNER_TEMP/dependency-candidate/dompurify-registry.json"
