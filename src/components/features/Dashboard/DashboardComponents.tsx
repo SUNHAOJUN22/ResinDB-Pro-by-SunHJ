@@ -215,8 +215,13 @@ export const Breadcrumbs: React.FC<{ view: AppView }> = ({ view }) => {
   return (
     <div className="flex items-center gap-2 text-[9px] font-black tracking-[0.2em] overflow-x-auto custom-scrollbar-horizontal pb-1">
       <motion.div
-        whileHover={{ x: 2 }}
-        className="flex items-center text-slate-400 dark:text-slate-500 hover:text-primary-600 dark:hover:text-primary-400 cursor-pointer transition-all px-3 py-1.5 bg-slate-100/40 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-800 rounded-xl border border-slate-200/50 dark:border-slate-800/50 group whitespace-nowrap shadow-sm"
+        whileHover={{
+          scale: 1.02,
+          x: 2,
+          backgroundColor: "rgba(255, 255, 255, 1)",
+        }}
+        whileTap={{ scale: 0.95 }}
+        className="flex items-center text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer transition-all px-3 py-1.5 bg-slate-100/40 dark:bg-slate-900/40 hover:bg-white dark:hover:bg-slate-800 rounded-xl border border-slate-200/50 dark:border-slate-800/50 group whitespace-nowrap shadow-sm"
       >
         <Home
           size={10}
@@ -269,7 +274,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 pb-4 border-b border-white/20 dark:border-white/5">
       <motion.div
         initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, y: 0 }}
+        animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5 }}
         className="flex items-center gap-4"
       >
