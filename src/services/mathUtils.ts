@@ -78,7 +78,13 @@ function clampUnit(value: number): number {
 function normalizedValue(value: number, minimum: number, maximum: number): number {
   const range = maximum - minimum;
   if (!(range > rangeTolerance(minimum, maximum))) return 0;
-  return clampUnit((value - minimum) / range);
+  if (Number.isFinite(range)) return clampUnit((value - minimum) / range);
+  // Opposite-sign finite endpoints can have an unrepresentable difference.
+  // Scaling first preserves the min-max ratio without Infinity / Infinity.
+  const scale = Math.max(Math.abs(minimum), Math.abs(maximum));
+  return clampUnit(
+    (value / scale - minimum / scale) / (maximum / scale - minimum / scale),
+  );
 }
 
 /**
@@ -89,9 +95,9 @@ export function normalizeMatrixMinMax(
   data: readonly Product[],
   valueExtractor: NumericValueExtractor,
 ): MatrixMinMaxSummary {
-  const mins: Record<string, number> = {};
-  const maxes: Record<string, number> = {};
-  const counts: Record<string, number> = {};
+  const mins: Record<string, number> = Object.create(null);
+  const maxes: Record<string, number> = Object.create(null);
+  const counts: Record<string, number> = Object.create(null);
 
   for (const product of data) {
     for (const key of Object.keys(product.properties)) {
@@ -124,7 +130,7 @@ export function euclideanDistance(
   if (vecA.length !== vecB.length) {
     throw new RangeError('Euclidean distance vectors must have equal length.');
   }
-  let sum = 0;
+  let magnitude = 0;
   for (let index = 0; index < vecA.length; index++) {
     const left = vecA[index];
     const right = vecB[index];
@@ -132,9 +138,12 @@ export function euclideanDistance(
       throw new TypeError('Euclidean distance vectors must contain only finite numbers.');
     }
     const difference = left - right;
-    sum += difference * difference;
+    // Math.hypot scales internally; direct squaring overflows/underflows
+    // even when the final norm is representable. Two arguments avoid a
+    // variadic argument-count limit for long vectors.
+    magnitude = Math.hypot(magnitude, difference);
   }
-  return Math.sqrt(Math.max(0, sum));
+  return magnitude;
 }
 
 /**
@@ -160,6 +169,7 @@ export function findSimilarProducts(
   const targetKeys: string[] = [];
   const targetNormalizedValues: number[] = [];
   const targetMinimums: number[] = [];
+  const targetMaximums: number[] = [];
   const targetInverseRanges: number[] = [];
   for (const key of activeKeys) {
     const value = valueExtractor(targetProduct, key);
@@ -168,8 +178,9 @@ export function findSimilarProducts(
     const range = maxes[key] - minimum;
     targetKeys.push(key);
     targetMinimums.push(minimum);
+    targetMaximums.push(maxes[key]);
     targetInverseRanges.push(1 / range);
-    targetNormalizedValues.push(clampUnit((value - minimum) / range));
+    targetNormalizedValues.push(normalizedValue(value, minimum, maxes[key]));
   }
   const targetFeatureCount = targetKeys.length;
   if (targetFeatureCount < MINIMUM_SHARED_FEATURES) return [];
@@ -184,9 +195,10 @@ export function findSimilarProducts(
     for (let index = 0; index < targetFeatureCount; index++) {
       const candidateValue = valueExtractor(product, targetKeys[index]);
       if (candidateValue === null || !Number.isFinite(candidateValue)) continue;
-      const candidateNormalized = clampUnit(
-        (candidateValue - targetMinimums[index]) * targetInverseRanges[index],
-      );
+      const inverseRange = targetInverseRanges[index];
+      const candidateNormalized = inverseRange === 0
+        ? normalizedValue(candidateValue, targetMinimums[index], targetMaximums[index])
+        : clampUnit((candidateValue - targetMinimums[index]) * inverseRange);
       const difference = targetNormalizedValues[index] - candidateNormalized;
       sumSquared += difference * difference;
       sharedIndices[sharedFeatureCount] = index;
