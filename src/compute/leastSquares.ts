@@ -198,13 +198,14 @@ function svdPseudoInverseSolve(svd: JacobiSvdResult, target: readonly number[], 
 }
 
 function residualNorm(design: readonly (readonly number[])[], target: readonly number[], solution: readonly number[]): number {
-  let squared = 0;
+  let norm = 0;
   for (let row = 0; row < design.length; row++) {
     let predicted = 0;
     for (let column = 0; column < solution.length; column++) predicted += design[row][column] * solution[column];
-    squared += (predicted - target[row]) ** 2;
+    norm = Math.hypot(norm, predicted - target[row]);
   }
-  return Math.sqrt(squared);
+  if (!Number.isFinite(norm)) throw new RangeError('Least-squares residual exceeds the finite floating-point range');
+  return norm;
 }
 
 export function solveLeastSquares(
@@ -223,9 +224,15 @@ export function solveLeastSquares(
   }
 
   const columnScales = Array.from({ length: columns }, (_, column) => {
-    let normSquared = 0;
-    for (let row = 0; row < rows; row++) normSquared += design[row][column] ** 2;
-    return Math.sqrt(normSquared) || 1;
+    let norm = 0;
+    let maximum = 0;
+    for (let row = 0; row < rows; row++) {
+      norm = Math.hypot(norm, design[row][column]);
+      maximum = Math.max(maximum, Math.abs(design[row][column]));
+    }
+    // A finite column can have an unrepresentable Euclidean norm. Its maximum
+    // magnitude is still a valid nonzero preconditioner; never divide by Infinity.
+    return (Number.isFinite(norm) ? norm : maximum) || 1;
   });
   const scaledDesign = design.map((row) => row.map((value, column) => value / columnScales[column]));
   const svd = oneSidedJacobiSvd(scaledDesign);
@@ -239,16 +246,29 @@ export function solveLeastSquares(
   const conditionNumber = rank < columns ? null : finiteConditionNumber;
   const conditionNumberStatus = rank < columns ? 'infinite' : 'finite';
 
+  // Normalize the right-hand side too: orthogonal projections can overflow
+  // even when the final coefficients and all supplied values are finite.
+  const targetScale = target.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0) || 1;
+  const scaledTarget = target.map((value) => value / targetScale);
   let solver: LeastSquaresSolver;
   let scaledSolution: number[];
   if (rows >= columns && rank === columns && finiteConditionNumber <= conditionLimit) {
     solver = 'qr-householder';
-    scaledSolution = householderQrSolve(scaledDesign, target, tolerance);
+    scaledSolution = householderQrSolve(scaledDesign, scaledTarget, tolerance);
   } else {
     solver = 'svd-jacobi-pseudoinverse';
-    scaledSolution = svdPseudoInverseSolve(svd, target, tolerance);
+    scaledSolution = svdPseudoInverseSolve(svd, scaledTarget, tolerance);
   }
-  const solution = scaledSolution.map((value, column) => value / columnScales[column]);
+  const solution = scaledSolution.map((value, column) => {
+    const ratio = targetScale / columnScales[column];
+    const coefficient = Number.isFinite(ratio) && ratio !== 0
+      ? value * ratio
+      : (value * targetScale) / columnScales[column];
+    if (!Number.isFinite(coefficient)) {
+      throw new RangeError('Least-squares coefficient exceeds the finite floating-point range');
+    }
+    return coefficient;
+  });
 
   return {
     solution,

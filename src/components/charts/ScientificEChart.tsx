@@ -32,6 +32,7 @@ const FIGURE_STATE_TEXT = {
     empty: '暂无可绘制数据',
     calculatingDetail: '数值模型正在后台 Worker 中运行。',
     emptyDetail: '请调整变量、筛选条件或样本选择。',
+    unavailableDetail: '尚未收到有效图表配置，请重新计算或调整输入。',
   },
   en: {
     calculating: 'Calculating scientific figure',
@@ -39,6 +40,7 @@ const FIGURE_STATE_TEXT = {
     empty: 'No plottable data',
     calculatingDetail: 'The numerical model is running in a background Worker.',
     emptyDetail: 'Adjust the variables, filters, or sample selection.',
+    unavailableDetail: 'No valid chart configuration is available. Recalculate or adjust the inputs.',
   },
 } as const;
 
@@ -187,7 +189,8 @@ export const ScientificEChart: React.FC<ScientificEChartProps> = React.memo(({
     };
   }, []);
 
-  const stateVisible = loading || empty || Boolean(error);
+  const unavailable = !normalizedOption && !loading && !empty && !error;
+  const stateVisible = loading || empty || Boolean(error) || unavailable;
   const figureState = loading
     ? 'loading'
     : error
@@ -233,10 +236,10 @@ export const ScientificEChart: React.FC<ScientificEChartProps> = React.memo(({
               <Database className="mx-auto mb-3 text-slate-400" size={28} aria-hidden="true" />
             )}
             <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-              {loading ? messages.calculating : error ? messages.unavailable : messages.empty}
+              {loading ? messages.calculating : error || unavailable ? messages.unavailable : messages.empty}
             </div>
             <div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-              {error ?? (loading ? messages.calculatingDetail : messages.emptyDetail)}
+              {error ?? (loading ? messages.calculatingDetail : unavailable ? messages.unavailableDetail : messages.emptyDetail)}
             </div>
           </div>
         </div>
