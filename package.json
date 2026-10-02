@@ -73,7 +73,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.0",
-    "@vitest/coverage-v8": "^4.1.5",
+    "@vitest/coverage-v8": "4.1.11",
     "eslint": "10.8.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-refresh": "0.5.3",
@@ -83,11 +83,11 @@
     "typescript": "~5.8.2",
     "typescript-eslint": "8.65.0",
     "vite": "^7.2.2",
-    "vitest": "^4.1.5"
+    "vitest": "4.1.11"
   },
   "overrides": {
     "browserslist": "4.28.8",
-    "dompurify": "3.4.13",
+    "dompurify": "3.4.16",
     "nanoid": "3.3.18"
   },
   "engines": {
