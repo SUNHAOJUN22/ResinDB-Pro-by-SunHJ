@@ -109,12 +109,11 @@ export const TreeSidebar: React.FC<TreeSidebarProps> = ({
         </div>
 
         {/* Search Input */}
-        <div className="relative group">
+        <div className="relative group/search mt-2 mb-4">
           <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors z-10"
             size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within/search:text-primary-500 transition-colors z-10"
           />
-          <div className="absolute inset-0 bg-primary-500/10 rounded-lg blur opacity-0 group-focus-within:opacity-100 transition-opacity duration-500 pointer-events-none" />
           <input
             type="text"
             placeholder={t("searchCategories")}
@@ -201,13 +200,13 @@ export const TreeSidebar: React.FC<TreeSidebarProps> = ({
                 />
               </div>
               <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">
-                Data Quality
+                {t("qualityFilterLabel")}
               </span>
             </div>
             <span
               className={`text-[10px] font-mono px-2 py-0.5 rounded-md shadow-sm ${minCompleteness > 80 ? "bg-emerald-500 text-white" : minCompleteness > 50 ? "bg-amber-500 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"}`}
             >
-              {minCompleteness > 0 ? `${minCompleteness}%+` : "All"}
+              {minCompleteness > 0 ? `${minCompleteness}%+` : t("qualityFilterAll")}
             </span>
           </div>
           <div className="relative h-2 flex items-center group/slider">
@@ -215,10 +214,11 @@ export const TreeSidebar: React.FC<TreeSidebarProps> = ({
             <motion.div
               initial={false}
               animate={{ width: `${minCompleteness}%` }}
-              className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary-400 to-primary-600 rounded-full shadow-[0_0_12px_rgba(14,165,233,0.4)] group-hover/slider:shadow-[0_0_15px_rgba(14,165,233,0.6)] transition-shadow"
+              className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary-400 to-primary-600 rounded-full shadow-[0_0_12px_rgba(14,165,233,0.4)] group-hover/slider:shadow-[0_0_15px_30px_rgba(14,165,233,0.6)] transition-shadow"
             />
             <input
               type="range"
+              aria-label={t("qualityFilterLabel")}
               min="0"
               max="90"
               step="10"
@@ -237,7 +237,7 @@ export const TreeSidebar: React.FC<TreeSidebarProps> = ({
             />
           </div>
           <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] px-1">
-            <span>Any</span>
+            <span>{t("qualityFilterAny")}</span>
             <span>50%</span>
             <span>90%</span>
           </div>
