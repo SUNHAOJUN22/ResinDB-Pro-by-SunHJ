@@ -73,6 +73,44 @@ C_{\mathrm{finite}}
 \land C_{\mathrm{nonblank}}.
 $$
 
+Direct addition of these components, including the sum-of-squares budget in the conceptual diagram, assumes unit-consistent, uncorrelated contributions expressed in the same observable. Correlated inputs require cross-covariance terms: general first-order propagation is $u_y^2\approx\sum_{i,j}J_iJ_j\operatorname{Cov}(x_i,x_j)$. These equations specify modeling assumptions; they do not establish validated uncertainty for an arbitrary material system.
+
+## Similarity and radar profiles: implemented numerical contracts
+
+The implementation is `src/services/mathUtils.ts`; permanent regressions live in `tests/unit/mathUtils.test.ts`. Harmonize units before parsing complete decimal or scientific-notation values. Empty strings, booleans, partial numeric strings, NaN and infinities are not observations.
+
+For finite feature bounds $a$ and $b$, ordinary min-max normalization is $z=(x-a)/(b-a)$. Opposite-sign finite endpoints can still overflow the floating-point difference $b-a$. In that case, set $s=\max(|a|,|b|)$ and use the equivalent scaled expression:
+
+$$
+z=\frac{x/s-a/s}{b/s-a/s}.
+$$
+
+Clamp the result to $[0,1]$. The existing constant-feature policy is unchanged: the numerical range must exceed $32\epsilon\max(1,|a|,|b|)$ and have at least two finite observations. This threshold is a software screening rule, not an instrument-resolution claim.
+
+Let $q$ be the target's comparable active-feature count and $m$ the candidate's shared active-feature count. Candidates require $m\ge2$. The score is:
+
+$$
+S=\operatorname{round}\left[
+100\frac{m}{q}\max\left(0,1-
+\sqrt{\frac{1}{m}\sum_{j=1}^{m}(z_{tj}-z_{pj})^2}
+\right)\right].
+$$
+
+Missing dimensions reduce supported coverage through $m/q$; they are not imputed as zero. Radar profiles use the same global ranges, display $100z$, and retain only dimensions observed finitely for every selected product.
+
+Euclidean distances accumulate with pairwise `Math.hypot`, avoiding false overflow or underflow from direct squaring. A true distance beyond the floating-point representation range still requires the caller to reject a non-finite result before plotting. Feature statistics use prototype-free dictionaries so that `__proto__`, `constructor` and `toString` remain ordinary feature names.
+
+Targeted reproduction after installing locked dependencies:
+
+```bash
+npm ci
+npx vitest run tests/unit/mathUtils.test.ts --pool=forks --maxWorkers=1
+npm run validate:unicode
+npm run validate:scientific-ui
+```
+
+Regressions cover large and tiny values, 601 orders of magnitude, extreme signed ranges, reserved property names, ordinary coverage-aware scoring and radar coordinates. A targeted regression pass is not full CI, browser visual acceptance or six-hour endurance qualification.
+
 ## Operating strategy
 
 1. Validate Schema, units, standards, temperature, provenance and evidence class first.
