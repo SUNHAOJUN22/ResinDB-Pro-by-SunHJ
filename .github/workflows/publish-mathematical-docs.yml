@@ -1,0 +1,179 @@
+name: Publish source-backed mathematical documentation
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    if: github.ref == 'refs/heads/main' && github.repository_owner == 'SUNHAOJUN22'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      PYTHONUTF8: '1'
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - name: Generate only declared documentation and genuine derived records
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$GITHUB_REPOSITORY" in
+            SUNHAOJUN22/AspenOps-Agent)
+              python -m pip install uv==0.11.16
+              uv sync --frozen --extra dev --extra agent --extra signing
+              uv run python scripts/refresh_current_main_readme.py --write
+              uv run python scripts/refresh_current_main_readme.py --check
+              uv run pytest -q tests/test_current_main_readme_generator.py tests/test_documentation_contracts.py
+              uv run ruff check .
+              uv run ruff format --check .
+              ;;
+            SUNHAOJUN22/TsaoSciComputation)
+              python -m pip install -e '.[validation,quality,security]'
+              node scripts/refresh-current-main-readme.mjs --write
+              node scripts/refresh-current-main-readme.mjs
+              python scripts/build_acceleration_audits.py
+              python scripts/quality_check.py
+              python scripts/security_scan.py
+              python scripts/build_manifest.py
+              python scripts/verify_all.py --profile core
+              python scripts/verify_all.py --profile quality
+              ;;
+            SUNHAOJUN22/TSAO-PROCESSING-SKILL)
+              python -m pip install --require-hashes -r requirements.lock
+              python -m pip install --no-deps --no-build-isolation -e .
+              node scripts/refresh-current-main-readme.mjs --write
+              node scripts/refresh-current-main-readme.mjs
+              python scripts/update_source_overlay.py --target reports/SOURCE_ACCEPTANCE_OVERLAY.tsv README.md README.zh-CN.md docs/CURRENT_MAIN_ACCEPTANCE.md docs/current-main/tsao-processing-current-main-zh.svg docs/current-main/tsao-processing-current-main-en.svg scripts/refresh-current-main-readme.mjs .github/workflows/refresh-mathematical-docs.yml
+              python scripts/run_ci.py
+              ;;
+            SUNHAOJUN22/ResinDB-Pro-by-SunHJ)
+              npm ci
+              node scripts/refresh-current-main-readme.mjs --write
+              node scripts/refresh-current-main-readme.mjs
+              node scripts/validate-repository-unicode.mjs --write
+              npm run validate:docs
+              npm run validate:unicode
+              npm run lint
+              npm run typecheck
+              npm run test
+              ;;
+            SUNHAOJUN22/TsaoDFT_skill)
+              python -m pip install -c constraints/py312.txt -r requirements-dev.txt
+              node scripts/refresh-current-main-readme.mjs --write
+              node scripts/refresh-current-main-readme.mjs
+              python scripts/quality_gate.py --report-dir "$RUNNER_TEMP/dft-reports"
+              ;;
+            SUNHAOJUN22/TsaoSciResearcher)
+              python -m pip install -r requirements-ci.lock
+              python -m pip install -e . --no-deps
+              node scripts/refresh-current-main-readme.mjs --write
+              node scripts/refresh-current-main-readme.mjs
+              python scripts/build_readme_facts.py --write
+              python scripts/validate_unicode_integrity.py --write
+              python scripts/build_validation_evidence.py --write --preflight
+              python scripts/build_test_dashboard.py --write
+              python scripts/build_engineering_report.py --write
+              python scripts/generate_checksums.py --write
+              python scripts/build_readme_facts.py --check
+              python scripts/validate_unicode_integrity.py --check
+              python scripts/build_validation_evidence.py --check
+              python scripts/generate_checksums.py --check
+              PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q -p hypothesis.extra.pytestplugin
+              python -m unittest discover -s .github/acceptance -v
+              ;;
+            *) echo 'Repository is outside the approved six-repository plan'; exit 2 ;;
+          esac
+      - name: Package allowlisted generated files without exporting repository source
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, pathlib, shutil, subprocess
+          fixed = {'README.md','README.en.md','README.zh-CN.md','README_EN.md','docs/CURRENT_MAIN_ACCEPTANCE.md','manifest.json','evidence/quality-check.json','evidence/security-scan.json','reports/ACCELERATION_OPPORTUNITIES_PRODUCTION_V4.json','reports/ACCELERATION_OPPORTUNITIES_FULL_TREE_V4.json','reports/ACCELERATION_OPPORTUNITIES_V2.json','reports/SOURCE_ACCEPTANCE_OVERLAY.tsv','reports/UNICODE_INTEGRITY_REPORT.json','docs/README_FACTS.json','docs/VALIDATION_EVIDENCE.json','docs/test-dashboard.html','docs/test-dashboard.svg','docs/engineering-audit-report.pdf','SHA256SUMS'}
+          visuals = {str(p) for p in pathlib.Path('docs/current-main').glob('*-current-main-*.svg')}
+          allowed = fixed | visuals
+          changed = set(subprocess.check_output(['git','diff','--name-only','-z']).decode().strip('\0').split('\0')) - {''}
+          if not changed <= allowed:
+              raise SystemExit(f'Unexpected tracked changes: {sorted(changed - allowed)}')
+          dest = pathlib.Path(os.environ['RUNNER_TEMP']) / 'documentation-candidate'
+          dest.mkdir()
+          records = {}
+          for name in sorted(changed):
+              source = pathlib.Path(name)
+              if not source.is_file() or source.is_symlink():
+                  raise SystemExit('Generated output must be a regular file')
+              target = dest / 'files' / name
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(source, target)
+              records[name] = hashlib.sha256(target.read_bytes()).hexdigest()
+          (dest/'receipt.json').write_text(json.dumps({'source':os.environ['GITHUB_SHA'],'repository':os.environ['GITHUB_REPOSITORY'],'files':records},sort_keys=True)+'\n')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mathematical-docs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/documentation-candidate
+          if-no-files-found: error
+          retention-days: 7
+  publish:
+    needs: generate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: main
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: mathematical-docs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/documentation-candidate
+      - name: Publish generated documentation only while the source lease still matches
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          python - <<'PY'
+          import hashlib, json, os, pathlib, shutil, subprocess
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])/'documentation-candidate'
+          record = json.loads((root/'receipt.json').read_text())
+          if record['source'] != os.environ['EXPECTED_SHA'] or record['repository'] != os.environ['GITHUB_REPOSITORY']:
+              raise SystemExit('Source receipt mismatch')
+          fixed = {'README.md','README.en.md','README.zh-CN.md','README_EN.md','docs/CURRENT_MAIN_ACCEPTANCE.md','manifest.json','evidence/quality-check.json','evidence/security-scan.json','reports/ACCELERATION_OPPORTUNITIES_PRODUCTION_V4.json','reports/ACCELERATION_OPPORTUNITIES_FULL_TREE_V4.json','reports/ACCELERATION_OPPORTUNITIES_V2.json','reports/SOURCE_ACCEPTANCE_OVERLAY.tsv','reports/UNICODE_INTEGRITY_REPORT.json','docs/README_FACTS.json','docs/VALIDATION_EVIDENCE.json','docs/test-dashboard.html','docs/test-dashboard.svg','docs/engineering-audit-report.pdf','SHA256SUMS'}
+          allowed = fixed | {str(p) for p in pathlib.Path('docs/current-main').glob('*-current-main-*.svg')}
+          files = record['files']
+          if not isinstance(files, dict) or not set(files) <= allowed or any(p.is_symlink() for p in root.rglob('*')):
+              raise SystemExit('Invalid generated-file inventory')
+          actual = {str(p.relative_to(root/'files')) for p in (root/'files').rglob('*') if p.is_file()}
+          if actual != set(files):
+              raise SystemExit('Artifact inventory mismatch')
+          for name, expected in files.items():
+              path = root/'files'/name
+              if hashlib.sha256(path.read_bytes()).hexdigest() != expected or pathlib.Path(name).is_symlink():
+                  raise SystemExit('Generated-file hash mismatch')
+              shutil.copyfile(path, name)
+          if files:
+              subprocess.run(['git','add','--',*sorted(files)],check=True)
+          PY
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'docs: publish source-backed bilingual mathematics and verified layouts'
+            git push origin HEAD:main
+          fi
+          gh api --method POST "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/dispatches" -f ref=main
