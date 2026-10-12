@@ -87,7 +87,6 @@ export function buildKdeFigure(
             style: { fill: api.visual('color') },
           };
         },
-        emphasis: { disabled: true },
       },
       { name: text.observed, type: 'scatter', data: points.map((point) => [point.x, point.y]), symbolSize: points.length > 2_000 ? 2 : 4, progressive: 1_000, itemStyle: { color: theme === 'dark' ? '#ffffff' : '#0f172a', opacity: 0.55 } },
     ],
