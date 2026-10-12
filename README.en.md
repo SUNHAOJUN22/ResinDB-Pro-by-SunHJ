@@ -136,34 +136,56 @@ npm run test:ui
 Software acceptance covers data contracts, implemented computations, interface rendering and reproducible evidence. Grade release, experimental truth, force-field applicability and industrial decisions still require independent qualification.
 
 <!-- CURRENT_MAIN_ACCEPTANCE_V2:START -->
-## Current `main`: data–compute–figure–evidence loop
+## Current implementation: code, mathematics and usage
 
-<p align="center"><img src="docs/current-main/resindb-current-main-en.svg" width="100%" alt="Current `main`: data–compute–figure–evidence loop"></p>
+![English code and mathematical-contract concept](docs/current-main/resindb-current-main-en.svg)
 
-> This figure is generated from current code contracts and is scientific-software conceptual design, not measured resin-database output.
+> ResinDB Pro is a local-first scientific data and analysis workbench, not a certified LIMS/ERP, commercial force field, industrial grade-release system or automatic scientific approval engine.
 
-### Core mathematical contracts
-
-$$
-C_figure = C_finite ∧ C_labeled ∧ C_finished ∧ C_nonblank
-$$
+#### Continuous-coordinate KDE
 
 $$
-d_M(x, μ) = √((x − μ)ᵀ Σ⁻¹ (x − μ))
+\widehat f(x,y)=\frac{1}{2\pi n h_xh_y}\sum_{i=1}^n\exp\!\left[-\frac12\left(\frac{x-x_i}{h_x}\right)^2-\frac12\left(\frac{y-y_i}{h_y}\right)^2\right]
 $$
 
+The separable bivariate Gaussian kernel requires positive bandwidths; density has inverse-product coordinate units. The figure layer uses custom cells on continuous axes and preserves original density rather than treating coordinates as category indices. A finite display window generally integrates to less than one; color intensity or relative maximum is not probability.
+
+Source mapping: [`src/compute/gaussianKde.ts`](src/compute/gaussianKde.ts) · [`src/components/charts/kdeFigure.ts`](src/components/charts/kdeFigure.ts)
+
+#### Weibull median-rank fit
+
 $$
-u_c² = u_data² + u_model² + u_scale²
+F(v)=1-e^{-(v/\eta)^m},\qquad \ln[-\ln(1-F(v))]=m\ln v-m\ln\eta,\qquad B_5=\eta[-\ln(0.95)]^{1/m}
 $$
 
-### Usage strategy
+Positive v and η are required; m is the shape parameter. The UI uses ordinary least-squares linearization of Bernard median ranks, not maximum-likelihood estimation (not MLE). B5 is the fitted 5% failure quantile, not a 95% parameter-confidence bound or a safety-release guarantee. Titles, legends and tooltips follow the selected language.
 
-1. Validate Schema, source type, record status, units and finite values at import.
-2. Similarity, regression, clustering and UQ must expose missing-data, scaling and applicability handling.
-3. Browser figures are exportable only after ECharts finished, nonblank canvas and complete labels.
-4. Chinese and English README, SVG and UI strings are qualified separately; language leakage and mojibake are rejected.
+Source mapping: [`src/components/charts/WeibullChart.tsx`](src/components/charts/WeibullChart.tsx)
 
-> **Responsibility boundary:** ResinDB Pro is a local-first scientific data and analysis workbench, not a certified LIMS/ERP, commercial force field, industrial grade-release system or automatic scientific approval engine.
+#### Figure delivery gate
 
-Execution prompt: [SIX_REPOSITORY_PARALLEL_6H_ACCEPTANCE_PROMPT_V2.md](docs/SIX_REPOSITORY_PARALLEL_6H_ACCEPTANCE_PROMPT_V2.md)
+$$
+C_{\mathrm{figure}}=C_{\mathrm{finite}}\land C_{\mathrm{labels}}\land C_{\mathrm{finished}}\land C_{\mathrm{nonblank}}
+$$
+
+This explanatory figure contract combines finite-data counts, labels, completion events and nonblank-canvas evidence, while distinguishing no data from an unavailable renderer. A screenshot alone is not proof of scientific correctness; test browser behavior, themes, locales and reopening charts.
+
+Source mapping: [`src/components/charts/ScientificEChart.tsx`](src/components/charts/ScientificEChart.tsx)
+
+### Usage and acceptance sequence
+
+1. Check the installation environment, input structure, units, applicability and execution permissions.
+2. Use the source mappings above to distinguish native implementation, explanatory contracts and external execution requirements.
+3. Run focused regression and full quality gates before long-duration testing of pinned commits.
+4. Preserve original logs, machine-readable reports and limitations; missing evidence must never be reported as PASS.
+
+```bash
+npm ci
+npm run validate:ci
+```
+
+Retest every changed commit. Baseline regression, two three-hour regression segments, browser visual checks and external engineering qualification are distinct evidence classes. Without original receipts, no six-hour completion is claimed.
+
+Implementation anchors: [`src/data/dataContract.ts`](src/data/dataContract.ts) · [`src/services/mathUtils.ts`](src/services/mathUtils.ts) · [`src/compute/capabilityProbe.ts`](src/compute/capabilityProbe.ts)
+
 <!-- CURRENT_MAIN_ACCEPTANCE_V2:END -->

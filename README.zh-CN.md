@@ -136,34 +136,56 @@ npm run test:ui
 软件验收只覆盖数据合同、计算实现、界面显示和可重复证据；牌号放行、实验真实性、力场适用性和工业决策仍需独立资格证据。
 
 <!-- CURRENT_MAIN_ACCEPTANCE_V2:START -->
-## 当前 `main`：数据—计算—图形—证据闭环
+## 当前实现：代码、数学与使用策略
 
-<p align="center"><img src="docs/current-main/resindb-current-main-zh.svg" width="100%" alt="当前 `main`：数据—计算—图形—证据闭环"></p>
+![中文代码与数学合同概念图](docs/current-main/resindb-current-main-zh.svg)
 
-> 该图由当前代码合同生成，是科学软件概念设计，不是树脂数据库测量结果。
+> ResinDB Pro 是本地优先的科学数据与分析工作台，不是经认证的 LIMS/ERP、商业力场、工业牌号放行系统或自动科研批准器。
 
-### 核心数理合同
-
-$$
-C_figure = C_finite ∧ C_labeled ∧ C_finished ∧ C_nonblank
-$$
+#### 连续坐标的核密度
 
 $$
-d_M(x, μ) = √((x − μ)ᵀ Σ⁻¹ (x − μ))
+\widehat f(x,y)=\frac{1}{2\pi n h_xh_y}\sum_{i=1}^n\exp\!\left[-\frac12\left(\frac{x-x_i}{h_x}\right)^2-\frac12\left(\frac{y-y_i}{h_y}\right)^2\right]
 $$
 
+二维独立高斯核使用正带宽；密度具有 x、y 单位乘积的倒数单位。新绘图层使用连续坐标自定义单元格，保留原始密度，不把坐标冒充类别索引。有限显示窗口的积分一般小于 1；颜色强度或“相对最大值”不是概率。
+
+源码对应: [`src/compute/gaussianKde.ts`](src/compute/gaussianKde.ts) · [`src/components/charts/kdeFigure.ts`](src/components/charts/kdeFigure.ts)
+
+#### Weibull 中位秩拟合
+
 $$
-u_c² = u_data² + u_model² + u_scale²
+F(v)=1-e^{-(v/\eta)^m},\qquad \ln[-\ln(1-F(v))]=m\ln v-m\ln\eta,\qquad B_5=\eta[-\ln(0.95)]^{1/m}
 $$
 
-### 使用策略
+v、η 必须为正，m 为形状参数。界面采用 Bernard 中位秩的普通最小二乘线性化，而非极大似然估计（not MLE）。B5 是模型的 5% 失效分位数，不是 95% 参数置信下限，也不是安全放行保证。中文与英文标题、图例及提示随语言切换。
 
-1. 导入时先验证 Schema、来源类型、记录状态、单位和有限值。
-2. 相似度、回归、聚类与 UQ 必须显式处理缺失数据、尺度和适用域。
-3. 浏览器图形只有在 ECharts finished、Canvas 非空且标签完整时才可导出。
-4. 中文与英文 README、SVG 和界面字符串分别验收，禁止语言串扰和乱码。
+源码对应: [`src/components/charts/WeibullChart.tsx`](src/components/charts/WeibullChart.tsx)
 
-> **责任边界：** ResinDB Pro 是本地优先的科学数据与分析工作台，不是经认证的 LIMS/ERP、商业力场、工业牌号放行系统或自动科研批准器。
+#### 图形交付门
 
-执行提示词: [SIX_REPOSITORY_PARALLEL_6H_ACCEPTANCE_PROMPT_V2.md](docs/SIX_REPOSITORY_PARALLEL_6H_ACCEPTANCE_PROMPT_V2.md)
+$$
+C_{\mathrm{figure}}=C_{\mathrm{finite}}\land C_{\mathrm{labels}}\land C_{\mathrm{finished}}\land C_{\mathrm{nonblank}}
+$$
+
+这是绘图验收的解释性合同：记录有限数据量、轴标签、完成事件和非空画布证据，并区分无数据与图形引擎不可用。它不是只凭截图就能推定成立的科学正确性证明；浏览器、主题、语言与重新打开图表均需测试。
+
+源码对应: [`src/components/charts/ScientificEChart.tsx`](src/components/charts/ScientificEChart.tsx)
+
+### 使用与验收顺序
+
+1. 先核对安装环境、输入结构、单位、有效范围与执行权限。
+2. 按上面的源码锚点区分原生实现、解释性合同和外部执行要求。
+3. 先运行快速回归和完整质量门，再用固定提交执行长期回归。
+4. 逐项保存原始日志、机器报告和限制；任何缺失证据不得写成 PASS。
+
+```bash
+npm ci
+npm run validate:ci
+```
+
+每次修复均须绑定新提交重新测试。基线回归、两段各三小时的重复回归、浏览器图形检查和外部工程认证是不同证据，不可互相替代。没有原始回执时，不宣称已完成六小时验收。
+
+源码锚点: [`src/data/dataContract.ts`](src/data/dataContract.ts) · [`src/services/mathUtils.ts`](src/services/mathUtils.ts) · [`src/compute/capabilityProbe.ts`](src/compute/capabilityProbe.ts)
+
 <!-- CURRENT_MAIN_ACCEPTANCE_V2:END -->
