@@ -47,7 +47,7 @@ jobs:
       - name: Validate installed dependency graph
         run: npm ls --all
       - name: Receipt contract regressions
-        run: node --test scripts/tests/validation-receipt-contract.node.mjs
+        run: node --test scripts/tests/validation-receipt-contract.node.mjs scripts/tests/readme-image-contract.node.mjs
 
       - name: Documentation and deterministic scientific visuals
         run: npm run validate:docs

@@ -27,6 +27,14 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22'
+      - name: Remove the one-time publisher caller from the candidate tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm -- .github/workflows/refresh-mathematical-docs.yml
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          fc-cache -f
       - name: Generate only declared documentation and genuine derived records
         shell: bash
         run: |
@@ -37,7 +45,9 @@ jobs:
               uv sync --frozen --extra dev --extra agent --extra signing
               uv run python scripts/refresh_current_main_readme.py --write
               uv run python scripts/refresh_current_main_readme.py --check
-              uv run pytest -q tests/test_current_main_readme_generator.py tests/test_documentation_contracts.py
+              uv run pytest -q -W error::ResourceWarning
+              uv run python scripts/verify_delivery.py
+              uv run mypy src
               uv run ruff check .
               uv run ruff format --check .
               ;;
@@ -57,7 +67,7 @@ jobs:
               python -m pip install --no-deps --no-build-isolation -e .
               node scripts/refresh-current-main-readme.mjs --write
               node scripts/refresh-current-main-readme.mjs
-              python scripts/update_source_overlay.py --target reports/SOURCE_ACCEPTANCE_OVERLAY.tsv README.md README.zh-CN.md docs/CURRENT_MAIN_ACCEPTANCE.md docs/current-main/tsao-processing-current-main-zh.svg docs/current-main/tsao-processing-current-main-en.svg scripts/refresh-current-main-readme.mjs .github/workflows/refresh-mathematical-docs.yml
+              python scripts/update_source_overlay.py --target reports/SOURCE_ACCEPTANCE_OVERLAY.tsv README.md README.zh-CN.md docs/CURRENT_MAIN_ACCEPTANCE.md docs/current-main/tsao-processing-current-main-zh.svg docs/current-main/tsao-processing-current-main-en.svg scripts/refresh-current-main-readme.mjs
               python scripts/run_ci.py
               ;;
             SUNHAOJUN22/ResinDB-Pro-by-SunHJ)
@@ -65,11 +75,8 @@ jobs:
               node scripts/refresh-current-main-readme.mjs --write
               node scripts/refresh-current-main-readme.mjs
               node scripts/validate-repository-unicode.mjs --write
-              npm run validate:docs
-              npm run validate:unicode
-              npm run lint
-              npm run typecheck
-              npm run test
+              node --test scripts/tests/validation-receipt-contract.node.mjs scripts/tests/readme-image-contract.node.mjs
+              npm run validate:ci
               ;;
             SUNHAOJUN22/TsaoDFT_skill)
               python -m pip install -c constraints/py312.txt -r requirements-dev.txt
@@ -104,8 +111,9 @@ jobs:
           import hashlib, json, os, pathlib, shutil, subprocess
           fixed = {'README.md','README.en.md','README.zh-CN.md','README_EN.md','docs/CURRENT_MAIN_ACCEPTANCE.md','manifest.json','evidence/quality-check.json','evidence/security-scan.json','reports/ACCELERATION_OPPORTUNITIES_PRODUCTION_V4.json','reports/ACCELERATION_OPPORTUNITIES_FULL_TREE_V4.json','reports/ACCELERATION_OPPORTUNITIES_V2.json','reports/SOURCE_ACCEPTANCE_OVERLAY.tsv','reports/UNICODE_INTEGRITY_REPORT.json','docs/README_FACTS.json','docs/VALIDATION_EVIDENCE.json','docs/test-dashboard.html','docs/test-dashboard.svg','docs/engineering-audit-report.pdf','SHA256SUMS'}
           visuals = {str(p) for p in pathlib.Path('docs/current-main').glob('*-current-main-*.svg')}
-          allowed = fixed | visuals
-          changed = set(subprocess.check_output(['git','diff','--name-only','-z']).decode().strip('\0').split('\0')) - {''}
+          cleanup = '.github/workflows/refresh-mathematical-docs.yml'
+          allowed = fixed | visuals | {cleanup}
+          changed = set(subprocess.check_output(['git','diff','HEAD','--name-only','-z']).decode().strip('\0').split('\0')) - {''}
           if not changed <= allowed:
               raise SystemExit(f'Unexpected tracked changes: {sorted(changed - allowed)}')
           dest = pathlib.Path(os.environ['RUNNER_TEMP']) / 'documentation-candidate'
@@ -113,6 +121,11 @@ jobs:
           records = {}
           for name in sorted(changed):
               source = pathlib.Path(name)
+              if name == cleanup:
+                  if source.exists():
+                      raise SystemExit('One-time caller must be absent from candidate')
+                  records[name] = None
+                  continue
               if not source.is_file() or source.is_symlink():
                   raise SystemExit('Generated output must be a regular file')
               target = dest / 'files' / name
@@ -157,23 +170,30 @@ jobs:
           if record['source'] != os.environ['EXPECTED_SHA'] or record['repository'] != os.environ['GITHUB_REPOSITORY']:
               raise SystemExit('Source receipt mismatch')
           fixed = {'README.md','README.en.md','README.zh-CN.md','README_EN.md','docs/CURRENT_MAIN_ACCEPTANCE.md','manifest.json','evidence/quality-check.json','evidence/security-scan.json','reports/ACCELERATION_OPPORTUNITIES_PRODUCTION_V4.json','reports/ACCELERATION_OPPORTUNITIES_FULL_TREE_V4.json','reports/ACCELERATION_OPPORTUNITIES_V2.json','reports/SOURCE_ACCEPTANCE_OVERLAY.tsv','reports/UNICODE_INTEGRITY_REPORT.json','docs/README_FACTS.json','docs/VALIDATION_EVIDENCE.json','docs/test-dashboard.html','docs/test-dashboard.svg','docs/engineering-audit-report.pdf','SHA256SUMS'}
-          allowed = fixed | {str(p) for p in pathlib.Path('docs/current-main').glob('*-current-main-*.svg')}
+          cleanup = '.github/workflows/refresh-mathematical-docs.yml'
+          allowed = fixed | {cleanup} | {str(p) for p in pathlib.Path('docs/current-main').glob('*-current-main-*.svg')}
           files = record['files']
           if not isinstance(files, dict) or not set(files) <= allowed or any(p.is_symlink() for p in root.rglob('*')):
               raise SystemExit('Invalid generated-file inventory')
           actual = {str(p.relative_to(root/'files')) for p in (root/'files').rglob('*') if p.is_file()}
-          if actual != set(files):
+          if actual != {name for name, value in files.items() if value is not None}:
               raise SystemExit('Artifact inventory mismatch')
           for name, expected in files.items():
+              if expected is None:
+                  if name != cleanup or pathlib.Path(name).is_symlink():
+                      raise SystemExit('Unapproved deletion')
+                  pathlib.Path(name).unlink()
+                  continue
               path = root/'files'/name
               if hashlib.sha256(path.read_bytes()).hexdigest() != expected or pathlib.Path(name).is_symlink():
                   raise SystemExit('Generated-file hash mismatch')
               shutil.copyfile(path, name)
           if files:
-              subprocess.run(['git','add','--',*sorted(files)],check=True)
+              subprocess.run(['git','add','-A','--',*sorted(files)],check=True)
           PY
           if ! git diff --cached --quiet; then
             git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'docs: publish source-backed bilingual mathematics and verified layouts'
             git push origin HEAD:main
           fi
+          git log -1 --format='%H %s' >> "$GITHUB_STEP_SUMMARY"
           gh api --method POST "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/dispatches" -f ref=main

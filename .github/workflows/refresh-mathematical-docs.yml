@@ -2,10 +2,6 @@ name: Refresh bilingual mathematical documentation
 on:
   push:
     branches: [main]
-    paths:
-      - scripts/refresh-current-main-readme.mjs
-      - .github/workflows/refresh-mathematical-docs.yml
-      - .github/workflows/publish-mathematical-docs.yml
   workflow_dispatch:
 permissions:
   contents: write

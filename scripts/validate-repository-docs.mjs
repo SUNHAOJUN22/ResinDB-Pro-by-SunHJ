@@ -3,6 +3,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateImageInventory } from './readme-image-contract.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const README_PATH = resolve(ROOT, 'README.md');
@@ -109,12 +110,18 @@ for (const name of EXPECTED_AI_DIAGRAMS) {
   if (readme.split(relativePath).length - 1 !== 1) fail(`${relativePath} must be referenced exactly once`);
   if (statSync(resolve(IMAGE_DIR, name)).size < 5_000) fail(`${relativePath} is too small for a README technical diagram`);
 }
-const markdownImages = [...readme.matchAll(/!\[[^\]]*]\(([^)]+)\)/g)]
-  .map((match) => match[1])
-  .filter((target) => !target.startsWith('http'));
-const expectedLocalImageCount = EXPECTED_SCREENSHOTS.length + EXPECTED_AI_DIAGRAMS.length;
-if (markdownImages.length !== expectedLocalImageCount) {
-  fail(`README local image count must equal ${expectedLocalImageCount}; found ${markdownImages.length}`);
+const baseImages = [...EXPECTED_SCREENSHOTS, ...EXPECTED_AI_DIAGRAMS].map((name) => `docs/images/${name}`);
+validateImageInventory(readme, [...baseImages,
+  'docs/current-main/resindb-current-main-zh.svg',
+  'docs/current-main/resindb-current-main-en.svg',
+], ROOT);
+for (const [path, language] of [['README.zh-CN.md', 'zh'], ['README.en.md', 'en']]) {
+  const localized = readFileSync(resolve(ROOT, path), 'utf8');
+  validateLinks(localized);
+  validateImageInventory(localized, [
+    `docs/localized-vision/resindb-vision-${language}.svg`,
+    `docs/current-main/resindb-current-main-${language}.svg`,
+  ], ROOT);
 }
 const oldSynthetic = readdirSync(IMAGE_DIR).filter((name) => /^resindb-.*\.svg$/.test(name));
 if (oldSynthetic.length) fail(`Synthetic README visual residue remains: ${JSON.stringify(oldSynthetic.sort())}`);

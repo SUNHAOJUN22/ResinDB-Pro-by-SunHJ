@@ -3,11 +3,12 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import type { EChartsOption } from '@/lib/echarts';
 import { ScientificEChart } from './ScientificEChart';
 import { SCIENTIFIC_PALETTE, escapeScientificHtml, formatScientificNumber, scientificTooltipItem } from './scientificFigurePolicy';
-import { summarizeFinite } from '@/lib/numericAggregation';
+import { weibullFigureData } from './weibullFigure';
 
 const WEIBULL_TEXT = {
   zh: {
     title: '双参数 Weibull 概率图',
+    invalid: '输入或拟合结果无效：需要至少三个有限正值样本、有效概率和正模型参数。',
     estimator: 'Bernard 中位秩最小二乘拟合（非极大似然估计）',
     observed: '中位秩观测值', fitted: '最小二乘拟合（模型）',
     failure: '累积失效概率', survival: 'B5 / 95% 存活率',
@@ -15,6 +16,7 @@ const WEIBULL_TEXT = {
   },
   en: {
     title: 'Two-parameter Weibull probability plot',
+    invalid: 'Invalid inputs or fit: at least three finite positive observations, valid probabilities and positive model parameters are required.',
     estimator: 'Bernard median-rank OLS (not MLE)',
     observed: 'Median-rank observations', fitted: 'OLS fit (model)',
     failure: 'Cumulative failure', survival: 'B5 / 95% survival',
@@ -36,11 +38,11 @@ export const WeibullChart: React.FC<WeibullChartProps> = React.memo((props) => {
   const { language } = useLanguage();
   const text = WEIBULL_TEXT[language];
   const { points, m, eta, rSquared, safeValue95, targetKey, theme } = props;
-  const option = useMemo<EChartsOption>(() => {
-    const bounds = summarizeFinite(points, (point) => point.x);
-    const minX = bounds?.minimum ?? 0;
-    const maxX = bounds?.maximum ?? 0;
-    const b5Log = safeValue95 > 0 ? Math.log(safeValue95) : null;
+  const data = useMemo(() => weibullFigureData(points, m, eta, rSquared, safeValue95),
+    [points, m, eta, rSquared, safeValue95]);
+  const option = useMemo<EChartsOption | null>(() => {
+    if (!data) return null;
+    const { b5Log } = data;
     return {
       title: {
         text: text.title,
@@ -69,7 +71,7 @@ export const WeibullChart: React.FC<WeibullChartProps> = React.memo((props) => {
         {
           name: text.observed,
           type: 'scatter',
-          data: points.map((point) => [point.x, point.y, point.value, point.p]),
+          data: data.observations,
           symbolSize: 7,
           itemStyle: { color: SCIENTIFIC_PALETTE[0] },
           markLine: b5Log === null ? undefined : {
@@ -83,14 +85,14 @@ export const WeibullChart: React.FC<WeibullChartProps> = React.memo((props) => {
         {
           name: text.fitted,
           type: 'line',
-          data: [[minX, m * (minX - Math.log(eta))], [maxX, m * (maxX - Math.log(eta))]],
+          data: data.fitted,
           symbol: 'none',
           lineStyle: { color: SCIENTIFIC_PALETTE[1], width: 1.6, type: 'dashed' },
           silent: true,
         },
       ],
     };
-  }, [eta, m, points, rSquared, safeValue95, targetKey, text]);
+  }, [data, eta, m, rSquared, safeValue95, targetKey, text]);
 
   return (
     <ScientificEChart
@@ -99,8 +101,9 @@ export const WeibullChart: React.FC<WeibullChartProps> = React.memo((props) => {
       ariaLabel={text.title}
       description={text.description}
       exportName="weibull-median-rank-ols"
-      dataCount={points.length + 2}
+      dataCount={data ? data.observations.length + data.fitted.length : 0}
       empty={points.length < 3}
+      error={points.length >= 3 && !data ? text.invalid : null}
     />
   );
 });

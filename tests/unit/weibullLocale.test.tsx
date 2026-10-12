@@ -4,10 +4,10 @@ import { LanguageProvider } from '@/contexts/LanguageContext';
 import { WeibullChart } from '@/components/charts/WeibullChart';
 import type { EChartsOption } from '@/lib/echarts';
 
-const state = vi.hoisted(() => ({ option: null as EChartsOption | null, aria: '', description: '' }));
+const state = vi.hoisted(() => ({ option: null as EChartsOption | null, aria: '', description: '', error: null as string | null, dataCount: 0 }));
 vi.mock('@/components/charts/ScientificEChart', () => ({
-  ScientificEChart: (props: { option: EChartsOption; ariaLabel: string; description: string }) => {
-    state.option = props.option; state.aria = props.ariaLabel; state.description = props.description;
+  ScientificEChart: (props: { option: EChartsOption | null; ariaLabel: string; description: string; error: string | null; dataCount: number }) => {
+    state.option = props.option; state.aria = props.ariaLabel; state.description = props.description; state.error = props.error; state.dataCount = props.dataCount;
     return null;
   },
 }));
@@ -25,6 +25,18 @@ describe('Weibull language and interpretation boundary', () => {
     expect(state.aria).toBe('Two-parameter Weibull probability plot');
     expect(state.description).toContain('not a safety guarantee');
     expect(JSON.stringify(state.option?.legend)).toContain('Median-rank observations');
+  });
+
+  it.each(['zh', 'en'] as const)('rejects an invalid fit and recovers after correction in %s', (language) => {
+    localStorage.setItem('resindb-language', language);
+    const view = render(<LanguageProvider><WeibullChart {...props} eta={0} /></LanguageProvider>);
+    expect(state.option).toBeNull();
+    expect(state.dataCount).toBe(0);
+    expect(state.error).toContain(language === 'zh' ? '拟合结果无效' : 'Invalid inputs or fit');
+    view.rerender(<LanguageProvider><WeibullChart {...props} /></LanguageProvider>);
+    expect(state.option).not.toBeNull();
+    expect(state.error).toBeNull();
+    expect(state.dataCount).toBe(5);
   });
 
   it.each(['zh', 'en'] as const)('escapes user-provided property names in the %s tooltip', (language) => {
