@@ -1,0 +1,138 @@
+name: Validate targeted build dependency security fixes
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/repair-build-dependencies.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: targeted-build-dependency-repair
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main' && github.repository == 'SUNHAOJUN22/ResinDB-Pro-by-SunHJ'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+      - name: Resolve only the two reviewed security fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp package-lock.json "$RUNNER_TEMP/original-lock.json"
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const file = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          file.overrides = { ...file.overrides, 'postcss-selector-parser': '7.1.6', 'source-map-js': '1.2.2' };
+          fs.writeFileSync('package.json', JSON.stringify(file, null, 2) + '\n');
+          JS
+          npm install --package-lock-only --ignore-scripts --no-audit
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const before = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/original-lock.json`, 'utf8'));
+          const after = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const allowed = new Set(['node_modules/postcss-selector-parser', 'node_modules/source-map-js']);
+          for (const key of new Set([...Object.keys(before.packages), ...Object.keys(after.packages)])) {
+            if (JSON.stringify(before.packages[key]) !== JSON.stringify(after.packages[key]) && !allowed.has(key)) throw Error(`Unrelated dependency change: ${key}`);
+          }
+          for (const [name, version] of Object.entries({ 'postcss-selector-parser': '7.1.6', 'source-map-js': '1.2.2' })) {
+            const entry = after.packages[`node_modules/${name}`];
+            if (entry?.version !== version || !entry.integrity?.startsWith('sha512-') || !entry.resolved?.startsWith('https://registry.npmjs.org/')) throw Error(`Invalid locked identity: ${name}`);
+          }
+          JS
+      - name: Install CJK fonts and exact candidate dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          npm ci
+          npm ls --all
+      - name: Run unchanged complete repository gates
+        run: |
+          node scripts/validate-repository-unicode.mjs --write
+          node --test scripts/tests/validation-receipt-contract.node.mjs
+          npm run validate:ci
+          npm audit --audit-level=moderate
+      - name: Package only validated dependency files and source inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib, shutil, subprocess
+          allowed = {'package.json', 'package-lock.json', 'reports/UNICODE_INTEGRITY_REPORT.json'}
+          changed = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines())
+          if not changed <= allowed:
+              raise SystemExit(f'Unexpected modified paths: {changed - allowed}')
+          destination = pathlib.Path('dependency-candidate')
+          destination.mkdir()
+          for name in sorted(allowed):
+              source = pathlib.Path(name)
+              if source.is_symlink() or not source.is_file():
+                  raise SystemExit('Candidate is not a regular file')
+              target = destination / name
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(source, target)
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: validated-dependency-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dependency-candidate
+          retention-days: 7
+          if-no-files-found: error
+      - name: Preserve original success or failure evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: dependency-security-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts
+          retention-days: 14
+          if-no-files-found: warn
+
+  publish:
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: main
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: validated-dependency-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/dependency-candidate
+      - name: Publish without overwriting a newer main and trigger exact-tree CI
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          python3 - <<'PY'
+          import os, pathlib, shutil
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'dependency-candidate'
+          allowed = {'package.json', 'package-lock.json', 'reports/UNICODE_INTEGRITY_REPORT.json'}
+          files = {str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}
+          if files != allowed or any(p.is_symlink() for p in root.rglob('*')):
+              raise SystemExit('Unexpected artifact contents')
+          for name in sorted(allowed):
+              shutil.copyfile(root / name, pathlib.Path(name))
+          PY
+          git add -- package.json package-lock.json reports/UNICODE_INTEGRITY_REPORT.json
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: lock reviewed build dependency security patches after full validation'
+            git push origin HEAD:main
+          fi
+          gh api --method POST "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/dispatches" -f ref=main
