@@ -710,7 +710,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
         chartData.series.forEach((s) => {
           if (Array.isArray(s.data)) {
             s.data.forEach((d) => {
-              if (Array.isArray(d) && typeof d[0] === 'number' && typeof d[1] === 'number') {
+              if (Array.isArray(d) && Number.isFinite(d[0]) && Number.isFinite(d[1])) {
                 allPoints.push([d[0], d[1]]);
               }
             });
@@ -734,8 +734,8 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
             insight.content += `\n- ${t("goodnessOfFit")}: ${(corr.r2 * 100).toFixed(1)}%`;
             
             if (pValue < 0.05) {
-              const relType = Math.abs(pearson - spearman) > 0.2 ? t("nonlinearMonotonic") : t("highlyLinear");
-              insight.content += `\n- ${t("physicalLogic")}: ${t("positiveCorrelation").replace("{type}", relType)}`;
+              const direction = pearson < 0 ? "negativeCorrelation" : "positiveCorrelation";
+              insight.content += `\n- ${t("physicalLogic")}: ${t(direction)}`;
             } else {
               insight.content += `\n- ${t("conclusionStrength")}: ${t("decisionInsignificant")}`;
             }
@@ -755,16 +755,14 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
               insight.content += `\n- ${t("outlierScreeningText").replace("{count}", String(iqrOutliers.length))}`;
             }
 
-            // Enhanced Distribution Analysis
-            const stats = materialEngine.getStats(xValues);
-            if (stats) {
-              const momentsX = materialEngine.calculateDistributionMoments(xValues);
-              const isNormal = Math.abs(momentsX?.skewness || 0) < 0.5;
-              const distType = isNormal ? t("normalDistribution") : t("skewedDistribution");
-              insight.content += `\n- ${t("sampleNormality")}: ${distType}${!isNormal && momentsX ? ` (SK: ${momentsX.skewness.toFixed(2)})` : ""}`;
+            // Skewness describes this sample; symmetry does not establish a
+            // normal population or validate the assumptions of inference.
+            const momentsX = materialEngine.calculateDistributionMoments(xValues);
+            if (momentsX && Number.isFinite(momentsX.skewness)) {
+              insight.content += `\n- ${t("sampleNormality")}: ${momentsX.skewness.toFixed(2)}; ${t("skewnessOnly")}`;
             }
 
-            insight.content += `\n- ${t("decisionSuggestion")}: ${pearson > 0.7 && pValue < 0.05 ? t("decisionPredictive") : t("decisionWeak")}`;
+            insight.content += `\n- ${t("decisionSuggestion")}: ${Math.abs(pearson) > 0.7 && pValue < 0.05 ? t("decisionPredictive") : t("decisionWeak")}`;
           }
         }
       }

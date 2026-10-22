@@ -104,6 +104,8 @@ $$
 
 Default axes use actual Density / MFR property keys. Canvas, K-Means and Pareto share the same finite paired cohort; unrelated sparse properties do not erase ordinary scatter points. Axis/cohort changes clear previous clusters/frontiers and cancel old workers. PCA uses complete cases and a global maximum-absolute scaling step, not per-feature standardization; design features carefully before comparing mixed units.
 
+Correlation reports use the sign of Pearson r for direction and |r| for the magnitude of association in the current sample. R² is the coefficient of determination, not a confidence level. Skewness describes sample asymmetry; zero skewness does not establish normality. P-values and slope intervals depend on sampling and model assumptions. Significant correlation does not establish causality, a physical mechanism or inverse-formulation capability; prediction error requires validation on independent data.
+
 ### Clustering and Pareto screening
 
 $$
