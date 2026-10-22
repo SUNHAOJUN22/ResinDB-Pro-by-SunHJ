@@ -274,7 +274,7 @@ try {
   await session.command('Page.reload', { ignoreCache: true });
   await waitForCondition(
     session,
-    `(document.body?.innerText || '').includes('13 RECORDS')`,
+    `Number(document.querySelector('[data-testid="record-count"]')?.dataset.count) === 13`,
     'authenticated dashboard',
   );
 
@@ -371,8 +371,8 @@ try {
     auditDocument.schemaVersion !== 'kmeans-profile-audit-1.0.0'
     || auditDocument.notice !== 'not-a-cross-device-performance-conclusion'
     || !/^[0-9a-f]{64}$/.test(auditDocument.digest)
-    || auditDocument.workload?.sampleCount !== 13
-    || !(auditDocument.workload?.dimensions > 0)
+    || auditDocument.workload?.sampleCount !== 10
+    || auditDocument.workload?.dimensions !== 2
     || !(auditDocument.workload?.maxClusters > 0)
     || auditDocument.autoDecision?.selectedBackend !== 'typescript'
     || auditDocument.autoDecision?.reason !== 'missing-compatible-local-profile'

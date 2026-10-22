@@ -14,7 +14,9 @@ import {
   Info
 } from 'lucide-react';
 import { Product, FormulaConfig } from '@/types/index';
-import { formulaEngine } from '@/lib/formulaParser';
+import { formulaEngine, type FormulaResultMap } from '@/lib/formulaParser';
+import { admittedPropertyValue } from '@/lib/propertyAdmission';
+import { canonicalizeCoreProperty, parseFiniteReal, resolveCorePropertyKey } from '@/lib/quantityRecord';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToasts } from '@/contexts/ToastContext';
 
@@ -159,10 +161,10 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
     const activeFormulas = formulas.filter(f => selectedFormulaIds.has(f.id));
 
     // Compile active formulas logic
-    let evaluator: ((product: Product) => Record<string, number>) | null = null;
+    let evaluator: ((product: Product) => FormulaResultMap) | null = null;
     try {
       if (activeFormulas.length > 0) {
-        evaluator = formulaEngine.compileGraph(activeFormulas);
+        evaluator = formulaEngine.compileResultGraph(formulas);
       }
     } catch {
       // Ignore evaluation errors because we will flag syntax errors individually
@@ -173,21 +175,30 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
       const violations: ValidationResult['violations'] = [];
 
       // Core Chemical Property helper
-      const getVal = (k: string): number => {
-        const raw = p.properties?.[k]?.value;
-        const num = typeof raw === 'number' ? raw : parseFloat(String(raw));
-        return isNaN(num) ? 0 : num;
+      const getVal = (key: 'mfr' | 'tensileYield'): number | null => {
+        const candidates = Object.entries(p.properties).filter(([name]) => resolveCorePropertyKey(name) === key);
+        if (candidates.length !== 1) return null;
+        const [name, property] = candidates[0];
+        const quantity = property.quantity ?? canonicalizeCoreProperty(name, property);
+        return admittedPropertyValue({ ...property, quantity });
       };
+      const unavailable = (type: 'mfr' | 'tensile' | 'formula', label: string, reason: string) => violations.push({
+        type, severity: 'warning',
+        messageZh: `${label} 无法评估：${reason}。缺失或无效数据不表示通过。`,
+        messageEn: `${label} is unassessed: ${reason}. Missing or invalid data is not a pass.`,
+        metricLabelZh: label, metricLabelEn: label, expectedRange: 'Valid declared quantity', actualValue: 'UNASSESSED',
+      });
 
       // 1. MFR Bounds
       const mfrValue = getVal('mfr');
-      if (mfrValue > 0) {
+      if (mfrValue === null) unavailable('mfr', 'MFR', 'UNKNOWN_OR_INVALID_QUANTITY');
+      if (mfrValue !== null) {
         if (mfrValue < minMfr) {
           violations.push({
             type: 'mfr',
             severity: 'warning',
-            messageZh: `熔指 (MFR) 偏低 (${mfrValue} < ${minMfr})，熔体粘度过大，可能面临熔体进胶充填困难。`,
-            messageEn: `MFR is below threshold (${mfrValue} < ${minMfr}), indicating extreme melt viscosity which may cause injection mold filling stress.`,
+            messageZh: `MFR 低于用户设定下界 (${mfrValue} < ${minMfr})；请核对测试条件和实际应用要求。`,
+            messageEn: `MFR is below the user-defined threshold (${mfrValue} < ${minMfr}); review measurement conditions and application requirements.`,
             metricLabelZh: '熔体流动速率 MFR',
             metricLabelEn: 'Melt Flow Rate MFR',
             expectedRange: `>= ${minMfr} g/10min`,
@@ -197,8 +208,8 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
           violations.push({
             type: 'mfr',
             severity: 'warning',
-            messageZh: `熔指 (MFR) 极高 (${mfrValue} > ${maxMfr})，易引发树脂溢料模飞边与毛刺隐患。`,
-            messageEn: `MFR exceeds safety limit (${mfrValue} > ${maxMfr}), raising critical flash spill or burr risks during injection flow.`,
+            messageZh: `MFR 高于用户设定上界 (${mfrValue} > ${maxMfr})；该筛选不预测成型缺陷。`,
+            messageEn: `MFR exceeds the user-defined threshold (${mfrValue} > ${maxMfr}); this screen does not predict molding defects.`,
             metricLabelZh: '熔体流动速率 MFR',
             metricLabelEn: 'Melt Flow Rate MFR',
             expectedRange: `<= ${maxMfr} g/10min`,
@@ -209,12 +220,13 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
 
       // 2. Tensile Strength
       const tensileValue = getVal('tensileYield');
-      if (tensileValue > 0 && tensileValue < minTensile) {
+      if (tensileValue === null) unavailable('tensile', 'Tensile yield', 'UNKNOWN_OR_INVALID_QUANTITY');
+      if (tensileValue !== null && tensileValue < minTensile) {
         violations.push({
           type: 'tensile',
           severity: 'critical',
-          messageZh: `抗拉强度低 (${tensileValue} < ${minTensile} MPa)，承载形变抵抗力严重欠缺，恐易脆性撕裂折断。`,
-          messageEn: `Tensile strength is low (${tensileValue} < ${minTensile} MPa). Absolute structural capability failure under tensile stress load.`,
+          messageZh: `拉伸屈服强度低于用户设定下界 (${tensileValue} < ${minTensile} MPa)，请独立评估应用适用性。`,
+          messageEn: `Tensile yield strength is below the user-defined threshold (${tensileValue} < ${minTensile} MPa). Assess application suitability independently.`,
           metricLabelZh: '拉伸屈服应力强度',
           metricLabelEn: 'Tensile Yield Strength',
           expectedRange: `>= ${minTensile} MPa`,
@@ -257,8 +269,13 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
         if (evaluator && !syntaxErr) {
           try {
             const outputs = evaluator(p);
-            const computedVal = outputs[f.id];
-            if (typeof computedVal === 'number' && enableFormulaBounds) {
+            const evaluated = outputs[f.id];
+            if (!evaluated || evaluated.status !== 'OK') {
+              unavailable('formula', f.name, evaluated?.reason ?? 'EVALUATION_UNAVAILABLE');
+              return;
+            }
+            const computedVal = evaluated.value;
+            if (Number.isFinite(computedVal) && enableFormulaBounds) {
               if (computedVal < formulaMinBoundary) {
                 violations.push({
                   type: 'formula',
@@ -274,8 +291,8 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                 violations.push({
                   type: 'formula',
                   severity: 'critical',
-                  messageZh: `公式 "${f.name}" 指数高过安全极值容差上界 (${computedVal.toFixed(2)} > ${formulaMaxBoundary})，存在溶胀/过敏交联等隐性风险。`,
-                  messageEn: `Formula indicator "${f.name}" exceeds safety upper limit (${computedVal.toFixed(2)} > ${formulaMaxBoundary}), risking composition swelling or excess crosslinking.`,
+                  messageZh: `公式 "${f.name}" 数值高于用户设定上界 (${computedVal.toFixed(2)} > ${formulaMaxBoundary})；此比较不推断溶胀或交联风险。`,
+                  messageEn: `Formula indicator "${f.name}" exceeds the user-defined upper limit (${computedVal.toFixed(2)} > ${formulaMaxBoundary}); this comparison does not infer swelling or crosslinking risk.`,
                   metricLabelZh: `公式指标 - ${f.name}`,
                   metricLabelEn: `Formula Index - ${f.name}`,
                   expectedRange: `<= ${formulaMaxBoundary}`,
@@ -284,8 +301,10 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
               }
             }
           } catch {
-            // Evaluator crash fallback
+            unavailable('formula', f.name, 'EVALUATION_FAILED');
           }
+        } else if (!syntaxErr) {
+          unavailable('formula', f.name, 'GRAPH_UNAVAILABLE');
         }
       });
 
@@ -427,7 +446,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                       max="60" 
                       step="1"
                       value={maxMfr} 
-                      onChange={(e) => setMaxMfr(parseFloat(e.target.value))}
+                      onChange={(e) => setMaxMfr(parseFiniteReal(e.target.value) ?? Number.NaN)}
                       className="w-full accent-primary-500 h-1 bg-slate-150 dark:bg-slate-800 rounded"
                     />
                   </div>
@@ -443,7 +462,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                       max="4.9" 
                       step="0.1"
                       value={minMfr} 
-                      onChange={(e) => setMinMfr(parseFloat(e.target.value))}
+                      onChange={(e) => setMinMfr(parseFiniteReal(e.target.value) ?? Number.NaN)}
                       className="w-full accent-primary-500 h-1 bg-slate-150 dark:bg-slate-800 rounded"
                     />
                   </div>
@@ -469,7 +488,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                       max="45" 
                       step="1"
                       value={minTensile} 
-                      onChange={(e) => setMinTensile(parseFloat(e.target.value))}
+                      onChange={(e) => setMinTensile(parseFiniteReal(e.target.value) ?? Number.NaN)}
                       className="w-full accent-primary-500 h-1 bg-slate-150 dark:bg-slate-800 rounded"
                     />
                   </div>
@@ -688,7 +707,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                   : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
               }`}
             >
-              {tLocal("完美配方", "Compliant")} ({stats.cleanProductsCount})
+              {tLocal("未触发设定阈值", "Within configured thresholds")} ({stats.cleanProductsCount})
             </motion.button>
           </div>
 
@@ -752,7 +771,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                           r.violations.some(v => v.severity === 'critical') ? (
                             <span className="text-[9px] bg-rose-500/10 text-rose-600 dark:text-rose-400 px-1.5 py-0.5 rounded font-black uppercase tracking-wider flex items-center gap-0.5">
                               <ShieldAlert size={10} />
-                              {tLocal("严重危险缺陷", "CRITICAL")}
+                              {tLocal("高优先级问题", "HIGH PRIORITY")}
                             </span>
                           ) : (
                             <span className="text-[9px] bg-amber-500/10 text-amber-600 dark:text-amber-450 px-1.5 py-0.5 rounded font-black uppercase tracking-wider flex items-center gap-0.5">
@@ -763,7 +782,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                         ) : (
                           <span className="text-[9px] bg-indigo-500/10 text-indigo-650 dark:text-indigo-400 px-1.5 py-0.5 rounded font-black uppercase tracking-wider flex items-center gap-0.5">
                             <CheckCircle size={10} />
-                            {tLocal("极致健康达边", "COMPLIANT")}
+                            {tLocal("未触发阈值", "NO THRESHOLD ALERT")}
                           </span>
                         )}
                       </div>
@@ -781,7 +800,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
                           ))
                         ) : (
                           <div className="text-[11px] text-slate-450 italic font-semibold">
-                            {tLocal("✓ 合规通过：公式解析均吻合化学计量且配方物性参数完整在预设安全范围内。", "✓ All systems clear: stoichiometry matches and formulation metrics operate fully within healthy ranges.")}
+                            {tLocal("已评估的量和公式未触发用户设定阈值；不构成材料认证或工艺安全结论。", "Assessed quantities and formulas did not trigger the configured thresholds. This is not material certification or a process safety conclusion.")}
                           </div>
                         )}
                       </div>

@@ -1,3 +1,5 @@
+import { ScientificMath } from '@/components/ui/ScientificMath';
+import { workbenchText } from '@/i18n/scientificWorkbench';
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import * as echarts from "@/lib/echarts";
@@ -125,109 +127,9 @@ function validateChemicalBalance(expression: string): { isValid: boolean; messag
 }
 
 const BUILT_IN_TEMPLATES: FormulaTemplate[] = [
-  {
-    id: "t_epoxy_amine",
-    name: "Epoxy-Amine Stoichiometric Ratio (环氧-胺固化剂配比)",
-    description: "Calculates the stoichiometric amine hardener amount required for 100 parts of epoxy resin based on Amine Hydrogen Equivalent Weight (AHEW) and Epoxy Equivalent Weight (EEW). Useful for stoichiometric blend designs.",
-    unit: "phr (parts per hundred resin)",
-    baseExpression: "((props['环氧当量'] || props['Epoxy Equivalent Weight'] || 190) > 0 ? ({{AHEW}} * 100 / (props['环氧当量'] || props['Epoxy Equivalent Weight'] || 190)) : 0)",
-    category: "Stoichiometry & Mixing",
-    parameters: [
-      {
-        key: "AHEW",
-        label: "Amine Hydrogen Equivalent Weight (AHEW)",
-        type: "number",
-        defaultValue: 43,
-        placeholder: "e.g. 43 for DETA",
-        unit: "g/eq",
-        description: "Molecular weight of the amine hardener divided by the number of active amine hydrogens."
-      }
-    ]
-  },
-  {
-    id: "t_arrhenius_gel",
-    name: "Arrhenius Gelation Time (阿伦尼乌斯凝胶时间预测)",
-    description: "Predicts polymer gelation or curing time as a function of processing temperature using Arrhenius kinetic relation: t = A * exp(Ea / (R * T)). Helps optimize thermosetting compound profiles.",
-    unit: "min",
-    baseExpression: "{{A}} * Math.exp({{Ea}} / (8.314 * ((props['固化温度'] || props['Curing Temperature'] || 120) + 273.15)))",
-    category: "Kinetic Modeling",
-    parameters: [
-      {
-        key: "A",
-        label: "Pre-exponential Frequency Factor (A)",
-        type: "number",
-        defaultValue: 0.005,
-        placeholder: "e.g. 0.005",
-        unit: "min",
-        description: "The kinetic collision/frequency factor representing molecular interactions."
-      },
-      {
-        key: "Ea",
-        label: "Arrhenius Activation Energy (Ea)",
-        type: "number",
-        defaultValue: 52000,
-        placeholder: "e.g. 52000",
-        unit: "J/mol",
-        description: "Energy activation barrier necessary to initiate crosslink/polymerization reaction."
-      }
-    ]
-  },
-  {
-    id: "t_fox_tg",
-    name: "Copolymer Tg Estimator (Fox Equation / 共聚物Tg预测)",
-    description: "Estimates the Glass Transition Temperature (Tg) of custom acrylic, epoxy, or urethane co-polymeric systems using the mass fraction of Monomer 1 and homopolymer Tg values.",
-    unit: "°C",
-    baseExpression: "1 / ({{w1}} / {{tg1}} + (1 - {{w1}}) / {{tg2}}) - 273.15",
-    category: "Thermal Properties",
-    parameters: [
-      {
-        key: "w1",
-        label: "Mass Fraction of Monomer 1 (w1)",
-        type: "number",
-        defaultValue: 0.6,
-        placeholder: "Value between 0 and 1, e.g. 0.6",
-        unit: "fraction",
-        description: "The weight fraction of the first homopolymer constituent in the copolymer network."
-      },
-      {
-        key: "tg1",
-        label: "Tg of Monomer 1 Homopolymer (Tg1)",
-        type: "number",
-        defaultValue: 378,
-        placeholder: "In Kelvin, e.g. 378 for PMMA (105°C)",
-        unit: "K",
-        description: "Homopolymer reference glass transition temperature of component 1 inside Kelvin scale."
-      },
-      {
-        key: "tg2",
-        label: "Tg of Monomer 2 Homopolymer (Tg2)",
-        type: "number",
-        defaultValue: 219,
-        placeholder: "In Kelvin, e.g. 219 for n-BA (-54°C)",
-        unit: "K",
-        description: "Homopolymer reference glass transition temperature of component 2 inside Kelvin scale."
-      }
-    ]
-  },
-  {
-    id: "t_crosslink_density",
-    name: "Thermoset Crosslink Density (热固性交联密度估算)",
-    description: "Estimates physical crosslink density from resin density and molecular weight average between crosslinks (Mc) according to the relation: [X] = Density / Mc.",
-    unit: "mol/cm³",
-    baseExpression: "(props['密度'] || props['Density'] || 1.1) / {{Mc}}",
-    category: "Physical Chemistry",
-    parameters: [
-      {
-        key: "Mc",
-        label: "MW Between Crosslinks (Mc)",
-        type: "number",
-        defaultValue: 350,
-        placeholder: "e.g. 350",
-        unit: "g/mol",
-        description: "Average molecular mass of polymer chain segments separating adjacent nodes."
-      }
-    ]
-  }
+  { id: 'specific-strength', name: 'Specific strength', description: 'Tensile yield stress divided by density; both quantities require explicit units.', unit: 'MPa·cm³/g', baseExpression: "props['拉伸屈服应力'] / props['密度']", category: 'Screening formulas', parameters: [] },
+  { id: 'specific-modulus', name: 'Specific modulus', description: 'Flexural modulus divided by density; no missing-value substitution.', unit: 'MPa·cm³/g', baseExpression: "props['弯曲模量'] / props['密度']", category: 'Screening formulas', parameters: [] },
+  { id: 'impact-stiffness', name: 'Charpy impact–stiffness product', description: 'Descriptive product of Charpy impact and flexural modulus; not a certified toughness score.', unit: 'MPa·kJ/m²', baseExpression: "props['简支梁缺口冲击强度'] * props['弯曲模量']", category: 'Screening formulas', parameters: [] },
 ];
 
 export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(({
@@ -239,13 +141,16 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
   onRemove,
   allProducts,
 }) => {
-  const { t: _t } = useLanguage();
+  const { t: _t, language: lang, tProp } = useLanguage();
+  const wt = (text: string) => workbenchText(lang, text);
+  const templateText = (template: FormulaTemplate, text: string) => BUILT_IN_TEMPLATES.includes(template) ? wt(text) : text;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [expression, setExpression] = useState("");
   const [description, setDescription] = useState("");
   const [unit, setUnit] = useState("");
   const [testResult, setTestResult] = useState<number | null>(null);
+  const [testScope, setTestScope] = useState<'DIMENSION_CHECKED' | 'NUMERIC_ONLY' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [realtimeError, setRealtimeError] = useState<string | null>(null);
@@ -304,24 +209,33 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
   }, [expression, name, formulas]);
 
   // Extract variables used in the formula
-  const usedVariables = useMemo(() => {
-     const matches: string[] = expression.match(/props\['([^']+)'\]/g) || [];
-     const vars = new Set<string>();
-     matches.forEach(m => vars.add(m.replace(/^props\['/, '').replace(/'\]$/, '')));
-     return Array.from(vars);
-  }, [expression]);
+  const usedVariables = useMemo(() => formulaEngine.extractDependencies(expression), [expression]);
+
+  // Bind every displayed result to the expression, dependency definitions and
+  // sample that produced it. Content signatures also detect an in-place sample
+  // edit; the set of referenced property names alone is not a valid task key.
+  const evaluationContext = JSON.stringify({
+    editingId, name, expression, unit,
+    formulas: formulas.map(({ id, name: formulaName, expression: formulaExpression, unit: formulaUnit }) =>
+      ({ id, name: formulaName, expression: formulaExpression, unit: formulaUnit })),
+    product: allProducts[0] ?? null,
+  });
+  useEffect(() => {
+    resetSimulation();
+    setTestResult(null);
+    setTestScope(null);
+    setError(null);
+  }, [evaluationContext, isOpen, resetSimulation]);
 
   // Sync variance state when used variables change
   useEffect(() => {
      setVariances(prev => {
-         const next = { ...prev };
-         for (const v of usedVariables) {
-             if (!(v in next)) next[v] = 5; // Default 5% variance
-         }
+         const next = Object.fromEntries(usedVariables.map(v => [v, prev[v] ?? 5]));
+         if (Object.keys(prev).length === usedVariables.length && usedVariables.every(v => prev[v] === next[v])) return prev;
          return next;
      });
-     resetSimulation();
-  }, [usedVariables, resetSimulation]);
+  }, [usedVariables]);
+  useEffect(() => { resetSimulation(); }, [variances, resetSimulation]);
   
   // Render KDE chart when stats update
   useEffect(() => {
@@ -346,7 +260,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                     const x = Array.isArray(rawValue) && typeof rawValue[0] === 'number'
                       ? rawValue[0].toFixed(2)
                       : '—';
-                    return `Value: ${x}`;
+                    return `${lang === 'zh' ? '数值' : 'Value'}: ${x}`;
                 }
             },
             grid: { top: 20, right: 20, bottom: 20, left: 20 },
@@ -382,15 +296,16 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                 }
             }]
          });
+         const chart = chartInstance.current;
+         const observer = new ResizeObserver(() => chart.resize());
+         observer.observe(chartRef.current);
+         return () => {
+             observer.disconnect();
+             chart.dispose();
+             if (chartInstance.current === chart) chartInstance.current = null;
+         };
      }
-  }, [simulationStats, showMonteCarlo]);
-
-  // Handle Resize
-  useEffect(() => {
-      const ro = new ResizeObserver(() => { if (chartInstance.current) chartInstance.current.resize(); });
-    if (chartRef.current) ro.observe(chartRef.current);
-    return () => ro.disconnect();
-  }, []);
+  }, [simulationStats, showMonteCarlo, lang]);
 
   // Available properties for variables
   const availableProps = useMemo(() => {
@@ -402,6 +317,12 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
   }, [allProducts]);
 
   const currentFormula = formulas.find((f) => f.id === editingId);
+  const previewFormula = (): FormulaConfig => ({
+    id: editingId ?? 'temp_test_id', name: name.trim() || 'TestFormula', expression, unit,
+  });
+  const previewGraph = (candidate: FormulaConfig) => [
+    ...formulas.filter(f => f.id !== candidate.id && f.name !== candidate.name), candidate,
+  ];
 
   useEffect(() => {
     if (currentFormula) {
@@ -421,21 +342,18 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
   }, [currentFormula, editingId]);
 
   const handleTest = () => {
+    setTestResult(null);
     if (!expression.trim()) return;
+    if (!unit.trim()) { setError(lang === 'zh' ? '请声明输出单位；无量纲请填写 1。' : 'Declare the output unit; use 1 for dimensionless results.'); return; }
+    if (!allProducts[0]) { setError(lang === 'zh' ? '请先选择包含输入物性的样本。' : 'A sample with input properties is required.'); return; }
     try {
-      const tempConfig: FormulaConfig = { id: "temp_test_id", name: name || "TestFormula", expression, unit: "" };
-      const tempFormulas = [...formulas.filter(f => f.name !== tempConfig.name), tempConfig];
-      const evaluator = formulaEngine.compileGraph(tempFormulas);
-      
-      const firstProduct = allProducts[0];
-      if (firstProduct) {
-        const result = evaluator(firstProduct)[tempConfig.id];
-        setTestResult(result);
-        setError(null);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid formula or cyclic dependency detected");
-    }
+      const tempConfig = previewFormula();
+      const result = formulaEngine.compileResultGraph(previewGraph(tempConfig))(allProducts[0])[tempConfig.id];
+      if (result.status !== 'OK') { setError(result.reason); return; }
+      setTestResult(result.value);
+      setTestScope(result.scope);
+      setError(null);
+    } catch (err) { setError(err instanceof Error ? err.message : 'Formula evaluation failed'); }
   };
 
   const handleSave = () => {
@@ -625,12 +543,9 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
               <Calculator size={24} />
             </div>
             <div>
-              <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">
-                Performance Index Engine
-              </h2>
+              <h2 className="text-xl font-black text-slate-800 dark:text-white tracking-tight">{wt("Performance Index Engine")}</h2>
               <p className="text-xs text-slate-500 font-medium tracking-wide flex items-center gap-1.5 uppercase">
-                <Settings size={12} /> Custom Material Computation Formulas
-              </p>
+                <Settings size={12} />{wt("Custom Material Computation Formulas")}</p>
             </div>
           </div>
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
@@ -641,6 +556,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
           </motion.button>
         </div>
 
+        <div className="shrink-0 px-6 py-2 text-xs overflow-x-auto"><ScientificMath tex={String.raw`[q]=M^aL^bT^c\Theta^d,\qquad E_s=E/\rho`} /></div>
         <div className="flex-1 overflow-hidden flex">
           {/* Sidebar: Formula List */}
           <div className="w-64 border-r border-slate-100 dark:border-slate-800 flex flex-col bg-slate-50/30 dark:bg-slate-950/20">
@@ -649,8 +565,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                 onClick={() => setEditingId(null)}
                 className={`w-full flex items-center gap-2 p-3 rounded-2xl text-sm font-bold transition-all border ${editingId === null ? "bg-primary-600 text-white border-transparent" : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800"}`}
               >
-                <Plus size={16} /> New Formula
-              </motion.button>
+                <Plus size={16} />{wt("New Formula")}</motion.button>
 
               <div className="space-y-1">
                 {formulas.map((f) => (
@@ -659,7 +574,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                       onClick={() => setEditingId(f.id)}
                       className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all ${editingId === f.id ? "bg-primary-50 dark:bg-primary-900/20 text-primary-600" : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"}`}
                     >
-                      {f.name}
+                      {tProp(f.name)}
                     </motion.button>
                     <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                       onClick={(e) => {
@@ -677,89 +592,80 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
           </div>
 
           {/* Editor Area */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col space-y-4 custom-scrollbar">
+          <div className="flex-1 min-w-0 overflow-y-auto p-4 md:p-6 flex flex-col space-y-4 custom-scrollbar">
             {/* Tabs & Share/Export Controls */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-slate-800 shrink-0 pb-1 sm:pb-0 gap-2">
-              <div className="flex">
+            <div className="flex flex-col border-b border-slate-200 dark:border-slate-800 shrink-0 pb-2 gap-2">
+              <div className="flex flex-wrap min-w-0">
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                   onClick={() => setActiveTab('editor')} 
                   className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'editor' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-                >
-                  Editor
-                </motion.button>
+                >{wt("Editor")}</motion.button>
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                   onClick={() => setActiveTab('templates')} 
                   className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'templates' ? 'border-primary-500 text-primary-600 dark:text-primary-450' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-                >
-                  Templates
-                </motion.button>
+                >{wt("Templates")}</motion.button>
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                   onClick={() => setActiveTab('heatmap')} 
                   className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'heatmap' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-                >
-                  Dependencies Heatmap
-                </motion.button>
+                >{wt("Dependencies Heatmap")}</motion.button>
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                   onClick={() => setActiveTab('suggestions')} 
                   className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'suggestions' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'} flex items-center gap-1.5`}
                 >
-                  <Beaker size={14} className="text-primary-500" /> AI Suggestions
-                </motion.button>
+                  <Beaker size={14} className="text-primary-500" />{wt("AI Suggestions")}</motion.button>
                 {editingId && (
                   <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} 
                     onClick={() => setActiveTab('history')} 
                     className={`px-4 py-2 text-sm font-bold border-b-2 transition-colors ${activeTab === 'history' ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
-                  >
-                    Change History
-                  </motion.button>
+                  >{wt("Change History")}</motion.button>
                 )}
               </div>
 
               {/* Share & Export controls */}
-              <div className="flex items-center gap-1.5 px-2 pb-1 sm:pb-0">
+              <div className="flex flex-wrap items-center gap-1.5 px-2">
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   onClick={handleCopyShareText}
-                  title="Copy formatted template to share with teammates"
+                  title={wt("Copy formatted template to share with teammates")}
                   className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
                 >
                   {copiedType === 'share' ? (
                     <>
                       <Check size={12} className="text-emerald-500" />
-                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">Copied Share!</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">{wt("Copied Share!")}</span>
                     </>
                   ) : (
                     <>
                       <Share2 size={12} />
-                      <span>Copy Share</span>
+                      <span>{wt("Copy Share")}</span>
                     </>
                   )}
                 </motion.button>
 
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   onClick={handleCopyJson}
-                  title="Copy full config JSON with history to clipboard"
+                  title={wt("Copy full config JSON with history to clipboard")}
                   className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
                 >
                   {copiedType === 'json' ? (
                     <>
                       <Check size={12} className="text-emerald-500" />
-                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">Copied JSON!</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">{wt("Copied JSON!")}</span>
                     </>
                   ) : (
                     <>
                       <Copy size={12} />
-                      <span>Copy JSON</span>
+                      <span>{wt("Copy JSON")}</span>
                     </>
                   )}
                 </motion.button>
 
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   onClick={handleDownloadJson}
-                  title="Download configuration JSON file"
+                  title={wt("Download configuration JSON file")}
                   className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-850 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
                 >
                   <Download size={12} />
-                  <span>Download</span>
+                  <span>{wt("Download")}</span>
                 </motion.button>
               </div>
             </div>
@@ -768,33 +674,27 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1">
                 <div className="space-y-4">
                   <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                    Index Name
-                  </label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{wt("Index Name")}</label>
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Stiffness-to-Weight"
+                    placeholder={wt("e.g. Stiffness-to-Weight")}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:ring-2 focus:ring-primary-500/20 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                    Unit
-                  </label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{wt("Unit")}</label>
                   <input
                     value={unit}
                     onChange={(e) => setUnit(e.target.value)}
-                    placeholder="e.g. MPa, g/cm³"
+                    placeholder={wt("e.g. MPa, g/cm³")}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:ring-2 focus:ring-primary-500/20 outline-none transition-all"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                    Formula (JS Syntax)
-                  </label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{wt("Formula (JS Syntax)")}</label>
                   <div className="relative">
                     <textarea
                       value={expression}
@@ -808,7 +708,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                         onClick={handleTest}
                         className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/50 rounded-xl text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/10 transition-all shadow-sm flex items-center gap-1.5 text-[10px] font-black"
                       >
-                        <Play size={10} /> TEST
+                        <Play size={10} /> {lang === 'zh' ? '测试' : 'TEST'}
                       </motion.button>
                     </div>
                   </div>
@@ -822,7 +722,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                        {expression.trim() && !realtimeError && (
                           <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold">
                             <CheckCircle2 size={12} />
-                            <span>Syntax valid</span>
+                            <span>{wt("Syntax valid")}</span>
                           </div>
                        )}
                        {realtimeError && (
@@ -846,13 +746,11 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                    Description
-                  </label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{wt("Description")}</label>
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Detailed explanation of this computation..."
+                    placeholder={wt("Detailed explanation of this computation...")}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm focus:ring-2 focus:ring-primary-500/20 outline-none transition-all resize-none"
                   />
                 </div>
@@ -861,24 +759,22 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
               <div className="space-y-4">
                 <div className="p-4 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800/40 rounded-2xl space-y-3">
                   <h3 className="text-xs font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-2 uppercase tracking-tight">
-                    <Layers size={14} /> Available Properties
-                  </h3>
+                    <Layers size={14} />{wt("Available Properties")}</h3>
                   <div className="flex flex-wrap gap-1.5 h-40 lg:h-48 overflow-y-auto custom-scrollbar p-1">
                     {availableProps.map((prop) => (
                       <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                        key={prop}
+                        key={tProp(prop)}
                         onClick={() =>
                           setExpression((prev) => prev.endsWith("props['") ? prev + `${prop}']` : prev + `props['${prop}']`)
                         }
                         className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[10px] font-mono text-slate-500 hover:border-primary-500 hover:text-primary-600 rounded-lg transition-all"
                       >
-                        {prop}
+                        {tProp(prop)}
                       </motion.button>
                     ))}
                   </div>
                   <div className="pt-2 border-t border-indigo-100 dark:border-indigo-900/30 flex items-center gap-3 text-[10px] text-indigo-500/60 font-bold italic">
-                    <Info size={12} /> Click to insert into formula
-                  </div>
+                    <Info size={12} />{wt("Click to insert into formula")}</div>
                 </div>
 
                 {testResult !== null && (
@@ -889,11 +785,10 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                   >
                     <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">
-                            Test Output
-                          </p>
+                          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">{wt("Test Output")}</p>
                           <p className="text-2xl font-mono font-black text-emerald-700 dark:text-emerald-400">
-                            {testResult.toFixed(4)}
+                            {testResult.toFixed(4)} {unit}
+                            <span className="block text-xs font-normal">{testScope === 'DIMENSION_CHECKED' ? (lang === 'zh' ? '量纲已检查' : 'Dimensions checked') : (lang === 'zh' ? '仅数值运算：单位未经验证' : 'Numeric only: units are unverified')}</span>
                           </p>
                         </div>
                         <div className="p-3 bg-emerald-500 rounded-2xl text-white">
@@ -907,7 +802,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                          onClick={() => setShowMonteCarlo(!showMonteCarlo)}
                          className="flex items-center justify-between w-full text-xs font-bold text-emerald-700 dark:text-emerald-500 hover:bg-emerald-100/50 dark:hover:bg-emerald-900/30 p-2 rounded-lg transition-colors"
                        >
-                           <span className="flex items-center gap-1.5"><Activity size={14}/> Monte Carlo Uncertainty Simulator</span>
+                           <span className="flex items-center gap-1.5"><Activity size={14}/>{wt("Monte Carlo Uncertainty Simulator")}</span>
                            {showMonteCarlo ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                        </motion.button>
                     </div>
@@ -922,13 +817,13 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                            >
                               <div className="pt-2 pb-2 space-y-3">
                                   <div>
-                                     <p className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wide">Input Variability (+/- %)</p>
+                                     <p className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wide">{wt("Input Variability (+/- %)")}</p>
                                      <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar pr-2">
                                         {usedVariables.length === 0 ? (
-                                           <div className="text-xs text-slate-400 italic">No variables detected yet. Add a property to the formula to simulate uncertainty.</div>
+                                           <div className="text-xs text-slate-400 italic">{wt("No variables detected yet. Add a property to the formula to simulate uncertainty.")}</div>
                                         ) : usedVariables.map(v => (
                                             <div key={v} className="flex items-center justify-between">
-                                                <span className="text-[10px] font-mono text-slate-600 truncate max-w-[120px]" title={v}>{v}</span>
+                                                <span className="text-[10px] font-mono text-slate-600 truncate max-w-[120px]" title={v}>{tProp(v)}</span>
                                                 <div className="flex items-center gap-2">
                                                    <span className="text-[10px] text-slate-400 font-bold">{variances[v]}%</span>
                                                    <input 
@@ -946,16 +841,15 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                                   <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                                      onClick={() => {
                                         if (allProducts[0] && expression) {
-                                            const tempConfig = { id: name || "temp", name, expression, unit };
-                                            const testFormulas = [...formulas.filter(f => f.id !== tempConfig.id), tempConfig];
-                                            runSimulation(tempConfig.id, testFormulas, allProducts[0], variances, 5000);
+                                            const tempConfig = previewFormula();
+                                            runSimulation(tempConfig.id, previewGraph(tempConfig), allProducts[0], variances, 5000);
                                         }
                                      }}
                                      disabled={usedVariables.length === 0 || isSimulating || !expression}
                                      className="w-full py-2 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-all"
                                   >
                                       {isSimulating ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} 
-                                      {isSimulating ? "Simulating..." : "Run 5000 Permutations"}
+                                      {wt(isSimulating ? "Simulating..." : "Run 5000 Permutations")}
                                   </motion.button>
                                   
                                   {mcError && <p className="text-[10px] text-rose-500 font-bold">{mcError}</p>}
@@ -964,7 +858,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                                   {simulationStats && (
                                      <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-100 dark:border-slate-800">
                                          <div className="flex justify-between items-center mb-1">
-                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wide">Distribution (KDE)</span>
+                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wide">{wt("Distribution (KDE)")}</span>
                                              <span className="text-[10px] font-mono text-emerald-600 font-bold border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 rounded">
                                                 μ = {simulationStats.mean.toFixed(2)}, σ = {simulationStats.stdDev.toFixed(2)}
                                              </span>
@@ -972,7 +866,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                                          <div ref={chartRef} className="w-full h-32" />
                                          <div className="flex justify-between items-center mt-1 text-[9px] font-bold text-slate-400">
                                              <span>P5: {simulationStats.p5.toFixed(2)}</span>
-                                             <span>90% CI</span>
+                                             <span>{wt("90% CI")}</span>
                                              <span>P95: {simulationStats.p95.toFixed(2)}</span>
                                          </div>
                                      </div>
@@ -992,24 +886,24 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                   <div className="p-4 bg-primary-50/50 dark:bg-primary-950/20 border border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 transition-all">
                     <div className="space-y-1">
                       <h4 className="text-xs font-black text-primary-600 dark:text-primary-400 flex items-center gap-1.5 uppercase tracking-tight">
-                        <Save size={13} /> Reusable Template Generator
+                        <Save size={13} /> {wt("Reusable Template Generator")}
                       </h4>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                        Save the currently configured formula <strong>"{name}"</strong> as a custom blueprint template to load and parameterize later.
+                        {wt("Save the currently configured formula")} <strong>"{name}"</strong> {wt("as a custom blueprint template to load and parameterize later.")}
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <input
                         value={customTemplateName}
                         onChange={(e) => setCustomTemplateName(e.target.value)}
-                        placeholder="Template Name (e.g. My Formula)"
+                        placeholder={wt("Template Name (e.g. My Formula)")}
                         className="px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-primary-500/20 w-48"
                       />
                       <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                         onClick={handleSaveAsTemplate}
                         className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-black shadow-md shadow-primary-500/10 transition-all flex items-center gap-1 active:scale-95"
                       >
-                        <Plus size={12} /> Save Template
+                        <Plus size={12} /> {wt("Save Template")}
                       </motion.button>
                     </div>
                   </div>
@@ -1019,9 +913,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                   {/* Left Column: Templates Library list */}
                   <div className="lg:col-span-3 flex flex-col space-y-4 overflow-y-auto custom-scrollbar pr-1 pb-4">
                     <div>
-                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
-                        Curated Synthetic Resin Blueprints
-                      </h3>
+                      <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">{wt("Curated Synthetic Resin Blueprints")}</h3>
                       <div className="space-y-3">
                         {BUILT_IN_TEMPLATES.map((tpl) => (
                           <div
@@ -1036,10 +928,10 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                             <div className="flex items-start justify-between gap-2">
                               <div>
                                 <span className="inline-block px-2 py-0.5 bg-slate-100 dark:bg-slate-850 rounded-md text-[9px] font-black text-slate-500 uppercase tracking-wide mb-1">
-                                  {tpl.category}
+                                  {templateText(tpl, tpl.category)}
                                 </span>
                                 <h4 className="text-sm font-bold text-slate-850 dark:text-white">
-                                  {tpl.name}
+                                  {templateText(tpl, tpl.name)}
                                 </h4>
                               </div>
                               <span className="shrink-0 px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/40 rounded-xl text-[10px] font-mono text-indigo-600 dark:text-indigo-400 font-bold">
@@ -1047,7 +939,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                               </span>
                             </div>
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-                              {tpl.description}
+                              {templateText(tpl, tpl.description)}
                             </p>
                           </div>
                         ))}
@@ -1056,9 +948,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
 
                     {customTemplates.length > 0 && (
                       <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
-                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
-                          My Custom Blueprint Templates
-                        </h3>
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">{wt("My Custom Blueprint Templates")}</h3>
                         <div className="space-y-3">
                           {customTemplates.map((tpl) => (
                             <div
@@ -1082,7 +972,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                                   onClick={(e) => handleRemoveCustomTemplate(tpl.id, e)}
                                   className="absolute right-3 top-3 p-1.5 text-slate-400 hover:text-rose-500 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all"
-                                  title="Delete custom template"
+                                  title={wt("Delete custom template")}
                                 >
                                   <Trash2 size={13} />
                                 </motion.button>
@@ -1102,14 +992,12 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                     {selectedTemplate ? (
                       <div className="space-y-5 h-full flex flex-col justify-between">
                         <div className="space-y-2 shrink-0">
-                          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            Parameters Configuration
-                          </h3>
+                          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{wt("Parameters Configuration")}</h3>
                           <h4 className="text-sm font-black text-slate-800 dark:text-white leading-snug">
-                            {selectedTemplate.name}
+                            {templateText(selectedTemplate, selectedTemplate.name)}
                           </h4>
                           <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                            {selectedTemplate.description}
+                            {templateText(selectedTemplate, selectedTemplate.description)}
                           </p>
                         </div>
 
@@ -1146,16 +1034,12 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                             ))}
                           </div>
                         ) : (
-                          <div className="my-6 p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-850 text-center text-xs text-slate-400 font-bold italic flex-1 flex items-center justify-center">
-                            This static template has no configurable arguments.
-                          </div>
+                          <div className="my-6 p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-850 text-center text-xs text-slate-400 font-bold italic flex-1 flex items-center justify-center">{wt("This static template has no configurable arguments.")}</div>
                         )}
 
                         <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800 shrink-0">
                           <div>
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">
-                              Mathematical JavaScript Compilation
-                            </span>
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">{wt("Mathematical JavaScript Compilation")}</span>
                             <div className="p-3.5 bg-slate-950 text-emerald-400 rounded-2xl font-mono text-xs overflow-x-auto border border-slate-850 shadow-inner max-h-32 select-all leading-relaxed whitespace-pre-wrap">
                               {getComputedTemplateExpression(selectedTemplate, templateParamValues)}
                             </div>
@@ -1165,7 +1049,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                             onClick={handleApplyTemplate}
                             className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black shadow-lg shadow-indigo-600/10 transition-all flex items-center justify-center gap-1.5 active:scale-95"
                           >
-                            <Check size={14} /> Apply Template Parameters
+                            <Check size={14} /> {wt("Apply Template Parameters")}
                           </motion.button>
                         </div>
                       </div>
@@ -1175,12 +1059,8 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                           <BookOpen size={30} />
                         </div>
                         <div className="max-w-[200px]">
-                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">
-                            No Blueprint Selected
-                          </h4>
-                          <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                            Select a polymer science formula from the left to configure parameters & compile code.
-                          </p>
+                          <h4 className="text-sm font-bold text-slate-800 dark:text-white">{wt("No Blueprint Selected")}</h4>
+                          <p className="text-xs text-slate-400 mt-1 leading-relaxed">{wt("Select a polymer science formula from the left to configure parameters & compile code.")}</p>
                         </div>
                       </div>
                     )}
@@ -1199,45 +1079,37 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                 <div className="p-5 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800/40 rounded-3xl space-y-3">
                   <div className="flex items-center gap-2">
                     <Beaker className="text-indigo-600 dark:text-indigo-400" size={20} />
-                    <h3 className="text-sm font-black text-indigo-950 dark:text-white uppercase tracking-tight">
-                      Chemical Suggestion Engine (AI-Powered)
-                    </h3>
+                    <h3 className="text-sm font-black text-indigo-950 dark:text-white uppercase tracking-tight">{wt("Chemical Suggestion Engine (AI-Powered)")}</h3>
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-semibold">
-                    ResinAI Principal Scientist runs microstructural simulations on molecular chain kinetics and crosslinks, cross-referencing indices from the live dataset to propose high-impact physical chemical modifiers and formulation replacements in order to maximize durability.
-                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-semibold">{wt("ResinAI Principal Scientist runs microstructural simulations on molecular chain kinetics and crosslinks, cross-referencing indices from the live dataset to propose high-impact physical chemical modifiers and formulation replacements in order to maximize durability.")}</p>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Left Column: Settings */}
                   <div className="space-y-4 lg:col-span-1">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                        Durability target Dimension
-                      </label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{wt("Durability target Dimension")}</label>
                       <select
                         id="targetPropertySelect"
                         value={targetProperty}
                         onChange={(e) => setTargetProperty(e.target.value)}
                         className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500/20 outline-none cursor-pointer"
                       >
-                        <option value="Durability">General Material Durability & Wear Longevity</option>
-                        <option value="Impact Strength">Izod Impact Strength & Fracture Energy Resistance (韧性提升)</option>
-                        <option value="Environmental Stress cracking resistance">Environmental Stress Cracking Resistance (ESCR)</option>
-                        <option value="Weatherability and Curing Stability">UV Aging Protection & Photo-Oxidative Stability</option>
-                        <option value="Thermal Longevity and Glass Transition">High Temperature Curing & Tg Arrhenius Stability</option>
+                        <option value="Durability">{wt("General Material Durability & Wear Longevity")}</option>
+                        <option value="Impact Strength">{wt("Izod Impact Strength & Fracture Energy Resistance (韧性提升)")}</option>
+                        <option value="Environmental Stress cracking resistance">{wt("Environmental Stress Cracking Resistance (ESCR)")}</option>
+                        <option value="Weatherability and Curing Stability">{wt("UV Aging Protection & Photo-Oxidative Stability")}</option>
+                        <option value="Thermal Longevity and Glass Transition">{wt("High Temperature Curing & Tg Arrhenius Stability")}</option>
                       </select>
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">
-                        Add Formulation Constraints
-                      </label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">{wt("Add Formulation Constraints")}</label>
                       <textarea
                         id="customConstraintsText"
                         value={customConstraints}
                         onChange={(e) => setCustomConstraints(e.target.value)}
-                        placeholder="e.g., Must keep raw material costs low, use non-halogenated filler, or restrict glass fiber density..."
+                        placeholder={wt("e.g., Must keep raw material costs low, use non-halogenated filler, or restrict glass fiber density...")}
                         rows={5}
                         className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 outline-none resize-none"
                       />
@@ -1254,18 +1126,18 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                       {isGeneratingSuggestions ? (
                         <>
                           <Loader2 size={14} className="animate-spin" />
-                          <span>Executing AI Chemistry Model...</span>
+                          <span>{wt("Executing AI Chemistry Model...")}</span>
                         </>
                       ) : (
                         <>
                           <Beaker size={14} />
-                          <span>Generate Durability suggestions</span>
+                          <span>{wt("Generate Durability suggestions")}</span>
                         </>
                       )}
                     </motion.button>
                     {!expression && (
                       <p className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold px-2 text-center leading-relaxed">
-                        ⚠️ Please write or apply a formula in the Editor tab to load variables.
+                        ⚠️ {wt("Please write or apply a formula in the Editor tab to load variables.")}
                       </p>
                     )}
                   </div>
@@ -1281,19 +1153,15 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                           <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-transparent border-t-indigo-600 animate-spin" />
                         </div>
                         <div className="max-w-sm space-y-2">
-                          <h4 className="text-sm font-bold text-slate-800 dark:text-white animate-pulse">
-                            ResinAI Scholar Engine Analyzing...
-                          </h4>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 italic">
-                            Constructing property-structure-performance correlation maps, cross-referencing polymeric ratios in ResinDB, and generating detailed stoichiometric recommendations...
-                          </p>
+                          <h4 className="text-sm font-bold text-slate-800 dark:text-white animate-pulse">{wt("ResinAI Scholar Engine Analyzing...")}</h4>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 italic">{wt("Constructing property-structure-performance correlation maps, cross-referencing polymeric ratios in ResinDB, and generating detailed stoichiometric recommendations...")}</p>
                         </div>
                       </div>
                     ) : suggestionError ? (
                       <div className="p-5 bg-rose-50 dark:bg-rose-950/20 border border-rose-150 dark:border-rose-900/30 rounded-2xl flex items-start gap-3">
                         <AlertCircle className="text-rose-500 mt-0.5 shrink-0" size={16} />
                         <div>
-                          <h4 className="text-xs font-black text-rose-700 dark:text-rose-400 uppercase tracking-tight">AI Service Error</h4>
+                          <h4 className="text-xs font-black text-rose-700 dark:text-rose-400 uppercase tracking-tight">{wt("AI Service Error")}</h4>
                           <p className="text-xs text-rose-600 dark:text-rose-400 mt-1">{suggestionError}</p>
                         </div>
                       </div>
@@ -1302,7 +1170,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                         {/* Summary Overview */}
                         <div className="p-5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-2">
                           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 leading-none">
-                            <Info size={12} className="text-indigo-500" /> Resin Durability Bottlenecks & Trends
+                            <Info size={12} className="text-indigo-500" /> {wt("Resin Durability Bottlenecks & Trends")}
                           </h4>
                           <p className="text-xs text-slate-600 dark:text-slate-350 leading-relaxed font-medium">
                             {suggestionsResponse.overview}
@@ -1311,9 +1179,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
 
                         {/* Recommendation cards */}
                         <div className="space-y-4">
-                          <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest px-1">
-                            Actionable Replacement & formulation Suggestions
-                          </h3>
+                          <h3 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest px-1">{wt("Actionable Replacement & formulation Suggestions")}</h3>
                           {suggestionsResponse.suggestions?.map((item, idx) => (
                             <div
                               key={idx}
@@ -1333,7 +1199,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                                 </div>
                                 <div className="flex flex-col items-end shrink-0">
                                   <span className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 uppercase bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-150 dark:border-indigo-900/40 px-2 py-0.5 rounded-md font-mono">
-                                    Confidence: {item.confidenceScore}%
+                                    {wt("Confidence:")} {item.confidenceScore}%
                                   </span>
                                   <div className="w-16 bg-slate-200 dark:bg-slate-850 h-1 rounded-full overflow-hidden mt-1">
                                     <div
@@ -1347,7 +1213,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                               <div className="space-y-2">
                                 <p className="text-xs font-black text-slate-850 dark:text-white flex items-center gap-1.5">
                                   <Activity size={12} className="text-indigo-500" />
-                                  Mechanistic Durability Impact: <span className="font-normal text-slate-600 dark:text-slate-300">{item.impact}</span>
+                                  {wt("Mechanistic Durability Impact:")} <span className="font-normal text-slate-600 dark:text-slate-300">{item.impact}</span>
                                 </p>
                                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed pl-3.5 border-l-2 border-slate-200 dark:border-slate-800">
                                   {item.rationale}
@@ -1357,9 +1223,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                               {item.formulaUpdate && (
                                 <div className="pt-3.5 border-t border-slate-100 dark:border-slate-850 space-y-2">
                                   <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-black text-slate-450 uppercase tracking-wider block">
-                                      Formula Representation Adjustments
-                                    </span>
+                                    <span className="text-[10px] font-black text-slate-450 uppercase tracking-wider block">{wt("Formula Representation Adjustments")}</span>
                                     <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                                       onClick={() => {
                                         setExpression(item.formulaUpdate!);
@@ -1369,7 +1233,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                                       className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/20 dark:hover:bg-emerald-900/30 text-[10px] font-black text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40 rounded-xl transition-all flex items-center gap-1 active:scale-95 shadow-sm cursor-pointer"
                                     >
                                       <Check size={11} />
-                                      <span>Apply Update</span>
+                                      <span>{wt("Apply Update")}</span>
                                     </motion.button>
                                   </div>
                                   <pre className="p-3 bg-slate-950 text-emerald-450 rounded-xl font-mono text-[10px] overflow-x-auto border border-slate-850 leading-relaxed select-all">
@@ -1388,10 +1252,10 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                         </div>
                         <div className="max-w-xs space-y-1">
                           <h4 className="text-sm font-bold text-slate-800 dark:text-white">
-                            Awaiting Trigger Parameters
+                            {wt("Awaiting Trigger Parameters")}
                           </h4>
                           <p className="text-xs text-slate-400 leading-relaxed font-semibold">
-                            Select a target physical property from the left panel and click "Generate Durability suggestions" to launch the AI-powered scientific suggestion engine.
+                            {wt('Select a target physical property from the left panel and click "Generate Durability suggestions" to launch the AI-powered scientific suggestion engine.')}
                           </p>
                         </div>
                       </div>
@@ -1412,7 +1276,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                       </motion.button>
                       <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                         <GitCompare size={16} className="text-primary-500" />
-                        Comparing Versions
+                        {wt("Comparing Versions")}
                       </h3>
                       <div className="ml-auto flex items-center gap-2">
                         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
@@ -1426,7 +1290,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                             }}
                             className="px-3 py-1.5 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-800 rounded-lg text-xs font-bold hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors"
                         >
-                          Revert to this version
+                          {wt("Revert to this version")}
                         </motion.button>
                       </div>
                     </div>
@@ -1435,32 +1299,32 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                        {/* Left side: Historical */}
                        <div className="space-y-4 pr-1">
                           <h4 className="text-xs font-black text-rose-500 uppercase tracking-widest sticky top-0 bg-white dark:bg-slate-950 py-1 z-10 border-b border-rose-100 dark:border-slate-800">
-                             Historical ({new Date(comparingHistory.date).toLocaleString()})
+                             {wt("Historical")} ({new Date(comparingHistory.date).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en')})
                           </h4>
                           
                           <div className="space-y-3">
                              <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Name</label>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{wt("Name")}</label>
                                 <div className="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300">
                                    {comparingHistory.name}
                                 </div>
                              </div>
                              <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Formula</label>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{wt("Formula")}</label>
                                 <div className="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono text-slate-700 dark:text-slate-300">
                                    {comparingHistory.expression}
                                 </div>
                              </div>
                              <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Unit</label>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{wt("Unit")}</label>
                                 <div className="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 break-words">
-                                   {comparingHistory.unit || <span className="italic text-slate-400">None</span>}
+                                   {comparingHistory.unit || <span className="italic text-slate-400">{wt("None")}</span>}
                                 </div>
                              </div>
                              <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Description</label>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{wt("Description")}</label>
                                 <div className="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 break-words">
-                                   {comparingHistory.description || <span className="italic text-slate-400">None</span>}
+                                   {comparingHistory.description || <span className="italic text-slate-400">{wt("None")}</span>}
                                 </div>
                              </div>
                           </div>
@@ -1469,34 +1333,34 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                        {/* Right side: Current with diff highlights */}
                        <div className="space-y-4 pl-1">
                           <h4 className="text-xs font-black text-emerald-500 uppercase tracking-widest sticky top-0 bg-white dark:bg-slate-950 py-1 z-10 border-b border-emerald-100 dark:border-slate-800">
-                             Current Status
+                             {wt("Current Status")}
                           </h4>
                           
                           <div className="space-y-3">
                              <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Name</label>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{wt("Name")}</label>
                                 <div className="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium">
                                    <DiffViewer oldText={comparingHistory.name} newText={name} />
                                 </div>
                              </div>
                              <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Formula</label>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{wt("Formula")}</label>
                                 <div className="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-mono">
                                    <DiffViewer oldText={comparingHistory.expression} newText={expression} />
                                 </div>
                              </div>
                              <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Unit</label>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{wt("Unit")}</label>
                                 <div className="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium break-words">
                                    <DiffViewer oldText={comparingHistory.unit || ""} newText={unit || ""} />
-                                   {!unit && !comparingHistory.unit && <span className="italic text-slate-400">None</span>}
+                                   {!unit && !comparingHistory.unit && <span className="italic text-slate-400">{wt("None")}</span>}
                                 </div>
                              </div>
                              <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Description</label>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{wt("Description")}</label>
                                 <div className="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium break-words">
                                    <DiffViewer oldText={comparingHistory.description || ""} newText={description || ""} />
-                                   {!description && !comparingHistory.description && <span className="italic text-slate-400">None</span>}
+                                   {!description && !comparingHistory.description && <span className="italic text-slate-400">{wt("None")}</span>}
                                 </div>
                              </div>
                           </div>
@@ -1505,20 +1369,20 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                   </div>
                 ) : !currentFormula?.history || currentFormula.history.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-sm font-bold text-slate-400 italic">
-                    No history found for this formula.
+                    {wt("No history found for this formula.")}
                   </div>
                 ) : (
                   <div className="space-y-3 overflow-y-auto custom-scrollbar flex-1 pb-4">
                     {[...currentFormula.history].reverse().map((h, i) => (
                       <div key={i} className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2 group transition-all">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-500">{new Date(h.date).toLocaleString()}</span>
+                          <span className="text-xs font-bold text-slate-500">{new Date(h.date).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en')}</span>
                           <div className="flex items-center gap-2">
                               <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                                 onClick={() => setComparingHistory(h)}
                                 className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors flex items-center gap-1 opacity-0 group-hover:opacity-100"
                               >
-                                <GitCompare size={12} /> Compare
+                                <GitCompare size={12} /> {wt("Compare")}
                               </motion.button>
                               <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                                 onClick={() => {
@@ -1530,7 +1394,7 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                                 }}
                                 className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-primary-600 dark:text-primary-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                               >
-                                Revert
+                                {wt("Revert")}
                               </motion.button>
                           </div>
                         </div>
@@ -1541,8 +1405,8 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
                            </div>
                            {(h.description || h.unit) && (
                               <div className="text-[10px] text-slate-500 flex gap-4 mt-2">
-                                {h.unit && <span><strong className="text-slate-600 dark:text-slate-300">Unit:</strong> {h.unit}</span>}
-                                {h.description && <span><strong className="text-slate-600 dark:text-slate-300">Desc:</strong> {h.description}</span>}
+                                {h.unit && <span><strong className="text-slate-600 dark:text-slate-300">{wt("Unit:")}</strong> {h.unit}</span>}
+                                {h.description && <span><strong className="text-slate-600 dark:text-slate-300">{wt("Desc:")}</strong> {h.description}</span>}
                               </div>
                            )}
                         </div>
@@ -1558,23 +1422,18 @@ export const FormulaEditorModal: React.FC<FormulaEditorModalProps> = React.memo(
         {/* Footer */}
         <div className="p-4 px-6 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between bg-slate-50/50 dark:bg-slate-900/50 gap-4">
           <p className="text-[10px] text-slate-400 font-bold italic flex items-center gap-1.5 text-center sm:text-left">
-            <Info size={12} className="shrink-0" /> Computed columns are
-            automatically added to the Data Grid and Analytics charts.
+            <Info size={12} className="shrink-0" /> {wt("Computed columns are automatically added to the Data Grid and Analytics charts.")}
           </p>
           <div className="flex gap-3 w-full sm:w-auto">
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={onClose}
               className="flex-1 sm:flex-none px-6 py-2.5 text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors"
-            >
-              Cancel
-            </motion.button>
+            >{wt("Cancel")}</motion.button>
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={handleSave}
               disabled={!name || !expression}
               className="flex-1 sm:flex-none px-8 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-2xl text-sm font-black shadow-lg shadow-primary-500/20 transition-all active:scale-95"
-            >
-              Save Formula
-            </motion.button>
+            >{wt("Save Formula")}</motion.button>
           </div>
         </div>
       </motion.div>

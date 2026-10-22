@@ -1,3 +1,5 @@
+import { admittedPropertyValue } from '@/lib/propertyAdmission';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useState, useCallback, useEffect } from 'react';
 import { Product } from '@/types/index';
 import { useToasts } from '@/contexts/ToastContext';
@@ -7,6 +9,7 @@ export function useMahalanobisWorker() {
   const [outlierResults, setOutlierResults] = useState<Record<string, { isOutlier: boolean; distance: number; contributingFeatures: string[] }>>({});
   const { isCalculating: isDetecting, result, runAnalysis } = useWorker();
   const { addToast } = useToasts();
+  const { language } = useLanguage();
 
   useEffect(() => {
     if (result) {
@@ -17,26 +20,27 @@ export function useMahalanobisWorker() {
            if(d.isOutlier) count++;
        });
        setOutlierResults(mapped);
-       if(count > 0) addToast('error', `Identified ${count} anomalous data points using Mahalanobis distance.`);
-       else addToast('success', "Data distribution conforms to expected structural limits.");
+       if(count > 0) addToast('error', language === 'en' ? `Identified ${count} screened outliers using Mahalanobis distance.` : `Mahalanobis 距离筛查标记 ${count} 个异常样本。`);
+       else addToast('success', language === 'en' ? "No outlier exceeded the selected statistical threshold." : "没有样本超过所选统计阈值。");
     }
-  }, [result, addToast]);
+  }, [result, addToast, language]);
 
   const detectOutliers = useCallback((products: Product[], features: string[]) => {
-      if (products.length <= features.length) {
-         addToast("error", "For Mahalanobis detection, the number of records must strictly exceed the number of features.");
+      const eligible = products.filter(product => features.every(key => admittedPropertyValue(product.properties[key]) !== null));
+      if (features.length === 0 || eligible.length <= features.length) {
+         setOutlierResults({});
+         addToast('error', language === 'en'
+           ? `Mahalanobis analysis needs n > p: ${eligible.length} complete records, ${features.length} features.`
+           : `Mahalanobis 分析需要 n > p：${eligible.length} 条完整记录，${features.length} 个特征。`);
          return;
       }
-      const dataRecord = products.map(p => {
-          const m = { _id: p.id, name: p.gradeName } as Record<string, number> & { _id: string, name: string };
-          features.forEach(f => {
-              const val = parseFloat(String(p.properties[f]?.value));
-              m[f] = isNaN(val) ? 0 : val;
-          });
-          return m;
+      const dataRecord = eligible.map(product => {
+        const record = { _id: product.id, name: product.gradeName } as Record<string, number> & { _id: string; name: string };
+        features.forEach(key => { record[key] = admittedPropertyValue(product.properties[key])!; });
+        return record;
       });
       runAnalysis(dataRecord, features, 0.05); // using 0.05 alpha instead of raw threshold
-  }, [addToast, runAnalysis]);
+  }, [addToast, runAnalysis, language]);
 
   const clearOutliers = useCallback(() => {
     setOutlierResults({});

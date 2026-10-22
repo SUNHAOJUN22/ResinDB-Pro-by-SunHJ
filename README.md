@@ -1,306 +1,211 @@
 # ResinDB Pro by SunHJ
 
-<!-- LOCALIZED_README_LINKS -->
+[中文](README.zh-CN.md) · [English](README.en.md)
 
-[中文设计版](README.zh-CN.md) · [English design edition](README.en.md) · [技术参考 / Technical reference](docs/TECHNICAL_REFERENCE.md)
+![Version 3.2.0](https://img.shields.io/badge/version-3.2.0-indigo)
 
-<p align="center">
-  <a href="https://github.com/SUNHAOJUN22/ResinDB-Pro-by-SunHJ/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/SUNHAOJUN22/ResinDB-Pro-by-SunHJ/actions/workflows/ci.yml/badge.svg?branch=main" /></a>
-  <img alt="Node.js 22" src="https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white" />
-  <img alt="React 19" src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" />
-  <img alt="TypeScript 5.8" src="https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white" />
-  <img alt="Version 3.2.0" src="https://img.shields.io/badge/version-3.2.0-7C3AED" />
-</p>
+ResinDB 是 React / TypeScript 材料数据与科研筛选工作区，提供本地 IndexedDB 数据管理、可配置 REST 客户端、公式依赖图、单位检查、统计筛选和多种科学图表。目标是让每个数字能够追溯到原始声明，让每次计算说明样本、单位、算法与限制。当前仓库交付浏览器应用及计算模块；远程鉴权、数据库服务器和真实材料测量需要独立部署或提供。
 
-**version-3.2.0-governed-data-scientific-compute**
+![中文愿景与功能设计图](docs/assets/vision-zh.png)
 
-ResinDB Pro 是本地优先的树脂与聚合物数据工作台，将结构化属性、数值计算、工程筛选、Worker、科研图形与验证工件连接起来。它不是经认证的 LIMS/ERP、法规判定器、材料放行系统、已验证力场或自动科研批准器。
+上图为 AI 设计的愿景示意；其文字与公式用于解释方向，不代表实验结果或验收截图。实际功能以以下代码说明和运行结果为准。
 
-*ResinDB Pro is a local-first resin and polymer workbench joining governed properties, numerical analysis, screening, Workers, scientific figures and reproducible evidence. It is not a certified LIMS/ERP, regulatory decision engine, material-release system, validated force field or automatic scientific approval engine.*
+![材料数据与计算路径](docs/localized-vision/resindb-vision-zh.svg)
 
-<!-- CLOSURE_STATUS_START -->
-## 1. 使用边界 / Operating boundary
+![代码交付边界](docs/current-main/resindb-current-main-zh.svg)
 
-| 合同 / Contract | 行为 / Behavior |
-|---|---|
-| 缺失值 / Missing values | 缺失、空白、Boolean、畸形字符串和非有限值不是物理零。合法零值必须保留。 / Missing or malformed data are not zero; legitimate zero remains valid. |
-| 公式 / Formula | `OK` 携带有限结果；`UNKNOWN`、`INVALID` 携带 `null` 和原因，不用零掩盖失败。 / Failures retain explicit status, null value and reason. |
-| 单位 / Units | 运算前检查维度并换算数值；不补造标准、方法、温度或负荷。 / Convert values, not just labels; never invent measurement conditions. |
-| 排名与图形 / Ranking and figures | TOPSIS 缺失项默认不合格；雷达图不补零，数据不足报告 `INSUFFICIENT_DATA`。 / Missing candidates are excluded by default and insufficient projections remain explicit. |
-| 报告 / Reports | 工作表比较声明属性与阈值，不证明实验室认证、法规合规或材料放行。 / Screening is not certification, compliance or material release. |
-| AI / AI | 浏览器只访问同源 `/api/ai/proxy`，不保存 provider key。身份字段和原始材料数据不应默认出站。 / Same-origin proxy only, no browser provider credentials or default identity-bearing egress. |
-| 执行与批准 / Execution and approval | 软件测试不证明外部模型、LAMMPS、工业设备或独立科学/工程批准。 / Software evidence does not attest external execution or independent approval. |
-
-AI 请求必须经过有界授权、载荷校验和最小化审计。代理部署、服务器密钥托管、用户身份、隐私、保留策略和法律批准仍由部署方独立验证。
-
-*AI requests require bounded authorization, payload validation and minimized audit metadata. Proxy deployment, server key custody, identity, privacy, retention and legal approval remain deployment responsibilities.*
-<!-- CLOSURE_STATUS_END -->
-
-## 2. 安装与使用 / Install and use
-
-Node 版本以 [`.nvmrc`](.nvmrc) 为准，依赖以 `package-lock.json` 为准。
+## 安装与运行
 
 ```bash
+nvm install
+nvm use
 npm ci
+npm run dev -- --host 127.0.0.1
+```
+
+使用 `.nvmrc` 指定的 Node 22.23.3（引擎范围 >=22.12.0 <23）。首次进入演示工作区显示 13 条演示记录，实际数量始终以界面为准。KaTeX 与字体随本地构建打包，不依赖外部公式 CDN。生产构建运行 `npm run build`，用 `npm run preview` 预览；部署设置参见 [.env.example](.env.example)。
+
+## 使用策略
+
+1. 先确认数据身份、来源、许可证与保密级别，区分 DEMO / SYNTHETIC / MEASURED / IMPORTED。
+2. 导入后核对原始字段、单位、方法、温度和载荷；平面 CSV 的单位必须出现在源表头声明中，不从属性名猜测。
+3. 编辑样本或批量修改后查看重建的 quantity 状态；UNKNOWN / INVALID 先解决原因再分析。
+4. 新建公式声明输出单位；无量纲明确填 `1`。先用“测试”查看状态，再保存依赖图。
+5. 选择实际有效的 X/Y 属性；查看散点的有效样本数，再运行聚类、Pareto、TOPSIS 或 Mahalanobis。
+6. 记录条件、随机种子、归一化、输入集合和排除原因；导出后与原始记录复核。
+
+## 数理程式与科学边界
+
+### 严格数量与单位
+
+$$
+q_{\mathrm{can}}=s_u q_{\mathrm{raw}},\qquad q_{\mathrm{raw}},q_{\mathrm{can}}\in\mathbb{R}_{\mathrm{finite}}
+$$
+
+完整十进制/科学记数法解析拒绝 `12abc`、十六进制、空值、无穷和非零下溢。原始字符串、单位、测试方法、温度、载荷与溯源保存于数量记录；canonical 单位由属性注册表定义（例如密度为 g/cm³、应力为 MPa）；公式模块另行执行 SI 量纲缩放。只有 VALID 的有限 canonical 值进入计算。UNKNOWN/INVALID 不通过 raw 值重新获准。没有单位不猜测默认单位。核心数量与公式单位符号区分大小写；不支持的 mPa 不会被解释为 MPa。
+
+### 量纲传播
+
+$$
+\begin{aligned}
+\mathbf{d}(q)&=(a,b,c,d),\qquad [q]=M^aL^bT^c\Theta^d \\
+\mathbf{d}(xy)&=\mathbf{d}(x)+\mathbf{d}(y),\qquad \mathbf{d}(x/y)=\mathbf{d}(x)-\mathbf{d}(y) \\
+x+y&\text{ 要求 }\mathbf{d}(x)=\mathbf{d}(y)
+\end{aligned}
+$$
+
+四维 SI 指数向量跟随依赖图传播；加减要求同维，乘除组合维度，指数与 log/exp/三角函数参数须无量纲。受限解析器不执行任意 JavaScript。兼容输入先换算，结果再换成声明的输出单位；25 MPa + 0.1 GPa 输出为 0.125 GPa。
+
+### 比强度
+
+$$
+\sigma_s=\frac{\sigma_y}{\rho},\qquad [\sigma_s]=\mathrm{MPa\,cm^3/g}
+$$
+
+使用 `拉伸屈服应力 / 密度`，不把 tensile break 当作 tensile yield，不用 0 或 1 填补缺失。两项须对应可比较的材料及测试状态；比强度不是结构件安全许可。
+
+### 比模量
+
+$$
+E_s=\frac{E_f}{\rho},\qquad [E_s]=\mathrm{MPa\,cm^3/g}
+$$
+
+使用弯曲模量与密度。单位注册表支持 Pa/kPa/MPa/GPa、g/cm³/kg/m³，以及这里的输出复合单位。未声明单位的旧记录可做 NUMERIC_ONLY 运算，但不得宣称 DIMENSION_CHECKED。混合有单位与无单位输入返回 UNKNOWN。
+
+### 冲击与刚度描述性乘积
+
+$$
+I_{CE}=\frac{a_{\mathrm{Charpy}}E_f}{10000},\qquad [I_{CE}]=\mathrm{MPa\,kJ/m^2}
+$$
+
+默认历史指标保留 ÷10000 比例并改正输出单位。只迁移 ID、名称、旧公式、旧单位完全匹配的内置默认项，并保留历史；用户自定义公式不被覆盖。Charpy 与 Izod 为不同试验，不作别名互换，也不把此乘积称为认证韧性评分。
+
+### TOPSIS 筛选
+
+$$
+r_{ij}=\frac{x_{ij}-\min_i x_{ij}}{\max_i x_{ij}-\min_i x_{ij}},\quad v_{ij}=w_jr_{ij},\quad C_i=\frac{D_i^-}{D_i^++D_i^-}
+$$
+
+成本型指标翻转方向。权重先按最大值缩放再归一化，数值先缩放后计算极差，距离采用稳定 hypot。缺失默认排除，显式插补须声明数值和溯源；没有指标时没有排名、没有前三名。全常数指标中合格候选得到中性 0.5，表示无法区分。
+
+### 雷达轮廓
+
+$$
+z_j=20+80\frac{n_{<j}+\tfrac12n_{=j}}{n_j}
+$$
+
+科研雷达在当前候选的共同有限属性上显示组内 midrank；至少三个共同轴。20–100 映射为视觉展示约定。坐标值与多边形面积不代表质量、均衡分或全能等级。没有足够有效轴时显示不可用，不补零。
+
+### 成对散点与主成分
+
+$$
+\mathcal{S}_{xy}=\{i:x_i,y_i\in\mathbb{R}_{\mathrm{finite}}\},\quad X_c=X-\bar X,\quad Z=X_cW_k
+$$
+
+默认坐标为真实字段“密度 / 熔体质量流动速率”。Canvas、K-Means 和 Pareto 复用同一成对有效样本；其他稀疏属性不使普通散点消失。更换坐标或样本会清除旧聚类/前沿并取消旧 Worker。PCA 使用完整案例，先做全矩阵最大绝对值缩放；这不等于逐特征标准化，跨单位解释前须人工设计特征。
+
+### 聚类与帕累托
+
+$$
+\min_{\mu,c}\sum_i\|x_i-\mu_{c_i}\|_2^2,\qquad x\prec y\iff(\forall j:x_j\le y_j)\land(\exists j:x_j<y_j)
+$$
+
+K-Means 的实际工作量来自当前有效样本与去重坐标，不来自属性并集，也不补齐缺失。前沿依照各目标方向判断非支配；相同 X/Y 不重复建立目标。本机运行基准测量 TS/WASM 执行路径，不是仪器或材料校准。随机种子、后端选择和实际样本数须随分析保存。
+
+### Mahalanobis 筛查
+
+$$
+D_M^2=(x-\mu)^T\Sigma_\lambda^{-1}(x-\mu),\qquad n_{\mathrm{complete}}>p
+$$
+
+先排除缺失/无效属性，再检查有效记录数 n 是否严格大于特征数 p。核心采用正则化与分解求解，界面报告实际 n/p；未超阈值只表示没有被该统计规则标记，不证明材料物理有效。
+
+### Carreau–Yasuda 流变代理
+
+$$
+\eta(\dot\gamma)=\eta_\infty+(\eta_0-\eta_\infty)\left[1+(\lambda\dot\gamma)^a\right]^{(n-1)/a}
+$$
+
+当前流变界面由 MFR 规则生成确定性代理点，再做有界拟合，未测量真实剪切曲线。必须有正有限 MFR；缺失时不默认为 5。代理点、拟合与原始观测分开标识；正值筛选、对数坐标及导出范围均有门禁。
+
+### 温移与活化关系
+
+$$
+\log_{10}a_T=-\frac{C_1(T-T_r)}{C_2+T-T_r},\qquad \ln k=\ln A-\frac{E_a}{RT}
+$$
+
+WLF 与 Arrhenius 位于独立计算模块；温度基准、量纲与有效域由对应入口决定。不能将摄氏数直接当开尔文，不能把公式编辑器有限单位注册表当通用单位代数。拟合须保留输入和残差检查。本地 Carreau/WLF/Weibull 沙箱拒绝空值、非有限数、域外参数与无法表示的结果，不会静默夹取参数。
+
+### 热分析动力学
+
+$$
+\ln\!\left(\frac{\beta}{T_p^2}\right)=\ln\!\left(\frac{AR}{E_a}\right)-\frac{E_a}{RT_p}
+$$
+
+Kissinger 分析依赖多个升温速率与对应绝对峰温。其线性关系有模型假设，不通过曲线拟合自动确认反应机理或实际工艺窗口。负数、重复退化条件和不足观测应按模块错误处理。
+
+### Weibull 与 Prony
+
+$$
+F(x)=1-e^{-(x/\eta)^m},\quad x>0;\qquad E(t)=E_\infty+\sum_jE_je^{-t/\tau_j}
+$$
+
+Weibull 形状、尺度及 63.2% 分位有输入域含义，不是制造质量认证。Prony 模态参数描述指定数据及时间域；外推与寿命结论需要额外测量依据。
+
+### 不确定性模拟
+
+$$
+\begin{aligned}
+X_j^{(b)}&\sim\mathcal N(\mu_j,\sigma_j^2),\qquad \sigma_j=|\mu_j|p_j/100\\
+Y^{(b)}&=f(X^{(b)}),\qquad I_{0.90}=[Q_{0.05}(Y),Q_{0.95}(Y)]
+\end{aligned}
+$$
+
+Monte Carlo 按独立正态分布抽样，百分比控件表示相对于输入均值绝对值的标准差。输出是经验模拟分位区间，不是参数置信区间；应记录输入标准差、抽样次数和随机种子，本实现不推断输入相关性。模拟与确定性“测试”共享量纲公式执行器，包括派生公式依赖：密度 `0.958 g/cm³` 在零方差时，两条路径均输出 `958 kg/m³`。每次请求绑定单位与数量资格，并复用数值字典，避免旧 canonical 数值覆盖抽样，也不逐次深拷贝材料记录。统计量采用量级缩放与补偿归约；不可表示的统计量或 KDE 绘图区间明确报错。改变公式、输出单位、依赖、样本或输入标准差，会作废旧结果。模拟不替代真实试验。
+
+### 核密度与高斯过程
+
+$$
+\hat f_h(x)=\frac1{nh}\sum_iK\!\left(\frac{x-x_i}{h}\right),\qquad \mu_*=k_*^T(K+\sigma_n^2I)^{-1}y
+$$
+
+KDE 平滑程度取决于带宽。Gaussian Process、贝叶斯优化、多目标代理及响应面输出都是模型预测；采集候选不是已验证配方。核矩阵正则化与有效样本检查只处理数值问题，不消除样本偏差。
+
+### 相对灵敏度与可复核证据
+
+$$
+S_{yx}\approx\frac{f(x+\delta x)-f(x-\delta x)}{2\delta x}\frac{x}{f(x)}
+$$
+
+依赖热图对拷贝后的有效数量做有限差分扰动，保留原记录；公式输出与规则代理分别标记。x=0、输出为 0、无效数量或不可计算依赖显示不可用。代码测试与数据审计是软件验收证据，不是材料性能认证。
+
+## 数据层与代码层分离
+
+`data/resins/` 保存版本化声明和分类树，`data/manifest.json` 与数据校验脚本维护数据契约；`src/lib/quantityRecord.ts` 定义数量边界。`src/lib/propertyAdmission.ts` 统一计算准入和编辑后重建；`src/lib/formula/` 与 `formulaParser.ts` 维护解析、量纲和依赖执行。`src/compute/`、`src/workers/`、`src/hooks/workers/` 分离核函数、消息与 React 生命周期。模块清单见 [docs/compute-module-catalog.json](docs/compute-module-catalog.json)。
+
+### 导入、编辑与后端边界
+
+JSON 导入/导出保留完整 Product；CSV 另含 `GovernanceJSON`、`PropertiesJSON`、`RecordJSON`，供原生结构往返；XML 进行转义并携带属性 Metadata 和 Governance，当前导入入口支持 JSON/CSV/TXT，不承诺 XML 自动导入。结构化输入损坏时拒绝，不能降级成丢失单位的平面记录。合并使用较严格保密级别，混合来源保留 UNKNOWN，并设置 NOT_FOR_RELEASE。编辑未改字段保留 method、load、sampleId、batchId、provenanceRefs；已改数量重新计算状态。
+
+IndexedDB 是本地持久化后端；REST 适配器是客户端契约。远程读取回退必须显式启用，远程写入失败不会悄悄写到本地。AI 数据外发有独立治理检查；预置内容、规则代理和生成建议均需按其来源解读。
+
+手动录入与文件导入都先进入预览，适配器确认保存后才显示完成。本地导入在一个 IndexedDB 事务中新增或更新记录，提交后更新缓存。远程导入沿用现有更新/新增接口，不假定后端提供跨请求事务；失败会明确显示并尝试重新读取已保存记录。
+
+## 验收、测试与可交付判断
+
+```bash
+npm run validate:ci
+npm audit --omit=dev --audit-level=high
 npm ls --all
-npm run dev
+node --test scripts/tests/*.node.mjs
 ```
 
-生产构建与本地预览 / Production build and local preview:
+`validate:ci` 执行文档/Unicode/源代码/科学 UI/计算/数据契约、ESLint、TypeScript、Vitest、构建及 smoke、K-Means 基准 smoke、分类测试、覆盖率、三个 Chromium 界面套件与完整依赖安全审计。门槛定义留在原配置中，不通过降低覆盖率、隐藏失败或替换空测试制造通过。浏览器验收需要可执行 Chromium（可设置 `CHROME_BIN`）及可用中英文字体；只有 canvas 元素存在不足以证明图已画出，散点须验证真实像素与有效点数。
 
-```bash
-npm run build
-npm run preview
-```
+报告和覆盖率写入本地 `artifacts/`、`coverage/`；每次结果对应具体代码和运行环境。最终交付应核对 GitHub main 的确切提交及该提交 Actions 结果，不能把旧提交结果充当新代码验收。六小时运行只能按真实起止时间与日志认定，README 不预先宣称完成时长。详见 [验收契约](docs/VALIDATION.md)。
 
-分析顺序：导入数据并检查 Schema、单位、条件与来源 → 筛选有限且同维的观测 → 执行统计、拟合或工程筛查 → 查看后端与适用域证据 → 导出工作表。不要将相关性、代理模型或情景投影解释为实验因果结论。
+## 已实现范围与后续愿景
 
-*Validate schema, units, conditions and provenance; select finite compatible observations; run analysis; inspect backend/domain evidence; then export a screening worksheet. Associations, proxies and scenarios are not experimental causal conclusions.*
+当前聚焦可追溯材料筛选、数值边界、局部持久化和可复核科学展示。单位系统是有限注册表：未实现通用复合单位语法、摄氏仿射转换、化学计量 mol/eq 全维度或自动实验认证。安全材料选型、法规合规与寿命结论需要独立试验和领域审查。下一步愿景是用真实测量、明确接口和可版本化证据扩展计算闭环，而不是把愿景图当作功能证明。
 
-Linux 截图运行环境需要实际 CJK 字体；永久 CI 已配置安装和绘制验证。
-
-```bash
-sudo apt-get update
-sudo apt-get install -y --no-install-recommends fonts-noto-cjk
-fc-cache -f
-```
-
-Windows 使用 Microsoft YaHei 等受治理回退字体；Linux 使用 Noto Sans CJK SC/Noto Sans SC。字体文件不由本仓库说明替代或分发。
-
-## 3. 架构 / Architecture
-
-**数据层与代码层分离**：`data/` 中的 JSON、Schema、manifest 与来源信息独立于 React bundle。属性不仅是数值，还需单位、方法、条件、不确定度和来源。
-
-*Data and code have separate identities. A property requires its unit, method, conditions, uncertainty and provenance rather than an unqualified scalar.*
-
-```text
-governed JSON / schema / manifest
-  → adapters / strict finite-number and quantity validation
-  → compute API / lazy Worker pool / typed buffers
-  → TypeScript or calibrated WASM backend
-  → observations / fits / proxies / scenarios
-  → ScientificEChart / worksheet / exact-commit evidence
-```
-
-[计算模块目录 / Compute catalog](docs/compute-module-catalog.json) 是功能清单入口。请求后端、实际后端、fallback、精度和设备信息应进入计算证据；没有设备校准证据时，不声称 WASM 或未来 GPU 路径必然更快。
-
-*The compute catalog is the maintained inventory. Evidence distinguishes requested and actual backends, fallback, precision and environment; no unmeasured acceleration claim is implied.*
-
-[技术参考](docs/TECHNICAL_REFERENCE.md) 保留原 README 的完整数据架构、计算证据对象、21 组数理合同及聚合物/LAMMPS 示例，不再在多个“当前验收”段落重复维护。
-
-*The technical reference preserves the detailed data and compute contracts, 21 mathematical sections and polymer/LAMMPS examples formerly embedded here.*
-
-## 4. 数理与科学合同 / Mathematical and scientific contracts
-
-| 功能 / Function | 关键约束 / Constraint |
-|---|---|
-| 描述统计、Pearson、Spearman / Statistics | 有限观测、明确样本数、并列秩；相关不等于因果。 / Finite observations, declared sample size and tie handling; correlation is not causation. |
-| 最小二乘、Carreau–Yasuda、WLF、Arrhenius / Fitting | 参数、适用域、温度单位与数值收敛必须明确。 / Declare parameters, domain, temperature units and convergence. |
-| Weibull、Gaussian KDE、Gaussian Copula / Distributions | 区分观测与拟合，保留样本与假设。 / Distinguish observations from fits and retain assumptions. |
-| Mahalanobis、Gaussian Process、Expected Improvement | 缩放、协方差、噪声和不确定度不可省略。 / Scaling, covariance, noise and uncertainty remain explicit. |
-| Prony、SPC、K-Means、Pareto / Engineering tools | 黏弹、过程能力、聚类与多目标语义各自独立。 / Do not conflate viscoelasticity, capability, clustering and multi-objective evidence. |
-| 相似度与雷达 / Similarity and radar | 仅比较共同有效属性，报告覆盖度，不用缺失项创造优势。 / Compare shared valid properties and expose coverage without rewarding missingness. |
-
-详细推导、实现约束和单位条件见 [数理合同](docs/TECHNICAL_REFERENCE.md#5-数理程式--mathematical-contracts)。例如，多变量异常量使用 Mahalanobis 距离：
-
-$$
-D_M(\mathbf{x})=\sqrt{(\mathbf{x}-\boldsymbol{\mu})^{\mathsf T}\boldsymbol{\Sigma}^{-1}(\mathbf{x}-\boldsymbol{\mu})}.
-$$
-
-科研图形的显示接受条件是：
-
-$$
-C_{\mathrm{figure}}=C_{\mathrm{finite}}\land C_{\mathrm{labeled}}\land C_{\mathrm{finished}}\land C_{\mathrm{nonblank}}.
-$$
-
-这只是图形显示合同，不是物理模型或材料资格证明。
-
-*These are numerical/display contracts, not proof of physical validity or material qualification.*
-
-PP-like 两相密度、重复单元描述符和 LAMMPS 模板的限制见 [聚合物物理参考](docs/TECHNICAL_REFERENCE.md#6-聚合物物理与-lammps--polymer-physics-and-lammps)。不从单体字符串推断支化、等规度或未声明的共聚组成；模板生成不证明力场有效或真实模拟已执行。
-
-## 5. 验证与证据 / Validation and evidence
-
-完整本地检查 / Complete local checks:
-
-```bash
-node --test scripts/tests/validation-receipt-contract.node.mjs
-npm run validate:ci
-npm run validate:ai-egress
-```
-
-`validate:ci` 包含文档、Unicode、source/data/compute/scientific-UI、ESLint、TypeScript、Vitest、构建、HTTP smoke、K-Means smoke、隔离 unit/science、覆盖率、Chromium UI 和完整依赖审计。永久 [CI](.github/workflows/ci.yml) 另负责同次运行的上下文、分支证明、源码固定点、生产依赖审计、回执、HTML/PDF 和工件归档；本地命令成功不自动产生远程 CI 身份。
-
-*The permanent CI adds exact-run identity, branch proof, tracked-source fixed-point checks, production audit, receipt/report generation and artifact upload. A successful local command is not a remote CI receipt.*
-
-回执 Node 测试使用 `.node.mjs`，避免被浏览器 Vitest 收集器误执行；它仍由永久 CI 显式运行，不是跳过测试。覆盖范围包括精确 SHA、分支、上下文、显式整数审计计数、预算、门禁集合，以及缺失、损坏或非对象 JSON 工件的结构化拒绝。
-
-*Receipt tests run explicitly with Node. Malformed or non-object evidence must produce `EVIDENCE_INCOMPLETE` and a nonzero CI exit, not an unhandled exception or a fabricated PASS.*
-
-截图证据必须是具名场景到不同 PNG 文件的映射；七个必需场景不可被任意键或数组替代。仅接受 artifacts 内的非空普通文件，拒绝目录、符号链接、绝对路径和路径穿越；Worker 与目录计数必须是整数，不能由数字字符串隐式转换。文件检查不替代 Chromium 的像素与交互验证。
-
-*Screenshot evidence binds required scene names to distinct, nonempty regular PNG files within artifacts. Arrays, missing scenes, duplicate paths, directories, symlinks and path traversal are rejected. Worker/catalog counts must be integers, not numeric strings. File checks do not replace Chromium pixel and interaction validation.*
-
-回执还将 `runId` 与 `runAttempt` 绑定到当前 GitHub 运行环境，并在输出中保留这两个字段。同一提交的其他运行或重试上下文不能冒充本次运行证据；离线查看历史回执不构成新一次 CI 验证。
-
-*Receipts bind `runId` and `runAttempt` to the current GitHub run and retain them in their output. A different run or retry for the same commit is not evidence for the current attempt; offline inspection of an old receipt is not a new CI qualification.*
-
-### 读取结果 / Reading results
-
-以待部署提交的同次 Actions 工件为依据：
-
-- `ci-context.json`：仓库、SHA、ref、run ID 与 attempt；
-- `ci-gates.json`：实际完成的完整门禁集合；
-- `test-results.json`、`coverage-summary.json`：完整测试数和实测覆盖率；
-- `npm-audit-prod.json`、`npm-audit-all.json`：该次依赖审计；
-- `exact-source-tree.tar.gz`、SHA-256 和 `branch-proof.txt`：源码与远端身份；
-- `validation-receipt.json`：所有必需检查通过才为 `PASS`；
-- UI 截图、HTML 和 PDF：同一生产构建的展示证据。
-
-**不再把旧运行的测试数、旧 lockfile 版本或“零漏洞”声明标成当前结果。** 覆盖率文件全部被插桩不等于行/分支覆盖率达到 100%；无 high/critical 不等于完全没有较低级别安全发现。
-
-*Historical counts, dependency versions and zero-vulnerability statements are not current results. Complete instrumentation is not complete line/branch coverage; no high/critical findings does not mean no lower-severity findings.*
-
-`CI` 是唯一完整软件资格链；`contracts-v17` 补充跨平台合同回归。已删除的 V19 状态和重复资格/导出工作流不再单独维护。`push/main` 与手动运行 `main` 使用同一精确 SHA 分支检查；清理分支必须保留需要的历史提交，不以禁用门禁换取成功。
-
-*CI success is scoped to the checked commit. Neither a narrow contract run nor a prior successful SHA qualifies a newer tree.*
-
-## 6. 图示与真实界面 / Diagrams and runtime UI
-
-### AI conceptual diagrams / AI 概念示意图
-
-以下四图说明架构和工作流，不是实验数据或运行成绩。
-
-![ResinDB Pro platform architecture](docs/images/ai-platform-architecture.svg)
-![Material statistics and numerical robustness](docs/images/ai-material-statistics.svg)
-![Polymer physics and LAMMPS workflow](docs/images/ai-polymer-lammps-workflow.svg)
-![Delivery strategy and validation evidence](docs/images/ai-delivery-validation.svg)
-
-### Chromium runtime screenshots / Chromium 真实界面截图
-
-以下八图是保留的运行界面示例；对应新提交的视觉资格仍以其 CI 工件为准。
-
-![ResinDB 中文数据工作区](docs/images/ui-dashboard-zh-light.png)
-![ResinDB English dark workspace](docs/images/ui-dashboard-en-dark.png)
-![ResinDB product detail](docs/images/ui-product-detail.png)
-![ResinDB scientific analytics](docs/images/ui-scientific-analytics.png)
-![ResinDB rheology analysis](docs/images/ui-phase2l-rheology-proxy.png)
-![ResinDB dependency heatmap](docs/images/ui-phase2l-dependency-heatmap.png)
-![ResinDB K-Means profile audit](docs/images/ui-kmeans-profile-audit.png)
-![ResinDB K-Means device calibration](docs/images/ui-kmeans-device-calibration.png)
-
-## 7. 维护入口与退出条件 / Maintenance and exit criteria
-
-[数据架构](docs/DATA_ARCHITECTURE.md) · [计算与显示审计](docs/COMPUTE_AND_DISPLAY_AUDIT.md) · [验证说明](docs/VALIDATION.md) · [技术参考](docs/TECHNICAL_REFERENCE.md) · [实施任务书](docs/PHASE_1_IMPLEMENTATION_TASKBOOK.md)
-
-保留稳定 API 和受治理兼容层；只合并有行为等价证据的重复实现。修改顺序为源码/测试/文档 → 格式与生成物 → check 模式 → 完整测试 → 精确提交证据。一次性运输脚本、缓存、coverage 数据库和构建垃圾不进入生产树。
-
-*Preserve stable APIs and governed compatibility layers. Consolidate equivalent implementations only with regression evidence. Finalize source, tests and documentation before regenerating evidence; then check the fixed point and qualify the exact commit. Temporary transport and runtime artifacts do not belong in the tracked source tree.*
-
-软件交付要求依赖、测试、构建、审计、回执和 README 对应同一代码身份；外部科学/工程/HSE/监管/客户批准与 21,600 秒稳定性试验单独记录，不由本 README 或单元测试自动授予。
-
-<!-- CURRENT_MAIN_ACCEPTANCE_V2:START -->
-## 当前实现：代码、数学与使用策略
-
-![中文代码与数学合同概念图](docs/current-main/resindb-current-main-zh.svg)
-
-> ResinDB Pro 是本地优先的科学数据与分析工作台，不是经认证的 LIMS/ERP、商业力场、工业牌号放行系统或自动科研批准器。
-
-#### 连续坐标的核密度
-
-$$
-\widehat f(x,y)=\frac{1}{2\pi n h_xh_y}\sum_{i=1}^n\exp\!\left[-\frac12\left(\frac{x-x_i}{h_x}\right)^2-\frac12\left(\frac{y-y_i}{h_y}\right)^2\right]
-$$
-
-二维独立高斯核使用正带宽；密度具有 x、y 单位乘积的倒数单位。新绘图层使用连续坐标自定义单元格，保留原始密度，不把坐标冒充类别索引。有限显示窗口的积分一般小于 1；颜色强度或“相对最大值”不是概率。
-
-源码对应: [`src/compute/gaussianKde.ts`](src/compute/gaussianKde.ts) · [`src/components/charts/kdeFigure.ts`](src/components/charts/kdeFigure.ts)
-
-#### Weibull 中位秩拟合
-
-$$
-F(v)=1-e^{-(v/\eta)^m},\qquad \ln[-\ln(1-F(v))]=m\ln v-m\ln\eta,\qquad B_5=\eta[-\ln(0.95)]^{1/m}
-$$
-
-v、η 必须为正，m 为形状参数。界面采用 Bernard 中位秩的普通最小二乘线性化，而非极大似然估计（not MLE）。B5 是模型的 5% 失效分位数，不是 95% 参数置信下限，也不是安全放行保证。中文与英文标题、图例及提示随语言切换。
-
-源码对应: [`src/components/charts/WeibullChart.tsx`](src/components/charts/WeibullChart.tsx)
-
-#### 图形交付门
-
-$$
-C_{\mathrm{figure}}=C_{\mathrm{finite}}\land C_{\mathrm{labels}}\land C_{\mathrm{finished}}\land C_{\mathrm{nonblank}}
-$$
-
-这是绘图验收的解释性合同：记录有限数据量、轴标签、完成事件和非空画布证据，并区分无数据与图形引擎不可用。它不是只凭截图就能推定成立的科学正确性证明；浏览器、主题、语言与重新打开图表均需测试。
-
-源码对应: [`src/components/charts/ScientificEChart.tsx`](src/components/charts/ScientificEChart.tsx)
-
-### 使用与验收顺序
-
-1. 先核对安装环境、输入结构、单位、有效范围与执行权限。
-2. 按上面的源码锚点区分原生实现、解释性合同和外部执行要求。
-3. 先运行快速回归和完整质量门，再用固定提交执行长期回归。
-4. 逐项保存原始日志、机器报告和限制；任何缺失证据不得写成 PASS。
-
-```bash
-npm ci
-npm run validate:ci
-```
-
-每次修复均须绑定新提交重新测试。基线回归、两段各三小时的重复回归、浏览器图形检查和外部工程认证是不同证据，不可互相替代。没有原始回执时，不宣称已完成六小时验收。
-
-源码锚点: [`src/data/dataContract.ts`](src/data/dataContract.ts) · [`src/services/mathUtils.ts`](src/services/mathUtils.ts) · [`src/compute/capabilityProbe.ts`](src/compute/capabilityProbe.ts)
-
-## Current implementation: code, mathematics and usage
-
-![English code and mathematical-contract concept](docs/current-main/resindb-current-main-en.svg)
-
-> ResinDB Pro is a local-first scientific data and analysis workbench, not a certified LIMS/ERP, commercial force field, industrial grade-release system or automatic scientific approval engine.
-
-#### Continuous-coordinate KDE
-
-$$
-\widehat f(x,y)=\frac{1}{2\pi n h_xh_y}\sum_{i=1}^n\exp\!\left[-\frac12\left(\frac{x-x_i}{h_x}\right)^2-\frac12\left(\frac{y-y_i}{h_y}\right)^2\right]
-$$
-
-The separable bivariate Gaussian kernel requires positive bandwidths; density has inverse-product coordinate units. The figure layer uses custom cells on continuous axes and preserves original density rather than treating coordinates as category indices. A finite display window generally integrates to less than one; color intensity or relative maximum is not probability.
-
-Source mapping: [`src/compute/gaussianKde.ts`](src/compute/gaussianKde.ts) · [`src/components/charts/kdeFigure.ts`](src/components/charts/kdeFigure.ts)
-
-#### Weibull median-rank fit
-
-$$
-F(v)=1-e^{-(v/\eta)^m},\qquad \ln[-\ln(1-F(v))]=m\ln v-m\ln\eta,\qquad B_5=\eta[-\ln(0.95)]^{1/m}
-$$
-
-Positive v and η are required; m is the shape parameter. The UI uses ordinary least-squares linearization of Bernard median ranks, not maximum-likelihood estimation (not MLE). B5 is the fitted 5% failure quantile, not a 95% parameter-confidence bound or a safety-release guarantee. Titles, legends and tooltips follow the selected language.
-
-Source mapping: [`src/components/charts/WeibullChart.tsx`](src/components/charts/WeibullChart.tsx)
-
-#### Figure delivery gate
-
-$$
-C_{\mathrm{figure}}=C_{\mathrm{finite}}\land C_{\mathrm{labels}}\land C_{\mathrm{finished}}\land C_{\mathrm{nonblank}}
-$$
-
-This explanatory figure contract combines finite-data counts, labels, completion events and nonblank-canvas evidence, while distinguishing no data from an unavailable renderer. A screenshot alone is not proof of scientific correctness; test browser behavior, themes, locales and reopening charts.
-
-Source mapping: [`src/components/charts/ScientificEChart.tsx`](src/components/charts/ScientificEChart.tsx)
-
-### Usage and acceptance sequence
-
-1. Check the installation environment, input structure, units, applicability and execution permissions.
-2. Use the source mappings above to distinguish native implementation, explanatory contracts and external execution requirements.
-3. Run focused regression and full quality gates before long-duration testing of pinned commits.
-4. Preserve original logs, machine-readable reports and limitations; missing evidence must never be reported as PASS.
-
-```bash
-npm ci
-npm run validate:ci
-```
-
-Retest every changed commit. Baseline regression, two three-hour regression segments, browser visual checks and external engineering qualification are distinct evidence classes. Without original receipts, no six-hour completion is claimed.
-
-Implementation anchors: [`src/data/dataContract.ts`](src/data/dataContract.ts) · [`src/services/mathUtils.ts`](src/services/mathUtils.ts) · [`src/compute/capabilityProbe.ts`](src/compute/capabilityProbe.ts)
-<!-- CURRENT_MAIN_ACCEPTANCE_V2:END -->
+[历史图像归档](README.visual-archive.md) 保留旧版界面截图与旧概念图；其标签明确说明并非本次运行证据。

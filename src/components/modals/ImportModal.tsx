@@ -1,3 +1,6 @@
+import { parseFiniteReal } from '@/lib/quantityRecord';
+import { refreshProperties, patchProperty } from '@/lib/propertyAdmission';
+import { nativeImportRecord, mergedImportGovernance } from '@/lib/importProductRecord';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Papa from "papaparse";
 import {
@@ -31,7 +34,7 @@ import { getProductValidationWarnings } from '@/utils/productUtils';
 interface ImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport?: (products: Product[]) => void;
+  onImport?: (products: Product[]) => void | boolean | Promise<void | boolean>;
   allProducts?: Product[];
 }
 
@@ -39,6 +42,7 @@ interface RawFileContent {
   fileName: string;
   headers: string[];
   rows: Record<string, unknown>[];
+  isSynthetic?: boolean;
 }
 
 export const ImportModal: React.FC<ImportModalProps> = React.memo(({
@@ -49,11 +53,14 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
 }) => {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [isDragging, setIsDragging] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importedCount, setImportedCount] = useState(0);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [parsedProducts, setParsedProducts] = useState<Product[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { t } = useLanguage();
+  const { t, language: lang, tProp } = useLanguage();
+  const L = (zh: string, en: string) => lang === "zh" ? zh : en;
 
   // Advanced Mapping & Ingestion States
   const [rawFileContents, setRawFileContents] = useState<RawFileContent[]>([]);
@@ -64,6 +71,7 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
   // Import method switch tab
   const [importSourceTab, setImportSourceTab] = useState<"file" | "clipboard">("file");
   const [rawClipboardText, setRawClipboardText] = useState("");
+  const [clipboardIsDemo, setClipboardIsDemo] = useState(false);
   
   // Sandbox query & inline cell editing states
   const [sandboxSearch, setSandboxSearch] = useState("");
@@ -87,12 +95,12 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
   const [experimentalLabName, setExperimentalLabName] = useState<string>("");
 
   // States for fast manual entry of real lab stress testing measurement results
-  const [manualGradeName, setManualGradeName] = useState<string>("自测HDPE-Exp1");
-  const [manualManufacturer, setManualManufacturer] = useState<string>("核心实验室自测");
-  const [manualDensity, setManualDensity] = useState<string>("0.954");
-  const [manualMFR, setManualMFR] = useState<string>("0.95");
-  const [manualStrength, setManualStrength] = useState<string>("24.8");
-  const [manualModulus, setManualModulus] = useState<string>("1180");
+  const [manualGradeName, setManualGradeName] = useState<string>("");
+  const [manualManufacturer, setManualManufacturer] = useState<string>("");
+  const [manualDensity, setManualDensity] = useState<string>("");
+  const [manualMFR, setManualMFR] = useState<string>("");
+  const [manualStrength, setManualStrength] = useState<string>("");
+  const [manualModulus, setManualModulus] = useState<string>("");
   const [isManualFormOpen, setIsManualFormOpen] = useState<boolean>(false);
 
   // Available database standard attributes for mapping dropdown
@@ -103,6 +111,7 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
     { key: "熔体质量流动速率", label: "熔体流动速率 (MFI / MFR)", unit: "g/10min" },
     { key: "拉伸屈服应力", label: "拉伸应力 / 强度", unit: "MPa" },
     { key: "弯曲模量", label: "弯曲模量 (Flexural Modulus)", unit: "MPa" },
+    { key: "简支梁缺口冲击强度", label: "Charpy impact", unit: "kJ/m²" },
     { key: "悬臂梁缺口冲击强度", label: "悬臂冲击强度 (Izod Impact)", unit: "kJ/m²" },
     { key: "断裂伸长率", label: "断裂伸长率 (Elongation)", unit: "%" },
     { key: "洛氏硬度", label: "洛氏硬度 (Rockwell Hardness)", unit: "R" },
@@ -111,15 +120,19 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
     { key: "灰分", label: "灰分含量 (Ash Content)", unit: "%" }
   ];
 
+  const strictNumber = (value: unknown): number => parseFiniteReal(value) ?? Number.NaN;
   const handleSaveManualRecord = () => {
-    if (!manualGradeName.trim()) {
+    const values = [manualDensity, manualMFR, manualStrength, manualModulus];
+    if (!manualGradeName.trim() || !values.some(value => value.trim()) || values.some(value => value.trim() && parseFiniteReal(value) === null)) {
+      setImportErrors([L("请填写牌号及至少一个完整有限数值；数值字段不能包含单位或其他后缀。", "Enter a grade and at least one finite numeric value. Numeric fields cannot contain units or trailing text.")]);
       return;
     }
+    setImportErrors([]);
     const now = new Date().toISOString().split("T")[0];
     const newProduct: Product = {
       id: `manual-lab-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       gradeName: manualGradeName.trim(),
-      manufacturer: manualManufacturer.trim() || t("experimentalLab", "自测实验室"),
+      manufacturer: manualManufacturer.trim() || L("未声明机构", "Undeclared organization"),
       manufacturerId: "m-exp-lab",
       categoryIds: ["root_plastic"],
       createdAt: now,
@@ -128,31 +141,42 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
       properties: {},
     };
 
-    if (manualDensity.trim() && !isNaN(parseFloat(manualDensity))) {
-      newProduct.properties["密度"] = { value: parseFloat(manualDensity), unit: "g/cm³" };
+    if (manualDensity.trim() && !isNaN(strictNumber(manualDensity))) {
+      newProduct.properties["密度"] = { value: strictNumber(manualDensity), unit: "g/cm³" };
     }
-    if (manualMFR.trim() && !isNaN(parseFloat(manualMFR))) {
-      newProduct.properties["熔体质量流动速率"] = { value: parseFloat(manualMFR), unit: "g/10min" };
+    if (manualMFR.trim() && !isNaN(strictNumber(manualMFR))) {
+      newProduct.properties["熔体质量流动速率"] = { value: strictNumber(manualMFR), unit: "g/10min" };
     }
-    if (manualStrength.trim() && !isNaN(parseFloat(manualStrength))) {
-      newProduct.properties["拉伸屈服应力"] = { value: parseFloat(manualStrength), unit: "MPa" };
+    if (manualStrength.trim() && !isNaN(strictNumber(manualStrength))) {
+      newProduct.properties["拉伸屈服应力"] = { value: strictNumber(manualStrength), unit: "MPa" };
     }
-    if (manualModulus.trim() && !isNaN(parseFloat(manualModulus))) {
-      newProduct.properties["弯曲模量"] = { value: parseFloat(manualModulus), unit: "MPa" };
+    if (manualModulus.trim() && !isNaN(strictNumber(manualModulus))) {
+      newProduct.properties["弯曲模量"] = { value: strictNumber(manualModulus), unit: "MPa" };
     }
 
-    setParsedProducts([newProduct]);
-    setStep(4);
+    newProduct.properties = refreshProperties(newProduct.properties);
+    newProduct.governance = { sourceType: 'MEASURED', recordStatus: 'NOT_FOR_RELEASE', confidentiality: 'UNKNOWN', license: 'UNKNOWN', provenanceRefs: ['manual entry: unverified measurement declaration'] };
+    const existing = allProducts.find(product => product.gradeName.trim().toUpperCase() === newProduct.gradeName.toUpperCase());
+    const candidate = existing && duplicateAction !== 'duplicate'
+      ? duplicateAction === 'merge'
+        ? { ...existing, ...newProduct, id: existing.id, createdAt: existing.createdAt, categoryIds: existing.categoryIds,
+            ...(!manualManufacturer.trim() ? { manufacturer: existing.manufacturer, manufacturerId: existing.manufacturerId } : {}),
+            properties: { ...existing.properties, ...newProduct.properties }, governance: mergedImportGovernance(existing.governance, newProduct.governance) }
+        : { ...newProduct, id: existing.id, createdAt: existing.createdAt }
+      : newProduct;
+    setParsedProducts(existing && duplicateAction === 'skip' ? [] : [candidate]);
+    setStep(3);
   };
 
   // Reset state when modal opens/closes
   useEffect(() => {
     if (!isOpen) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         setStep(1);
         setStagedFiles([]);
         setImportErrors([]);
         setParsedProducts([]);
+        setImportedCount(0);
         setIsExperimentalImport(false);
         setExperimentalLabName("");
         setRawFileContents([]);
@@ -161,9 +185,11 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
         setDuplicateAction("merge");
         setCustomColumns([]);
         setRawClipboardText("");
+        setClipboardIsDemo(false);
         setSandboxSearch("");
         setEditingCell(null);
       }, 300);
+      return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
@@ -216,9 +242,9 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
         lower.includes("刚性模量")
       ) {
         mappings[header] = "弯曲模量";
+      } else if (lower.includes("charpy") || lower.includes("简支梁")) {
+        mappings[header] = "简支梁缺口冲击强度";
       } else if (
-        lower.includes("impact") || 
-        lower.includes("缺口冲击") || 
         lower.includes("悬臂梁") || 
         lower.includes("izod")
       ) {
@@ -272,9 +298,10 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
               rows,
             });
           } catch {
-            reject(new Error("JSON 格式错误，请检查结构。"));
+            reject(new Error(L("JSON 格式错误，请检查结构。", "Invalid JSON structure.")));
           }
         };
+        reader.onerror = () => reject(new Error(L("文件读取失败", "File read failed")));
         reader.readAsText(file);
       } else {
         // Standard CSV/TXT Papa parse
@@ -282,6 +309,7 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
           header: true,
           skipEmptyLines: true,
           complete: (results) => {
+            if (results.errors.length) { reject(new Error(results.errors.map(error => error.message).join("; "))); return; }
             const rows = results.data as Record<string, unknown>[];
             const headers = results.meta.fields || [];
             if (headers.length === 0 && rows.length > 0) {
@@ -318,8 +346,9 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
         skipEmptyLines: true,
       });
       
+      if (results.errors.length) throw new Error(results.errors.map(error => error.message).join("; "));
       if (results.data.length === 0) {
-        setImportErrors(["无法从剪贴板解析任何含有表头的行。请确保包含列标题并且使用制表符（Tab）或逗号分隔字段。"]);
+        setImportErrors([L("没有可用数据行，请提供标题及制表符或逗号分隔的内容。", "No data rows found. Provide headers and tab-delimited or CSV rows.")]);
         return;
       }
       
@@ -332,7 +361,8 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
       }
       
       setRawFileContents([{
-        fileName: "剪贴板直接粘滞数据 (Clipboard Data)",
+        fileName: "clipboard-data",
+        isSynthetic: clipboardIsDemo,
         headers,
         rows: dataRows,
       }]);
@@ -346,7 +376,7 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
       setStep(2);
       setImportErrors([]);
     } catch (err) {
-      setImportErrors([`剪贴板内容解析异常: ${err instanceof Error ? err.message : String(err)}`]);
+      setImportErrors([`${L("剪贴板解析失败", "Clipboard parse failed")}: ${err instanceof Error ? err.message : String(err)}`]);
     }
   };
 
@@ -373,7 +403,7 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
         });
 
         if (parsedData.rows.length === 0) {
-          errors.push(`文件 ${file.name} 中没有容纳任何可用记录。`);
+          errors.push(`${file.name}: ${L("文件不包含记录", "No records in file")}`);
         } else {
           rawContents.push(parsedData);
         }
@@ -381,7 +411,7 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
       } catch (e: unknown) {
         logger.error("Raw parsing error", e);
         errors.push(
-          `文件 ${file.name} 预读取失败: ${e instanceof Error ? e.message : String(e)}`
+          `${file.name}: ${L("读取失败", "Read failed")}: ${e instanceof Error ? e.message : String(e)}`
         );
       }
     }
@@ -413,120 +443,54 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
   const generateImportProducts = () => {
     const products: Product[] = [];
     const now = new Date().toISOString().split("T")[0];
-    let _duplicationDetected = 0;
-
-    // Retrieve file column headers that represent metadata or particular keys
-    const getFileHeaderFor = (target: string): string | undefined => {
-      return Object.keys(columnMappings).find((h) => columnMappings[h] === target);
-    };
-
-    rawFileContents.forEach((fileContent) => {
-      fileContent.rows.forEach((row) => {
-        // Extract Product Identity Attributes
-        const gradeHeader = getFileHeaderFor("gradeName");
-        const rawGrade = gradeHeader ? row[gradeHeader] : undefined;
-        if (rawGrade === undefined || String(rawGrade).trim() === "") return;
-
-        const gradeName = String(rawGrade).trim();
-        const manHeader = getFileHeaderFor("manufacturer");
-        const rawMan = manHeader ? row[manHeader] : undefined;
-
-        const manufacturer = isExperimentalImport
-          ? (experimentalLabName.trim() || "自测实验室")
-          : rawMan
-          ? String(rawMan).trim()
-          : "Imported";
-
-        const properties: Record<string, PropertyValue> = {};
-
-        // Extract Material Properties Attributes matching mapped rows
-        Object.keys(columnMappings).forEach((header) => {
-          const bindingDestination = columnMappings[header];
-          if (
-            bindingDestination === "[skip]" || 
-            bindingDestination === "gradeName" || 
-            bindingDestination === "manufacturer"
-          ) {
-            return;
-          }
-
-          const rawVal = row[header];
-          if (rawVal === "" || rawVal === null || rawVal === undefined) return;
-          const strVal = String(rawVal).trim().toUpperCase();
-          if (strVal === "-" || strVal === "N/A" || strVal === "ND" || strVal === "NULL" || strVal === "NONE") return;
-
-          // Attempt to scan standard metrics unit
-          let detectedUnit = "";
-          const unitMatch = header.match(/\((.*?)\)/) || header.match(/\[(.*?)\]/);
-          if (unitMatch) {
-            detectedUnit = unitMatch[1];
-          } else {
-            const matchInProps = STANDARD_PROPERTIES.find((p) => p.key === bindingDestination);
-            if (matchInProps && matchInProps.unit) {
-              detectedUnit = matchInProps.unit;
+    const errors: string[] = [];
+    for (const fileContent of rawFileContents) {
+      for (const [index, row] of fileContent.rows.entries()) {
+        try {
+          let incoming = nativeImportRecord(row);
+          const structured = incoming !== null;
+          if (!incoming) {
+            const headerFor = (target: string) => Object.keys(columnMappings).find(header => columnMappings[header] === target);
+            const gradeHeader = headerFor('gradeName');
+            const gradeName = String(gradeHeader ? row[gradeHeader] ?? '' : '').trim();
+            if (!gradeName) continue;
+            const manufacturerHeader = headerFor('manufacturer');
+            const properties: Record<string, PropertyValue> = {};
+            for (const [header, key] of Object.entries(columnMappings)) {
+              if (['[skip]', 'gradeName', 'manufacturer'].includes(key)) continue;
+              const raw = row[header];
+              if (raw === undefined || raw === null || String(raw).trim() === '') continue;
+              const explicitUnit = header.match(/\((.*?)\)|\[(.*?)\]/);
+              properties[key] = { value: parseFiniteReal(raw) ?? String(raw), unit: explicitUnit?.[1] ?? explicitUnit?.[2] };
             }
+            incoming = {
+              id: `imported-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`,
+              gradeName, manufacturer: isExperimentalImport ? experimentalLabName.trim() || 'Laboratory' : String(manufacturerHeader ? row[manufacturerHeader] ?? 'Imported' : 'Imported'),
+              manufacturerId: isExperimentalImport ? 'm-exp-lab' : 'm-import', categoryIds: ['root_plastic'],
+              createdAt: now, updatedAt: now, isExperimental: isExperimentalImport || undefined,
+              properties: refreshProperties(properties),
+              governance: { sourceType: fileContent.isSynthetic ? 'SYNTHETIC' : 'IMPORTED', recordStatus: 'NOT_FOR_RELEASE', confidentiality: 'UNKNOWN', license: 'UNKNOWN', provenanceRefs: [fileContent.fileName] },
+            };
           }
-
-          const parseFloatValue = parseFloat(String(rawVal));
-          properties[bindingDestination] = {
-            value: isNaN(parseFloatValue) ? String(rawVal) : parseFloatValue,
-            unit: detectedUnit,
-          };
-        });
-
-        // Resolve Collision check with existing list
-        const duplicatesInDB = (allProducts || []).find(
-          (p) => p.gradeName.trim().toUpperCase() === gradeName.toUpperCase()
-        );
-
-        if (duplicatesInDB) {
-          _duplicationDetected++;
-          if (duplicateAction === "skip") {
-            return; // Ignore this record fully
-          } else if (duplicateAction === "overwrite") {
-            products.push({
-              id: duplicatesInDB.id,
-              gradeName,
-              manufacturer,
-              manufacturerId: isExperimentalImport ? "m-exp-lab" : duplicatesInDB.manufacturerId || "m-import",
-              categoryIds: duplicatesInDB.categoryIds || ["root_plastic"],
-              createdAt: duplicatesInDB.createdAt || now,
-              updatedAt: now,
-              properties,
-              isExperimental: isExperimentalImport ? true : duplicatesInDB.isExperimental,
-            });
-            return;
-          } else if (duplicateAction === "merge") {
-            const mergedProps = { ...duplicatesInDB.properties, ...properties };
-            products.push({
-              id: duplicatesInDB.id,
-              gradeName,
-              manufacturer,
-              manufacturerId: isExperimentalImport ? "m-exp-lab" : duplicatesInDB.manufacturerId || "m-import",
-              categoryIds: duplicatesInDB.categoryIds || ["root_plastic"],
-              createdAt: duplicatesInDB.createdAt || now,
-              updatedAt: now,
-              properties: mergedProps,
-              isExperimental: isExperimentalImport ? true : duplicatesInDB.isExperimental,
-            });
-            return;
+          const existing = allProducts.find(item => item.id === incoming.id || item.gradeName.trim().toUpperCase() === incoming.gradeName.trim().toUpperCase());
+          if (existing && duplicateAction === 'skip') continue;
+          if (existing && duplicateAction === 'merge') {
+            products.push({ ...existing, ...incoming,
+              ...(!structured ? { categoryIds: existing.categoryIds, ...(!isExperimentalImport && !Object.entries(columnMappings).some(([header, key]) => key === 'manufacturer' && String(row[header] ?? '').trim()) ? { manufacturer: existing.manufacturer, manufacturerId: existing.manufacturerId } : {}) } : {}),
+              id: existing.id, createdAt: existing.createdAt, updatedAt: now,
+              properties: { ...existing.properties, ...incoming.properties }, governance: mergedImportGovernance(existing.governance, incoming.governance) });
+          } else if (existing && duplicateAction === 'overwrite') {
+            products.push({ ...incoming, id: existing.id, createdAt: existing.createdAt, updatedAt: now });
+          } else {
+            products.push(existing ? { ...incoming, id: `imported-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}` } : incoming);
           }
+        } catch (error) {
+          errors.push(`${fileContent.fileName}:${index + 1}: ${error instanceof Error ? error.message : String(error)}`);
         }
-
-        // Fresh record creation
-        products.push({
-          id: `imported-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          gradeName,
-          manufacturer,
-          manufacturerId: isExperimentalImport ? "m-exp-lab" : "m-import",
-          categoryIds: ["root_plastic"],
-          createdAt: now,
-          updatedAt: now,
-          properties,
-          isExperimental: isExperimentalImport ? true : undefined,
-        });
-      });
-    });
+      }
+    }
+    if (errors.length) { setImportErrors(errors); return; }
+    setImportErrors([]);
 
     setParsedProducts(products);
     setStep(3); // Enter verification sandbox table
@@ -558,11 +522,7 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
           if (valStr.trim() === "") {
             delete properties[propKey];
           } else {
-            const parsedVal = parseFloat(valStr);
-            properties[propKey] = {
-              ...properties[propKey],
-              value: isNaN(parsedVal) ? valStr : parsedVal,
-            };
+            properties[propKey] = patchProperty(propKey, properties[propKey], { value: parseFiniteReal(valStr) ?? valStr });
           }
           return { ...p, properties };
         }
@@ -596,7 +556,6 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
   useEffect(() => {
     if (!isOpen) return;
     const handlePaste = (e: ClipboardEvent) => {
-      e.preventDefault();
       const items = e.clipboardData?.items;
       if (!items) return;
       const newFiles: File[] = [];
@@ -606,7 +565,7 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
           if (file) newFiles.push(file);
         }
       }
-      if (newFiles.length > 0) addFiles(newFiles);
+      if (newFiles.length > 0) { e.preventDefault(); addFiles(newFiles); }
     };
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
@@ -621,7 +580,7 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+    return strictNumber((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
 
   const getFileIcon = (file: File) => {
@@ -698,6 +657,8 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
                 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={onClose}
+                disabled={isImporting}
+                aria-label={L("关闭导入", "Close import")}
                 className="p-2 bg-white/10 backdrop-blur-md border border-white/20 text-white transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-rose-500 z-10 rounded-xl cursor-pointer"
               >
                 <X size={16} />
@@ -707,10 +668,10 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
             {/* Stepper Status Indicators */}
             <div className="px-6 py-3 bg-slate-50 dark:bg-slate-900 border-b border-slate-300 dark:border-slate-700 flex items-center justify-between shrink-0">
               {[
-                { s: 1, name: "上传源文件" },
-                { s: 2, name: "表结构映射" },
-                { s: 3, name: "校验沙盒" },
-                { s: 4, name: "合流完毕" }
+                { s: 1, name: L("上传源文件", "Upload files") },
+                { s: 2, name: L("表结构映射", "Map columns") },
+                { s: 3, name: L("校验沙盒", "Review records") },
+                { s: 4, name: L("合流完毕", "Import complete") }
               ].map(({ s, name }) => (
                 <div key={s} className="flex items-center gap-2">
                   <div
@@ -734,13 +695,14 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
 
             {/* Body Content of Modal */}
             <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-white dark:bg-slate-950">
+              {step !== 1 && importErrors.length > 0 && <div role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-950">{importErrors.join(' · ')}</div>}
               {step === 1 && (
                 <div className="space-y-6">
                   {importErrors.length > 0 && (
                     <div className="p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-205 dark:border-rose-800 rounded-xl space-y-2">
                       <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 font-mono font-bold text-[10px] uppercase tracking-widest">
                         <AlertCircle size={14} />
-                        <span>检测到以下数据异常:</span>
+                        <span>{L("检测到以下数据问题：", "The following data issues were detected:")}</span>
                       </div>
                       <ul className="text-[10px] font-mono text-rose-500 dark:text-rose-450 list-disc list-inside space-y-1">
                         {importErrors.map((err, i) => (
@@ -765,8 +727,7 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
                           : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
                       }`}
                     >
-                      📁 多格式物理文件拖拉上传 (File Drop)
-                    </motion.button>
+                      {L("📁 上传文件", "📁 Upload files")}</motion.button>
                     <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.97 }}
@@ -778,8 +739,7 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
                           : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
                       }`}
                     >
-                      📋 剪贴板 Excel 表格网格粘贴 (Clipboard Paste)
-                    </motion.button>
+                      {L("📋 粘贴表格", "📋 Paste a table")}</motion.button>
                   </div>
 
                   {importSourceTab === "file" ? (
@@ -829,8 +789,7 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
                         </h4>
                         <div className="flex items-center justify-center gap-2.5 text-[10px] text-slate-400 font-mono font-bold uppercase tracking-wider">
                           <span className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded">
-                            <Clipboard size={10} /> Ctrl+V 粘贴
-                          </span>
+                            <Clipboard size={10} /> {L("Ctrl+V 粘贴", "Ctrl+V to paste")}</span>
                           <span className="w-1 h-1 bg-slate-300 rounded-full" />
                           <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded">
                             Excel / CSV / JSON
@@ -847,36 +806,31 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
                     >
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-mono font-bold text-slate-400 block uppercase tracking-wider">
-                          复制 Excel 表格行列数据并直接粘贴于此 (Supports Tab/CSV Separated Grid Copying)
-                        </label>
+                          {L("粘贴含列标题的表格（支持制表符或 CSV）", "Paste a table with headers (tab-delimited or CSV)")}</label>
                         <textarea
+                          aria-label={L("待导入表格", "Table to import")}
                           value={rawClipboardText}
                           onChange={(e) => setRawClipboardText(e.target.value)}
                           rows={6}
-                          placeholder={`例如直接从 Excel 选中复制的物性表格数据：
-牌号		生产厂家		密度		熔体流动速率
-HDPE-5000S	中石化		0.954		0.95
-PP-M1600	中石油		0.910		1200`}
+                          placeholder={L("示例标题：牌号\t厂家\t密度 (g/cm³)\nExample-Grade\tExample Lab\t0.954", "Example headers: Grade\tManufacturer\tDensity (g/cm³)\nExample-Grade\tExample Lab\t0.954")}
                           className="w-full px-4 py-3 font-mono text-xs border border-slate-300 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-550 rounded-xl outline-none focus:ring-1 focus:ring-primary-500 focus:bg-white dark:focus:bg-slate-950 transition-all custom-scrollbar shrink-0"
                         />
                       </div>
                       
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="text-[10px] font-mono text-slate-400">
-                          * 粘贴数据需包含第 1 行的标题，并保证具有牌号型号列。
-                        </div>
+                          {L("* 第一行必须包含列标题，且须有牌号列。", "* Include a header row and a grade-name column.")}</div>
                         <div className="flex gap-2">
                           <motion.button
                             type="button"
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
-                            onClick={() => setRawClipboardText(`牌号	生产厂家	密度	熔体质量流动速率	拉伸屈服应力
-自测高抗冲合金-PE01	Sinopec	0.958	1.2	25.5
-测试轻质PP-FR102	LyondellBasell	0.902	8.5	31.0`)}
+                            onClick={() => { setClipboardIsDemo(true); setRawClipboardText(lang === 'zh'
+                              ? "牌号\t生产厂家\t密度 (g/cm³)\t熔体质量流动速率 (g/10min)\t拉伸屈服应力 (MPa)\nSYNTHETIC-PE01\tExample Lab\t0.958\t1.2\t25.5\nSYNTHETIC-PP02\tExample Lab\t0.902\t8.5\t31.0"
+                              : "Grade\tManufacturer\tDensity (g/cm³)\tMFR (g/10min)\tTensile Yield (MPa)\nSYNTHETIC-PE01\tExample Lab\t0.958\t1.2\t25.5\nSYNTHETIC-PP02\tExample Lab\t0.902\t8.5\t31.0"); }}
                             className="px-3 py-1.5 border border-slate-300 dark:border-slate-750 text-slate-600 dark:text-slate-400 hover:text-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/65 flex items-center gap-1.5 transition-all text-[10px] font-mono font-bold rounded-lg cursor-pointer"
                           >
-                            💡 填充自测演示网格
-                          </motion.button>
+                            {L("💡 填入合成示例数据", "💡 Fill synthetic example data")}</motion.button>
                           <motion.button
                             type="button"
                             whileHover={{ scale: 1.02 }}
@@ -885,8 +839,7 @@ PP-M1600	中石油		0.910		1200`}
                             disabled={!rawClipboardText.trim()}
                             className="px-4 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 disabled:opacity-40 font-mono font-bold text-[10px] uppercase tracking-widest cursor-pointer shadow-sm rounded-lg"
                           >
-                            🚀 进行文本网格快速解析
-                          </motion.button>
+                            {L("解析表格", "Parse table")}</motion.button>
                         </div>
                       </div>
                     </motion.div>
@@ -922,11 +875,9 @@ PP-M1600	中石油		0.910		1200`}
                     <label className="flex items-center justify-between cursor-pointer select-none">
                       <div className="space-y-0.5">
                         <span className="text-xs font-bold text-slate-900 dark:text-slate-150 flex items-center gap-1.5">
-                          🔬 标记导入产品为 [内部自测实验测量数据]
-                        </span>
+                          {L("标记为实验室来源声明", "Declare laboratory origin")}</span>
                         <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                          将激活雷达指纹偏差对比图、实验极限偏差警报和材料比对专页功能
-                        </p>
+                          {L("这是来源声明，不会补齐测试条件或把数据变为已验证测量。", "This is a provenance declaration. It does not supply missing test conditions or verify measurements.")}</p>
                       </div>
                       <input
                         type="checkbox"
@@ -934,7 +885,7 @@ PP-M1600	中石油		0.910		1200`}
                         onChange={(e) => {
                           setIsExperimentalImport(e.target.checked);
                           if (e.target.checked && !experimentalLabName) {
-                            setExperimentalLabName("自测高性能实验室");
+                            setExperimentalLabName("");
                           }
                         }}
                         className="w-4 h-4 text-primary-600 border-slate-300 dark:border-slate-705 rounded focus:ring-primary-500 cursor-pointer"
@@ -948,13 +899,12 @@ PP-M1600	中石油		0.910		1200`}
                         className="space-y-1.5 pt-2 border-t border-dashed border-slate-200 dark:border-slate-700"
                       >
                         <span className="text-[9px] uppercase font-mono font-bold text-slate-400 tracking-wider block">
-                          实验测试机构 / 实验室名称 (Laboratory Unit)
-                        </span>
+                          {L("实验室名称", "Laboratory name")}</span>
                         <input
                           type="text"
                           value={experimentalLabName}
                           onChange={(e) => setExperimentalLabName(e.target.value)}
-                          placeholder="例如: 智能高分子精密物性检测中心"
+                          placeholder={L("填写实际测量机构", "Enter the actual measurement organization")}
                           className="w-full px-3 py-2 text-xs font-medium border border-slate-300 dark:border-slate-750 bg-white dark:bg-slate-950 text-slate-950 dark:text-white rounded-lg focus:ring-1 focus:ring-primary-500 outline-none transition-all"
                         />
                       </motion.div>
@@ -971,10 +921,9 @@ PP-M1600	中石油		0.910		1200`}
                       className="w-full flex items-center justify-between px-4 py-3 bg-slate-100 dark:bg-slate-900/60 text-left cursor-pointer"
                     >
                       <span className="text-xs font-bold text-slate-700 dark:text-slate-250 flex items-center gap-1.5">
-                        ✍️ 极速直接手动键盘录入测量数据 (无需准备多格式文件)
-                      </span>
+                        {L("✍️ 手动录入测量声明", "✍️ Enter a measurement declaration")}</span>
                       <span className="text-[10px] font-mono font-semibold text-primary-600 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 px-2 py-0.5 rounded hover:bg-slate-50">
-                        {isManualFormOpen ? "隐藏快速表单" : "录入单条"}
+                        {isManualFormOpen ? L("隐藏快速表单", "Hide form") : L("录入单条", "Enter one record")}
                       </span>
                     </motion.button>
 
@@ -982,18 +931,20 @@ PP-M1600	中石油		0.910		1200`}
                       <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-3 animate-in slide-in-from-top-1">
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
-                            <label className="text-[10px] font-mono font-bold text-slate-400 block">自测牌号型号 *</label>
+                            <label className="text-[10px] font-mono font-bold text-slate-400 block">{L("牌号名称 *", "Grade name *")}</label>
                             <input
                               type="text"
+                              aria-label={L("牌号名称", "Grade name")}
                               value={manualGradeName}
                               onChange={(e) => setManualGradeName(e.target.value)}
                               className="w-full px-3 py-1.5 text-xs font-mono border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-50 rounded outline-none focus:border-primary-500"
                             />
                           </div>
                           <div className="space-y-1">
-                            <label className="text-[10px] font-mono font-bold text-slate-400 block">测试组及单位</label>
+                            <label className="text-[10px] font-mono font-bold text-slate-400 block">{L("测试机构", "Measurement organization")}</label>
                             <input
                               type="text"
+                              aria-label={L("测试机构", "Measurement organization")}
                               value={manualManufacturer}
                               onChange={(e) => setManualManufacturer(e.target.value)}
                               className="w-full px-3 py-1.5 text-xs font-mono border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-slate-50 rounded outline-none focus:border-primary-500"
@@ -1003,36 +954,40 @@ PP-M1600	中石油		0.910		1200`}
 
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                           <div className="space-y-1">
-                            <label className="text-[9px] uppercase font-mono font-bold text-slate-400 block">密度 (g/cm³)</label>
+                            <label className="text-[9px] normal-case font-mono font-bold text-slate-400 block">{L("密度 (g/cm³)", "Density (g/cm³)")}</label>
                             <input
                               type="text"
+                              aria-label={L("密度", "Density")}
                               value={manualDensity}
                               onChange={(e) => setManualDensity(e.target.value)}
                               className="w-full px-2 py-1 text-xs font-mono border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-50 bg-slate-50 dark:bg-slate-900/50 rounded"
                             />
                           </div>
                           <div className="space-y-1">
-                            <label className="text-[9px] uppercase font-mono font-bold text-slate-400 block">熔体流动速率</label>
+                            <label className="text-[9px] normal-case font-mono font-bold text-slate-400 block">{L("熔体质量流动速率 (g/10min)", "MFR (g/10min)")}</label>
                             <input
                               type="text"
+                              aria-label={L("熔体质量流动速率", "MFR")}
                               value={manualMFR}
                               onChange={(e) => setManualMFR(e.target.value)}
                               className="w-full px-2 py-1 text-xs font-mono border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-50 bg-slate-50 dark:bg-slate-900/50 rounded"
                             />
                           </div>
                           <div className="space-y-1">
-                            <label className="text-[9px] uppercase font-mono font-bold text-slate-400 block">拉伸应力(MPa)</label>
+                            <label className="text-[9px] normal-case font-mono font-bold text-slate-400 block">{L("拉伸屈服应力 (MPa)", "Tensile yield (MPa)")}</label>
                             <input
                               type="text"
+                              aria-label={L("拉伸屈服应力", "Tensile yield")}
                               value={manualStrength}
                               onChange={(e) => setManualStrength(e.target.value)}
                               className="w-full px-2 py-1 text-xs font-mono border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-50 bg-slate-50 dark:bg-slate-900/50 rounded"
                             />
                           </div>
                           <div className="space-y-1">
-                            <label className="text-[9px] uppercase font-mono font-bold text-slate-400 block">弯曲模量(MPa)</label>
+                            <label className="text-[9px] normal-case font-mono font-bold text-slate-400 block">{L("弯曲模量 (MPa)", "Flexural modulus (MPa)")}</label>
                             <input
                               type="text"
+                              aria-label={L("弯曲模量", "Flexural modulus")}
                               value={manualModulus}
                               onChange={(e) => setManualModulus(e.target.value)}
                               className="w-full px-2 py-1 text-xs font-mono border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-50 bg-slate-50 dark:bg-slate-900/50 rounded"
@@ -1049,8 +1004,7 @@ PP-M1600	中石油		0.910		1200`}
                             disabled={!manualGradeName.trim()}
                             className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-mono font-bold text-[9px] uppercase tracking-widest cursor-pointer shadow-sm rounded-lg"
                           >
-                            🚀 生成单条并前往校验
-                          </motion.button>
+                            {L("生成一条记录并预览", "Prepare one record for review")}</motion.button>
                         </div>
                       </div>
                     )}
@@ -1059,15 +1013,14 @@ PP-M1600	中石油		0.910		1200`}
                   {importSourceTab === "file" && stagedFiles.length > 0 && (
                     <div className="space-y-2.5 animate-in slide-in-from-bottom-2 duration-300">
                       <div className="flex items-center justify-between text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest px-1">
-                        <span>已选入待解析文件 ({stagedFiles.length})</span>
+                        <span>{L("待解析文件 (", "Staged files (")}{stagedFiles.length})</span>
                         <motion.button
                           whileHover={{ scale: 1.02, color: "#f43f5e" }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => setStagedFiles([])}
                           className="text-rose-500 hover:underline focus:outline-none transition-all cursor-pointer"
                         >
-                          全部清除 (Clear All)
-                        </motion.button>
+                          {L("全部清除", "Clear all")}</motion.button>
                       </div>
                       <div className="max-h-44 overflow-y-auto custom-scrollbar space-y-1.5 pr-1">
                         {stagedFiles.map((file, idx) => (
@@ -1118,10 +1071,9 @@ PP-M1600	中石油		0.910		1200`}
                       >
                         {stagedFiles.length > 0 ? (
                           <>
-                            <Database size={13} /> 开始预分析 {stagedFiles.length} 个文件
-                          </>
+                            <Database size={13} /> {L("分析", "Analyze")}{stagedFiles.length} {L("个文件", "files")}</>
                         ) : (
-                          "请先拖入文件或点击极速录入"
+                          L("请先拖入文件或点击极速录入", "Select files or enter a record")
                         )}
                       </motion.button>
                     </div>
@@ -1134,8 +1086,7 @@ PP-M1600	中石油		0.910		1200`}
                 <div className="flex flex-col items-center justify-center py-12 w-full max-w-xs mx-auto text-center">
                   <div className="relative w-12 h-12 border-2 border-slate-200 dark:border-slate-800 border-t-primary-600 animate-spin mb-6 rounded-full"></div>
                   <h4 className="text-slate-900 dark:text-slate-100 font-mono font-bold text-xs uppercase tracking-widest animate-pulse">
-                    正在分析文件物理化学属性字段...
-                  </h4>
+                    {L("正在读取文件字段…", "Reading file fields…")}</h4>
                   <div className="w-full bg-slate-200 dark:bg-slate-850 h-1 rounded-full mt-4 overflow-hidden">
                     <div
                       className="bg-primary-600 h-full transition-all duration-300 animate-pulse"
@@ -1156,20 +1107,18 @@ PP-M1600	中石油		0.910		1200`}
                     <Info size={16} className="text-primary-600 dark:text-primary-400 shrink-0 mt-0.5" />
                     <div className="space-y-1 text-left">
                       <h4 className="text-xs font-bold text-primary-800 dark:text-primary-300">
-                        智能属性字段桥接与合流
-                      </h4>
+                        {L("检查列映射", "Review column mappings")}</h4>
                       <p className="text-[10px] leading-relaxed text-primary-600 dark:text-primary-405 font-mono">
-                        检测到您上传的文件中含有以下列标题，系统已通过同义模糊算法推测了其在标准高分子工艺数据库中的归属属性。您可以自由校对映射，或定义忽略某个多余段落。
-                      </p>
+                        {L("系统依据列名建议属性映射，请逐项核对。单位仅从明确列声明读取；缺失单位不会猜测补齐。", "Suggested mappings use header aliases. Review every mapping. Units are read from explicit headers; missing units are not guessed.")}</p>
                     </div>
                   </div>
 
                   {/* Schema mapping matrix */}
                   <div className="border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded-xl overflow-hidden shadow-xs">
                     <div className="grid grid-cols-12 gap-2 bg-slate-50 dark:bg-slate-900 px-4 py-2 border-b border-slate-200 dark:border-slate-800 font-mono font-bold text-[9px] text-slate-500 uppercase tracking-wider text-left">
-                      <div className="col-span-5">文件原始列名 / Header in File</div>
-                      <div className="col-span-6">映射至数据库参数 / Mapped Parameter</div>
-                      <div className="col-span-1 text-center">状态</div>
+                      <div className="col-span-5">{L("文件原始列名", "Source header")}</div>
+                      <div className="col-span-6">{L("目标属性", "Mapped property")}</div>
+                      <div className="col-span-1 text-center">{L("状态", "Status")}</div>
                     </div>
 
                     <div className="divide-y divide-slate-100 dark:divide-slate-800/60 max-h-60 overflow-y-auto custom-scrollbar">
@@ -1180,7 +1129,7 @@ PP-M1600	中石油		0.910		1200`}
                         // Extract a sample row data to preview to help user understand the content
                         let sampleVal = "";
                         if (rawFileContents[0] && rawFileContents[0].rows[0]) {
-                          sampleVal = String(rawFileContents[0].rows[0][header] || "");
+                          sampleVal = String(rawFileContents[0].rows[0][header] ?? "");
                           if (sampleVal.length > 25) sampleVal = sampleVal.substring(0, 22) + "...";
                         }
 
@@ -1192,7 +1141,7 @@ PP-M1600	中石油		0.910		1200`}
                               </div>
                               {sampleVal && (
                                 <span className="text-[9px] font-mono text-slate-400 uppercase tracking-tight block truncate">
-                                  样例: <span className="text-amber-600 dark:text-amber-400">{sampleVal}</span>
+                                  {L("样例：", "Example:")}<span className="text-amber-600 dark:text-amber-400">{sampleVal}</span>
                                 </span>
                               )}
                             </div>
@@ -1209,28 +1158,26 @@ PP-M1600	中石油		0.910		1200`}
                                 className="w-full px-2.5 py-1.5 text-xs font-semibold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-750 focus:border-primary-500 focus:outline-none transition-all rounded-lg"
                               >
                                 <option value="[skip]" className="text-slate-400 font-mono">
-                                  [ 忽略此列不导入 / Ignore Column ]
-                                </option>
-                                <optgroup label="系统主字段/主键" className="font-bold">
+                                  {L("[ 忽略此列 ]", "[ Ignore this column ]")}</option>
+                                <optgroup label={L("记录身份字段", "Record identity")} className="font-bold">
                                   {STANDARD_PROPERTIES.filter((p) => p.isMeta).map((p) => (
                                     <option key={p.key} value={p.key}>
-                                      {p.label}
+                                      {(p.isMeta ? (p.key === 'gradeName' ? (lang === 'zh' ? '牌号名称 *' : 'Grade name *') : (lang === 'zh' ? '生产厂家' : 'Manufacturer')) : tProp(p.key))}
                                     </option>
                                   ))}
                                 </optgroup>
-                                <optgroup label="标准物理性能参数" className="font-bold">
+                                <optgroup label={L("标准属性", "Standard properties")} className="font-bold">
                                   {STANDARD_PROPERTIES.filter((p) => !p.isMeta).map((p) => (
                                     <option key={p.key} value={p.key}>
-                                      {p.label}
+                                      {(p.isMeta ? (p.key === 'gradeName' ? (lang === 'zh' ? '牌号名称 *' : 'Grade name *') : (lang === 'zh' ? '生产厂家' : 'Manufacturer')) : tProp(p.key))}
                                     </option>
                                   ))}
                                 </optgroup>
                                 {customColumns.length > 0 && (
-                                  <optgroup label="用户自建变量" className="font-bold">
+                                  <optgroup label={L("自定义属性", "Custom properties")} className="font-bold">
                                     {customColumns.map((c) => (
                                       <option key={c} value={c}>
-                                        {c} (自定义属性)
-                                      </option>
+                                        {c} {L("（自定义）", "(custom)")}</option>
                                     ))}
                                   </optgroup>
                                 )}
@@ -1239,9 +1186,9 @@ PP-M1600	中石油		0.910		1200`}
 
                             <div className="col-span-1 flex justify-center">
                               {destination !== "[skip]" ? (
-                                <span className={`w-2 h-2 rounded-full ${isRequiredMatched ? "bg-primary-500 animate-ping" : "bg-emerald-500"}`} title={isRequiredMatched ? "主控必需字段" : "正常映射中"} />
+                                <span className={`w-2 h-2 rounded-full ${isRequiredMatched ? "bg-primary-500 animate-ping" : "bg-emerald-500"}`} title={isRequiredMatched ? L("主控必需字段", "Required identity field") : L("正常映射中", "Mapped")} />
                               ) : (
-                                <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" title="忽略" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" title={L("忽略", "Ignored")} />
                               )}
                             </div>
                           </div>
@@ -1260,15 +1207,14 @@ PP-M1600	中石油		0.910		1200`}
                         onClick={() => setShowCustomColumnInput(true)}
                         className="text-[10px] font-mono font-bold text-primary-600 dark:text-primary-450 hover:underline hover:text-primary-700 flex items-center gap-1.5 uppercase tracking-wide focus:outline-none cursor-pointer"
                       >
-                        <PlusCircle size={14} /> + 手动声明新增非标特种参数字段 (Map a custom property)
-                      </motion.button>
+                        <PlusCircle size={14} /> {L("+ 添加自定义属性", "+ Map a custom property")}</motion.button>
                     ) : (
                       <div className="flex gap-2 items-center">
                         <input
                           type="text"
                           value={newCustomColumnName}
                           onChange={(e) => setNewCustomColumnName(e.target.value)}
-                          placeholder="例如: 极度撕裂指数 (R-Tear)"
+                          placeholder={L("例如：撕裂指标", "For example: Tear index")}
                           className="flex-1 px-3 py-1.5 text-xs font-semibold border border-slate-300 dark:border-slate-750 bg-white dark:bg-slate-900 text-slate-950 dark:text-white rounded-lg focus:ring-1 focus:ring-primary-500 outline-none"
                           onKeyDown={(e) => {
                             if (e.key === "Enter") handleAddCustomColumn();
@@ -1281,8 +1227,7 @@ PP-M1600	中石油		0.910		1200`}
                           onClick={handleAddCustomColumn}
                           className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 font-mono font-bold text-[10px] text-white uppercase tracking-wider rounded-lg cursor-pointer"
                         >
-                          确认添加
-                        </motion.button>
+                          {L("确认添加", "Add property")}</motion.button>
                         <motion.button
                           whileHover={{ scale: 1.04 }}
                           whileTap={{ scale: 0.96 }}
@@ -1290,8 +1235,7 @@ PP-M1600	中石油		0.910		1200`}
                           onClick={() => setShowCustomColumnInput(false)}
                           className="px-3.5 py-1.5 bg-slate-205 dark:bg-slate-800 text-slate-600 dark:text-slate-350 hover:bg-slate-300 text-[10px] font-mono uppercase tracking-wider rounded-lg cursor-pointer"
                         >
-                          取消
-                        </motion.button>
+                          {L("取消", "Cancel")}</motion.button>
                       </div>
                     )}
                   </div>
@@ -1300,34 +1244,32 @@ PP-M1600	中石油		0.910		1200`}
                   <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl text-left space-y-3.5">
                     <div className="space-y-0.5">
                       <span className="text-xs font-bold text-slate-905 dark:text-slate-100 flex items-center gap-1.5">
-                        <Settings size={14} className="text-slate-500" /> 重合牌号冲突消解逻辑 (Deduplication Policy)
-                      </span>
+                        <Settings size={14} className="text-slate-500" /> {L("重复牌号处理", "Duplicate-grade policy")}</span>
                       <p className="text-[10px] text-slate-405 dark:text-slate-450 leading-relaxed font-mono">
-                        若您即将合流的牌号名称与物性库已有数据重名，系统将依据以下企业合流机制保障数据一致性：
-                      </p>
+                        {L("选择导入记录与库中牌号重合时的处理方式。确认前请检查原始数据和来源。", "Choose how to handle grades already present in the database. Review the original records and provenance before applying changes.")}</p>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                       {([
                         {
                           key: "merge",
-                          title: "🔍 增量合并，局部覆盖",
-                          desc: "合流新属性至老牌号中。原记录键值保留，重合属性用新数据更新（最常用且安全）",
+                          title: L("增量合并", "Merge properties"),
+                          desc: L("保留记录标识，将导入属性覆盖到原属性中。来源和保密信息按更严格限制合并。", "Keep the record ID and overlay imported properties. Provenance and confidentiality retain the stricter restrictions."),
                         },
                         {
                           key: "overwrite",
-                          title: "♻️ 完全覆盖替换 / Overwrite",
-                          desc: "彻底剔除该牌号的已有库数据，完整用此文件录入的新结构取而代之",
+                          title: L("完全覆盖", "Replace record"),
+                          desc: L("保留记录标识，用导入结构替换原记录内容。", "Keep the record ID and replace its content with the imported structure."),
                         },
                         {
                           key: "skip",
-                          title: "🚫 重合牌号跳过 / Skip",
-                          desc: "一旦检索到同名物性数据，则自动静默忽略不合流此行",
+                          title: L("跳过重复", "Skip duplicates"),
+                          desc: L("跳过与库中牌号或标识重复的记录。", "Skip records whose grade or ID is already present."),
                         },
                         {
                           key: "duplicate",
-                          title: "📝 并存，作为新记录导入",
-                          desc: "忽略同名约束，为其分配新的UUID，在列表中并存记录",
+                          title: L("作为新记录并存", "Keep as a new record"),
+                          desc: L("分配新标识，同时保留原记录。", "Assign a new ID and retain the existing record."),
                         }
                       ] as const).map((policy) => (
                         <label
@@ -1366,7 +1308,7 @@ PP-M1600	中石油		0.910		1200`}
                       onClick={() => setStep(1)}
                       className="flex-1 py-3 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono font-bold text-[10px] uppercase tracking-widest rounded-xl border border-slate-300 dark:border-slate-700 focus:outline-none cursor-pointer"
                     >
-                      <X size={13} /> Back
+                      <X size={13} /> {L("返回", "Back")}
                     </motion.button>
                     <motion.button
                       whileHover={{ scale: 1.01 }}
@@ -1381,10 +1323,9 @@ PP-M1600	中石油		0.910		1200`}
                     >
                       {Object.values(columnMappings).includes("gradeName") ? (
                         <>
-                          <CheckCircle size={13} /> 前往数据合法性校验沙盒 (Verify Ingestion)
-                        </>
+                          <CheckCircle size={13} /> {L("生成预览记录", "Prepare import preview")}</>
                       ) : (
-                        "必须映射一个列至牌号主键才可以进行校验"
+                        L("必须映射一个列至牌号主键才可以进行校验", "Map a grade-name column before continuing")
                       )}
                     </motion.button>
                   </div>
@@ -1411,21 +1352,18 @@ PP-M1600	中石油		0.910		1200`}
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <div className="text-left">
                         <h4 className="text-[10px] font-mono font-bold text-slate-800 dark:text-slate-200 uppercase tracking-widest flex items-center gap-2">
-                          <Filter size={14} className="text-primary-500" /> 合流前底层校验安全审查
-                        </h4>
+                          <Filter size={14} className="text-primary-500" /> {L("导入预览", "Import preview")}</h4>
                         <p className="text-[9px] font-mono text-slate-400 mt-1 uppercase tracking-tight">
-                          DATA VALIDATION & QUALITY CONTROL INSPECTION SANDBOX (双击单元格可极速修改)
-                        </p>
+                          {L("双击单元格编辑。结构检查不代表物理验证。", "Double-click a cell to edit. Structural checks are not physical validation.")}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         {computedDuplicateOverlapCount > 0 && (
                           <span className="text-[9px] font-mono font-bold bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60 px-2 py-0.5 rounded shadow-xs">
-                            {computedDuplicateOverlapCount} 个牌号在库重合 ({duplicateAction === "merge" ? "增量更新" : duplicateAction === "overwrite" ? "替换覆盖" : duplicateAction === "skip" ? "自动跳过" : "并存新创"})
+                            {computedDuplicateOverlapCount} {L("条重复牌号 (", "overlapping grades (")}{duplicateAction === "merge" ? L("增量更新", "Merge") : duplicateAction === "overwrite" ? L("替换覆盖", "Overwrite") : duplicateAction === "skip" ? L("自动跳过", "Skip") : L("并存新创", "Keep both")})
                           </span>
                         )}
                         <span className="text-[10px] font-mono font-bold bg-emerald-50 dark:bg-emerald-950/25 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-850 px-2 py-0.5 rounded shadow-xs">
-                          已验证 {filteredProducts.length} 条记录
-                        </span>
+                          {L("待确认", "Staged")} {filteredProducts.length} {L("条记录", "records")}</span>
                       </div>
                     </div>
 
@@ -1574,7 +1512,7 @@ PP-M1600	中石油		0.910		1200`}
                                       </span>
                                     ) : (
                                       <span className="text-[8px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 px-2 py-0.5 rounded">
-                                        {t("pass", "物理安全通过")}
+                                        {L("无重复牌号", "No duplicate grade")}
                                       </span>
                                     )}
                                     {warnings.map((w, idx) => (
@@ -1615,22 +1553,34 @@ PP-M1600	中石油		0.910		1200`}
                       <motion.button
                         whileHover={{ scale: 1.01 }}
                         whileTap={{ scale: 0.99 }}
-                        onClick={() => setStep(2)}
+                        disabled={isImporting}
+                        onClick={() => setStep(uniqueHeaders.length ? 2 : 1)}
                         className="flex-1 py-3.5 bg-slate-100 dark:bg-slate-900 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-mono font-bold text-[10px] uppercase tracking-widest shadow-sm flex items-center justify-center gap-2 rounded-xl border border-slate-300 dark:border-slate-700 cursor-pointer"
                       >
-                        <X size={13} /> Back
+                        <X size={13} /> {L("返回", "Back")}
                       </motion.button>
                       <motion.button
                         whileHover={{ scale: 1.01 }}
                         whileTap={{ scale: 0.99 }}
-                        disabled={filteredProducts.length === 0}
-                        onClick={() => {
-                          if (onImport) onImport(filteredProducts);
-                          setStep(4); // Transfer to elegant completion screen
+                        disabled={filteredProducts.length === 0 || isImporting || !onImport}
+                        onClick={async () => {
+                          if (!onImport || isImporting) return;
+                          setIsImporting(true);
+                          setImportErrors([]);
+                          try {
+                            const saved = await onImport(filteredProducts);
+                            if (saved === false) throw new Error(L("保存未完成，请检查错误并重试。", "Saving did not complete. Review the error and retry."));
+                            setImportedCount(filteredProducts.length);
+                            setStep(4);
+                          } catch (error) {
+                            setImportErrors([error instanceof Error ? error.message : L("保存失败", "Save failed")]);
+                          } finally {
+                            setIsImporting(false);
+                          }
                         }}
                         className="flex-[2.5] py-3.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white font-mono font-bold text-[10px] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2 rounded-xl border border-primary-500 shadow-primary-500/20 cursor-pointer"
                       >
-                        <CheckCircle size={14} /> {t("mergeAndImportBtn").replace("{count}", String(filteredProducts.length))}
+                        <CheckCircle size={14} /> {isImporting ? L("正在保存…", "Saving…") : t("mergeAndImportBtn").replace("{count}", String(filteredProducts.length))}
                       </motion.button>
                     </div>
                   </motion.div>
@@ -1653,7 +1603,7 @@ PP-M1600	中石油		0.910		1200`}
                   </h4>
                   <p className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-6">
                     <span className="text-emerald-600 dark:text-emerald-400">
-                      {parsedProducts.length} RECORDS MERGED & ENRICHED SECURELY
+                      {L(`已保存 ${importedCount} 条记录`, `Saved ${importedCount} ${importedCount === 1 ? 'record' : 'records'}`)}
                     </span>
                   </p>
 
@@ -1662,10 +1612,10 @@ PP-M1600	中石油		0.910		1200`}
                       {t("dataIngestionTelemetry", "物性摄取审计 (Data Ingestion Telemetry)")}
                     </h5>
                     <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-500 dark:text-slate-400">
-                      <div>{t("successImportRecords")}: <span className="text-slate-800 dark:text-white font-bold">{parsedProducts.length} {t("itemsUnit", "条")}</span></div>
+                      <div>{t("successImportRecords")}: <span className="text-slate-800 dark:text-white font-bold">{importedCount} {t("itemsUnit", "条")}</span></div>
                       <div>{t("successOverlapConflicts")}: <span className="text-slate-850 dark:text-white font-bold">{computedDuplicateOverlapCount} {t("countUnit", "个")}</span></div>
                       <div>{t("successInjectMode")}: <span className="text-slate-800 dark:text-white font-bold">{isExperimentalImport ? t("experimentalLabData", "自测实验数据") : t("mainMerge", "主厂合流")}</span></div>
-                      <div>{t("successValidationLevel")}: <span className="text-emerald-600 font-bold">100% EXCELLENT</span></div>
+                      <div className="col-span-2">{L("结构检查通过；物理结果未验证。", "Structural checks passed; physical results are unverified.")}</div>
                     </div>
                   </div>
 

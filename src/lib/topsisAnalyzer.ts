@@ -119,7 +119,7 @@ export function calculateTopsisDetailed<T extends { id: string }>(
   const rows = data.map((item) => {
     const values: number[] = [];
     const eligibleCriteria: string[] = [];
-    const excludedReasons: string[] = [];
+    const excludedReasons: string[] = columns.length === 0 ? ['NO_CRITERIA'] : [];
     const imputedCriteria: string[] = [];
     for (const column of columns) {
       const extracted = valueExtractor(item, column.key);
@@ -149,8 +149,10 @@ export function calculateTopsisDetailed<T extends { id: string }>(
 
   const eligibleRows = rows.filter((row) => row.eligible);
   const rawWeights = columns.map((column) => column.weight ?? 1);
-  const totalWeight = rawWeights.reduce((sum, value) => sum + value, 0);
-  const normalizedWeights = rawWeights.map((value) => value / totalWeight);
+  const maxWeight = rawWeights.reduce((maximum, value) => Math.max(maximum, value), 0);
+  const scaledWeights = rawWeights.map((value) => value / maxWeight);
+  const totalWeight = scaledWeights.reduce((sum, value) => sum + value, 0);
+  const normalizedWeights = scaledWeights.map((value) => value / totalWeight);
 
   const criterionMetadata: TopsisCriterionMetadata[] = columns.map((column, index) => {
     const extent = finiteExtent(eligibleRows.map((row) => row.values[index]));
@@ -188,16 +190,16 @@ export function calculateTopsisDetailed<T extends { id: string }>(
       const minimum = criterion.minimum as number;
       const maximum = criterion.maximum as number;
       const raw = row.values[index];
-      const oriented = criterion.isLowBest
-        ? (maximum - raw) / (maximum - minimum)
-        : (raw - minimum) / (maximum - minimum);
+      const scale = Math.max(Math.abs(minimum), Math.abs(maximum)) || 1;
+      const fraction = (raw / scale - minimum / scale) / (maximum / scale - minimum / scale);
+      const oriented = Math.max(0, Math.min(1, criterion.isLowBest ? 1 - fraction : fraction));
       const weighted = oriented * criterion.weight;
       const ideal = criterion.weight;
-      distanceToIdeal += (weighted - ideal) ** 2;
-      distanceToAntiIdeal += weighted ** 2;
+      distanceToIdeal = Math.hypot(distanceToIdeal, weighted - ideal);
+      distanceToAntiIdeal = Math.hypot(distanceToAntiIdeal, weighted);
     }
-    const dPlus = Math.sqrt(distanceToIdeal);
-    const dMinus = Math.sqrt(distanceToAntiIdeal);
+    const dPlus = distanceToIdeal;
+    const dMinus = distanceToAntiIdeal;
     const denominator = dPlus + dMinus;
     const score = denominator === 0 ? 0.5 : dMinus / denominator;
     if (!Number.isFinite(score)) throw new Error(`Non-finite TOPSIS score for ${row.item.id}`);
@@ -208,7 +210,7 @@ export function calculateTopsisDetailed<T extends { id: string }>(
     id: row.item.id,
     eligible: row.eligible,
     score: scores.get(row.item.id) ?? null,
-    coverage: columns.length === 0 ? 1 : row.eligibleCriteria.length / columns.length,
+    coverage: columns.length === 0 ? 0 : row.eligibleCriteria.length / columns.length,
     eligibleCriteria: [...row.eligibleCriteria],
     excludedReasons: [...row.excludedReasons],
     imputedCriteria: [...row.imputedCriteria],

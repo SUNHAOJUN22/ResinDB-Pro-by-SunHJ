@@ -283,11 +283,11 @@ try {
     localStorage.setItem('resindb-theme', 'light');
     localStorage.setItem('resindb-color-theme', 'indigo');`);
   await cdp.command('Page.reload', { ignoreCache: true });
-  await waitCondition(cdp, `(document.body?.innerText || '').includes('13 RECORDS')`, 'dashboard');
+  await waitCondition(cdp, `Number(document.querySelector('[data-testid="record-count"]')?.dataset.count) === 13`, 'dashboard');
 
   await clickTitle(cdp, ['性能指数引擎', 'Performance Index Engine']);
-  await waitCondition(cdp, `document.body.innerText.includes('Performance Index Engine')`, 'formula editor');
-  await clickText(cdp, ['Dependencies Heatmap']);
+  await waitCondition(cdp, `(document.body.innerText.includes('Performance Index Engine') || document.body.innerText.includes('材料公式工作台'))`, 'formula editor');
+  await clickText(cdp, ['Dependencies Heatmap', '依赖灵敏度图']);
   await waitCondition(cdp, `!!document.querySelector('[data-testid="dependency-heatmap-migrated"]')`, 'dependency heatmap');
   await evaluate(cdp, `document.querySelector('[data-testid="dependency-heatmap-migrated"]').scrollIntoView({ block: 'start' })`);
   await waitCondition(cdp, `(() => {
@@ -342,7 +342,7 @@ try {
   await waitCondition(cdp, `!document.documentElement.classList.contains('dark')`, 'dependency light restore');
   await evaluate(cdp, `(() => {
     const modal = Array.from(document.querySelectorAll('div.fixed.inset-0')).find((node) =>
-      (node.innerText || '').includes('Performance Index Engine'));
+      ((node.innerText || '').includes('Performance Index Engine') || (node.innerText || '').includes('材料公式工作台')));
     const close = modal?.querySelector('button:has(svg.lucide-x)');
     if (!close) throw new Error('Formula editor close control missing');
     close.click();

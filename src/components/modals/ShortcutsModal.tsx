@@ -1,4 +1,5 @@
 import React from "react";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { motion, AnimatePresence } from "motion/react";
 import {
   X,
@@ -20,16 +21,18 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const { language } = useLanguage();
+  const zh = language === "zh";
   const shortcuts = [
-    { key: "/", label: "聚焦搜索框", icon: Search },
-    { key: "Ctrl + K", label: "打开命令中心", icon: Command },
-    { key: "Ctrl + I", label: "导入数据", icon: Download },
-    { key: "Ctrl + E", label: "导出选中项", icon: Download },
-    { key: "?", label: "显示快捷键", icon: Keyboard },
-    { key: "ESC", label: "关闭弹窗/取消选择", icon: X },
-    { key: "↑ / ↓", label: "表格行导航", icon: Activity },
-    { key: "Enter", label: "查看详情", icon: Info },
-    { key: "Space", label: "选择当前行", icon: CheckCircle2 },
+    { key: "/", label: zh ? "聚焦搜索框" : "Focus search", icon: Search },
+    { key: "Ctrl + K", label: zh ? "打开命令中心" : "Open command center", icon: Command },
+    { key: "Ctrl + I", label: zh ? "导入数据" : "Import data", icon: Download },
+    { key: "Ctrl + E", label: zh ? "导出选中项" : "Export selected records", icon: Download },
+    { key: "?", label: zh ? "显示快捷键" : "Show keyboard shortcuts", icon: Keyboard },
+    { key: "ESC", label: zh ? "关闭弹窗/取消选择" : "Close dialog or clear selection", icon: X },
+    { key: "↑ / ↓", label: zh ? "表格行导航" : "Navigate table rows", icon: Activity },
+    { key: "Enter", label: zh ? "查看详情" : "View details", icon: Info },
+    { key: "Space", label: zh ? "选择当前行" : "Select current row", icon: CheckCircle2 },
   ];
 
   return (
@@ -60,10 +63,10 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm font-serif font-bold text-slate-800 dark:text-white tracking-tight">
-                    键盘快捷键
+                    {zh ? "键盘快捷键" : "Keyboard shortcuts"}
                   </h3>
                   <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">
-                    Keyboard Shortcuts Reference
+                    {zh ? "常用操作与按键" : "Common actions and keys"}
                   </p>
                 </div>
               </div>
@@ -74,6 +77,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({
                 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={onClose}
+                aria-label={zh ? "关闭快捷键" : "Close shortcuts"}
                 className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-500 shadow-sm transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-rose-500 z-10 rounded-xl"
               >
                 <X size={16} />

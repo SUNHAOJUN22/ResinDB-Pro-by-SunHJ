@@ -8,6 +8,7 @@ import type { WorkerMessage, WorkerResponse } from '@/workers/dataWorker';
 interface UseDataGridWorkerProps {
   data: Product[];
   columns: ColumnConfig[];
+  /** Display-only filter chips; data is the cohort already filtered by useDatabase. */
   activeFilters?: FilterItem[];
   selectedIds?: Set<string>;
   onSelectionChange?: React.Dispatch<React.SetStateAction<Set<string>>>;
@@ -16,7 +17,6 @@ interface UseDataGridWorkerProps {
 export function useDataGridWorker({ 
   data, 
   columns, 
-  activeFilters = [], 
   selectedIds: controlledSelectedIds, 
   onSelectionChange 
 }: UseDataGridWorkerProps) {
@@ -127,29 +127,21 @@ export function useDataGridWorker({
         payload: { allProducts: data, formulas, columns }
       } as WorkerMessage);
       
-      // We should also trigger a re-query immediately to apply current filter/sort to new data
-      // That'll be handled by the next useEffect, which watches data reference changes directly?
-      // No, we can just trigger it if we want, but the dependency array below includes data/formulas/columns anyway.
+      // The next effect queries this already-filtered cohort in message order.
     }
   }, [data, formulas, columns]);
 
-  // Send QUERY when filter/sort changes (or after INIT_DATA)
+  // useDatabase owns filtering. Never treat localized display chips as raw queries.
   useEffect(() => {
     if (workerRef.current) {
       setIsComputing(true);
       
-      const serializableFilters = activeFilters.map(({ id, label, type }) => ({
-        id,
-        label,
-        type
-      }));
-
       workerRef.current.postMessage({
         type: 'QUERY',
-        payload: { activeFilters: serializableFilters, sortConfig, useTopsis, detectAnomaliesKey }
+        payload: { activeFilters: [], inputIsFiltered: true, sortConfig, useTopsis, detectAnomaliesKey }
       } as WorkerMessage);
     }
-  }, [activeFilters, sortConfig, data, formulas, columns, useTopsis, detectAnomaliesKey]); // include data to re-query after it changes
+  }, [sortConfig, data, formulas, columns, useTopsis, detectAnomaliesKey]);
 
   const toggleSelection = useCallback((id: string) => {
     updateSelection(prev => {

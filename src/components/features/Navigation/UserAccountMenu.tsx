@@ -49,12 +49,12 @@ export const UserAccountMenu: React.FC<UserAccountMenuProps> = ({
   const { theme, toggleTheme, colorTheme, setColorTheme } = useTheme();
 
   const colors: { id: ColorTheme; color: string; label: string }[] = [
-    { id: "indigo", color: "#4f46e5", label: "Indigo" },
-    { id: "emerald", color: "#059669", label: "Emerald" },
-    { id: "blue", color: "#2563eb", label: "Blue" },
-    { id: "rose", color: "#e11d48", label: "Rose" },
-    { id: "amber", color: "#d97706", label: "Amber" },
-    { id: "violet", color: "#7c3aed", label: "Violet" },
+    { id: "indigo", color: "#4f46e5", label: language === 'zh' ? '靛蓝' : 'Indigo' },
+    { id: "emerald", color: "#059669", label: language === 'zh' ? '翠绿' : 'Emerald' },
+    { id: "blue", color: "#2563eb", label: language === 'zh' ? '蓝色' : 'Blue' },
+    { id: "rose", color: "#e11d48", label: language === 'zh' ? '玫红' : 'Rose' },
+    { id: "amber", color: "#d97706", label: language === 'zh' ? '琥珀' : 'Amber' },
+    { id: "violet", color: "#7c3aed", label: language === 'zh' ? '紫罗兰' : 'Violet' },
   ];
 
   useEffect(() => {
@@ -76,6 +76,8 @@ export const UserAccountMenu: React.FC<UserAccountMenuProps> = ({
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(!isOpen)}
+        aria-label={language === 'zh' ? '账户菜单' : 'Account menu'}
+        aria-expanded={isOpen}
         className={`w-10 h-10 border overflow-hidden transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 rounded-lg shadow-sm ${isOpen ? "border-primary-500" : "border-slate-200/80 dark:border-slate-800/80 hover:border-primary-400"}`}
       >
         <UserAvatar
@@ -161,6 +163,7 @@ export const UserAccountMenu: React.FC<UserAccountMenuProps> = ({
                       className={`w-6 h-6 border transition-all focus:outline-none focus-visible:ring-1 focus-visible:ring-primary-500 rounded-full shadow-sm ${colorTheme === c.id ? "border-primary-500 ring-2 ring-primary-500 ring-offset-2 scale-110" : "border-transparent hover:scale-110"}`}
                       style={{ backgroundColor: c.color }}
                       title={c.label}
+                      aria-label={c.label}
                     />
                   ))}
                 </div>
@@ -174,6 +177,7 @@ export const UserAccountMenu: React.FC<UserAccountMenuProps> = ({
                   }}
                   whileTap={{ scale: 0.9 }}
                   onClick={toggleTheme}
+                  aria-label={language === 'zh' ? (theme === 'dark' ? '切换至浅色模式' : '切换至深色模式') : (theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode')}
                   className="flex-1 h-full flex items-center justify-center hover:text-slate-800 dark:hover:text-slate-200 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-primary-500 border border-transparent rounded-lg"
                 >
                   {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
@@ -185,6 +189,7 @@ export const UserAccountMenu: React.FC<UserAccountMenuProps> = ({
                   }}
                   whileTap={{ scale: 0.9 }}
                   onClick={toggleLanguage}
+                  aria-label={language === 'zh' ? '切换至英文' : 'Switch to Chinese'}
                   className="flex-1 h-full flex items-center justify-center hover:text-slate-800 dark:hover:text-slate-200 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-primary-500 border border-transparent rounded-lg"
                 >
                   <Globe size={14} />

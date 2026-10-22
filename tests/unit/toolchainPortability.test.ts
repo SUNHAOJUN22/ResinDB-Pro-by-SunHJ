@@ -52,6 +52,7 @@ describe('stage-one Node-only tooling', () => {
     const syntheticVisuals = readdirSync(imageDirectory)
       .filter((name) => /^resindb-.*\.svg$/.test(name))
     const readme = readFileSync(resolve(root, 'README.md'), 'utf8')
+    const archive = readFileSync(resolve(root, 'README.visual-archive.md'), 'utf8')
 
     expect(screenshots).toHaveLength(8)
     expect(diagrams).toEqual(expectedDiagrams)
@@ -62,14 +63,20 @@ describe('stage-one Node-only tooling', () => {
 
     for (const screenshot of screenshots) {
       expect(statSync(resolve(imageDirectory, screenshot)).size).toBeGreaterThan(20_000)
-      expect(readme).toContain(`docs/images/${screenshot}`)
+      expect(archive).toContain(`docs/images/${screenshot}`)
     }
     for (const diagram of diagrams) {
       expect(statSync(resolve(imageDirectory, diagram)).size).toBeGreaterThan(5_000)
-      expect(readme).toContain(`docs/images/${diagram}`)
+      expect(archive).toContain(`docs/images/${diagram}`)
     }
-    expect(readme).toContain('AI conceptual diagrams')
-    expect(readme).toContain('Chromium runtime screenshots')
+    expect(readme).toContain('README.visual-archive.md')
+    expect(archive).toContain('historical')
+    for (const [file, language, opposite] of [['README.md', 'zh', 'en'], ['README.zh-CN.md', 'zh', 'en'], ['README.en.md', 'en', 'zh']]) {
+      const text = readFileSync(resolve(root, file), 'utf8')
+      expect(text).toContain(`docs/assets/vision-${language}.png`)
+      expect(text).not.toContain(`docs/assets/vision-${opposite}.png`)
+      expect(statSync(resolve(root, `docs/assets/vision-${language}.png`)).size).toBeGreaterThan(20_000)
+    }
   })
 
   it('rejects future stage-one delta transport residue', () => {

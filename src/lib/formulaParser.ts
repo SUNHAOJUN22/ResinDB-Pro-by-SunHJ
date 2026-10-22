@@ -1,3 +1,6 @@
+import { parseFiniteReal } from '@/lib/quantityRecord';
+import { admittedPropertyValue } from '@/lib/propertyAdmission';
+import { compileDimensionedExpression, unitDefinition, toSI, fromSI, type DimensionedValue } from '@/lib/formula/dimensionedExpression';
 import type { FormulaConfig, Product } from '@/types/index';
 import {
   compileFormulaExpression,
@@ -6,7 +9,7 @@ import {
 } from '@/lib/formula/expressionParser';
 
 export type FormulaResult =
-  | { status: 'OK'; value: number; unit: string; dependencies: string[] }
+  | { status: 'OK'; value: number; unit: string; dependencies: string[]; scope: 'DIMENSION_CHECKED' | 'NUMERIC_ONLY' }
   | { status: 'UNKNOWN' | 'INVALID'; value: null; reason: string; dependencies: string[] };
 
 export type FormulaResultMap = Record<string, FormulaResult>;
@@ -34,15 +37,9 @@ interface CompiledFormulaPlan {
   propertyExecutor: PropertyGraphExecutor;
   productResultExecutor: (product: Product) => FormulaResultMap;
   propertyResultExecutor: PropertyResultGraphExecutor;
+  bindProductResultExecutor: (product: Product) => PropertyResultGraphExecutor;
 }
 
-function finiteNumeric(value: unknown): number | null {
-  if (typeof value === 'boolean' || value === null || value === undefined) return null;
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  if (typeof value !== 'string' || value.trim() === '') return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -157,7 +154,7 @@ export class FormulaEngine {
         }
         continue;
       }
-      const numericValue = finiteNumeric(property.value);
+      const numericValue = parseFiniteReal(property.value);
       if (numericValue !== null) properties[key] = numericValue;
     }
     return properties;
@@ -189,7 +186,7 @@ export class FormulaEngine {
       return results;
     };
     const productExecutor = (product: Product) => propertyExecutor(this.createPropertyDictionary(product));
-    return { formulasSnapshot: formulas, productExecutor, propertyExecutor, productResultExecutor, propertyResultExecutor };
+    return { formulasSnapshot: formulas, productExecutor, propertyExecutor, productResultExecutor, propertyResultExecutor, bindProductResultExecutor: () => propertyResultExecutor };
   }
 
   private compilePlan(formulas: FormulaConfig[]): CompiledFormulaPlan {
@@ -208,7 +205,7 @@ export class FormulaEngine {
 
     const steps: CompiledStep[] = ordered.map((formula) => {
       const dependencies = this.extractDependencies(formula.expression);
-      const unit = formula.unit === undefined ? '' : formula.unit.trim() || 'UNSPECIFIED';
+      const unit = formula.unit?.trim() ?? '';
       try {
         return { id: formula.id, name: formula.name, unit, dependencies, evaluator: compileFormulaExpression(formula.expression) };
       } catch (error) {
@@ -250,7 +247,7 @@ export class FormulaEngine {
           }
           properties[step.name] = calculated;
           results[step.id] = {
-            status: 'OK', value: calculated, unit: step.unit, dependencies: [...step.dependencies],
+            status: 'OK', value: calculated, unit: step.unit, dependencies: [...step.dependencies], scope: 'NUMERIC_ONLY',
           };
         } catch (error) {
           results[step.id] = {
@@ -261,7 +258,72 @@ export class FormulaEngine {
       return results;
     };
 
-    const productResultExecutor = (product: Product) => propertyResultExecutor(this.createPropertyDictionary(product));
+    const typedEvaluators = new Map(ordered.map(formula => {
+      try { return [formula.id, compileDimensionedExpression(formula.expression)] as const; }
+      catch { return [formula.id, undefined] as const; }
+    }));
+    const outputUnits = new Map(steps.map(step => [step.id, unitDefinition(step.unit)]));
+    const bindProductResultExecutor = (product: Product): PropertyResultGraphExecutor => {
+      // Unit/status metadata is fixed for a simulation request. Reuse numeric
+      // and typed dictionaries across draws; never copy or mutate a Product in
+      // the sampling loop. Deterministic TEST uses this same execution path.
+      const metadata = Object.entries(product.properties).map(([key, property]) => {
+        const unit = property.quantity?.status === 'VALID' ? property.quantity.canonical?.unit : property.unit;
+        return {
+          key, admitted: admittedPropertyValue(property) !== null,
+          declared: property.quantity !== undefined || Boolean(unit?.trim()),
+          definition: unit ? unitDefinition(unit) : undefined,
+        };
+      });
+      const input: PropertyDictionary = Object.create(null);
+      const typed: Record<string, DimensionedValue> = Object.create(null);
+      const declared = new Set<string>();
+      return (values, results = {}) => {
+        declared.clear();
+        for (const { key, admitted, declared: hasDeclaration, definition } of metadata) {
+          delete input[key]; delete typed[key];
+          if (hasDeclaration) declared.add(key);
+          const numeric = admitted && Object.hasOwn(values, key) ? values[key] : undefined;
+          if (typeof numeric !== 'number' || !Number.isFinite(numeric)) continue;
+          input[key] = numeric;
+          if (definition) {
+            try { typed[key] = toSI(numeric, definition); } catch { /* Rejected below as unavailable typed input. */ }
+          }
+        }
+        for (const step of steps) { delete input[step.name]; delete typed[step.name]; declared.delete(step.name); }
+        for (const step of steps) {
+          const fail = (status: 'UNKNOWN' | 'INVALID', reason: string) => {
+            results[step.id] = { status, value: null, reason, dependencies: [...step.dependencies] };
+            delete input[step.name]; delete typed[step.name]; declared.add(step.name);
+          };
+          if (!step.unit || step.compileError) { fail('INVALID', !step.unit ? 'MISSING_OUTPUT_UNIT' : `PARSE_ERROR:${step.compileError}`); continue; }
+          if (step.dependencies.some(key => !Number.isFinite(input[key]))) { fail('UNKNOWN', 'MISSING_DEPENDENCY'); continue; }
+          const hasDeclared = step.dependencies.some(key => declared.has(key));
+          if (!hasDeclared) {
+            try {
+              const value = step.evaluator!(input);
+              if (!Number.isFinite(value)) throw new Error('NONFINITE_OR_DOMAIN_ERROR');
+              input[step.name] = value;
+              results[step.id] = { status: 'OK', value, unit: step.unit, scope: 'NUMERIC_ONLY', dependencies: [...step.dependencies] };
+            } catch (error) { fail('INVALID', errorMessage(error)); }
+            continue;
+          }
+          if (step.dependencies.some(key => !typed[key])) { fail('UNKNOWN', 'MIXED_OR_UNSUPPORTED_INPUT_UNITS'); continue; }
+          try {
+            const outputUnit = outputUnits.get(step.id);
+            const evaluator = typedEvaluators.get(step.id);
+            if (!outputUnit || !evaluator) throw new Error('UNSUPPORTED_OUTPUT_UNIT_OR_EXPRESSION');
+            const si = evaluator(typed);
+            const value = fromSI(si, outputUnit);
+            typed[step.name] = si; declared.add(step.name); input[step.name] = value;
+            results[step.id] = { status: 'OK', value, unit: step.unit, scope: 'DIMENSION_CHECKED', dependencies: [...step.dependencies] };
+          } catch (error) { fail('INVALID', errorMessage(error)); }
+        }
+        return results;
+      };
+    };
+    const productResultExecutor = (product: Product): FormulaResultMap =>
+      bindProductResultExecutor(product)(this.createPropertyDictionary(product));
     const propertyExecutor: PropertyGraphExecutor = (properties, results = {}) => {
       const detailed = propertyResultExecutor(properties);
       for (const [id, result] of Object.entries(detailed)) {
@@ -270,8 +332,10 @@ export class FormulaEngine {
       }
       return results;
     };
-    const productExecutor = (product: Product) => propertyExecutor(this.createPropertyDictionary(product));
-    this.cachedPlan = { formulasSnapshot, productExecutor, propertyExecutor, productResultExecutor, propertyResultExecutor };
+    const productExecutor = (product: Product) => Object.fromEntries(
+      Object.entries(productResultExecutor(product)).flatMap(([id, result]) => result.status === 'OK' ? [[id, result.value]] : []),
+    );
+    this.cachedPlan = { formulasSnapshot, productExecutor, propertyExecutor, productResultExecutor, propertyResultExecutor, bindProductResultExecutor };
     return this.cachedPlan;
   }
 
@@ -281,6 +345,20 @@ export class FormulaEngine {
 
   public compilePropertyGraph(formulas: FormulaConfig[]): PropertyGraphExecutor {
     return this.compilePlan(formulas).propertyExecutor;
+  }
+
+  /** Numeric draws use the fixed sample's actual units and admission metadata. */
+  public compileSampledPropertyGraph(formulas: FormulaConfig[], product: Product): PropertyGraphExecutor {
+    const execute = this.compilePlan(formulas).bindProductResultExecutor(product);
+    const detailed: FormulaResultMap = {};
+    return (properties, results = {}) => {
+      execute(properties, detailed);
+      for (const [id, result] of Object.entries(detailed)) {
+        if (result.status === 'OK') results[id] = result.value;
+        else delete results[id];
+      }
+      return results;
+    };
   }
 
   public compileResultGraph(formulas: FormulaConfig[]): (product: Product) => FormulaResultMap {

@@ -1,6 +1,7 @@
 import { useState, useMemo, useDeferredValue, useEffect, useCallback, useRef } from 'react';
 import { Product, FilterGroup, Category, Toast, SyncEvent } from '@/types/index';
 import { compileFilterGroup } from '@/lib/filterUtils';
+import { matchesPropertyCondition, parsePropertyCondition } from '@/lib/propertySearch';
 import { calculateCompleteness, getLower } from '@/utils/productUtils';
 import { CATEGORY_TREE } from '@/config/constants';
 import { debounce } from 'lodash';
@@ -47,14 +48,16 @@ export function useDatabase(
   const { columns } = columnManagement;
   const propertyKeyLookup = useMemo(() => {
     const lookup = new Map<string, string>();
-    for (const column of columns) {
-      lookup.set(column.key.toLowerCase(), column.key);
-      lookup.set(tProp(column.label).toLowerCase(), column.key);
-    }
     for (const [key, translatedLabel] of Object.entries(propertyMap)) {
       lookup.set(key.toLowerCase(), key);
       lookup.set(translatedLabel.toLowerCase(), key);
     }
+    for (const column of columns) {
+      lookup.set(tProp(column.label).toLowerCase(), column.key);
+    }
+    // Exact keys present in the dataset outrank translated aliases. Otherwise
+    // an actual `density` field can be redirected to a nonexistent `密度` field.
+    for (const column of columns) lookup.set(column.key.toLowerCase(), column.key);
     return lookup;
   }, [columns, tProp]);
 
@@ -203,8 +206,8 @@ export function useDatabase(
   }, [allProducts, buildProductTextIndex]);
 
   const filteredData = useMemo(() => {
-    const syntaxRegex = /([^:\s]+(?:\s+[^:\s]+)*):([<>]=?|[^:\s]+)/g;
-    const syntaxFilters: { key: string, operator: string, value: string | number, max?: number }[] = [];
+    const syntaxRegex = /([^:\s]+(?:\s+[^:\s]+)*):([^:\s]+)/g;
+    const syntaxFilters: { key: string; condition: ReturnType<typeof parsePropertyCondition> }[] = [];
     const filterMatches: { start: number, end: number }[] = [];
     let match;
     while ((match = syntaxRegex.exec(deferredSearchQuery)) !== null) {
@@ -226,16 +229,7 @@ export function useDatabase(
         const filterPart = `${matchedLabel}:${condition}`;
         const filterStart = match.index + full.lastIndexOf(filterPart);
         filterMatches.push({ start: filterStart, end: filterStart + filterPart.length });
-        if (condition.includes('-') && !condition.startsWith('-')) {
-          const parts = condition.split('-');
-          syntaxFilters.push({ key, operator: 'range', value: parseFloat(parts[0]), max: parseFloat(parts[1]) });
-        } else if (condition.match(/^[<>]=?/)) {
-          const operator = condition.match(/^[<>]=?/)?.[0] || '';
-          syntaxFilters.push({ key, operator, value: parseFloat(condition.replace(operator, '')) });
-        } else {
-          const numeric = parseFloat(condition);
-          syntaxFilters.push({ key, operator: '=', value: Number.isNaN(numeric) ? getLower(condition) : numeric });
-        }
+        syntaxFilters.push({ key, condition: parsePropertyCondition(condition) });
       }
     }
 
@@ -269,23 +263,7 @@ export function useDatabase(
       }
 
       for (const filter of syntaxFilters) {
-        const propertyValue = product.properties[filter.key]?.value;
-        const numericValue = typeof propertyValue === 'number' ? propertyValue : parseFloat(String(propertyValue));
-        let matches: boolean;
-        if (Number.isNaN(numericValue) || typeof filter.value === 'string') {
-          matches = getLower(String(propertyValue)).includes(filter.value as string);
-        } else {
-          switch (filter.operator) {
-            case '>': matches = numericValue > (filter.value as number); break;
-            case '<': matches = numericValue < (filter.value as number); break;
-            case '>=': matches = numericValue >= (filter.value as number); break;
-            case '<=': matches = numericValue <= (filter.value as number); break;
-            case 'range': matches = numericValue >= (filter.value as number) && numericValue <= (filter.max ?? Infinity); break;
-            case '=': matches = numericValue === (filter.value as number); break;
-            default: matches = true;
-          }
-        }
-        if (!matches) return false;
+        if (!matchesPropertyCondition(product.properties[filter.key], filter.condition)) return false;
       }
 
       return !hasAdvancedFilters || advancedPredicate(product);

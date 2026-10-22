@@ -75,6 +75,12 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
     // Metadata fields (gradeName, manufacturer, ...) use the same locale map
     // as ordinary UI labels; scientific property names retain their fallback.
     const labels = translations[language];
+    const formulaLabels: Record<string, [string, string]> = {
+      'Specific Strength (比强度)': ['比强度', 'Specific strength'],
+      'Specific Modulus (比模量)': ['比模量', 'Specific modulus'],
+      'Toughness Balance Index (刚韧平衡指数)': ['简支梁冲击与刚度乘积（÷10000）', 'Charpy impact–stiffness product (÷10000)'],
+    };
+    if (formulaLabels[key]) return formulaLabels[key][language === 'zh' ? 0 : 1];
     const metadataLabel = Object.prototype.hasOwnProperty.call(labels, key)
       ? labels[key as keyof typeof labels]
       : undefined;

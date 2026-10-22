@@ -38,7 +38,7 @@ const EXCLUDED_DIRECTORIES = new Set([
 const MOJIBAKE_PATTERN = /\uFFFD|\u00C3[\u0080-\u00BF]|\u00C2[\u0080-\u00BF]|\u00E2[\u0080-\u00BF]{1,2}|\u00F0\u0178|\u00EF\u00BB\u00BF|\u951F\u65A4\u62F7/u;
 const HAN_PATTERN = /\p{Script=Han}/u;
 const CJK_FONT_PATTERN = /Noto Sans (?:SC|CJK)|Microsoft YaHei|PingFang SC|WenQuanYi Micro Hei/u;
-const LOCALIZED_VISUAL_PATTERN = /(?:docs\/localized-vision\/|docs\/current-main\/).+-(?:zh|en)\.svg$/u;
+const LOCALIZED_VISUAL_PATTERN = /(?:docs\/localized-vision\/|docs\/current-main\/|docs\/assets\/).+-(?:zh|en)\.(?:svg|png)$/u;
 const REQUIRED_LOCALIZED_KEYS = [
   'chart_feature_importance',
   'desc_feature_importance',
@@ -48,7 +48,7 @@ const REQUIRED_LOCALIZED_KEYS = [
   'sysHealthNoEvents',
   'sysHealthSubtitle',
 ];
-const README_PATHS = ['README.md', 'README.zh-CN.md', 'README.en.md'];
+const README_PATHS = ['README.md', 'README.zh-CN.md', 'README.en.md', 'README.visual-archive.md'];
 const fatalUtf8Decoder = new TextDecoder('utf-8', { fatal: true });
 
 const failures = [];
@@ -252,10 +252,10 @@ function validateLocalizedReadmeSeparation(records) {
     }
     if (!LOCALIZED_VISUAL_PATTERN.test(record.target)) continue;
     localizedReferences += 1;
-    if (record.readme === 'README.zh-CN.md' && /-en\.svg$/u.test(record.target)) {
+    if (['README.md', 'README.zh-CN.md'].includes(record.readme) && /-en\.(svg|png)$/u.test(record.target)) {
       failures.push(`${record.readme}: English localized visual referenced: ${record.target}`);
     }
-    if (record.readme === 'README.en.md' && /-zh\.svg$/u.test(record.target)) {
+    if (record.readme === 'README.en.md' && /-zh\.(svg|png)$/u.test(record.target)) {
       failures.push(`${record.readme}: Chinese localized visual referenced: ${record.target}`);
     }
   }

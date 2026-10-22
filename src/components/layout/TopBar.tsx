@@ -98,10 +98,10 @@ export const TopBar: React.FC<TopBarProps> = ({
   const activeFilterCount = advancedFilterGroup.conditions.length;
 
   return (
-    <div className="w-full flex flex-col px-4 xl:px-8 h-16 justify-center bg-white/98 dark:bg-slate-950/98 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/80 relative z-[100] shadow-sm overflow-x-auto overflow-y-hidden scrollbar-none py-1">
-      <div className="flex flex-row items-center justify-start gap-3 w-full min-w-max">
-        <div className="flex items-center gap-1.5 md:gap-3 flex-nowrap justify-start flex-1 min-w-max ml-auto">
-          <div className="flex items-center gap-1.5 md:gap-2 relative flex-nowrap justify-start">
+    <div className="w-full min-w-0 flex flex-col px-4 xl:px-8 min-h-16 justify-center bg-white/98 dark:bg-slate-950/98 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/80 relative z-[100] shadow-sm py-2">
+      <div className="flex flex-row items-center justify-start gap-3 w-full min-w-0">
+        <div className="flex items-center gap-1.5 md:gap-3 flex-wrap justify-start flex-1 min-w-0">
+          <div className="flex w-full min-w-0 items-center gap-1.5 md:gap-2 relative flex-wrap justify-start">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -153,7 +153,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               onToggleAllColumns={toggleAllColumns}
             />
 
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex max-w-full min-w-0 flex-wrap items-center gap-3">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}

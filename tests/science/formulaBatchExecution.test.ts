@@ -3,8 +3,8 @@ import { FormulaEngine } from '@/lib/formulaParser';
 import type { FormulaConfig, Product } from '@/types/index';
 
 const formulas: FormulaConfig[] = [
-  { id: 'derived', name: 'Derived', expression: "Props['A'] * 2", unit: '' },
-  { id: 'combined', name: 'Combined', expression: "Props['Derived'] + Props['B']", unit: '' },
+  { id: 'derived', name: 'Derived', expression: "Props['A'] * 2", unit: '1' },
+  { id: 'combined', name: 'Combined', expression: "Props['Derived'] + Props['B']", unit: '1' },
 ];
 
 const product: Product = {
@@ -42,8 +42,8 @@ describe('reusable numeric formula execution', () => {
   it('supports explicit restoration when a base property shares a formula name', () => {
     const engine = new FormulaEngine();
     const collidingFormulas: FormulaConfig[] = [
-      { id: 'derived', name: 'Derived', expression: "Props['A'] * 3", unit: '' },
-      { id: 'final', name: 'Final', expression: "Props['Derived'] + Props['A']", unit: '' },
+      { id: 'derived', name: 'Derived', expression: "Props['A'] * 3", unit: '1' },
+      { id: 'final', name: 'Final', expression: "Props['Derived'] + Props['A']", unit: '1' },
     ];
     const numericExecutor = engine.compilePropertyGraph(collidingFormulas);
     const properties = { A: 2, Derived: 100 };

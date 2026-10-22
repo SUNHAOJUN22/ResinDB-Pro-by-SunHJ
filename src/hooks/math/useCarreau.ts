@@ -10,7 +10,8 @@ export function useCarreauWorker() {
     result: fittedParams,
     setResult: setFittedParams,
     error,
-    postMessage
+    postMessage,
+    cancel
   } = useWorkerManager<CarreauMessage, NonNullable<CarreauResponse['payload']>>(
     useCallback(() => new Worker(new URL('../../workers/carreauWorker.ts', import.meta.url), { type: 'module' }), []),
     'CARREAU_FITTED'
@@ -23,9 +24,10 @@ export function useCarreauWorker() {
         payload: { shearRates, viscosities }
       });
     } else {
+      cancel('Rheology inputs cleared');
       setFittedParams(null);
     }
-  }, [postMessage, setFittedParams]);
+  }, [cancel, postMessage, setFittedParams]);
 
   return {
     fittedParams,

@@ -1,21 +1,23 @@
 import React, { useMemo, useState } from 'react';
 import { Activity, Calculator, FlaskConical, ShieldAlert } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { parseFiniteReal } from '@/lib/quantityRecord';
+import { sandboxCarreau, sandboxWlf, sandboxWeibull } from '@/lib/sandboxModels';
 
 type Model = 'carreau' | 'wlf' | 'weibull';
 
 function NumberField({ label, value, onChange, unit }: { label: string; value: number; onChange: (value: number) => void; unit?: string }) {
   return (
     <label className="space-y-2">
-      <span className="block text-xs font-bold uppercase tracking-wide text-slate-500">{label}</span>
+      <span className="block text-xs font-bold normal-case tracking-wide text-slate-500">{label}</span>
       <div className="flex rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-950">
         <input
           type="number"
           value={Number.isFinite(value) ? value : ''}
-          onChange={(event) => onChange(Number(event.target.value))}
+          onChange={(event) => onChange(parseFiniteReal(event.target.value) ?? Number.NaN)}
           className="min-w-0 flex-1 rounded-xl bg-transparent px-3 py-2.5 text-sm text-slate-900 outline-none dark:text-white"
         />
-        {unit && <span className="self-center pr-3 text-xs text-slate-400">{unit}</span>}
+        {unit && <span className="self-center pr-3 text-xs text-slate-400 normal-case">{unit}</span>}
       </div>
     </label>
   );
@@ -39,27 +41,15 @@ export const BetaSandboxView: React.FC = () => {
 
   const result = useMemo(() => {
     if (model === 'carreau') {
-      const safeEta0 = Math.max(0, eta0);
-      const safeLambda = Math.max(0, lambda);
-      const safeRate = Math.max(0, shearRate);
-      const safeN = Math.min(1, Math.max(0, n));
-      const viscosity = safeEta0 * Math.pow(1 + Math.pow(safeLambda * safeRate, 2), (safeN - 1) / 2);
-      return { value: viscosity, unit: 'Pa·s', formula: 'η = η₀[1 + (λγ̇)²]^((n−1)/2)' };
+      return { value: sandboxCarreau(eta0, lambda, shearRate, n), unit: 'Pa·s', formula: 'η = η₀[1 + (λγ̇)²]^((n−1)/2)' };
     }
     if (model === 'wlf') {
-      const delta = temperature - referenceTemperature;
-      const denominator = c2 + delta;
-      const logShift = Math.abs(denominator) < 1e-9 ? Number.NaN : (-c1 * delta) / denominator;
-      return { value: Math.pow(10, logShift), unit: 'aT', formula: 'log₁₀(aT) = −C₁(T−Tref)/(C₂+T−Tref)' };
+      return { value: sandboxWlf(temperature, referenceTemperature, c1, c2), unit: 'aT', formula: 'log₁₀(aT) = −C₁(T−Tref)/(C₂+T−Tref)' };
     }
-    const safeScale = Math.max(Number.EPSILON, scale);
-    const safeShape = Math.max(Number.EPSILON, shape);
-    const safeTime = Math.max(0, time);
-    const survival = Math.exp(-Math.pow(safeTime / safeScale, safeShape));
-    return { value: survival * 100, unit: '% survival', formula: 'R(t) = exp[−(t/η)^β]' };
+    return { value: sandboxWeibull(time, scale, shape), unit: '% survival', formula: 'R(t) = exp[−(t/η)^β]' };
   }, [c1, c2, eta0, lambda, model, n, referenceTemperature, scale, shape, shearRate, temperature, time]);
 
-  const valid = Number.isFinite(result.value);
+  const valid = result.value !== null && Number.isFinite(result.value);
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-8">
@@ -104,14 +94,14 @@ export const BetaSandboxView: React.FC = () => {
             </>}
             {model === 'weibull' && <>
               <NumberField label="t" value={time} onChange={setTime} unit="h" />
-              <NumberField label="η (scale)" value={scale} onChange={setScale} unit="h" />
-              <NumberField label="β (shape)" value={shape} onChange={setShape} />
+              <NumberField label={zh ? "η（尺度）" : "η (scale)"} value={scale} onChange={setScale} unit="h" />
+              <NumberField label={zh ? "β（形状）" : "β (shape)"} value={shape} onChange={setShape} />
             </>}
           </div>
 
           <div className="mt-6 rounded-2xl bg-slate-950 p-5 text-white">
             <p className="font-mono text-xs text-slate-400">{result.formula}</p>
-            <p className="mt-3 text-3xl font-black">{valid ? result.value.toLocaleString(undefined, { maximumFractionDigits: 6 }) : 'Invalid'} <span className="text-base font-medium text-slate-400">{valid ? result.unit : ''}</span></p>
+            <p className="mt-3 text-3xl font-black">{valid && result.value !== null ? result.value.toLocaleString(undefined, { maximumFractionDigits: 6 }) : (zh ? '输入或计算无效' : 'Invalid input or calculation')} <span className="text-base font-medium text-slate-400">{valid ? (result.unit === '% survival' ? (zh ? '% 存活率' : '% survival') : result.unit) : ''}</span></p>
           </div>
 
           <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">

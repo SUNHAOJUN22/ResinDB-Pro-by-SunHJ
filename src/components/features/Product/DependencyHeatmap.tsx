@@ -1,3 +1,5 @@
+import { admittedPropertyValue } from '@/lib/propertyAdmission';
+import { compileDimensionedExpression, unitDefinition, toSI, type DimensionedValue } from '@/lib/formula/dimensionedExpression';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Beaker, Download, Info, Sliders, TrendingDown, TrendingUp } from 'lucide-react';
 import { ScientificEChart } from '@/components/charts/ScientificEChart';
@@ -122,18 +124,14 @@ function localize(language: 'zh' | 'en', zh: string, en: string): string {
   return language === 'zh' ? zh : en;
 }
 
-function parseFinite(value: unknown): number | null {
-  const parsed = typeof value === 'number' ? value : Number.parseFloat(String(value));
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 function directValue(product: Product, key: string): number | null {
-  return parseFinite(product.properties?.[key]?.value);
+  return admittedPropertyValue(product.properties?.[key]);
 }
 
 function aliasedValue(product: Product, keys: readonly string[]): number | null {
   for (const key of keys) {
-    const value = parseFinite(product.properties?.[key]?.value);
+    const value = admittedPropertyValue(product.properties?.[key]);
     if (value !== null) return value;
   }
   return null;
@@ -162,17 +160,23 @@ export function evaluateDependencyOutput(
     case 'formula': {
       if (!expression.trim()) return null;
       try {
-        const temporaryFormula: FormulaConfig = {
-          id: 'temp_hm_id',
-          name: 'HeatmapTemp',
-          expression,
-          unit: '',
-        };
-        const graph = formulaEngine.compileGraph([
-          ...formulas.filter((formula) => formula.id !== temporaryFormula.id),
-          temporaryFormula,
-        ]);
-        const value = graph(product)[temporaryFormula.id];
+        const properties: Record<string, DimensionedValue> = {};
+        const declared = Object.values(product.properties).some(property => property.unit || property.quantity);
+        if (declared) {
+          for (const [key, property] of Object.entries(product.properties)) {
+            const value = admittedPropertyValue(property);
+            const definition = unitDefinition(property.quantity?.canonical?.unit ?? property.unit ?? '');
+            if (value !== null && definition) properties[key] = toSI(value, definition);
+          }
+          for (const formula of formulas) {
+            const result = formulaEngine.compileResultGraph(formulas)(product)[formula.id];
+            const definition = unitDefinition(formula.unit ?? '');
+            if (result?.status === 'OK' && result.scope === 'DIMENSION_CHECKED' && definition) properties[formula.name] = toSI(result.value, definition);
+          }
+          return compileDimensionedExpression(expression)(properties).value;
+        }
+        const temporaryFormula: FormulaConfig = { id: 'temp_hm_id', name: 'HeatmapTemp', expression, unit: '1' };
+        const value = formulaEngine.compileGraph([...formulas.filter(formula => formula.id !== temporaryFormula.id), temporaryFormula])(product)[temporaryFormula.id];
         return Number.isFinite(value) ? value : null;
       } catch {
         return null;
@@ -270,7 +274,10 @@ function perturb(product: Product, key: string, value: number): Product {
     ...product,
     properties: {
       ...product.properties,
-      [key]: { ...product.properties[key], value },
+      [key]: { ...product.properties[key], value,
+        ...(product.properties[key]?.quantity?.status === 'VALID' && product.properties[key].quantity?.canonical
+          ? { quantity: { ...product.properties[key].quantity!, canonical: { ...product.properties[key].quantity!.canonical!, value } } } : {}),
+      },
     },
   };
 }

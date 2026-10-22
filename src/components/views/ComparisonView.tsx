@@ -1,3 +1,4 @@
+import { parseFiniteReal } from '@/lib/quantityRecord';
 import React, { useMemo, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -72,7 +73,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
     allPropKeys.forEach((key) => {
       const summary = summarizeFinite(displayProducts, (product) => {
         const value = product.properties[key]?.value;
-        return typeof value === "number" ? value : parseFloat(String(value));
+        return typeof value === "number" ? value : strictNumber(String(value));
       });
 
       if (summary && summary.count > 1) {
@@ -256,7 +257,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
       displayProducts.forEach((p) => {
         Object.keys(p.properties).forEach((k) => {
           const val = p.properties[k]?.value;
-          if (typeof val === "number" || !isNaN(parseFloat(String(val)))) {
+          if (typeof val === "number" || !isNaN(strictNumber(String(val)))) {
             numericProps.add(k);
           }
         });
@@ -928,3 +929,5 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
     </AnimatePresence>
   );
 });
+
+function strictNumber(value: unknown): number { return parseFiniteReal(value) ?? Number.NaN; }

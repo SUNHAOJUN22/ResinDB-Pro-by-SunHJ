@@ -1,3 +1,4 @@
+import { admittedPropertyValue } from '@/lib/propertyAdmission';
 import { logger } from '@/lib/logger';
 import React, {
   useState,
@@ -92,7 +93,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
       return formulaEngine.compileGraph(formulas);
     }, [formulas]);
 
-    const { setAnalyzingProduct, openModal: openModalGlobal } = useModals();
+    const { setAnalyzingProduct, openModal: openModalGlobal, openModals, viewingProduct, analyzingProduct } = useModals();
     const {
       sortedData,
       sortConfig,
@@ -243,17 +244,15 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
         colIsLowBest[c] = isLowBest(colKeys[c]);
       }
 
-      const minArr = new Float32Array(numCols).fill(Infinity);
-      const maxArr = new Float32Array(numCols).fill(-Infinity);
+      const minArr = new Float64Array(numCols).fill(Infinity);
+      const maxArr = new Float64Array(numCols).fill(-Infinity);
       const hasDataArr = new Uint8Array(numCols);
 
       for (let i = 0; i < numData; i++) {
         const props = currentViewData[i].properties;
         for (let c = 0; c < numCols; c++) {
-          const rawVal = props[colKeys[c]]?.value;
-          const val =
-            typeof rawVal === "number" ? rawVal : parseFloat(String(rawVal));
-          if (!isNaN(val)) {
+          const val = admittedPropertyValue(props[colKeys[c]]);
+          if (val !== null) {
             hasDataArr[c] = 1;
             if (val < minArr[c]) minArr[c] = val;
             if (val > maxArr[c]) maxArr[c] = val;
@@ -270,60 +269,43 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
       return extremes;
     }, [currentViewData, visibleCols]);
 
-    useEffect(() => {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (contextMenu) return;
+    const handleGridKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+      const target = e.target;
+      if (
+        e.defaultPrevented || e.nativeEvent.isComposing || e.altKey ||
+        contextMenu || editingProduct || deletingIds.length > 0 ||
+        openModals.size > 0 || viewingProduct || analyzingProduct ||
+        !(target instanceof HTMLElement) || !e.currentTarget.contains(target) ||
+        target.closest('input, textarea, select, button, a, [contenteditable="true"], [role="textbox"], [role="combobox"]')
+      ) return;
 
-        if (e.key === "ArrowDown") {
-          e.preventDefault();
-          setFocusedIndex((prev) => {
-            const next = Math.min(prev + 1, currentViewData.length - 1);
-            rowVirtualizer.scrollToIndex(next, { align: "auto" });
-            return next;
-          });
-        } else if (e.key === "ArrowUp") {
-          e.preventDefault();
-          setFocusedIndex((prev) => {
-            const next = Math.max(prev - 1, 0);
-            rowVirtualizer.scrollToIndex(next, { align: "auto" });
-            return next;
-          });
-        } else if (e.key === "Enter" && focusedIndex >= 0) {
-          onViewDetails(currentViewData[focusedIndex]);
-        } else if (e.key === " " && focusedIndex >= 0) {
-          e.preventDefault();
-          toggleSelection(currentViewData[focusedIndex].id);
-        } else if ((e.metaKey || e.ctrlKey) && e.key === "a") {
-          // Only select all if grid is likely the focus target or active element is body/grid
-          if (
-            document.activeElement?.tagName === "BODY" ||
-            document.activeElement?.closest(".group\\/grid")
-          ) {
-            e.preventDefault();
-            handleToggleAllSelection();
-          }
-        } else if (e.key === "Delete" || e.key === "Backspace") {
-          // Delete focused item if not in input
-          const target = e.target as HTMLElement;
-          if (
-            target.tagName !== "INPUT" &&
-            target.tagName !== "TEXTAREA" &&
-            focusedIndex >= 0
-          ) {
-            setDeletingIds([currentViewData[focusedIndex].id]);
-          }
-        }
-      };
-      window.addEventListener("keydown", handleKeyDown);
-      return () => window.removeEventListener("keydown", handleKeyDown);
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        handleToggleAllSelection();
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || currentViewData.length === 0) return;
+      const focusedProduct = currentViewData[focusedIndex];
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const direction = e.key === "ArrowDown" ? 1 : -1;
+        const next = Math.max(0, Math.min(focusedIndex + direction, currentViewData.length - 1));
+        setFocusedIndex(next);
+        rowVirtualizer.scrollToIndex(next, { align: "auto" });
+      } else if (e.key === "Enter" && focusedProduct) {
+        e.preventDefault();
+        onViewDetails(focusedProduct);
+      } else if (e.key === " " && focusedProduct) {
+        e.preventDefault();
+        toggleSelection(focusedProduct.id);
+      } else if ((e.key === "Delete" || e.key === "Backspace") && focusedProduct) {
+        e.preventDefault();
+        setDeletingIds([focusedProduct.id]);
+      }
     }, [
-      currentViewData,
-      focusedIndex,
-      contextMenu,
-      onViewDetails,
-      toggleSelection,
-      handleToggleAllSelection,
-      rowVirtualizer,
+      currentViewData, focusedIndex, contextMenu, editingProduct, deletingIds.length,
+      openModals, viewingProduct, analyzingProduct, onViewDetails, toggleSelection,
+      handleToggleAllSelection, rowVirtualizer,
     ]);
 
     useEffect(() => {
@@ -384,7 +366,21 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
     }, [onUpdate]);
 
     return (
-      <div className="h-full flex flex-col relative overflow-hidden group/grid">
+      <div
+        className="h-full flex flex-col relative overflow-hidden group/grid focus-visible:outline-2 focus-visible:outline-primary-500"
+        data-testid="material-data-grid"
+        role="region"
+        aria-label={language === 'zh' ? '材料数据表' : 'Material data grid'}
+        tabIndex={0}
+        onKeyDown={handleGridKeyDown}
+        onPointerDown={(e) => {
+          const target = e.target;
+          if (e.button === 0 && target instanceof HTMLElement && e.currentTarget.contains(target) &&
+            !target.closest('input, textarea, select, button, a, [contenteditable="true"], [role="textbox"], [role="combobox"]')) {
+            e.currentTarget.focus({ preventScroll: true });
+          }
+        }}
+      >
         {/* Context Menu */}
         {contextMenu && createPortal(
           <div
@@ -654,7 +650,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
                 whileTap={{ scale: 0.9, rotate: 180 }}
                 onClick={handleRefresh}
                 className={`p-1.5 rounded-lg transition-all ${isRefreshing ? "bg-white dark:bg-slate-700 shadow-sm text-primary-500" : "text-slate-400 hover:text-slate-600"}`}
-                title="Refresh Data"
+                title={t("refreshData")}
               >
                 <RefreshCw
                   size={14}
@@ -667,7 +663,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
                 whileTap={{ scale: 0.9 }}
                 onClick={() => setIsCompact(false)}
                 className={`p-1.5 rounded-lg transition-all ${!isCompact ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600" : "text-slate-400 hover:text-slate-600"}`}
-                title="Relaxed View"
+                title={t("relaxedView")}
               >
                 <LayoutList size={14} />
               </motion.button>
@@ -676,7 +672,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
                 whileTap={{ scale: 0.9 }}
                 onClick={() => setIsCompact(true)}
                 className={`p-1.5 rounded-lg transition-all ${isCompact ? "bg-white dark:bg-slate-700 shadow-sm text-primary-600" : "text-slate-400 hover:text-slate-600"}`}
-                title="Compact View"
+                title={t("compactView")}
               >
                 <LayoutGrid size={14} />
               </motion.button>
@@ -701,7 +697,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
                   />
                )}
                <Sparkles size={14} className={useTopsis ? "text-amber-500" : ""} />
-               Smart Rank (TOPSIS)
+               {t("scientificRanking")}
             </motion.button>
             <motion.button
                whileHover={{ scale: 1.02 }}
@@ -728,12 +724,12 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
                       const dataPayload = sortedData.map(d => {
                           const v: Record<string, number> = {};
                           for (const o of objectives) {
-                             v[o.key] = parseFloat(String(d.properties[o.key]?.value)) || 0;
+                             v[o.key] = admittedPropertyValue(d.properties[o.key]) ?? Number.NaN;
                           }
                           return { id: d.id, values: v };
                       });
                       
-                      computePareto(dataPayload, objectives);
+                      computePareto(dataPayload.filter(row => objectives.every(objective => Number.isFinite(row.values[objective.key]))), objectives);
                    }
                }}
                className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
@@ -743,7 +739,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
                }`}
             >
                {isComputingPareto ? <RefreshCw size={14} className="animate-spin" /> : <Radar size={14} className={paretoFrontIds.size > 0 ? "text-purple-500" : ""} />}
-               {paretoFrontIds.size > 0 ? "💎 Pareto Front: ON" : "💎 Pareto Front"}
+               {paretoFrontIds.size > 0 ? t("paretoFrontOn") : t("paretoFront")}
             </motion.button>
 
             <motion.button
@@ -764,12 +760,12 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
                }`}
              >
                {isDetectingOutliers ? <RefreshCw size={14} className="animate-spin text-rose-500" /> : <Sparkles size={14} className={Object.keys(outlierResults).length > 0 ? "text-rose-500" : ""} />}
-               {Object.keys(outlierResults).length > 0 ? "🧼 Clear Anomalies" : "🧼 Mahalanobis Check"}
+               {Object.keys(outlierResults).length > 0 ? t("clearAnomalies") : t("mahalanobisCheck")}
             </motion.button>
           </div>
           <div className="flex items-center gap-2">
-            <p className="hidden sm:block text-xs font-mono text-slate-400 uppercase tracking-widest">
-              {sortedData.length} records
+            <p data-testid="record-count" data-count={sortedData.length} className="hidden sm:block text-xs font-mono text-slate-400 tracking-widest">
+              {sortedData.length} {language === "zh" ? "条记录" : "records"}
             </p>
           </div>
         </div>

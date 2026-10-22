@@ -214,7 +214,12 @@ describe('FormulaEngine governed quantity admission', () => {
     const source = product({
       A: { value: 950, quantity: quantity('VALID', { value: 0.95, unit: 'g/cm3', dimension: 'mass_density' }) },
     });
-    expect(new FormulaEngine().compileGraph(formulas)(source)).toEqual({ 'F-Q': 1.9, 'F-Q2': 2.9 });
+    source.properties.B = { value: 1, unit: 'g/cm³' };
+    const densityFormulas = [
+      { ...formulas[0], unit: 'g/cm³' },
+      { ...formulas[1], expression: "p['DerivedQ'] + p['B']", unit: 'g/cm³' },
+    ];
+    expect(new FormulaEngine().compileGraph(densityFormulas)(source)).toEqual({ 'F-Q': 1.9, 'F-Q2': 2.9 });
   });
 
   it('keeps canonical zero valid and propagates it', () => {

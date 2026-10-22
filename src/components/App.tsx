@@ -26,6 +26,7 @@ import { motion, AnimatePresence, LayoutGroup } from "motion/react";
 
 import { LanguageProvider, useLanguage } from "@/contexts/LanguageContext";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
+import { PreferenceControls } from "@/components/ui/PreferenceControls";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToasts } from "@/contexts/ToastContext";
 import { useUI } from "@/contexts/UIContext";
@@ -351,11 +352,12 @@ const AppContent = memo(() => {
     return uniqueNames.map((name) => ({ id: `m-${name}`, name }));
   }, [allProducts]);
 
-  if (!currentUser) return <AuthScreen onLogin={login} />;
+  if (!currentUser) return <><PreferenceControls /><AuthScreen onLogin={login} /></>;
 
   if (activeView === "dashboard" && allProducts.length === 0 && isLoading) {
     return (
       <div className="h-[100dvh] w-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+        <PreferenceControls />
         <FloatingParticles />
         <div className="relative z-10 flex flex-col items-center">
           <div className="w-24 h-24 mb-6 relative">
@@ -407,15 +409,20 @@ const AppContent = memo(() => {
 
       <LayoutGroup>
         <div className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden bg-slate-50 dark:bg-slate-950">
-          <div className="shrink-0 z-[60] relative print:hidden">
-            <MemoizedTopBar
-              isExporting={isExporting}
-              savedViews={savedViews}
-              onSaveView={saveView}
-              onApplyView={applyView}
-              onDeleteView={deleteView}
-              lastSyncTime={lastSyncTime}
-            />
+          <div className="flex shrink-0 items-center z-[80] relative bg-white dark:bg-slate-950 print:hidden">
+            <div className="min-w-0 flex-1">
+              <MemoizedTopBar
+                isExporting={isExporting}
+                savedViews={savedViews}
+                onSaveView={saveView}
+                onApplyView={applyView}
+                onDeleteView={deleteView}
+                lastSyncTime={lastSyncTime}
+              />
+            </div>
+            <div className="shrink-0 px-2">
+              <PreferenceControls placement="inline" />
+            </div>
           </div>
 
           <div className="flex-1 flex overflow-hidden relative bg-white dark:bg-slate-950">
@@ -599,10 +606,7 @@ const AppContent = memo(() => {
           isOpen={isModalOpen("import")}
           onClose={() => closeModal("import")}
           allProducts={allProducts}
-          onImport={(data) => {
-            handleImportData(data);
-            closeModal("import");
-          }}
+          onImport={handleImportData}
         />
         <ProfileModal
           isOpen={isModalOpen("profile")}

@@ -70,4 +70,11 @@ describe('scientific scatter display boundaries', () => {
       expect(Number.isFinite(y)).toBe(true);
     }
   });
+  it('renders an explicit empty state instead of fake zero points', () => {
+    render(<CanvasScatterGraph data={[product('invalid')]} xKey="x" yKey="y" xValues={[NaN]} yValues={[1]} language="zh" />);
+    expect(context.arc).not.toHaveBeenCalled();
+    expect(screen.getByRole('status').textContent).toContain('没有同时有效');
+    expect(screen.getByTestId('canvas-scatter').dataset.eligiblePoints).toBe('0');
+  });
+
 });

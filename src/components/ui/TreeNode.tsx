@@ -1,3 +1,4 @@
+import { categoryLabel } from '@/i18n/categoryLabels';
 import React, { useState, useEffect } from "react";
 import { Category } from '@/types/index';
 import {
@@ -141,14 +142,10 @@ export const TreeNode = React.memo<TreeNodeProps>(
           <span
             className="truncate relative z-10 flex-1 tracking-tight font-mono text-xs"
             title={
-              language === "en" && category.nameEn
-                ? category.nameEn
-                : category.name
+              categoryLabel(category, language)
             }
           >
-            {language === "en" && category.nameEn
-              ? category.nameEn
-              : category.name}
+            {categoryLabel(category, language)}
           </span>
 
           {count > 0 && (

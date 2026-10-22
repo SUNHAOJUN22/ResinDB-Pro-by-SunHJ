@@ -124,7 +124,7 @@ describe('ranking and one-dimensional KDE performance contracts', () => {
       'SIMULATION_COMPLETE',
     );
     expect(payload.reproducibility).toMatchObject({
-      modelVersion: 'monte-carlo-formula-numeric-dictionary-3.1.0',
+      modelVersion: 'monte-carlo-formula-dimension-bound-4.0.0',
       requestedIterations: 64,
       acceptedSamples: 64,
     });

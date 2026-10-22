@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Check, X, Sliders, Hash, HelpCircle } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { parseFiniteReal } from '@/lib/quantityRecord';
 
 interface QuickEditOverlayProps {
   colKey: string;
@@ -68,15 +69,15 @@ export const QuickEditOverlay: React.FC<QuickEditOverlayProps> = ({
   };
 
   // Check if it is a numeric field
-  const isNumeric = !isNaN(parseFloat(String(initialValue))) && !isNaN(Number(initialValue));
-  const numVal = isNumeric ? parseFloat(value) || 0 : 0;
+  const isNumeric = parseFiniteReal(initialValue) !== null;
+  const numVal = parseFiniteReal(value);
 
   // Render a mini slider for number fields
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValue(e.target.value);
   };
 
-  // Determine healthy min/max ranges for sliders based on column names (density, tensile, raw, etc)
+  // Determine convenient editing ranges (not material acceptance limits) for sliders based on column names (density, tensile, raw, etc)
   const getSliderMinMax = () => {
     const key = colKey.toLowerCase();
     if (key.includes('density') || key.includes('密度')) return { min: 0.8, max: 1.5, step: 0.01 };
@@ -132,25 +133,25 @@ export const QuickEditOverlay: React.FC<QuickEditOverlayProps> = ({
           placeholder={t("输入新属性值...", "Enter new attribute value...")}
         />
         {unit && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 uppercase tracking-tighter pointer-events-none select-none">
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 normal-case tracking-tighter pointer-events-none select-none">
             {unit}
           </span>
         )}
       </div>
 
       {/* Mini Slider (Only for numbers inside reasonable range) */}
-      {isNumeric && (
+      {isNumeric && numVal !== null && (
         <div className="space-y-1">
           <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400">
-            <span>Min: {sliderLimits.min}</span>
-            <span>Max: {sliderLimits.max}</span>
+            <span>{t("最小", "Min")}: {sliderLimits.min}</span>
+            <span>{t("最大", "Max")}: {sliderLimits.max}</span>
           </div>
           <input
             type="range"
             min={sliderLimits.min}
             max={sliderLimits.max}
             step={sliderLimits.step}
-            value={isNaN(numVal) ? sliderLimits.min : Math.min(Math.max(numVal, sliderLimits.min), sliderLimits.max)}
+            value={Math.min(Math.max(numVal, sliderLimits.min), sliderLimits.max)}
             onChange={handleSliderChange}
             className="w-full h-1 bg-slate-150 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary-500"
           />

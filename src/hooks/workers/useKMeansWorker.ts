@@ -30,6 +30,7 @@ export function useKMeansWorker() {
     result,
     setResult,
     postMessage,
+    cancel,
   } = useWorkerManager<
     KMeansProfileAwareMessage,
     Extract<KMeansResponse, { type: 'KMEANS_RESULT' }>['payload']
@@ -43,6 +44,8 @@ export function useKMeansWorker() {
     ),
     'KMEANS_RESULT',
   );
+  const latestRequest = useRef(0);
+  useEffect(() => () => { latestRequest.current += 1; }, []);
   const lastAuditedResult = useRef<typeof result>(null);
 
   useEffect(() => {
@@ -62,7 +65,9 @@ export function useKMeansWorker() {
     seed?: RandomSeed,
     options: KMeansExecutionOptions = {},
   ) => {
+    const request = ++latestRequest.current;
     if (keys.length === 0 || data.length === 0) {
+      cancel('K-Means inputs changed or clustering was cleared');
       clearKMeansWorkloadSnapshot();
       setResult(null);
       return;
@@ -71,6 +76,7 @@ export function useKMeansWorker() {
     const loadedProfile = requestedBackend === 'auto'
       ? await kmeansBackendProfileStore.load()
       : null;
+    if (request !== latestRequest.current) return;
     setProfileLoadStatus(loadedProfile?.status ?? 'missing');
     const matrix = createRowMajorFloat64Matrix(
       data.length,
@@ -94,7 +100,7 @@ export function useKMeansWorker() {
           : undefined,
       },
     }, { transfer: [matrix.values.buffer] });
-  }, [postMessage, setResult]);
+  }, [cancel, postMessage, setResult]);
 
   return {
     clusters: result?.clusters ?? {},

@@ -19,6 +19,7 @@ const screenshotPaths = {
   emptyState: path.join(artifactDir, 'ui-empty-state.png'),
   productDetail: path.join(artifactDir, 'ui-product-detail.png'),
   analytics: path.join(artifactDir, 'ui-scientific-analytics.png'),
+  scatter: path.join(artifactDir, 'ui-scatter-zh-light.png'),
   dependencyMap: path.join(artifactDir, 'ui-dependency-map.png'),
   dashboardEnDark: path.join(artifactDir, 'ui-dashboard-en-dark.png'),
   mobile: path.join(artifactDir, 'ui-mobile-dashboard.png'),
@@ -182,6 +183,7 @@ async function waitForDashboard(session) {
       session,
       `(() => ({
         ready: document.readyState,
+        count: Number(document.querySelector('[data-testid="record-count"]')?.dataset.count),
         text: document.body?.innerText || '',
         alert: (document.body?.innerText || '').includes('System Alert')
       }))()`,
@@ -190,7 +192,7 @@ async function waitForDashboard(session) {
     if (
       state.ready === 'complete' &&
       (state.text.includes('DATA WAREHOUSE') || state.text.includes('数据中心')) &&
-      state.text.includes('13 RECORDS')
+      state.count === 13
     ) {
       return state.text;
     }
@@ -332,6 +334,40 @@ try {
 
   await clickButtonByTitle(session, ['科研可视化', 'Scientific Visualization']);
   await waitForCondition(session, `document.body.innerText.includes('科学图表') || document.body.innerText.includes('Scientific Charts')`, 'scientific analytics view');
+  await waitForCondition(session, `(() => {
+    const canvas = document.querySelector('[data-scientific-chart-rendered="true"] canvas');
+    if (!canvas) return false;
+    const rect = canvas.getBoundingClientRect();
+    return rect.height >= 250 && rect.height <= innerHeight && rect.top + rect.height / 2 < innerHeight;
+  })()`, 'visible radar viewport', 160);
+  await evaluate(session, `(() => {
+    const button = Array.from(document.querySelectorAll('button')).find(node => /CANVAS/i.test(node.textContent || ''));
+    if (!button) throw new Error('Canvas scatter mode unavailable');
+    button.click();
+  })()`);
+  await waitForCondition(session, `(() => {
+    const graph = document.querySelector('[data-testid="canvas-scatter"]');
+    const canvas = graph?.querySelector('canvas');
+    return Number(graph?.dataset.eligiblePoints) >= 3 && canvas?.height >= 250;
+  })()`, 'eligible scatter cohort and canvas');
+  const scatterEvidence = await evaluate(session, `(() => {
+    const graph = document.querySelector('[data-testid="canvas-scatter"]');
+    const canvas = graph.querySelector('canvas');
+    const rect = canvas.getBoundingClientRect();
+    const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    let plottedPixels = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (pixels[i + 3] > 30 && pixels[i + 2] - pixels[i] > 80 && pixels[i + 2] - pixels[i + 1] > 80) plottedPixels += 1;
+    }
+    const x = document.querySelector('[aria-label="散点图 X 轴"]')?.value;
+    const y = document.querySelector('[aria-label="散点图 Y 轴"]')?.value;
+    return { eligiblePoints: Number(graph.dataset.eligiblePoints), plottedPixels, width: canvas.width, height: canvas.height, x, y,
+      visible: rect.height >= 250 && rect.height <= innerHeight && rect.top + rect.height / 2 < innerHeight };
+  })()`);
+  if (!scatterEvidence.visible || scatterEvidence.plottedPixels < 20 || scatterEvidence.x !== '密度' || scatterEvidence.y !== '熔体质量流动速率') {
+    throw new Error('Scatter canvas lacks correct visible observations: ' + JSON.stringify(scatterEvidence));
+  }
+  await capture(session, screenshotPaths.scatter);
   const rheologyActivated = await evaluate(session, `(() => {
     const button = Array.from(document.querySelectorAll('button'))
       .find((candidate) => /RHEOLOGY/i.test(candidate.textContent || ''));
@@ -407,7 +443,7 @@ try {
   await capture(session, screenshotPaths.dependencyMap);
 
   await clickButtonByTitle(session, ['数据仓库', 'Data Warehouse']);
-  await waitForCondition(session, `document.body.innerText.includes('13 RECORDS')`, 'dashboard before responsive capture');
+  await waitForCondition(session, `Number(document.querySelector('[data-testid="record-count"]')?.dataset.count) === 13`, 'dashboard before responsive capture');
   await session.command('Emulation.setDeviceMetricsOverride', {
     width: 390,
     height: 844,
@@ -427,9 +463,9 @@ try {
     session,
     `(() => {
       const buttons = Array.from(document.querySelectorAll('button'));
-      const languageButton = buttons.find((button) => button.title?.includes('Switch to English'));
-      const themeButton = buttons.find((button) => button.title?.includes('深色夜间模式'));
-      const paletteButton = buttons.find((button) => button.title?.includes('皮肤配色主题'));
+      const languageButton = document.querySelector('[data-testid="language-control"]');
+      const themeButton = document.querySelector('[data-testid="theme-control"]');
+      const paletteButton = document.querySelector('[data-testid="palette-control"]');
       if (!languageButton || !themeButton || !paletteButton) {
         throw new Error('Language/theme/palette controls are not visible in the top bar');
       }
@@ -494,7 +530,8 @@ try {
     schemaVersion: 2,
     generatedAt: new Date().toISOString(),
     appUrl,
-    recordCount: bodyText.includes('13 RECORDS') ? 13 : null,
+    scatterCanvas: scatterEvidence,
+    recordCount: await evaluate(session, `Number(document.querySelector('[data-testid="record-count"]')?.dataset.count)`),
     screenshots: Object.fromEntries(Object.entries(screenshotPaths).map(([name, file]) => [name, path.basename(file)])),
     preferences: savedPreferences,
     cjkFont: cjkFontEvidence,

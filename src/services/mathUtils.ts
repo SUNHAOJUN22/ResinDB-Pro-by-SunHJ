@@ -1,3 +1,4 @@
+import { parseFiniteReal } from '@/lib/quantityRecord';
 import type { Product } from '@/types/index';
 import { summarizeFiniteNumbers } from '@/lib/numericAggregation';
 
@@ -57,13 +58,7 @@ export interface NormalizedComparisonProfile {
  * Empty strings, booleans, hexadecimal text and partial numeric strings are rejected.
  */
 export function parseFiniteNumericValue(value: unknown): number | null {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (trimmed.length === 0) return null;
-  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(trimmed)) return null;
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : null;
+  return parseFiniteReal(value);
 }
 
 function rangeTolerance(minimum: number, maximum: number): number {

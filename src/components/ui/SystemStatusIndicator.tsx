@@ -1,3 +1,4 @@
+import { useLanguage } from '@/contexts/LanguageContext';
 import React from "react";
 import { RefreshCw } from "lucide-react";
 import { motion } from "motion/react";
@@ -13,6 +14,7 @@ export const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({
   lastSyncTime,
   onOpenSystemHealth,
 }) => {
+  const { t } = useLanguage();
   return (
     <motion.div
       whileHover={{
@@ -35,7 +37,7 @@ export const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({
       <div className="w-px h-3 bg-slate-200 dark:bg-slate-700 mx-1"></div>
       <span
         className="text-[9px] font-mono text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors"
-        title={`Last Sync: ${lastSyncTime}`}
+        title={`${t("lastSync")}: ${lastSyncTime}`}
       >
         v3.2.0
       </span>
@@ -43,7 +45,7 @@ export const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({
         whileHover={{ scale: 1.1, rotate: 180 }}
         whileTap={{ scale: 0.9 }}
         className="ml-1 p-0.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-400 hover:text-slate-600 transition-colors"
-        title="Check for updates"
+        title={t("checkUpdates")}
       >
         <RefreshCw size={10} />
       </motion.button>

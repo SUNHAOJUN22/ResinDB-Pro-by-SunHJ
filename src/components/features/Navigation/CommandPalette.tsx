@@ -48,7 +48,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = React.memo(({
   manufacturers,
   onViewProduct,
 }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { recentSearches, setSearchQuery, setAdvancedFilterGroup, setSelectedCategoryIds } = useData();
   const { clickFeedbackEnabled, setClickFeedbackEnabled } = useUI();
   const [query, setQuery] = useState("");
@@ -210,17 +210,19 @@ export const CommandPalette: React.FC<CommandPaletteProps> = React.memo(({
     }
   }, [isOpen]);
 
+  useEffect(() => { setSelectedIndex(0); }, [query]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedIndex((prev) => (prev + 1) % filteredResults.length);
+        setSelectedIndex((prev) => filteredResults.length ? (prev + 1) % filteredResults.length : 0);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setSelectedIndex(
           (prev) =>
-            (prev - 1 + filteredResults.length) % filteredResults.length,
+            filteredResults.length ? (prev - 1 + filteredResults.length) % filteredResults.length : 0,
         );
       } else if (e.key === "Enter") {
         e.preventDefault();
@@ -265,7 +267,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = React.memo(({
               <input
                 ref={inputRef}
                 type="text"
-                placeholder="输入命令或搜索功能..."
+                placeholder={language === "en" ? "Search commands or features..." : "输入命令或搜索功能..."}
                 className="flex-1 bg-transparent border-none outline-none text-base font-mono font-bold text-slate-800 dark:text-white placeholder:text-slate-500 relative z-10"
                 value={query}
                 onChange={(e) => {
@@ -386,7 +388,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = React.memo(({
                     </div>
                   </div>
                   <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">
-                    选择
+                    {language === "en" ? "Select" : "选择"}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -394,14 +396,14 @@ export const CommandPalette: React.FC<CommandPaletteProps> = React.memo(({
                     ENTER
                   </div>
                   <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest">
-                    确认
+                    {language === "en" ? "Confirm" : "确认"}
                   </span>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-primary-500">
                 <Zap size={12} className="animate-pulse" />
                 <span className="text-[9px] font-mono uppercase tracking-widest">
-                  ResinDB Command Center
+                  {language === "en" ? "ResinDB Command Center" : "ResinDB 命令中心"}
                 </span>
               </div>
             </div>

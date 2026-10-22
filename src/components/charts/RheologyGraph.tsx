@@ -1,3 +1,4 @@
+import { admittedPropertyValue } from '@/lib/propertyAdmission';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Download, Loader2, Zap } from 'lucide-react';
 import { ScientificEChart } from './ScientificEChart';
@@ -171,11 +172,8 @@ function exportPng(chart: ECharts | null, theme: ScientificFigureTheme): void {
 }
 
 function finiteMfr(product: Product | undefined): number {
-  const raw = product?.properties['熔体质量流动速率']?.value
-    || product?.properties.MFR?.value
-    || 5;
-  const parsed = Number.parseFloat(String(raw));
-  return Number.isFinite(parsed) ? parsed : 5;
+  const value = admittedPropertyValue(product?.properties['熔体质量流动速率'] ?? product?.properties.MFR);
+  return value !== null && value > 0 ? value : Number.NaN;
 }
 
 export const RheologyGraph: React.FC<RheologyGraphProps> = React.memo(({ products, temps }) => {
@@ -186,7 +184,7 @@ export const RheologyGraph: React.FC<RheologyGraphProps> = React.memo(({ product
   const mainProduct = products[0];
   const targetTemperature = temps[0] || 190;
   const proxyPoints = useMemo(
-    () => mainProduct
+    () => mainProduct && Number.isFinite(finiteMfr(mainProduct))
       ? simulateRheologyProxyPoints(finiteMfr(mainProduct), targetTemperature - 190)
       : [],
     [mainProduct, targetTemperature],
@@ -196,8 +194,8 @@ export const RheologyGraph: React.FC<RheologyGraphProps> = React.memo(({ product
     [proxyPoints],
   );
   const validFittedPoints = useMemo(
-    () => sanitizePositiveRheologyPoints(fittedParams?.fittedData ?? []),
-    [fittedParams?.fittedData],
+    () => sanitizePositiveRheologyPoints(validProxyPoints.length ? fittedParams?.fittedData ?? [] : []),
+    [fittedParams?.fittedData, validProxyPoints.length],
   );
 
   useEffect(() => {
@@ -206,7 +204,7 @@ export const RheologyGraph: React.FC<RheologyGraphProps> = React.memo(({ product
         validProxyPoints.map(([rate]) => rate),
         validProxyPoints.map(([, viscosity]) => viscosity),
       );
-    }
+    } else { fitCarreau([], []); }
   }, [fitCarreau, validProxyPoints]);
 
   const option = useMemo(

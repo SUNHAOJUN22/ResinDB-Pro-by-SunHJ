@@ -1,3 +1,5 @@
+import { parseFiniteReal as parseFiniteNumeric } from '@/lib/quantityRecord';
+import { admittedPropertyValue } from '@/lib/propertyAdmission';
 import { Product, SortConfig, ColumnConfig, FilterItem, FormulaConfig } from '@/types/index';
 import { calculateCompleteness, isLowBest } from '@/utils/productUtils';
 import { FormulaEngine } from '@/lib/formulaParser';
@@ -5,17 +7,10 @@ import { calculateTopsis } from '@/lib/topsisAnalyzer';
 
 const formulaEngine = new FormulaEngine();
 
-function parseFiniteNumeric(value: unknown): number | null {
-  if (typeof value === 'boolean') return null;
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  if (typeof value !== 'string' || value.trim() === '') return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 export type WorkerMessage =
   | { type: 'INIT_DATA', payload: { allProducts: Product[], formulas: FormulaConfig[], columns: ColumnConfig[] } }
-  | { type: 'QUERY', payload: { activeFilters: FilterItem[], sortConfig: SortConfig[], useTopsis?: boolean, detectAnomaliesKey?: string } };
+  | { type: 'QUERY', payload: { activeFilters: Pick<FilterItem, 'id' | 'label' | 'type'>[], inputIsFiltered?: boolean, sortConfig: SortConfig[], useTopsis?: boolean, detectAnomaliesKey?: string } };
 
 export type WorkerResponse =
   | { type: 'INIT_SUCCESS' }
@@ -41,7 +36,9 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
       case 'QUERY': {
         const { activeFilters, sortConfig } = msg.payload;
         let filteredData = data;
-        if (activeFilters && activeFilters.length > 0) {
+        // The application passes an admitted, pre-filtered cohort. The legacy
+        // standalone worker query remains available for explicit raw search terms.
+        if (!msg.payload.inputIsFiltered && activeFilters && activeFilters.length > 0) {
           filteredData = data.filter(product => activeFilters.every(filter => {
             if (filter.type !== 'search') return true;
             const searchLower = filter.label.toLowerCase();
@@ -69,12 +66,7 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
               return parseFiniteNumeric(formulaExecutor(item)[col.formulaId]);
             }
             const property = item.properties[key];
-            const governed = property?.quantity;
-            if (governed?.status === 'VALID' && governed.canonical) {
-              return governed.canonical.value;
-            }
-            const value = property?.value ?? (item as unknown as Record<string, unknown>)[key];
-            return parseFiniteNumeric(value);
+            return property ? admittedPropertyValue(property) : parseFiniteNumeric((item as unknown as Record<string, unknown>)[key]);
           });
 
           sortedData = [...filteredData].sort((a, b) => {
@@ -142,17 +134,18 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
             const col = columns.find(c => c.key === key);
             const raw = col?.isComputed && col.formulaId
               ? formulaExecutor(product)[col.formulaId]
-              : product.properties[key]?.value ?? (product as unknown as Record<string, unknown>)[key];
+              : product.properties[key] ? admittedPropertyValue(product.properties[key]) : (product as unknown as Record<string, unknown>)[key];
             const numeric = parseFiniteNumeric(raw);
             if (numeric !== null) values.push({ id: product.id, value: numeric });
           }
           if (values.length > 0) {
-            const mean = values.reduce((sum, item) => sum + item.value, 0) / values.length;
-            const variance = values.reduce((sum, item) => sum + (item.value - mean) ** 2, 0) / values.length;
+            const scale = values.reduce((maximum, item) => Math.max(maximum, Math.abs(item.value)), 0) || 1;
+            const mean = values.reduce((sum, item) => sum + item.value / scale, 0) / values.length;
+            const variance = values.reduce((sum, item) => sum + (item.value / scale - mean) ** 2, 0) / values.length;
             const standardDeviation = Math.sqrt(variance);
             if (standardDeviation > 0) {
               outliers = values
-                .filter(item => Math.abs((item.value - mean) / standardDeviation) > 3)
+                .filter(item => Math.abs((item.value / scale - mean) / standardDeviation) > 3)
                 .map(item => item.id);
             }
           }

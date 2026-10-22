@@ -57,6 +57,8 @@ export const QuickActionMenu: React.FC<QuickActionMenuProps> = ({
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(!isOpen)}
+        aria-label={t("quickActions")}
+        aria-expanded={isOpen}
         className={`h-10 px-3 md:px-4 flex items-center gap-2 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 shrink-0 rounded-lg shadow-sm border border-transparent ${isOpen ? "bg-primary-600 text-white" : "bg-slate-800 dark:bg-primary-600 text-white hover:bg-slate-700 dark:hover:bg-primary-500"}`}
       >
         <Plus size={14} className="shrink-0" />

@@ -62,6 +62,8 @@ export interface IProductAdapter {
   update(product: Product): Promise<Product>;
   batchUpdate(ids: string[], updates: ProductUpdates): Promise<void>;
   batchCreate(products: Partial<Product>[]): Promise<Product[]>;
+  /** Optional atomic upsert capability; never inferred for remote backends. */
+  importRecords?(products: Product[]): Promise<Product[]>;
   delete(ids: string[]): Promise<void>;
   exportReport(products: Product[], format: 'csv' | 'json' | 'xml'): Promise<Blob>;
   restoreSnapshot(products: Product[]): Promise<void>;

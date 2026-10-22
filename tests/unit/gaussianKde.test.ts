@@ -44,4 +44,12 @@ describe('hoisted-invariant exact Gaussian KDE', () => {
     expect(result).toHaveLength(11);
     expect(result.every((point) => Number.isFinite(point.x) && Number.isFinite(point.y))).toBe(true);
   });
+
+  it('keeps representable extreme grids and kernels finite without squaring huge differences', () => {
+    for (const [values, bandwidth] of [[new Float64Array([1e308, 1e308]), 0], [new Float64Array([-1e308, 1e308]), 1e308]] as const) {
+      const kde = calculateGaussianKde(values, bandwidth, 10);
+      expect(kde.every(point => Number.isFinite(point.x) && Number.isFinite(point.y))).toBe(true);
+      expect(kde.some(point => point.y > 0)).toBe(true);
+    }
+  });
 });

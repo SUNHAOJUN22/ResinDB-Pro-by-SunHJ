@@ -150,7 +150,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
             className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 transition-all dark:text-slate-400"
           >
             {theme === 'dark' ? <Sun size={14} strokeWidth={2.5} /> : <Moon size={14} strokeWidth={2.5} />}
-            {theme === 'dark' ? 'Light' : 'Dark'}
+            {zh ? (theme === 'dark' ? '浅色' : '深色') : (theme === 'dark' ? 'Light' : 'Dark')}
           </motion.button>
         </div>
       </motion.div>

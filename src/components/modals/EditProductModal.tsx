@@ -1,3 +1,5 @@
+import { patchProperty } from '@/lib/propertyAdmission';
+import { parseFiniteReal } from '@/lib/quantityRecord';
 import { logger } from '@/lib/logger';
 import React, { useState, useEffect } from "react";
 import {
@@ -31,6 +33,8 @@ interface EditProductModalProps {
 
 interface PropertyRow {
   id: string;
+  originalKey?: string;
+  original?: PropertyValue;
   key: string;
   value: string;
   unit: string;
@@ -142,6 +146,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = React.memo(({
         return {
           id: `prop-${index}-${Date.now()}`,
           key,
+          originalKey: key,
+          original: val,
           value: String(val.value),
           unit: val.unit || "",
           standard: val.standard || "",
@@ -164,16 +170,13 @@ export const EditProductModal: React.FC<EditProductModalProps> = React.memo(({
     const newProperties: Record<string, PropertyValue> = {};
     propertyRows.forEach((row) => {
       if (row.key.trim()) {
-        const numVal = Number(row.value);
-        newProperties[row.key] = {
-          value: !isNaN(numVal) && row.value.trim() !== "" ? numVal : row.value,
-          unit: row.unit.trim() || undefined,
-          standard: row.standard.trim() || undefined,
-          instrument: row.instrument.trim() || undefined,
-          temperature: row.temperature.trim() || undefined,
-          referenceId: row.referenceId.trim() || undefined,
-          sourceUrl: row.sourceUrl.trim() || undefined,
-        };
+        const original = row.original;
+        const patch: Partial<PropertyValue> = {};
+        if (!original || row.value !== String(original.value)) patch.value = parseFiniteReal(row.value) ?? row.value;
+        for (const field of ['unit', 'standard', 'instrument', 'temperature', 'referenceId', 'sourceUrl'] as const) {
+          if (!original || row[field] !== String(original[field] ?? '')) patch[field] = row[field].trim() || undefined;
+        }
+        newProperties[row.key.trim()] = patchProperty(row.key.trim(), original, patch, row.originalKey !== undefined && row.originalKey !== row.key.trim());
       }
     });
 

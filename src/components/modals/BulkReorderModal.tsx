@@ -1,3 +1,4 @@
+import { parseFiniteReal } from '@/lib/quantityRecord';
 import React, { useState, useEffect } from "react";
 import {
   X,
@@ -102,8 +103,8 @@ export const BulkReorderModal: React.FC<BulkReorderModalProps> = ({
       } else {
         // Numeric properties like density, tensile
         const propKey = key === "density" ? "Density" : "Tensile Strength";
-        aVal = parseFloat(String(a.properties[propKey]?.value || "0"));
-        bVal = parseFloat(String(b.properties[propKey]?.value || "0"));
+        aVal = strictNumber(String(a.properties[propKey]?.value || "0"));
+        bVal = strictNumber(String(b.properties[propKey]?.value || "0"));
         return bVal - aVal; // descending
       }
 
@@ -447,3 +448,5 @@ export const BulkReorderModal: React.FC<BulkReorderModalProps> = ({
     </AnimatePresence>
   );
 };
+
+function strictNumber(value: unknown): number { return parseFiniteReal(value) ?? Number.NaN; }

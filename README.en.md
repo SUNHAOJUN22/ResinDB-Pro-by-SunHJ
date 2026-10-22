@@ -1,191 +1,211 @@
-# ResinDB Pro by SunHJ — English Design Edition
+# ResinDB Pro by SunHJ
 
-[中文设计版](README.zh-CN.md) · [Complete bilingual technical documentation](README.md)
+[中文](README.zh-CN.md) · [English](README.en.md)
 
+![Version 3.2.0](https://img.shields.io/badge/version-3.2.0-indigo)
 
-<!-- CLOSURE_STATUS_START -->
-## Current qualification and operating boundary
+ResinDB is a React / TypeScript materials-data and scientific-screening workspace with local IndexedDB storage, a configurable REST client, formula dependency graphs, unit checking, statistical screening and scientific charts. Its goal is to connect each number to its declaration and each calculation to a cohort, units, algorithm and limits. This repository delivers the browser application and computation modules; remote authentication/database servers and real material measurements require separate provision.
 
-- `CI` is the authoritative full software gate; `contracts-v17` adds cross-platform screening regressions.
-- Redundant exact-tree, V19 custom-status, and duplicate full-qualification workflows were removed. The primary CI already emits exact-tree evidence.
-- The Spearman correlation matrix uses the shared finite-number parser and complete-case selection; missing, blank, boolean, malformed and non-finite inputs remain unobserved rather than being silently rewritten as physical zeroes.
-- Browser AI is restricted to the same-origin `/api/ai/proxy`, stores no provider key, and denies grade/vendor/formulation/free-text egress by default.
-- A software pass does not establish proxy deployment, key custody, privacy/legal approval, material release, regulatory compliance, or experimental truth.
-<!-- CLOSURE_STATUS_END -->
+![Vision and implemented workflow concept](docs/assets/vision-en.png)
 
-<!-- LOCALIZED_VISION_EN:START -->
-## Project vision: from resin data to material decisions and scientific visualization
+The AI-designed image illustrates the project vision. Its text and equations explain the concept; it is not an experimental result or acceptance screenshot. Implemented behavior is described below and must be checked against execution evidence.
 
-<p align="center">
-  <img src="docs/localized-vision/resindb-vision-en.svg" width="100%" alt="ResinDB Pro English material data and scientific decision architecture">
-</p>
+![Materials data and computation path](docs/localized-vision/resindb-vision-en.svg)
 
-> Every module and equation maps to current data, compute, Worker, ECharts and acceptance code. The figure is not resin test data, grade certification or force-field validation.
+![Code delivery boundary](docs/current-main/resindb-current-main-en.svg)
 
-<!-- LOCALIZED_VISION_EN:END -->
-
-## Positioning
-
-ResinDB Pro joins resin grades, experimental/reference properties, statistical models, scientific-compute Workers, polymer-physics templates and reproducible acceptance in one evidence chain. It is not a certified LIMS, ERP, material-release system or validated force-field platform.
-
-## Mathematical core
-
-Multivariate anomaly magnitude uses the Mahalanobis distance:
-
-$$
-D_M(\mathbf{x})=
-\sqrt{(\mathbf{x}-\boldsymbol{\mu})^{\mathsf T}
-\boldsymbol{\Sigma}^{-1}
-(\mathbf{x}-\boldsymbol{\mu})}.
-$$
-
-A non-Newtonian rheology proxy uses the Carreau–Yasuda form:
-
-$$
-\eta(\dot\gamma)=
-\eta_\infty+
-(\eta_0-\eta_\infty)
-\left[1+(\lambda\dot\gamma)^a\right]^{(n-1)/a}.
-$$
-
-The decision-observable uncertainty budget keeps parameter, sampling, model-form and scale-transfer terms distinct:
-
-$$
-\boldsymbol{\Sigma}_y
-\approx
-\mathbf{J}\boldsymbol{\Sigma}_\theta\mathbf{J}^{\mathsf T}
-+
-\boldsymbol{\Sigma}_{\mathrm{sample}}
-+
-\boldsymbol{\Sigma}_{\mathrm{model}}
-+
-\boldsymbol{\Sigma}_{\mathrm{transfer}}.
-$$
-
-A scientific figure is accepted only when values are finite, semantics are labelled, ECharts has completed rendering and the Canvas is non-blank:
-
-$$
-C_{\mathrm{figure}}
-=
-C_{\mathrm{finite}}
-\land C_{\mathrm{labeled}}
-\land C_{\mathrm{finished}}
-\land C_{\mathrm{nonblank}}.
-$$
-
-Direct addition of these components, including the sum-of-squares budget in the conceptual diagram, assumes unit-consistent, uncorrelated contributions expressed in the same observable. Correlated inputs require cross-covariance terms: general first-order propagation is $u_y^2\approx\sum_{i,j}J_iJ_j\operatorname{Cov}(x_i,x_j)$. These equations specify modeling assumptions; they do not establish validated uncertainty for an arbitrary material system.
-
-## Similarity and radar profiles: implemented numerical contracts
-
-The implementation is `src/services/mathUtils.ts`; permanent regressions live in `tests/unit/mathUtils.test.ts`. Harmonize units before parsing complete decimal or scientific-notation values. Empty strings, booleans, partial numeric strings, NaN and infinities are not observations.
-
-For finite feature bounds $a$ and $b$, ordinary min-max normalization is $z=(x-a)/(b-a)$. Opposite-sign finite endpoints can still overflow the floating-point difference $b-a$. In that case, set $s=\max(|a|,|b|)$ and use the equivalent scaled expression:
-
-$$
-z=\frac{x/s-a/s}{b/s-a/s}.
-$$
-
-Clamp the result to $[0,1]$. The existing constant-feature policy is unchanged: the numerical range must exceed $32\epsilon\max(1,|a|,|b|)$ and have at least two finite observations. This threshold is a software screening rule, not an instrument-resolution claim.
-
-Let $q$ be the target's comparable active-feature count and $m$ the candidate's shared active-feature count. Candidates require $m\ge2$. The score is:
-
-$$
-S=\operatorname{round}\left[
-100\frac{m}{q}\max\left(0,1-
-\sqrt{\frac{1}{m}\sum_{j=1}^{m}(z_{tj}-z_{pj})^2}
-\right)\right].
-$$
-
-Missing dimensions reduce supported coverage through $m/q$; they are not imputed as zero. Radar profiles use the same global ranges, display $100z$, and retain only dimensions observed finitely for every selected product.
-
-Euclidean distances accumulate with pairwise `Math.hypot`, avoiding false overflow or underflow from direct squaring. A true distance beyond the floating-point representation range still requires the caller to reject a non-finite result before plotting. Feature statistics use prototype-free dictionaries so that `__proto__`, `constructor` and `toString` remain ordinary feature names.
-
-Targeted reproduction after installing locked dependencies:
+## Install and run
 
 ```bash
+nvm install
+nvm use
 npm ci
-npx vitest run tests/unit/mathUtils.test.ts --pool=forks --maxWorkers=1
-npm run validate:unicode
-npm run validate:scientific-ui
+npm run dev -- --host 127.0.0.1
 ```
 
-Regressions cover large and tiny values, 601 orders of magnitude, extreme signed ranges, reserved property names, ordinary coverage-aware scoring and radar coordinates. A targeted regression pass is not full CI, browser visual acceptance or six-hour endurance qualification.
+Use Node 22.23.3 from `.nvmrc` (engine range >=22.12.0 <23). The initial demo workspace contains 13 demo records; always review the live count. KaTeX and its fonts are bundled locally, without a formula CDN. Build with `npm run build` and inspect with `npm run preview`; deployment settings are in [.env.example](.env.example).
 
-## Operating strategy
+## Working strategy
 
-1. Validate Schema, units, standards, temperature, provenance and evidence class first.
-2. Run statistics, fitting and material screening only on finite, dimensionally compatible data.
-3. Keep observations, fits, proxies and scenario projections distinct; association must not be promoted to causation.
-4. Polymer/LAMMPS templates require external force-field, equilibration and experimental validation before supporting scientific conclusions.
-5. Scientific figures must pass CJK/font readiness where relevant, the ECharts `finished` event, non-blank Canvas and PNG evidence gates.
-6. READMEs, SVGs and translations are audited for UTF-8, Unicode controls, CJK fallbacks and local-image integrity.
+1. Establish data identity, source, license and confidentiality. Distinguish DEMO / SYNTHETIC / MEASURED / IMPORTED records.
+2. After import, verify fields, units, methods, temperature and load. Flat CSV units must be declared in source headers; property names do not supply units.
+3. After edits or batch updates, inspect refreshed quantity states. Resolve UNKNOWN / INVALID reasons before analysis.
+4. Declare every formula output unit; enter `1` for dimensionless output. Use Test to inspect status before saving the dependency graph.
+5. Select valid X/Y properties and inspect the eligible-point count before clustering, Pareto, TOPSIS or Mahalanobis screening.
+6. Record conditions, seeds, normalization, cohorts and exclusions; compare exported records with their original declarations.
 
-## Acceptance
+## Mathematical methods and scientific boundaries
+
+### Strict quantities and units
+
+$$
+q_{\mathrm{can}}=s_u q_{\mathrm{raw}},\qquad q_{\mathrm{raw}},q_{\mathrm{can}}\in\mathbb{R}_{\mathrm{finite}}
+$$
+
+Complete decimal/scientific-notation parsing rejects `12abc`, hexadecimal text, empty values, infinity and nonzero underflow. Raw text, units, methods, temperature, load and provenance remain in the quantity record. Canonical units come from the property registry (for example g/cm³ for density and MPa for stress); the formula module applies a separate SI dimensional scaling. Only finite VALID canonical values are admitted. UNKNOWN/INVALID records cannot regain eligibility through raw values; missing units are never guessed. Core and formula unit symbols are case-sensitive: unsupported mPa is never reinterpreted as MPa.
+
+### Dimensional propagation
+
+$$
+\begin{aligned}
+\mathbf{d}(q)&=(a,b,c,d),\qquad [q]=M^aL^bT^c\Theta^d \\
+\mathbf{d}(xy)&=\mathbf{d}(x)+\mathbf{d}(y),\qquad \mathbf{d}(x/y)=\mathbf{d}(x)-\mathbf{d}(y) \\
+x+y&\text{ requires }\mathbf{d}(x)=\mathbf{d}(y)
+\end{aligned}
+$$
+
+Four SI exponent components propagate through the dependency graph. Addition/subtraction require matching dimensions; multiplication/division combine dimensions. Exponents and log/exp/trigonometric arguments must be dimensionless. The bounded parser does not execute arbitrary JavaScript. Compatible inputs are converted before calculation: 25 MPa + 0.1 GPa produces 0.125 GPa.
+
+### Specific strength
+
+$$
+\sigma_s=\frac{\sigma_y}{\rho},\qquad [\sigma_s]=\mathrm{MPa\,cm^3/g}
+$$
+
+Use tensile yield stress divided by density. Tensile break stress is not automatically substituted for yield stress, and missing inputs are not replaced by zero or one. Inputs need comparable material and test states; this ratio does not authorize structural use.
+
+### Specific modulus
+
+$$
+E_s=\frac{E_f}{\rho},\qquad [E_s]=\mathrm{MPa\,cm^3/g}
+$$
+
+Use flexural modulus and density. The bounded registry supports Pa/kPa/MPa/GPa, g/cm³/kg/m³ and this compound output unit. Legacy records without units may calculate as NUMERIC_ONLY; they cannot claim DIMENSION_CHECKED. Mixed typed and untyped inputs return UNKNOWN.
+
+### Descriptive impact–stiffness product
+
+$$
+I_{CE}=\frac{a_{\mathrm{Charpy}}E_f}{10000},\qquad [I_{CE}]=\mathrm{MPa\,kJ/m^2}
+$$
+
+The historical default retains its ÷10000 scale while correcting the output unit. Migration requires an exact match of the preset ID, name, old expression and unit and preserves history; custom formulas are untouched. Charpy and Izod are distinct tests. This product is not a certified toughness score.
+
+### TOPSIS screening
+
+$$
+r_{ij}=\frac{x_{ij}-\min_i x_{ij}}{\max_i x_{ij}-\min_i x_{ij}},\quad v_{ij}=w_jr_{ij},\quad C_i=\frac{D_i^-}{D_i^++D_i^-}
+$$
+
+Cost criteria reverse direction. Weights are scaled before normalization; values are scaled before range subtraction and distances use stable hypot. Missing observations are excluded by default; explicit imputation requires a value and provenance. With no criteria there is no ranking or top three. Eligible rows with only constant criteria receive neutral 0.5, meaning no discrimination.
+
+### Radar profiles
+
+$$
+z_j=20+80\frac{n_{<j}+\tfrac12n_{=j}}{n_j}
+$$
+
+The scientific radar shows within-cohort midranks on shared finite properties, requiring at least three shared axes. Mapping to 20–100 is a display convention. Axis values and polygon area do not measure quality, balance or an all-round grade. Insufficient data remains unavailable rather than being filled with zeros.
+
+### Paired scatter and principal components
+
+$$
+\mathcal{S}_{xy}=\{i:x_i,y_i\in\mathbb{R}_{\mathrm{finite}}\},\quad X_c=X-\bar X,\quad Z=X_cW_k
+$$
+
+Default axes use actual Density / MFR property keys. Canvas, K-Means and Pareto share the same finite paired cohort; unrelated sparse properties do not erase ordinary scatter points. Axis/cohort changes clear previous clusters/frontiers and cancel old workers. PCA uses complete cases and a global maximum-absolute scaling step, not per-feature standardization; design features carefully before comparing mixed units.
+
+### Clustering and Pareto screening
+
+$$
+\min_{\mu,c}\sum_i\|x_i-\mu_{c_i}\|_2^2,\qquad x\prec y\iff(\forall j:x_j\le y_j)\land(\exists j:x_j<y_j)
+$$
+
+K-Means receives the current eligible cohort and distinct selected axes, not a union of sparse properties with imputed zeros. Pareto screening follows objective directions and avoids duplicated X/Y objectives. The local runtime benchmark measures TS/WASM execution paths; it is not instrument or material calibration. Preserve seeds, backend decisions and actual cohort sizes with analysis.
+
+### Mahalanobis screening
+
+$$
+D_M^2=(x-\mu)^T\Sigma_\lambda^{-1}(x-\mu),\qquad n_{\mathrm{complete}}>p
+$$
+
+Exclude incomplete or invalid rows before checking that the complete-case count n strictly exceeds feature count p. The core uses regularization and factorization-based solves. The UI reports actual n/p. Being below the threshold only means the selected statistical rule did not flag the sample.
+
+### Carreau–Yasuda rheology proxy
+
+$$
+\eta(\dot\gamma)=\eta_\infty+(\eta_0-\eta_\infty)\left[1+(\lambda\dot\gamma)^a\right]^{(n-1)/a}
+$$
+
+The current rheology interface generates deterministic proxy points from an MFR rule, then performs bounded fitting. It does not measure a shear curve. A positive finite MFR is required; missing values do not default to 5. Proxy points, fitted models and observations are labeled separately, with positive-domain, log-axis and export checks.
+
+### Temperature shift and activation relations
+
+$$
+\log_{10}a_T=-\frac{C_1(T-T_r)}{C_2+T-T_r},\qquad \ln k=\ln A-\frac{E_a}{RT}
+$$
+
+WLF and Arrhenius have dedicated computation modules with explicit reference temperatures and domains. Celsius values cannot be treated as Kelvin. The formula editor’s bounded unit registry is not a general-purpose unit algebra. Preserve inputs and inspect fit residuals. The local Carreau/WLF/Weibull sandbox rejects blank, non-finite, out-of-domain, and unrepresentable inputs/results instead of silently clamping parameters.
+
+### Thermal kinetics
+
+$$
+\ln\!\left(\frac{\beta}{T_p^2}\right)=\ln\!\left(\frac{AR}{E_a}\right)-\frac{E_a}{RT_p}
+$$
+
+Kissinger analysis needs multiple heating rates and corresponding absolute peak temperatures. Its linear relation has model assumptions; fitting does not establish a reaction mechanism or process window. Invalid domains, degenerate observations and insufficient data must follow module errors.
+
+### Weibull and Prony models
+
+$$
+F(x)=1-e^{-(x/\eta)^m},\quad x>0;\qquad E(t)=E_\infty+\sum_jE_je^{-t/\tau_j}
+$$
+
+Weibull shape, scale and its 63.2% quantile describe the supplied domain; they are not manufacturing certification. Prony modes describe the selected data and time domain. Extrapolation and service-life conclusions need additional measurements.
+
+### Uncertainty simulation
+
+$$
+\begin{aligned}
+X_j^{(b)}&\sim\mathcal N(\mu_j,\sigma_j^2),\qquad \sigma_j=|\mu_j|p_j/100\\
+Y^{(b)}&=f(X^{(b)}),\qquad I_{0.90}=[Q_{0.05}(Y),Q_{0.95}(Y)]
+\end{aligned}
+$$
+
+Monte Carlo samples independent normal inputs; the percentage control specifies standard deviation relative to the absolute input mean. It returns empirical simulation quantiles, not a confidence interval for model parameters. Record the input standard deviations, draw count and seed; this implementation does not infer input correlations. Simulation and deterministic TEST share the same unit-aware formula evaluator, including derived dependencies: zero-variance density `0.958 g/cm³` returns `958 kg/m³` in both paths. Fixed unit/admission metadata and reusable dictionaries prevent stale canonical values without cloning a product per draw. Scaled compensated reductions keep representable statistics finite; an unrepresentable statistic or KDE domain returns an error. Changing formulas, output units, dependencies, the sample or its variability invalidates earlier results. Simulation does not replace physical testing.
+
+### Density estimation and Gaussian Process
+
+$$
+\hat f_h(x)=\frac1{nh}\sum_iK\!\left(\frac{x-x_i}{h}\right),\qquad \mu_*=k_*^T(K+\sigma_n^2I)^{-1}y
+$$
+
+KDE smoothing depends on bandwidth. Gaussian Process, Bayesian optimization, multiobjective surrogates and response surfaces produce model predictions; acquisition candidates are not validated formulations. Regularization and finite-cohort checks handle numerical issues, not sampling bias.
+
+### Relative sensitivity and reviewable evidence
+
+$$
+S_{yx}\approx\frac{f(x+\delta x)-f(x-\delta x)}{2\delta x}\frac{x}{f(x)}
+$$
+
+Dependency heatmaps perturb copied admitted quantities using finite differences and preserve source records. Formula outputs and rule-generated proxies are labeled separately. Zero input/output baselines, rejected quantities and unavailable dependencies remain unavailable. Software tests and data audits establish software checks, not material certification.
+
+## Separate data and code layers
+
+`data/resins/` contains versioned declarations and taxonomy, governed by `data/manifest.json` and data validators. `src/lib/quantityRecord.ts` defines quantity boundaries; `src/lib/propertyAdmission.ts` centralizes admission and recanonicalization after edits. `src/lib/formula/` and `formulaParser.ts` implement parsing, dimensions and dependency execution. `src/compute/`, `src/workers/` and `src/hooks/workers/` separate kernels, messages and React lifecycle. See [docs/compute-module-catalog.json](docs/compute-module-catalog.json).
+
+### Import, editing and backend boundaries
+
+JSON import/export preserves complete Product records. CSV includes `GovernanceJSON`, `PropertiesJSON` and `RecordJSON` for structured round trips. XML escapes values and includes property Metadata and Governance; the import UI supports JSON/CSV/TXT and does not promise automatic XML import. Corrupt structured input is rejected instead of flattened into a record with missing units. Merges retain the stricter confidentiality, mark mixed sources UNKNOWN and set NOT_FOR_RELEASE. Unchanged edit fields preserve method, load, sampleId, batchId and provenanceRefs; changed quantities are recanonicalized.
+
+Manual entry and file import both reach a preview before persistence. Completion is shown only after the adapter confirms success. Local imports apply inserts and updates in one IndexedDB transaction and update caches after commit. Remote imports use the existing update/create endpoints; a backend transaction spanning those requests is not assumed. A failed remote sequence remains visible and attempts to reconcile persisted records.
+
+IndexedDB provides local persistence; the REST adapter is a client contract. Remote-read fallback must be explicitly enabled; failed remote writes never silently write locally. AI egress has separate governance checks. Interpret presets, proxies and generated suggestions according to their sources.
+
+## Acceptance, tests and delivery decisions
 
 ```bash
-npm ci
-npm run validate:docs
-npm run validate:i18n-visuals
-npm run validate:scientific-ui
-npm run typecheck
-npm run test:unit
-npm run build
-npm run test:ui
-```
-
-Software acceptance covers data contracts, implemented computations, interface rendering and reproducible evidence. Grade release, experimental truth, force-field applicability and industrial decisions still require independent qualification.
-
-<!-- CURRENT_MAIN_ACCEPTANCE_V2:START -->
-## Current implementation: code, mathematics and usage
-
-![English code and mathematical-contract concept](docs/current-main/resindb-current-main-en.svg)
-
-> ResinDB Pro is a local-first scientific data and analysis workbench, not a certified LIMS/ERP, commercial force field, industrial grade-release system or automatic scientific approval engine.
-
-#### Continuous-coordinate KDE
-
-$$
-\widehat f(x,y)=\frac{1}{2\pi n h_xh_y}\sum_{i=1}^n\exp\!\left[-\frac12\left(\frac{x-x_i}{h_x}\right)^2-\frac12\left(\frac{y-y_i}{h_y}\right)^2\right]
-$$
-
-The separable bivariate Gaussian kernel requires positive bandwidths; density has inverse-product coordinate units. The figure layer uses custom cells on continuous axes and preserves original density rather than treating coordinates as category indices. A finite display window generally integrates to less than one; color intensity or relative maximum is not probability.
-
-Source mapping: [`src/compute/gaussianKde.ts`](src/compute/gaussianKde.ts) · [`src/components/charts/kdeFigure.ts`](src/components/charts/kdeFigure.ts)
-
-#### Weibull median-rank fit
-
-$$
-F(v)=1-e^{-(v/\eta)^m},\qquad \ln[-\ln(1-F(v))]=m\ln v-m\ln\eta,\qquad B_5=\eta[-\ln(0.95)]^{1/m}
-$$
-
-Positive v and η are required; m is the shape parameter. The UI uses ordinary least-squares linearization of Bernard median ranks, not maximum-likelihood estimation (not MLE). B5 is the fitted 5% failure quantile, not a 95% parameter-confidence bound or a safety-release guarantee. Titles, legends and tooltips follow the selected language.
-
-Source mapping: [`src/components/charts/WeibullChart.tsx`](src/components/charts/WeibullChart.tsx)
-
-#### Figure delivery gate
-
-$$
-C_{\mathrm{figure}}=C_{\mathrm{finite}}\land C_{\mathrm{labels}}\land C_{\mathrm{finished}}\land C_{\mathrm{nonblank}}
-$$
-
-This explanatory figure contract combines finite-data counts, labels, completion events and nonblank-canvas evidence, while distinguishing no data from an unavailable renderer. A screenshot alone is not proof of scientific correctness; test browser behavior, themes, locales and reopening charts.
-
-Source mapping: [`src/components/charts/ScientificEChart.tsx`](src/components/charts/ScientificEChart.tsx)
-
-### Usage and acceptance sequence
-
-1. Check the installation environment, input structure, units, applicability and execution permissions.
-2. Use the source mappings above to distinguish native implementation, explanatory contracts and external execution requirements.
-3. Run focused regression and full quality gates before long-duration testing of pinned commits.
-4. Preserve original logs, machine-readable reports and limitations; missing evidence must never be reported as PASS.
-
-```bash
-npm ci
 npm run validate:ci
+npm audit --omit=dev --audit-level=high
+npm ls --all
+node --test scripts/tests/*.node.mjs
 ```
 
-Retest every changed commit. Baseline regression, two three-hour regression segments, browser visual checks and external engineering qualification are distinct evidence classes. Without original receipts, no six-hour completion is claimed.
+`validate:ci` runs docs/Unicode/source/scientific-UI/compute/data contracts, ESLint, TypeScript, Vitest, build and smoke, K-Means benchmark smoke, grouped tests, coverage, three Chromium UI suites and the full dependency audit. Original thresholds remain in configuration: passing requires real checks, not reduced coverage gates, hidden failures or empty test substitutes. Browser acceptance needs executable Chromium (`CHROME_BIN`) and Chinese/English fonts. A canvas element alone does not establish rendered data; scatter evidence must inspect real pixels and eligible-point counts.
 
-Implementation anchors: [`src/data/dataContract.ts`](src/data/dataContract.ts) · [`src/services/mathUtils.ts`](src/services/mathUtils.ts) · [`src/compute/capabilityProbe.ts`](src/compute/capabilityProbe.ts)
+Reports and coverage are generated in local `artifacts/` and `coverage/`. Every result belongs to a particular source revision and environment. Delivery must verify the exact GitHub main commit and its Actions result; old results do not certify new code. A six-hour run requires real timestamps and logs, not a README assertion. See the [validation contract](docs/VALIDATION.md).
 
-<!-- CURRENT_MAIN_ACCEPTANCE_V2:END -->
+## Implemented scope and next steps
+
+The current scope is traceable materials screening, numerical boundaries, local persistence and reviewable scientific displays. Units use a finite registry: general compound-unit grammar, affine Celsius conversion, full mol/eq chemical dimensions and automatic experimental certification are not implemented. Safety-critical selection, compliance and service-life conclusions require independent experiments and domain review. The next-stage vision is to connect real measurements, explicit interfaces and versioned evidence; artwork does not demonstrate implementation.
+
+The [historical image archive](README.visual-archive.md) preserves earlier UI screenshots and concept diagrams with explicit historical labels. They are not evidence from the current execution.

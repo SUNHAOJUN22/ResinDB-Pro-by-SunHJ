@@ -1,3 +1,4 @@
+import { categoryLabel } from '@/i18n/categoryLabels';
 import React, { useState, useMemo, useCallback } from "react";
 import { Category } from '@/types/index';
 import {
@@ -45,7 +46,7 @@ export const TreeSidebar: React.FC<TreeSidebarProps> = ({
     (cats: Category[], term: string): Category[] => {
       const filter = (categoriesToFilter: Category[]): Category[] => {
         return categoriesToFilter.reduce<Category[]>((acc, cat) => {
-          const name = language === "en" && cat.nameEn ? cat.nameEn : cat.name;
+          const name = categoryLabel(cat, language);
           const matches = name.toLowerCase().includes(term.toLowerCase());
           let filteredChildren: Category[] = [];
 

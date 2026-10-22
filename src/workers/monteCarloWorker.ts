@@ -10,7 +10,7 @@ import {
 import type { FormulaConfig, Product } from '@/types/index';
 import { formulaEngine } from '@/lib/formulaParser';
 
-const MONTE_CARLO_MODEL_VERSION = 'monte-carlo-formula-numeric-dictionary-3.1.0';
+const MONTE_CARLO_MODEL_VERSION = 'monte-carlo-formula-dimension-bound-4.0.0';
 const NORMAL_TRANSFORM_VERSION = 'box-muller-1.0.0';
 const MAX_ITERATIONS = 1_000_000;
 const KDE_STEPS = 100;
@@ -95,7 +95,7 @@ self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
     for (const [key, variance] of Object.entries(variances)) {
       validateVariancePercent(variance, key);
     }
-    const actualSeed = seed ?? deriveRandomSeed('monte-carlo-formula-v3', {
+    const actualSeed = seed ?? deriveRandomSeed('monte-carlo-formula-v4', {
       targetFormulaId,
       formulas,
       product,
@@ -103,7 +103,7 @@ self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
       iterations,
     });
     const random = createSeededRandom(actualSeed);
-    const evaluator = formulaEngine.compilePropertyGraph(formulas);
+    const evaluator = formulaEngine.compileSampledPropertyGraph(formulas, product);
     const baseProperties = formulaEngine.createPropertyDictionary(product);
     const workingProperties = { ...baseProperties };
     const formulaResults: Record<string, number> = {};
@@ -114,10 +114,14 @@ self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
     for (const [key, mean] of Object.entries(baseProperties)) {
       const variancePercent = variances[key] ?? 0;
       if (Number.isFinite(mean) && variancePercent > 0) {
+        const standardDeviation = Math.abs(mean) * (variancePercent / 100);
+        if (!Number.isFinite(standardDeviation) || (mean !== 0 && standardDeviation === 0)) {
+          throw new RangeError(`Input standard deviation is not representable for ${key}`);
+        }
         stochasticProperties.push({
           key,
           mean,
-          standardDeviation: Math.abs(mean) * (variancePercent / 100),
+          standardDeviation,
         });
       }
     }
@@ -161,18 +165,47 @@ self.onmessage = (event: MessageEvent<MonteCarloMessage>) => {
     self.postMessage(createWorkerProgressMessage({ ratio: 0.9, phase: 'statistics' }));
     const validResults = resultBuffer.subarray(0, acceptedSamples);
     validResults.sort();
-    let sum = 0;
-    for (let index = 0; index < validResults.length; index++) sum += validResults[index];
-    const mean = sum / validResults.length;
-    let squaredDeviationSum = 0;
+    // Reduce dimensionless values to avoid overflowing a finite mean or
+    // variance, and compensate rounding in both reductions.
+    const scale = Math.max(Math.abs(validResults[0]), Math.abs(validResults[validResults.length - 1]));
+    let sum = 0; let sumCorrection = 0;
     for (let index = 0; index < validResults.length; index++) {
-      squaredDeviationSum += (validResults[index] - mean) ** 2;
+      const term = scale === 0 ? 0 : validResults[index] / scale;
+      if (validResults[index] !== 0 && term === 0) {
+        throw new RangeError('Simulation statistics normalization underflowed a nonzero sample.');
+      }
+      const next = sum + term;
+      sumCorrection += Math.abs(sum) >= Math.abs(term) ? (sum - next) + term : (term - next) + sum;
+      sum = next;
     }
-    const stdDev = Math.sqrt(squaredDeviationSum / validResults.length);
+    const scaledMean = (sum + sumCorrection) / validResults.length;
+    if (sum + sumCorrection !== 0 && scaledMean === 0) {
+      throw new RangeError('Simulation mean normalization underflowed a nonzero residual.');
+    }
+    const mean = scaledMean * scale;
+    let squaredDeviationSum = 0;
+    let deviationCorrection = 0;
+    for (let index = 0; index < validResults.length; index++) {
+      const difference = (scale === 0 ? 0 : validResults[index] / scale) - scaledMean;
+      const term = difference * difference;
+      const next = squaredDeviationSum + term;
+      deviationCorrection += Math.abs(squaredDeviationSum) >= Math.abs(term)
+        ? (squaredDeviationSum - next) + term : (term - next) + squaredDeviationSum;
+      squaredDeviationSum = next;
+    }
+    const scaledStdDev = Math.sqrt((squaredDeviationSum + deviationCorrection) / validResults.length);
+    const stdDev = scaledStdDev * scale;
     const p5 = validResults[Math.min(validResults.length - 1, Math.floor(validResults.length * 0.05))];
     const p95 = validResults[Math.min(validResults.length - 1, Math.floor(validResults.length * 0.95))];
-    const bandwidth = 1.06 * stdDev * Math.pow(validResults.length, -0.2);
+    const bandwidth = stdDev * (1.06 * Math.pow(validResults.length, -0.2));
+    if (![mean, stdDev, p5, p95, bandwidth].every(Number.isFinite)
+      || (scaledMean !== 0 && mean === 0) || (scaledStdDev !== 0 && stdDev === 0)) {
+      throw new RangeError('Simulation statistics are not representable as finite numbers.');
+    }
     const kde = calculateGaussianKde(validResults, bandwidth, KDE_STEPS);
+    if (!kde.every(point => Number.isFinite(point.x) && Number.isFinite(point.y))) {
+      throw new RangeError('Simulation KDE is not representable as finite coordinates and densities.');
+    }
     const results = Array.from(validResults);
     self.postMessage(createWorkerProgressMessage({ ratio: 1, phase: 'complete' }));
 

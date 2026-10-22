@@ -178,7 +178,7 @@ export function KMeansBackendCalibrationPanel({
         <span className="flex min-w-0 items-center gap-2">
           <Gauge size={15} className="shrink-0 text-indigo-500" />
           <span className="truncate text-[11px] font-black uppercase tracking-wide text-slate-700 dark:text-slate-200">
-            {english ? 'K-Means device calibration' : 'K-Means 本机性能校准'}
+            {english ? 'K-Means runtime benchmark' : 'K-Means 本机运算基准'}
           </span>
         </span>
         <span className="text-[10px] font-bold text-slate-400">{expanded ? '−' : '+'}</span>

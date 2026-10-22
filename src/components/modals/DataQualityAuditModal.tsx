@@ -13,7 +13,7 @@ export const DataQualityAuditModal: React.FC<DataQualityAuditModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { allProducts } = useData();
 
   const auditResults = useMemo(() => {
@@ -124,28 +124,28 @@ export const DataQualityAuditModal: React.FC<DataQualityAuditModalProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-center items-center">
                  <div className="text-3xl font-bold text-slate-800 dark:text-slate-100 mb-1">{score.toFixed(1)}</div>
-                 <div className="text-xs text-slate-500 uppercase tracking-wider font-mono">质量评分 / Score</div>
+                  <div className="text-xs text-slate-500 uppercase tracking-wider font-mono">{language === 'zh' ? '质量评分' : 'Quality score'}</div>
               </div>
               <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-center items-center">
                  <div className="flex items-center gap-2">
                      <AlertTriangle size={18} className="text-amber-500" />
                      <div className="text-3xl font-bold text-amber-500 mb-1">{auditResults.missingFields}</div>
                  </div>
-                 <div className="text-xs text-slate-500 uppercase tracking-wider font-mono">缺失字段 / Missing Fields</div>
+                  <div className="text-xs text-slate-500 uppercase tracking-wider font-mono">{language === 'zh' ? '缺失字段' : 'Missing fields'}</div>
               </div>
               <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-center items-center">
                  <div className="flex items-center gap-2">
                      <ShieldAlert size={18} className="text-red-500" />
                      <div className="text-3xl font-bold text-red-500 mb-1">{auditResults.duplicates.length}</div>
                  </div>
-                 <div className="text-xs text-slate-500 uppercase tracking-wider font-mono">重复项 / Duplicates</div>
+                  <div className="text-xs text-slate-500 uppercase tracking-wider font-mono">{language === 'zh' ? '重复项' : 'Duplicates'}</div>
               </div>
               <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-center items-center">
                  <div className="flex items-center gap-2">
                      <Info size={18} className="text-blue-500" />
                      <div className="text-3xl font-bold text-blue-500 mb-1">{auditResults.inconsistentUnits.length}</div>
                  </div>
-                 <div className="text-xs text-slate-500 uppercase tracking-wider font-mono">单位不一致 / Inconsistent Units</div>
+                  <div className="text-xs text-slate-500 uppercase tracking-wider font-mono">{language === 'zh' ? '单位不一致' : 'Inconsistent units'}</div>
               </div>
             </div>
 

@@ -12,6 +12,7 @@ export function useMonteCarlo() {
     error,
     setError,
     postMessage,
+    cancel,
   } = useWorkerManager<MonteCarloMessage, NonNullable<MonteCarloResponse['payload']>>(
     useCallback(() => new Worker(new URL('../../workers/monteCarloWorker.ts', import.meta.url), { type: 'module' }), []),
     'SIMULATION_COMPLETE',
@@ -25,16 +26,18 @@ export function useMonteCarlo() {
     iterations: number = 5000,
     seed?: RandomSeed,
   ) => {
+    setResult(null);
     postMessage({
       type: 'RUN_SIMULATION',
       payload: { targetFormulaId, formulas, product, variances, iterations, seed },
     });
-  }, [postMessage]);
+  }, [postMessage, setResult]);
 
   const resetSimulation = useCallback(() => {
+    cancel('Monte Carlo inputs changed or the simulation was reset');
     setResult(null);
     setError(null);
-  }, [setResult, setError]);
+  }, [cancel, setResult, setError]);
 
   const simulationStats = useMemo(() => result?.stats ?? null, [result]);
   const reproducibility = useMemo(() => result?.reproducibility ?? null, [result]);

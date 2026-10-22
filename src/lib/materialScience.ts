@@ -352,10 +352,10 @@ export const materialEngine = {
     if (minimum === maximum) {
       if (isLog) {
         const factor = Math.sqrt(10);
-        return { min: minimum / factor, max: maximum * factor };
+        return { min: Math.max(Number.MIN_VALUE, minimum / factor), max: Math.min(Number.MAX_VALUE, maximum * factor) };
       }
       const margin = Math.max(1, Math.abs(minimum) * 0.1);
-      return { min: minimum - margin, max: maximum + margin };
+      return { min: Math.max(-Number.MAX_VALUE, minimum - margin), max: Math.min(Number.MAX_VALUE, maximum + margin) };
     }
 
     if (isLog) {
@@ -363,13 +363,13 @@ export const materialEngine = {
       const logMaximum = Math.log10(maximum);
       const margin = (logMaximum - logMinimum) * 0.15;
       return {
-        min: 10 ** (logMinimum - margin),
-        max: 10 ** (logMaximum + margin),
+        min: Math.max(Number.MIN_VALUE, 10 ** Math.max(-324, logMinimum - margin)),
+        max: Math.min(Number.MAX_VALUE, 10 ** Math.min(Math.log10(Number.MAX_VALUE), logMaximum + margin)),
       };
     }
 
-    const margin = (maximum - minimum) * 0.15;
-    return { min: minimum - margin, max: maximum + margin };
+    const margin = maximum * 0.15 - minimum * 0.15;
+    return { min: Math.max(-Number.MAX_VALUE, minimum - margin), max: Math.min(Number.MAX_VALUE, maximum + margin) };
   },
 
   calculateSums: (points: [number, number][]) => {

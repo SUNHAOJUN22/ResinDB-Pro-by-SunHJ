@@ -1,3 +1,6 @@
+import { buildFiniteRadarProjection } from '@/utils/radarProjection';
+import { admittedPropertyValue } from '@/lib/propertyAdmission';
+import { categoryLabel } from '@/i18n/categoryLabels';
 import React, { useMemo, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -25,7 +28,6 @@ import {
   Download,
   Loader2,
   History,
-  User,
   Brain,
   AlertTriangle,
 } from "lucide-react";
@@ -36,12 +38,12 @@ import {
   REFERENCES,
   PROPERTY_GROUPS,
 } from '@/config/constants';
-import { RADAR_KEYS, RADAR_DEFAULT_MAX } from '@/utils/productUtils';
+import { RADAR_DEFAULT_MAX } from '@/utils/productUtils';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { logger } from "@/lib/logger";
 import * as echarts from "@/lib/echarts";
 import Markdown from "react-markdown";
-import { findSimilarProducts, parseFiniteNumericValue } from "@/services/mathUtils";
+import { findSimilarProducts } from "@/services/mathUtils";
 import { SimilarProductsRadar } from '@/components/charts/SimilarProductsRadar';
 import { DegradationSimulator } from '@/components/charts/DegradationSimulator';
 
@@ -153,7 +155,7 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
     ) => {
       for (const node of nodes) {
         const nodeName =
-          language === "en" && node.nameEn ? node.nameEn : node.name;
+          categoryLabel(node, language);
         const newPath = [...currentPath, nodeName];
         if (node.id === targetId) {
           paths.push({ segments: newPath, leafId: node.id });
@@ -206,7 +208,7 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
     return findSimilarProducts(
       displayProduct,
       allProducts,
-      (candidate, key) => parseFiniteNumericValue(candidate.properties[key]?.value),
+      (candidate, key) => admittedPropertyValue(candidate.properties[key]),
     ).slice(0, 3);
   }, [displayProduct, allProducts]);
 
@@ -220,33 +222,16 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
         echarts.init(chartRef.current);
     }
 
-    // Filter RADAR_KEYS to only include properties that exist on this product
-    let availableProps = RADAR_KEYS.filter(
-      (p) => displayProduct.properties?.[p] !== undefined,
-    );
-
-    if (availableProps.length < 3) {
-      const numericProps = Object.keys(displayProduct.properties).filter(
-        (k) => {
-          const val = displayProduct.properties?.[k]?.value;
-          return typeof val === "number" || !isNaN(parseFloat(String(val)));
-        },
-      );
-      availableProps = numericProps.slice(0, 5);
-    }
-
-    const props = availableProps.length >= 3 ? availableProps : RADAR_KEYS;
-
-    const values = props.map((p) => {
-      const v = displayProduct.properties?.[p]?.value;
-      return typeof v === "number" ? v : parseFloat(String(v)) || 0;
-    });
+    const projection = buildFiniteRadarProjection(displayProduct);
+    if (projection.status !== 'OK') { chartInstance.current.clear(); return; }
+    const props = projection.keys;
+    const values = projection.values;
 
     const indicator = props.map((p, i) => {
       const defaultMax = RADAR_DEFAULT_MAX[p] || 100;
       return {
-        name: tProp(p).slice(0, 6),
-        max: Math.max(values[i] * 1.1, defaultMax),
+        name: tProp(p),
+        max: Math.min(Number.MAX_VALUE, Math.max(values[i] * 1.1, defaultMax)),
       };
     });
 
@@ -436,9 +421,7 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
                   {displayProduct.categoryIds.map((catId) => {
                     const cat = flatCategoryMap.get(catId);
                     const catName =
-                      language === "en" && cat?.nameEn
-                        ? cat.nameEn
-                        : cat?.name || "Category";
+                      cat ? categoryLabel(cat, language) : "Category";
                     return (
                       <motion.button
                         key={catId}
@@ -838,7 +821,7 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
                                 size={10}
                                 className="text-secondary-500"
                               />
-                              相似牌号推荐 (Similar Grades)
+                               {language === "en" ? "Similar grades" : "相似牌号推荐"}
                             </div>
                             <div className="grid grid-cols-1 gap-2">
                               {similarProducts.map(
@@ -937,73 +920,26 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
                     )}
 
                     {activeTab === "history" && (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-[10px] font-mono font-bold text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
-                            <History size={14} className="text-primary-500" />
-                            数据审计日志
-                          </h4>
-                          <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-widest">
-                            共 4 条记录
-                          </span>
-                        </div>
-                        <div className="space-y-2">
-                          {[
-                            {
-                              user: "resj666@gmail.com",
-                              action: "更新了“密度”属性",
-                              time: "2026-04-02 14:20",
-                              type: "update",
-                            },
-                            {
-                              user: "system@resindb.com",
-                              action: "同步了“熔体质量流动速率”",
-                              time: "2026-03-28 09:15",
-                              type: "sync",
-                            },
-                            {
-                              user: "admin@resindb.com",
-                              action: "审核并通过了该牌号",
-                              time: "2026-03-25 16:40",
-                              type: "audit",
-                            },
-                            {
-                              user: "resj666@gmail.com",
-                              action: "创建了该牌号记录",
-                              time: "2026-03-25 10:00",
-                              type: "create",
-                            },
-                          ].map((item, i) => (
-                            <div
-                              key={i}
-                              className="flex gap-3 p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm transition-all"
-                            >
-                              <div className="shrink-0">
-                                <div
-                                  className={`w-8 h-8 rounded-xl border flex items-center justify-center shadow-sm ${item.type === "update" ? "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800/50" : item.type === "sync" ? "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800/50" : item.type === "audit" ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800/50" : "bg-white text-slate-600 border-slate-200 dark:bg-slate-800 dark:border-slate-700"}`}
-                                >
-                                  <User size={14} />
-                                </div>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-1 gap-2">
-                                  <span
-                                    className="text-[10px] font-mono font-bold text-slate-800 dark:text-white truncate tracking-tight"
-                                    title={item.user}
-                                  >
-                                    {item.user}
-                                  </span>
-                                  <span className="text-[9px] font-mono font-bold text-slate-400 shrink-0 uppercase tracking-widest">
-                                    {item.time}
-                                  </span>
-                                </div>
-                                <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-                                  {item.action}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                      <div className="space-y-4" data-testid="product-record-history">
+                        <h4 className="text-[10px] font-mono font-bold text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                          <History size={14} className="text-primary-500" />
+                          {language === "en" ? "Stored record timestamps" : "记录中的时间元数据"}
+                        </h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {language === "en"
+                            ? "This record does not provide verifiable audit events. Its stored dates do not identify an operator, prove a change, or establish approval."
+                            : "该记录未提供可核验的逐条审计事件。所存日期不能证明操作人员、具体修改或审核通过。"}
+                        </p>
+                        <dl className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs dark:border-slate-800 dark:bg-slate-900">
+                          <div className="flex flex-wrap justify-between gap-2">
+                            <dt className="text-slate-500">{language === "en" ? "Created date (record metadata)" : "创建日期（记录元数据）"}</dt>
+                            <dd className="font-mono text-slate-800 dark:text-white">{displayProduct.createdAt || (language === "en" ? "Not provided" : "未提供")}</dd>
+                          </div>
+                          <div className="flex flex-wrap justify-between gap-2">
+                            <dt className="text-slate-500">{language === "en" ? "Updated date (record metadata)" : "更新日期（记录元数据）"}</dt>
+                            <dd className="font-mono text-slate-800 dark:text-white">{displayProduct.updatedAt || (language === "en" ? "Not provided" : "未提供")}</dd>
+                          </div>
+                        </dl>
                       </div>
                     )}
 
@@ -1012,7 +948,7 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
                         <div className="flex items-center justify-between mb-2">
                           <h4 className="text-[10px] font-mono font-bold text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
                             <Sparkles size={14} className="text-primary-500" />
-                            推荐相似牌号
+                            {language === "en" ? "Recommended similar grades" : "推荐相似牌号"}
                           </h4>
                         </div>
 
@@ -1062,9 +998,7 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
                                 {p.categoryIds.slice(0, 2).map((catId) => {
                                   const cat = flatCategoryMap.get(catId);
                                   const name =
-                                    language === "en" && cat?.nameEn
-                                      ? cat.nameEn
-                                      : cat?.name || catId;
+                                    cat ? categoryLabel(cat, language) : catId;
                                   return (
                                     <span
                                       key={catId}

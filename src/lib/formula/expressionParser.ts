@@ -1,3 +1,4 @@
+import { parseFiniteReal } from '@/lib/quantityRecord';
 export type PropertyDictionary = Record<string, number>;
 export type Evaluator = (properties: PropertyDictionary) => number;
 
@@ -11,7 +12,7 @@ type TokenType =
   | 'comma'
   | 'eof';
 
-interface Token {
+export interface Token {
   type: TokenType;
   value: string;
   position: number;
@@ -28,7 +29,15 @@ const UNARY_FUNCTIONS: Readonly<Record<string, (value: number) => number>> = {
   tan: Math.tan,
 };
 
-function tokenize(expression: string): Token[] {
+function checked(value: number, nonzero = false): number {
+  if (!Number.isFinite(value) || (nonzero && value === 0)) throw new Error('NONFINITE_OR_UNDERFLOW');
+  return value;
+}
+function checkedPower(base: number, exponent: number): number {
+  return checked(Math.pow(base, exponent), base !== 0);
+}
+
+export function tokenize(expression: string): Token[] {
   const tokens: Token[] = [];
   let position = 0;
 
@@ -49,6 +58,7 @@ function tokenize(expression: string): Token[] {
 
     const number = source.match(/^(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?/i);
     if (number) {
+      if (parseFiniteReal(number[0]) === null) throw new Error(`Non-finite or underflowing numeric literal at ${position}`);
       tokens.push({ type: 'number', value: number[0], position });
       position += number[0].length;
       continue;
@@ -163,7 +173,7 @@ class ArithmeticParser {
       const right = this.parseLogicalAnd();
       const previous = left;
       left = (properties) => {
-        const valL = previous(properties);
+        const valL = checked(previous(properties));
         if (Number.isFinite(valL) && valL !== 0) return valL;
         return right(properties);
       };
@@ -183,7 +193,7 @@ class ArithmeticParser {
       const right = this.parseAdditive();
       const previous = left;
       left = (properties) => {
-        const valL = previous(properties);
+        const valL = checked(previous(properties));
         if (!Number.isFinite(valL) || valL === 0) return valL;
         return right(properties);
       };
@@ -204,30 +214,30 @@ class ArithmeticParser {
       const previous = left;
       left =
         operator === '+'
-          ? (properties) => previous(properties) + right(properties)
-          : (properties) => previous(properties) - right(properties);
+          ? (properties) => checked(previous(properties) + right(properties))
+          : (properties) => checked(previous(properties) - right(properties));
     }
 
     return left;
   }
 
   private parseMultiplicative(): Evaluator {
-    let left = this.parsePower();
+    let left = this.parseUnary();
 
     while (
       this.current().type === 'operator' &&
       ['*', '/', '%'].includes(this.current().value)
     ) {
       const operator = this.consume().value;
-      const right = this.parsePower();
+      const right = this.parseUnary();
       const previous = left;
 
       if (operator === '*') {
-        left = (properties) => previous(properties) * right(properties);
+        left = (properties) => { const a = previous(properties), b = right(properties); return checked(a * b, a !== 0 && b !== 0); };
       } else if (operator === '/') {
-        left = (properties) => previous(properties) / right(properties);
+        left = (properties) => { const a = previous(properties), b = right(properties); return checked(a / b, a !== 0); };
       } else {
-        left = (properties) => previous(properties) % right(properties);
+        left = (properties) => checked(previous(properties) % right(properties));
       }
     }
 
@@ -235,14 +245,14 @@ class ArithmeticParser {
   }
 
   private parsePower(): Evaluator {
-    const left = this.parseUnary();
+    const left = this.parsePrimary();
     if (
       this.current().type === 'operator' &&
       (this.current().value === '**' || this.current().value === '^')
     ) {
       this.consume();
-      const right = this.parsePower();
-      return (properties) => Math.pow(left(properties), right(properties));
+      const right = this.parseUnary();
+      return (properties) => checkedPower(left(properties), right(properties));
     }
     return left;
   }
@@ -253,7 +263,7 @@ class ArithmeticParser {
       const operand = this.parseUnary();
       return (properties) => -operand(properties);
     }
-    return this.parsePrimary();
+    return this.parsePower();
   }
 
   private parsePrimary(): Evaluator {
@@ -268,7 +278,7 @@ class ArithmeticParser {
     if (token.type === 'property') {
       this.consume();
       const propertyName = token.value;
-      return (properties) => properties[propertyName] ?? 0;
+      return (properties) => checked(properties[propertyName]);
     }
 
     if (token.type === 'leftParen') {
@@ -298,16 +308,16 @@ class ArithmeticParser {
           throw new Error(`${normalized} expects exactly one argument`);
         }
         const fn = UNARY_FUNCTIONS[normalized];
-        return (properties) => fn(args[0](properties));
+        return (properties) => checked(fn(args[0](properties)), normalized === 'exp');
       }
       if (normalized === 'pow') {
         if (args.length !== 2) throw new Error('pow expects exactly two arguments');
-        return (properties) => Math.pow(args[0](properties), args[1](properties));
+        return (properties) => checkedPower(args[0](properties), args[1](properties));
       }
       if (normalized === 'min' || normalized === 'max') {
         if (args.length === 0) throw new Error(`${normalized} expects at least one argument`);
         const fn = normalized === 'min' ? Math.min : Math.max;
-        return (properties) => fn(...args.map((argument) => argument(properties)));
+        return (properties) => args.map(argument => checked(argument(properties))).reduce((a, b) => fn(a, b));
       }
 
       throw new Error(`Unsupported identifier: ${token.value}`);

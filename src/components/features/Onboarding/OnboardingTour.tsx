@@ -9,10 +9,13 @@ import {
   Zap,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface TourStep {
   title: string;
   description: string;
+  titleEn: string;
+  descriptionEn: string;
   icon: unknown;
   color: string;
 }
@@ -20,6 +23,8 @@ interface TourStep {
 const TOUR_STEPS: TourStep[] = [
   {
     title: "欢迎来到 ResinDB Pro",
+    titleEn: "Welcome to ResinDB Pro",
+    descriptionEn: "Explore the core tools for organizing, comparing, and investigating polymer material records.",
     description:
       "这是您的新一代高分子材料科研数据中心。让我们花一分钟了解一下核心功能。",
     icon: Sparkles,
@@ -27,26 +32,34 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     title: "数据概览",
+    titleEn: "Data overview",
+    descriptionEn: "Review record completeness, manufacturers, and application status. These indicators describe your dataset, not material certification.",
     description:
-      "实时监控数据完整度、活跃厂商和系统健康状态。系统会为您提供数据优化建议。",
+      "查看记录完整度、厂商分布与应用状态。这些指标描述您的数据集，不代表材料认证。",
     icon: LayoutGrid,
     color: "text-indigo-500",
   },
   {
     title: "强大的搜索与过滤",
+    titleEn: "Search and filter",
+    descriptionEn: "Find grades using text search or property conditions such as Density:>0.9. Save frequently used views for later.",
     description:
-      "使用自然语言或属性语法（如 密度 > 0.9）快速定位目标牌号。支持保存常用视图。",
+      "使用文本搜索或属性语法（如 密度:>0.9）快速定位目标牌号。支持保存常用视图。",
     icon: Search,
     color: "text-emerald-500",
   },
   {
     title: "科研实验室",
-    description: "强大的可视化引擎，支持复杂的数据对比、性能预测和科研分析。",
+    titleEn: "Scientific workspace",
+    descriptionEn: "Compare eligible measurements with charts, evaluate formulas, and explore mathematical models. Check units, conditions, and assumptions before interpreting results.",
+    description: "用图表比较有效数据、计算公式并探索数学模型。解读结果前请检查单位、测试条件和模型假设。",
     icon: Bot,
     color: "text-violet-500",
   },
   {
     title: "即刻开始科研之旅",
+    titleEn: "Ready to explore",
+    descriptionEn: "Import your records or browse the existing material library. Open the help center whenever you need guidance.",
     description:
       "现在您可以开始导入数据或浏览现有的牌号库了。如有疑问，请随时查看帮助中心。",
     icon: Zap,
@@ -58,6 +71,8 @@ export const OnboardingTour: React.FC<{ onComplete: () => void }> = ({
   onComplete,
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
+  const { language } = useLanguage();
+  const zh = language === "zh";
 
   const next = () => {
     if (currentStep < TOUR_STEPS.length - 1) {
@@ -109,10 +124,10 @@ export const OnboardingTour: React.FC<{ onComplete: () => void }> = ({
               transition={{ duration: 0.3 }}
             >
               <h3 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight mb-4">
-                {step.title}
+                {zh ? step.title : step.titleEn}
               </h3>
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm mx-auto">
-                {step.description}
+                {zh ? step.description : step.descriptionEn}
               </p>
             </motion.div>
           </AnimatePresence>
@@ -133,7 +148,7 @@ export const OnboardingTour: React.FC<{ onComplete: () => void }> = ({
               onClick={onComplete}
               className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500/50 rounded px-1"
             >
-              跳过介绍
+              {zh ? "跳过介绍" : "Skip tour"}
             </motion.button>
 
             <div className="flex items-center gap-3">
@@ -142,6 +157,7 @@ export const OnboardingTour: React.FC<{ onComplete: () => void }> = ({
                   whileHover={{ scale: 1.1, x: -2 }}
                   whileTap={{ scale: 0.9 }}
                   onClick={prev}
+                  aria-label={zh ? "上一步" : "Previous step"}
                   className="p-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 shadow-sm"
                 >
                   <ChevronLeft size={20} />
@@ -153,7 +169,7 @@ export const OnboardingTour: React.FC<{ onComplete: () => void }> = ({
                 onClick={next}
                 className="px-8 py-3 bg-primary-600 hover:bg-primary-500 text-white rounded-2xl font-bold text-xs transition-all shadow-xl shadow-primary-500/20 flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50"
               >
-                {currentStep === TOUR_STEPS.length - 1 ? "开始使用" : "下一步"}
+                {currentStep === TOUR_STEPS.length - 1 ? (zh ? "开始使用" : "Get started") : (zh ? "下一步" : "Next")}
                 <ChevronRight size={16} />
               </motion.button>
             </div>

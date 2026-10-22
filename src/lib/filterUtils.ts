@@ -1,3 +1,5 @@
+import { parseFiniteReal } from '@/lib/quantityRecord';
+import { admittedPropertyValue } from '@/lib/propertyAdmission';
 import { Product, FilterGroup, FilterCondition } from '@/types/index';
 
 export type ProductPredicate = (product: Product) => boolean;
@@ -33,7 +35,7 @@ export function compileFilterGroup(
 function compileCondition(condition: FilterCondition): ProductPredicate {
   const { field, operator, value } = condition;
   const condVal = String(value ?? "").toLowerCase();
-  const condNum = parseFloat(condVal);
+  const condNum = parseFiniteReal(condVal) ?? Number.NaN;
 
   return (product: Product) => {
     let val: string | number | undefined;
@@ -48,7 +50,7 @@ function compileCondition(condition: FilterCondition): ProductPredicate {
     }
 
     const strVal = String(val ?? "").toLowerCase();
-    const numVal = typeof val === "number" ? val : parseFloat(strVal);
+    const numVal = (product.properties?.[field] ? admittedPropertyValue(product.properties[field]) : parseFiniteReal(val)) ?? Number.NaN;
 
     switch (operator) {
       case "contains":

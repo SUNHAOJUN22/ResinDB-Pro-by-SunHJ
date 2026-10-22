@@ -1,52 +1,12 @@
+import { parseProductPayload } from '@/lib/productPayload';
 import { logger } from '@/lib/logger';
 import { IProductAdapter } from '@/lib/adapters/types';
-import { Product, ProductUpdates, PropertyValue } from '@/types/index';
+import { Product, ProductUpdates } from '@/types/index';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-const STRING_PROPERTY_FIELDS = ['unit', 'standard', 'temperature', 'referenceId', 'instrument', 'sourceUrl', 'annotation', 'temp', 'load'] as const;
-const NUMBER_PROPERTY_FIELDS = ['mean', 'stdDev', 'min', 'max', 'count'] as const;
-
-function isPropertyValue(value: unknown): value is PropertyValue {
-  if (!isRecord(value)) return false;
-  if (typeof value.value !== 'string' && !(typeof value.value === 'number' && Number.isFinite(value.value))) return false;
-  if (STRING_PROPERTY_FIELDS.some((field) => value[field] !== undefined && typeof value[field] !== 'string')) return false;
-  if (NUMBER_PROPERTY_FIELDS.some((field) => value[field] !== undefined && !(typeof value[field] === 'number' && Number.isFinite(value[field])))) return false;
-  return true;
-}
-
-function isIsoDate(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0 && Number.isFinite(Date.parse(value));
-}
-
-function parseProductPayload(payload: unknown, context: string): Product {
-  if (
-    !isRecord(payload) ||
-    typeof payload.id !== 'string' || !payload.id.trim() ||
-    typeof payload.gradeName !== 'string' || !payload.gradeName.trim() ||
-    typeof payload.manufacturerId !== 'string' || !payload.manufacturerId.trim() ||
-    typeof payload.manufacturer !== 'string' || !payload.manufacturer.trim() ||
-    !Array.isArray(payload.categoryIds) ||
-    !payload.categoryIds.every((id) => typeof id === 'string') ||
-    !isRecord(payload.properties) ||
-    !Object.values(payload.properties).every(isPropertyValue) ||
-    !isIsoDate(payload.createdAt) ||
-    !isIsoDate(payload.updatedAt) ||
-    (payload.isExperimental !== undefined && typeof payload.isExperimental !== 'boolean') ||
-    (payload.tags !== undefined && (!Array.isArray(payload.tags) || !payload.tags.every((tag) => typeof tag === 'string'))) ||
-    (payload.priority !== undefined && !(typeof payload.priority === 'number' && Number.isFinite(payload.priority)))
-  ) {
-    throw new Error(`Remote API returned an invalid Product payload for ${context}`);
-  }
-  return payload as unknown as Product;
 }
 
 function parseProductList(payload: unknown, context: string): Product[] {

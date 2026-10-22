@@ -18,10 +18,11 @@ interface CanvasScatterGraphProps {
   clusters?: Record<string, number>;
   paretoFrontIds?: Set<string>;
   enableConvexHull?: boolean;
+  language?: 'zh' | 'en';
 }
 
 export const CanvasScatterGraph: React.FC<CanvasScatterGraphProps> = ({
-    data, xKey, yKey, xLabel = xKey, yLabel = yKey, xValues, yValues, clusters, paretoFrontIds, enableConvexHull
+    data, xKey, yKey, xLabel = xKey, yLabel = yKey, xValues, yValues, clusters, paretoFrontIds, enableConvexHull, language = 'en'
 }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -219,10 +220,13 @@ export const CanvasScatterGraph: React.FC<CanvasScatterGraphProps> = ({
     }, []);
 
     return (
-        <div ref={containerRef} className="w-full h-full relative" onMouseLeave={() => setHoveredPoint(null)}>
+        <div className="flex w-full h-full min-h-0 flex-col relative" data-testid="canvas-scatter" data-eligible-points={validRows.length} onMouseLeave={() => setHoveredPoint(null)}>
+            <div className="shrink-0 px-2 pb-2 text-xs text-slate-500">{language === 'zh' ? `有效点 ${validRows.length}/${data.length}；缺失或无效值不补零。` : `Eligible points ${validRows.length}/${data.length}; missing or invalid values are excluded.`}</div>
+            <div ref={containerRef} className="relative min-h-0 flex-1">
             <KMeansBackendCalibrationPanel />
             <canvas ref={canvasRef} role="img" aria-label={`${xLabel} / ${yLabel} (${validRows.length})`}
                 onMouseMove={handleMouseMove} className="cursor-crosshair absolute inset-0" />
+            {validRows.length === 0 && <div role="status" className="absolute inset-0 flex items-center justify-center p-12 text-center text-slate-500">{language === 'zh' ? '所选坐标没有同时有效的数值，请选择其他属性或补全声明。' : 'No eligible numeric pairs for these axes. Select other properties or complete the declarations.'}</div>}
             {hoveredPoint && (
                 <div className="fixed z-50 bg-slate-900 text-white text-xs p-2 rounded shadow-xl pointer-events-none transform -translate-x-1/2 -translate-y-[calc(100%+10px)] whitespace-nowrap"
                     style={{ left: hoveredPoint.sx, top: hoveredPoint.sy }}>
@@ -231,6 +235,7 @@ export const CanvasScatterGraph: React.FC<CanvasScatterGraphProps> = ({
                     <div>{yLabel}: {hoveredPoint.point.data.properties?.[yKey]?.value ?? '—'}</div>
                 </div>
             )}
+            </div>
         </div>
     );
 };

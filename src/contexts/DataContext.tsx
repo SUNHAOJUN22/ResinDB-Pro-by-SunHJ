@@ -6,6 +6,7 @@ import { useUI } from "@/contexts/UIContext";
 import { useDatabase } from '@/hooks/app/useDatabase';
 import { CATEGORY_TREE } from '@/config/constants';
 import api from '@/lib/adapters';
+import { persistImportedProducts } from '@/lib/importProducts';
 import { safeStorage } from "@/lib/utils";
 import { useHistory } from '@/hooks/app/useHistory';
 import { HistoryRecord } from "@/lib/adapters/types";
@@ -57,7 +58,7 @@ interface DataContextType {
   handleBatchUpdate: (ids: string[], updates: ProductUpdates) => Promise<void>;
   handleBatchTagging: (ids: string[], tags: string[], mode: "append" | "overwrite" | "remove") => Promise<void>;
   handleBatchReorder: (updates: { id: string, priority: number }[]) => Promise<void>;
-  handleImportData: (newProducts: Product[]) => void;
+  handleImportData: (newProducts: Product[]) => Promise<boolean>;
   clearFilters: () => void;
   selectSingleCategory: (id: string) => void;
   activeFilters: FilterItem[];
@@ -365,20 +366,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleImportData = useCallback(async (newProducts: Product[]) => {
     try {
-      const created = await api.batchCreate(newProducts);
       const previousProducts = allProductsRef.current;
-      setAllProducts((prev) => [...created, ...prev]);
+      const created = await persistImportedProducts(api, newProducts, previousProducts);
+      const importedIds = new Set(created.map(product => product.id));
+      setAllProducts((prev) => [...created, ...prev.filter(product => !importedIds.has(product.id))]);
       pushToHistory(`Imported ${newProducts.length} products`, previousProducts);
       addToast(
         "success",
         t("importSuccess").replace("{count}", created.length.toString()),
       );
       setShowSidebar(true);
+      return true;
     } catch (error) {
+      // Remote adapters may have completed some requests. Reconcile persisted
+      // records, and keep the modal open instead of displaying a false success.
+      try { setAllProducts(await api.search('', null)); } catch { /* Preserve the visible snapshot when reconciliation is unavailable. */ }
       addToast(
         "error",
-        t("importFailed", "Import failed: ") + (error instanceof Error ? t(error.message) : t("unknownError")),
+        t("importFailed", "Import failed: ") + (error instanceof Error ? error.message : t("unknownError")),
       );
+      return false;
     }
   }, [setAllProducts, addToast, t, setShowSidebar, pushToHistory]);
 
@@ -444,7 +451,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (searchQuery.trim()) {
       items.push({
         id: "search",
-        label: `Search: "${searchQuery}"`,
+        label: `${language === 'zh' ? '搜索' : 'Search'}: "${searchQuery}"`,
         type: "search",
         onRemove: () => setSearchQuery(""),
       });
@@ -478,7 +485,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
     return items;
-  }, [searchQuery, setSearchQuery, selectedCategoryIds, setSelectedCategoryIds, advancedFilterGroup, setAdvancedFilterGroup, categoryNameMap, t]);
+  }, [searchQuery, setSearchQuery, selectedCategoryIds, setSelectedCategoryIds, advancedFilterGroup, setAdvancedFilterGroup, categoryNameMap, t, language]);
 
   const value = useMemo(() => ({
     ...db,

@@ -58,7 +58,17 @@ export function useWorkerManager<TMessage, TResponsePayload>(
   }, []);
 
   const cancel = useCallback((reason = 'Worker task cancelled by the user') => {
-    activeHandleRef.current?.cancel(new ComputeAbortError(reason));
+    const handle = activeHandleRef.current;
+    activeTaskKeyRef.current = null;
+    activeHandleRef.current = null;
+    workerRef.current = null;
+    handle?.cancel(new ComputeAbortError(reason));
+    if (mountedRef.current) {
+      setIsCalculating(false);
+      setActiveTaskId(null);
+      setProgress(null);
+      setError(null);
+    }
   }, []);
 
   const postMessage = useCallback((

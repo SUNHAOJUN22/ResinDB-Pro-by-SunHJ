@@ -338,6 +338,16 @@ export function canonicalizeQuantity(
   };
 }
 
+// SI symbols are case-sensitive: mPa must never be interpreted as MPa.
+const CORE_DECLARED_UNITS: Readonly<Record<keyof typeof CORE_QUANTITY_CONTRACTS, readonly string[]>> = {
+  density: ['g/cm3', 'kg/m3'],
+  mfr: ['g/10min'],
+  tensileYield: ['Pa', 'kPa', 'MPa', 'GPa'],
+  flexuralModulus: ['Pa', 'kPa', 'MPa', 'GPa'],
+  izodImpact: ['J/m2', 'kJ/m2'],
+  charpyImpact: ['J/m2', 'kJ/m2'],
+};
+
 export function canonicalizeCoreProperty(
   key: string,
   raw: RawQuantity,
@@ -352,5 +362,12 @@ export function canonicalizeCoreProperty(
       provenanceRefs: deduplicate([...provenanceRefs]),
     };
   }
-  return canonicalizeQuantity(raw, CORE_QUANTITY_CONTRACTS[resolved], provenanceRefs);
+  const spelling = typeof raw.unit === 'string'
+    ? raw.unit.normalize('NFKC').trim().replace(/\s+/g, '').replace(/\^([23])/g, '$1').replace(/10minutes?|10mins?/g, '10min')
+    : '';
+  const contract = CORE_QUANTITY_CONTRACTS[resolved];
+  // The generic conversion API can have caller-defined aliases. Core contracts
+  // admit only explicitly supported spellings, preserving the original raw unit.
+  const strictContract = CORE_DECLARED_UNITS[resolved].includes(spelling) ? contract : { ...contract, factors: {} };
+  return canonicalizeQuantity(raw, strictContract, provenanceRefs);
 }

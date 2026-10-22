@@ -1,3 +1,4 @@
+import { admittedPropertyValue, refreshProperties } from '@/lib/propertyAdmission';
 import { logger } from '@/lib/logger';
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Category, Product, ProductUpdates, PropertyValue } from '@/types/index';
@@ -79,8 +80,8 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     if (product.properties) {
       for (const [key, prop] of Object.entries(product.properties)) {
         if (prop && prop.value !== undefined && prop.value !== null) {
-          const numValue = typeof prop.value === 'number' ? prop.value : Number(String(prop.value).trim());
-          if (Number.isFinite(numValue)) {
+          const numValue = admittedPropertyValue(prop);
+          if (numValue !== null) {
             if (!this.propertyIndex.has(key)) {
               this.propertyIndex.set(key, []);
             }
@@ -157,7 +158,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     for (const id of ids) {
       const p = this.cachedProducts.find(x => x.id === id);
       if (p) {
-        const newProperties = { ...p.properties };
+        const newProperties = { ...(restUpdates.properties ?? p.properties) };
         if (_propertyUpdates) {
           Object.entries(_propertyUpdates).forEach(([key, updateVal]) => {
             if (updateVal !== null && typeof updateVal === "object" && "value" in updateVal) {
@@ -174,7 +175,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
         const updated = {
           ...p,
           ...restUpdates,
-          properties: newProperties,
+          properties: refreshProperties(newProperties, p.properties),
           updatedAt: new Date().toISOString().split('T')[0]
         };
         
@@ -324,12 +325,13 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     }
 
     const newProduct: Product = {
+      ...product,
       id: product.id || generateId(),
       gradeName: product.gradeName,
       manufacturer: product.manufacturer || "Unknown",
       manufacturerId: product.manufacturerId || "m-unknown",
       categoryIds: product.categoryIds || [],
-      properties: product.properties || {},
+      properties: refreshProperties(product.properties || {}),
       updatedAt: new Date().toISOString().split('T')[0],
       createdAt: new Date().toISOString().split('T')[0],
       isExperimental: product.isExperimental ?? false,
@@ -380,17 +382,14 @@ export class IndexedDBProductAdapter implements IProductAdapter {
       throw new Error("400 Bad Request: Missing required fields");
     }
 
+    const db = await this.getDB();
+    const existing = await db.get('products', product.id);
+    if (!existing) throw new Error(`404 Not Found: Product ${product.id} does not exist`);
     const updatedProduct = {
       ...product,
-      updatedAt: new Date().toISOString().split('T')[0]
+      properties: refreshProperties(product.properties, existing.properties),
+      updatedAt: new Date().toISOString().split('T')[0],
     };
-
-    const db = await this.getDB();
-    // Check if exists
-    const existing = await db.get('products', product.id);
-    if (!existing) {
-      throw new Error(`404 Not Found: Product ${product.id} does not exist`);
-    }
 
     await db.put('products', updatedProduct);
     this.registerMutationUpdate(updatedProduct);
@@ -420,7 +419,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     for (const id of ids) {
       const p = await tx.store.get(id);
       if (p) {
-        const newProperties = { ...p.properties };
+        const newProperties = { ...(restUpdates.properties ?? p.properties) };
         if (_propertyUpdates) {
           Object.entries(_propertyUpdates).forEach(([key, updateVal]) => {
             if (updateVal !== null && typeof updateVal === "object" && "value" in updateVal) {
@@ -437,7 +436,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
         await tx.store.put({
           ...p,
           ...restUpdates,
-          properties: newProperties,
+          properties: refreshProperties(newProperties, p.properties),
           updatedAt: new Date().toISOString().split('T')[0]
         });
       }
@@ -458,36 +457,28 @@ export class IndexedDBProductAdapter implements IProductAdapter {
 
     for (const p of products) {
       const newProduct: Product = {
+        ...p,
         id: p.id || generateId(),
         gradeName: p.gradeName || "New Product",
         manufacturer: p.manufacturer || "Unknown",
         manufacturerId: p.manufacturerId || "m-unknown",
         categoryIds: p.categoryIds || [],
-        properties: p.properties || {},
+        properties: refreshProperties(p.properties || {}),
         updatedAt: now,
         createdAt: now,
         isExperimental: p.isExperimental ?? false,
       };
       
-      try {
-        await tx.store.add(newProduct);
-        createdProducts.push(newProduct);
-
-        // Sync to UniversalStorageBridge if experimental
-        if (newProduct.isExperimental) {
-          try {
-            const rec = UniversalStorageBridge.productToRecord(newProduct, 'my_lab');
-            UniversalStorageBridge.saveLabRecord(rec);
-          } catch (err) {
-            logger.error("Failed to sync batch created exp product", err);
-          }
-        }
-      } catch (err) {
-        logger.warn(`Skipping product due to error during batch export: ${newProduct.id}`, err);
-        // Continue with others
-      }
+      await tx.store.add(newProduct);
+      createdProducts.push(newProduct);
     }
     await tx.done;
+    // A failed transaction must not publish lab mirrors or cache entries.
+    for (const product of createdProducts.filter(product => product.isExperimental)) {
+      try { UniversalStorageBridge.saveLabRecord(UniversalStorageBridge.productToRecord(product, 'my_lab')); }
+      catch (error) { logger.error('Lab mirror failed after batch create commit', error); }
+    }
+
 
     // Update cache and indices in bulk
     for (const product of createdProducts) {
@@ -503,6 +494,51 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     }
     
     return createdProducts;
+  }
+
+  async importRecords(products: Product[]): Promise<Product[]> {
+    await this.simulateLatency();
+    if (!products.length) return [];
+    const ids = new Set<string>();
+    for (const product of products) {
+      if (!product.id || !product.gradeName.trim() || ids.has(product.id)) throw new Error('DUPLICATE_OR_MISSING_IMPORT_IDENTITY');
+      ids.add(product.id);
+    }
+    const db = await this.getDB();
+    const tx = db.transaction('products', 'readwrite');
+    const completion = tx.done;
+    // Observe rejection even if an individual request fails before awaiting done.
+    void completion.catch(() => undefined);
+    const imported: Product[] = [];
+    try {
+      for (const product of products) {
+        const previous = await tx.store.get(product.id);
+        const saved: Product = {
+          ...product,
+          createdAt: previous?.createdAt ?? product.createdAt,
+          updatedAt: new Date().toISOString().split('T')[0],
+          properties: refreshProperties(product.properties, previous?.properties),
+        };
+        await tx.store.put(saved);
+        imported.push(saved);
+      }
+      await completion;
+    } catch (error) {
+      try { tx.abort(); } catch { /* A failed request may already have aborted it. */ }
+      await completion.catch(() => undefined);
+      throw error;
+    }
+    if (this.cachedProducts) {
+      const replacements = new Map(imported.map(product => [product.id, product]));
+      this.cachedProducts = [...this.cachedProducts.filter(product => !replacements.has(product.id)), ...imported];
+      this.rebuildIndices();
+    }
+    // Secondary lab mirroring happens only after the main transaction commits.
+    for (const product of imported.filter(product => product.isExperimental)) {
+      try { UniversalStorageBridge.saveLabRecord(UniversalStorageBridge.productToRecord(product, 'my_lab')); }
+      catch (error) { logger.error('Lab mirror failed after import commit', error); }
+    }
+    return imported;
   }
 
   async delete(ids: string[]): Promise<void> {
@@ -537,19 +573,21 @@ export class IndexedDBProductAdapter implements IProductAdapter {
       return new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
     }
 
+    const xml = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[char]!);
     if (format === 'xml') {
       const xmlContent = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<Products>',
         ...products.map(p => {
           const props = Object.entries(p.properties)
-            .map(([k, v]) => `      <Property name="${k}" value="${v.value}" unit="${v.unit || ''}"/>`)
+            .map(([k, v]) => `      <Property name="${xml(k)}" value="${xml(v.value)}" unit="${xml(v.unit)}"><Metadata>${xml(JSON.stringify(v))}</Metadata></Property>`)
             .join('\n');
-          return `  <Product id="${p.id}">
-    <GradeName>${p.gradeName}</GradeName>
-    <Manufacturer>${p.manufacturer}</Manufacturer>
-    <Categories>${p.categoryIds.join(',')}</Categories>
-    <UpdatedAt>${p.updatedAt}</UpdatedAt>
+          return `  <Product id="${xml(p.id)}">
+    <GradeName>${xml(p.gradeName)}</GradeName>
+    <Manufacturer>${xml(p.manufacturer)}</Manufacturer>
+    <Categories>${xml(p.categoryIds.join(','))}</Categories>
+    <UpdatedAt>${xml(p.updatedAt)}</UpdatedAt>
+    <Governance>${xml(JSON.stringify(p.governance ?? null))}</Governance>
     <Properties>
 ${props}
     </Properties>
@@ -565,7 +603,7 @@ ${props}
     products.forEach(p => Object.keys(p.properties).forEach(k => allPropKeys.add(k)));
     const propKeys = Array.from(allPropKeys);
     
-    const allHeaders = [...headers, ...propKeys].join(',');
+    const allHeaders = [...headers, ...propKeys, 'GovernanceJSON', 'PropertiesJSON', 'RecordJSON'].map(formatCsvValue).join(',');
 
     const rows = products.map(p => {
       const basic = [
@@ -576,7 +614,7 @@ ${props}
         p.updatedAt
       ];
       const props = propKeys.map(k => formatCsvValue(p.properties[k]?.value));
-      return [...basic.map(formatCsvValue), ...props].join(',');
+      return [...basic.map(formatCsvValue), ...props, ...[p.governance ?? null, p.properties, p].map(value => formatCsvValue(JSON.stringify(value)))].join(',');
     });
 
     const csvContent = [allHeaders, ...rows].join('\n');

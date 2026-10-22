@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from '@/components/App';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
-import { PreferenceControls } from '@/components/ui/PreferenceControls';
 
 const rootElement = document.getElementById('root');
 
@@ -14,7 +13,6 @@ if (!rootElement) {
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <PreferenceControls />
       <App />
     </ErrorBoundary>
   </React.StrictMode>,

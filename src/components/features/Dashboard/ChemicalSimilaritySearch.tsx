@@ -1,3 +1,4 @@
+import { parseFiniteReal } from '@/lib/quantityRecord';
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, SlidersHorizontal, Cpu, ArrowUpRight, RefreshCw, BarChart2, Zap } from 'lucide-react';
@@ -39,7 +40,7 @@ export const ChemicalSimilaritySearch: React.FC<ChemicalSimilaritySearchProps> =
     allProducts.forEach(p => {
       Object.entries(p.properties || {}).forEach(([key, propVal]) => {
         const val = propVal?.value;
-        const num = typeof val === 'number' ? val : parseFloat(String(val));
+        const num = typeof val === 'number' ? val : strictNumber(String(val));
         if (!isNaN(num)) {
           if (!keysMap.has(key)) {
             const mapping = defaultMappings[key] || { zh: key, en: key };
@@ -134,7 +135,7 @@ export const ChemicalSimilaritySearch: React.FC<ChemicalSimilaritySearchProps> =
     allProducts.forEach(p => {
       activeKeys.forEach(k => {
         const raw = p.properties?.[k]?.value;
-        const val = typeof raw === 'number' ? raw : parseFloat(String(raw));
+        const val = typeof raw === 'number' ? raw : strictNumber(String(raw));
         if (!isNaN(val)) {
           if (val < mins[k]) mins[k] = val;
           if (val > maxes[k]) maxes[k] = val;
@@ -146,7 +147,7 @@ export const ChemicalSimilaritySearch: React.FC<ChemicalSimilaritySearchProps> =
     const targetVector: Record<string, number> = {};
     activeKeys.forEach(k => {
       const raw = targetProduct.properties?.[k]?.value;
-      const val = typeof raw === 'number' ? raw : parseFloat(String(raw));
+      const val = typeof raw === 'number' ? raw : strictNumber(String(raw));
       const range = (maxes[k] || 0) - (mins[k] || 0);
       if (!isNaN(val)) {
         targetVector[k] = range > 0 ? (val - mins[k]) / range : 0.5;
@@ -164,7 +165,7 @@ export const ChemicalSimilaritySearch: React.FC<ChemicalSimilaritySearchProps> =
 
         activeKeys.forEach(k => {
           const raw = p.properties?.[k]?.value;
-          const val = typeof raw === 'number' ? raw : parseFloat(String(raw));
+          const val = typeof raw === 'number' ? raw : strictNumber(String(raw));
           const range = (maxes[k] || 0) - (mins[k] || 0);
           if (!isNaN(val)) {
             candidateVector[k] = range > 0 ? (val - mins[k]) / range : 0.5;
@@ -180,9 +181,9 @@ export const ChemicalSimilaritySearch: React.FC<ChemicalSimilaritySearchProps> =
 
         activeKeys.forEach(k => {
           const targetRaw = targetProduct.properties?.[k]?.value;
-          const targetVal = typeof targetRaw === 'number' ? targetRaw : parseFloat(String(targetRaw));
+          const targetVal = typeof targetRaw === 'number' ? targetRaw : strictNumber(String(targetRaw));
           const candRaw = p.properties?.[k]?.value;
-          const candidateVal = typeof candRaw === 'number' ? candRaw : parseFloat(String(candRaw));
+          const candidateVal = typeof candRaw === 'number' ? candRaw : strictNumber(String(candRaw));
 
           details[k] = {
             targetVal: isNaN(targetVal) ? 0 : targetVal,
@@ -422,7 +423,7 @@ export const ChemicalSimilaritySearch: React.FC<ChemicalSimilaritySearchProps> =
                       </label>
                       {isActive && (
                         <span className="text-[10px] font-black text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
-                          {weight}x 重
+                          {weight}× {language === 'zh' ? '权重' : 'weight'}
                         </span>
                       )}
                     </div>
@@ -588,3 +589,5 @@ export const ChemicalSimilaritySearch: React.FC<ChemicalSimilaritySearchProps> =
     </div>
   );
 };
+
+function strictNumber(value: unknown): number { return parseFiniteReal(value) ?? Number.NaN; }

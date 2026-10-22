@@ -85,6 +85,7 @@ function validateLinks(text) {
 }
 
 const readme = readFileSync(README_PATH, 'utf8');
+const archive = readFileSync(resolve(ROOT, 'README.visual-archive.md'), 'utf8');
 const packageJson = JSON.parse(readFileSync(PACKAGE_PATH, 'utf8'));
 const validation = readFileSync(VALIDATION_PATH, 'utf8');
 const version = packageJson.version;
@@ -92,6 +93,8 @@ if (version !== '3.2.0' || !readme.includes(`version-${version}-`) || !validatio
   fail('Version drift between package, README and validation contract');
 }
 validateLinks(readme);
+validateLinks(archive);
+if (!readme.includes('README.visual-archive.md')) fail('Historical image archive link missing');
 
 const actualScreenshots = readdirSync(IMAGE_DIR)
   .filter((name) => /^ui-.*\.png$/.test(name))
@@ -101,27 +104,27 @@ if (JSON.stringify(actualScreenshots) !== JSON.stringify(EXPECTED_SCREENSHOTS)) 
 }
 for (const name of EXPECTED_SCREENSHOTS) {
   const relativePath = `docs/images/${name}`;
-  if (readme.split(relativePath).length - 1 !== 1) fail(`${relativePath} must be referenced exactly once`);
+  if (archive.split(relativePath).length - 1 !== 1) fail(`${relativePath} must be referenced exactly once`);
   if (statSync(resolve(IMAGE_DIR, name)).size < 20_000) fail(`${relativePath} is too small to be a real UI evidence screenshot`);
 }
 for (const name of EXPECTED_AI_DIAGRAMS) {
   const relativePath = `docs/images/${name}`;
   if (!existsSync(resolve(IMAGE_DIR, name))) fail(`README AI diagram is missing: ${relativePath}`);
-  if (readme.split(relativePath).length - 1 !== 1) fail(`${relativePath} must be referenced exactly once`);
+  if (archive.split(relativePath).length - 1 !== 1) fail(`${relativePath} must be referenced exactly once`);
   if (statSync(resolve(IMAGE_DIR, name)).size < 5_000) fail(`${relativePath} is too small for a README technical diagram`);
 }
 const baseImages = [...EXPECTED_SCREENSHOTS, ...EXPECTED_AI_DIAGRAMS].map((name) => `docs/images/${name}`);
-validateImageInventory(readme, [...baseImages,
-  'docs/current-main/resindb-current-main-zh.svg',
-  'docs/current-main/resindb-current-main-en.svg',
-], ROOT);
-for (const [path, language] of [['README.zh-CN.md', 'zh'], ['README.en.md', 'en']]) {
+validateImageInventory(archive, baseImages, ROOT);
+for (const [path, language] of [['README.md', 'zh'], ['README.zh-CN.md', 'zh'], ['README.en.md', 'en']]) {
   const localized = readFileSync(resolve(ROOT, path), 'utf8');
   validateLinks(localized);
   validateImageInventory(localized, [
+    `docs/assets/vision-${language}.png`,
     `docs/localized-vision/resindb-vision-${language}.svg`,
     `docs/current-main/resindb-current-main-${language}.svg`,
   ], ROOT);
+  const png = readFileSync(resolve(ROOT, `docs/assets/vision-${language}.png`));
+  if (png.length < 20000 || !png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) fail(`Invalid localized PNG: ${language}`);
 }
 const oldSynthetic = readdirSync(IMAGE_DIR).filter((name) => /^resindb-.*\.svg$/.test(name));
 if (oldSynthetic.length) fail(`Synthetic README visual residue remains: ${JSON.stringify(oldSynthetic.sort())}`);

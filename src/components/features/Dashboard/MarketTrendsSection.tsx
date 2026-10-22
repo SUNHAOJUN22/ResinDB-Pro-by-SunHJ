@@ -12,6 +12,8 @@ import {
   AreaChart,
   Area
 } from "recharts";
+import { admittedPropertyValue } from '@/lib/propertyAdmission';
+import { resolveCorePropertyKey } from '@/lib/quantityRecord';
 import { Product } from '@/types/index';
 import { motion } from "motion/react";
 import { TrendingUp, BarChart3, PieChart as PieChartIcon } from "lucide-react";
@@ -34,17 +36,17 @@ export const MarketTrendsSection: React.FC<MarketTrendsSectionProps> = ({ produc
       .slice(0, 5); // Top 5
   }, [products]);
 
-  // 2. Completeness Trends (Mocking some timeline if date is same, or aggregate by month)
+  // 2. Creation timeline: records without a date remain in an explicit unknown bucket.
   const timelineData = useMemo(() => {
     const months: Record<string, number> = {};
     products.forEach(p => {
-      const month = p.createdAt?.substring(0, 7) || '2026-04';
+      const month = p.createdAt?.substring(0, 7) || t('unknown', 'Unknown');
       months[month] = (months[month] || 0) + 1;
     });
     return Object.entries(months)
       .map(([name, grades]) => ({ name, grades }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [products]);
+  }, [products, t]);
 
   // 3. Property Distribution (e.g., MFR values range)
   const mfrDistribution = useMemo(() => {
@@ -56,7 +58,9 @@ export const MarketTrendsSection: React.FC<MarketTrendsSectionProps> = ({ produc
       '50+': 0
     };
     products.forEach(p => {
-      const mfr = parseFloat(String(p.properties['mfr']?.value || 0));
+      const matches = Object.entries(p.properties).filter(([key]) => resolveCorePropertyKey(key) === 'mfr');
+      const mfr = matches.length === 1 ? admittedPropertyValue(matches[0][1]) : null;
+      if (mfr === null || mfr < 0) return;
       if (mfr <= 5) bins['0-5']++;
       else if (mfr <= 10) bins['5-10']++;
       else if (mfr <= 20) bins['10-20']++;

@@ -1,3 +1,5 @@
+import { admittedPropertyValue } from '@/lib/propertyAdmission';
+import { parseFiniteReal } from '@/lib/quantityRecord';
 import React, {
   useState,
   useMemo,
@@ -71,7 +73,6 @@ import { useSpcWorker } from '@/hooks/workers/useSpcWorker';
 
 const SpcChart = lazy(() => import("@/components/charts/SpcChart").then((m) => ({ default: m.SpcChart })));
 
-import { RADAR_KEYS, getPerformanceFingerprint } from '@/utils/productUtils';
 
 export type ViewChartType = SCChartType | "canvas_scatter" | "correlation" | "similarity_graph" | "rsm" | "feature_importance" | "kde_topology" | "weibull" | "wlf_tts" | "copula" | "arrhenius" | "sobol" | "spc" | "bayes" | "mahalanobis" | "kinetics" | "prony" | "moo";
 import { PCA } from "@/lib/math/pca";
@@ -129,7 +130,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
 
     // Canvas Scatter settings
     const [scatterXKey, setScatterXKey] = useState<string>("密度");
-    const [scatterYKey, setScatterYKey] = useState<string>("熔融指数");
+    const [scatterYKey, setScatterYKey] = useState<string>("熔体质量流动速率");
     const [enableConvexHull, setEnableConvexHull] = useState(false);
     
     // Pareto Settings
@@ -298,9 +299,8 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
         const properties = baseData[i].properties;
         for (const key in properties) {
           if (props.has(key)) continue;
-          const val = properties[key]?.value;
-          const num = typeof val === "number" ? val : parseFloat(String(val));
-          if (!isNaN(num)) {
+          const num = admittedPropertyValue(properties[key]);
+          if (num !== null) {
             props.add(key);
           }
         }
@@ -354,8 +354,8 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
       // Compile float boundaries ONCE outside the main 50,000 document iteration loop
       const compiledFilters = filterKeys.map((key) => ({
         key,
-        min: filters[key].min === "" ? -Infinity : parseFloat(filters[key].min),
-        max: filters[key].max === "" ? Infinity : parseFloat(filters[key].max),
+        min: filters[key].min === "" ? -Infinity : safeParse(filters[key].min),
+        max: filters[key].max === "" ? Infinity : safeParse(filters[key].max),
       }));
 
       const numFilters = compiledFilters.length;
@@ -369,7 +369,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
           const rule = compiledFilters[f];
           const rawVal = p.properties[rule.key]?.value;
           const numVal =
-            typeof rawVal === "number" ? rawVal : parseFloat(String(rawVal));
+            typeof rawVal === "number" ? rawVal : safeParse(String(rawVal));
           if (isNaN(numVal) || numVal < rule.min || numVal > rule.max) {
             pass = false;
             break;
@@ -389,50 +389,48 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
         }
     }, [activeChart, filteredData, similarityFeatures, similarityThreshold, calculateSimilarity]);
 
-    // Helper: Safe Float Parser (Layer 1: Anti-Crash)
-    const safeParse = useCallback((val: unknown, fallback = 0): number => {
-      if (val === undefined || val === null || val === "") return fallback;
-      const num = parseFloat(String(val));
-      return isNaN(num) ? fallback : num;
-    }, []);
-
     const formulaExecutor = useMemo(() => formulaEngine.compileGraph(formulas), [formulas]);
+    const getVal = useCallback((product: Product, key: string): number => {
+      if (/^formula[-_]/.test(key)) {
+        const value = formulaExecutor(product)[key.replace(/^formula[-_]/, '')];
+        return Number.isFinite(value) ? value : Number.NaN;
+      }
+      return admittedPropertyValue(product.properties[key]) ?? Number.NaN;
+    }, [formulaExecutor]);
 
-    const getVal = useCallback(
-      (p: Product, key: string): number => {
-        if (key.startsWith("formula_")) {
-          const id = key.replace("formula_", "");
-          const f = formulas.find((form) => form.id === id);
-          if (!f) return 0;
-          try {
-            const val = formulaExecutor(p)[f.id];
-            return typeof val === "number" ? val : parseFloat(String(val)) || 0;
-          } catch {
-            return 0;
-          }
-        }
-        return safeParse(p.properties[key]?.value);
-      },
-      [formulas, safeParse, formulaExecutor],
-    );
-
-    // Run Pareto computation
     useEffect(() => {
-        if (activeChart === "canvas_scatter" && enablePareto) {
-            const dataPayload = filteredData.map(d => ({
-                id: d.id,
-                values: {
-                    [scatterXKey]: getVal(d, scatterXKey),
-                    [scatterYKey]: getVal(d, scatterYKey)
-                }
-            }));
-            const objectives = [
-                { key: scatterXKey, minimize: paretoXDir === 'min' },
-                { key: scatterYKey, minimize: paretoYDir === 'min' }
-            ];
-            computePareto(dataPayload, objectives);
-        }
-    }, [activeChart, enablePareto, paretoXDir, paretoYDir, scatterXKey, scatterYKey, filteredData, getVal, computePareto]);
+      const keys = numericProperties.filter(key => !key.startsWith('formula_'));
+      if (!keys.length) return;
+      const available = (key: string) => keys.includes(key) || ['PC1', 'PC2'].includes(key) || formulas.some(formula => key === `formula-${formula.id}` || key === `formula_${formula.id}`);
+      const nextX = available(scatterXKey) ? scatterXKey : keys.includes('密度') ? '密度' : keys[0];
+      const nextY = available(scatterYKey) ? scatterYKey : keys.includes('熔体质量流动速率') ? '熔体质量流动速率' : keys.find(key => key !== nextX) ?? keys[0];
+      if (nextX !== scatterXKey) setScatterXKey(nextX);
+      if (nextY !== scatterYKey) setScatterYKey(nextY);
+    }, [numericProperties, formulas, scatterXKey, scatterYKey]);
+
+    const scatterProjection = useMemo(() => {
+      if (activeChart !== 'canvas_scatter') return { data: [] as Product[], xValues: [] as number[], yValues: [] as number[] };
+      if (['PC1', 'PC2'].includes(scatterXKey) || ['PC1', 'PC2'].includes(scatterYKey)) {
+        const keys = numericProperties.filter(key => !key.startsWith('formula_'));
+        const cohort = filteredData.filter(product => keys.length > 0 && keys.every(key => Number.isFinite(getVal(product, key))));
+        if (cohort.length < 2 || keys.length < 2) return { data: [], xValues: [], yValues: [] };
+        const matrix = cohort.map(product => keys.map(key => getVal(product, key)));
+        const scale = matrix.reduce((maximum, row) => row.reduce((m, value) => Math.max(m, Math.abs(value)), maximum), 0) || 1;
+        const { projected } = PCA.getComponents(matrix.map(row => row.map(value => value / scale)), 2);
+        return { data: cohort, xValues: cohort.map((product, i) => scatterXKey === 'PC1' ? projected[i]?.[0] : scatterXKey === 'PC2' ? projected[i]?.[1] : getVal(product, scatterXKey)), yValues: cohort.map((product, i) => scatterYKey === 'PC1' ? projected[i]?.[0] : scatterYKey === 'PC2' ? projected[i]?.[1] : getVal(product, scatterYKey)) };
+      }
+      return { data: filteredData, xValues: filteredData.map(product => getVal(product, scatterXKey)), yValues: filteredData.map(product => getVal(product, scatterYKey)) };
+    }, [activeChart, filteredData, numericProperties, getVal, scatterXKey, scatterYKey]);
+    const scatterSamples = useMemo(() => scatterProjection.data.flatMap((product, i) => {
+      const x = scatterProjection.xValues[i]; const y = scatterProjection.yValues[i];
+      return Number.isFinite(x) && Number.isFinite(y) ? [{ id: product.id, values: { [scatterXKey]: x, [scatterYKey]: y } }] : [];
+    }), [scatterProjection, scatterXKey, scatterYKey]);
+    useEffect(() => { void computeKMeans([], []); }, [scatterSamples, computeKMeans]);
+    useEffect(() => {
+      if (activeChart === 'canvas_scatter' && enablePareto && scatterXKey !== scatterYKey) {
+        computePareto(scatterSamples, [{ key: scatterXKey, minimize: paretoXDir === 'min' }, { key: scatterYKey, minimize: paretoYDir === 'min' }]);
+      } else { computePareto([], []); }
+    }, [activeChart, enablePareto, paretoXDir, paretoYDir, scatterXKey, scatterYKey, scatterSamples, computePareto]);
 
     const handleAddFilter = React.useCallback((key: string) => {
       if (!filters[key]) {
@@ -460,46 +458,22 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
 
     // --- Data Preparation Logic (Defensive) using filteredData ---
 
-    // 1. Radar Data: Percentile-based ranking for maximum visual differentiation
+    // Descriptive within-cohort midranks: no composite material-quality score.
     const radarData = useMemo(() => {
-      if (!filteredData || filteredData.length === 0)
-        return { series: [], indicators: [] };
-      try {
-        const source = filteredData.slice(0, 6);
-        
-        // Dynamic statistical map for the current filtered set to enable relative ranking
-        const stats: Record<string, number[]> = {};
-        RADAR_KEYS.forEach((key, idx) => {
-          stats[key] = filteredData.map(p => getPerformanceFingerprint(p)[idx]).filter(v => v > 0);
-        });
+      const source = filteredData.slice(0, 6);
+      if (!source.length) return { series: [], indicators: [] };
+      const keys = numericProperties.filter(key => !key.startsWith('formula_') && source.every(product => Number.isFinite(getVal(product, key)))).slice(0, 6);
+      if (keys.length < 3) return { series: [], indicators: [] };
+      const stats = keys.map(key => filteredData.map(product => getVal(product, key)).filter(Number.isFinite));
+      return {
+        indicators: keys.map(key => ({ name: tProp(key), max: 100 })),
+        series: source.map(product => ({ name: product.gradeName, value: keys.map((key, index) => {
+          const value = getVal(product, key); const sample = stats[index];
+          return 20 + 80 * (sample.filter(v => v < value).length + sample.filter(v => v === value).length / 2) / sample.length;
+        }) })),
+      };
+    }, [filteredData, numericProperties, getVal, tProp]);
 
-        const indicators = RADAR_KEYS.map((key) => {
-          const enKey = key === "流动性" ? "Flow" : 
-                        key === "硬度刚性" ? "Rigidity" :
-                        key === "耐热性" ? "Thermal" :
-                        key === "拉伸性能" ? "Tensile" :
-                        key === "冲击强度" ? "Impact" : "Quality";
-          return {
-            name: `${tProp(key)}\n${enKey}`,
-            max: 100, // Normalized ranking percentage
-          };
-        });
-
-        const series = source.map((p) => {
-          const raw = getPerformanceFingerprint(p);
-          return {
-            name: p.gradeName,
-            // Maps actual value to its percentile rank in the current group
-            value: raw.map((v, i) => materialEngine.normalizePercentile(v, stats[RADAR_KEYS[i]]))
-          };
-        });
-
-        return { series, indicators };
-      } catch (e) {
-        logger.error("Radar Prep Error:", e);
-        return { series: [], indicators: [] };
-      }
-    }, [filteredData, tProp]);
 
     // 2. Ashby Data: Auto-scaling Scatter Plot
     const ashbyData = useMemo(() => {
@@ -795,25 +769,14 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
         }
       }
 
-      // 2. Radar Chart - Quality Balance Score
-      const chartObj = currentChartData as { series?: { name: string; value: number[] }[] };
-      if (activeChart === 'radar' && chartObj?.series) {
-        const series = chartObj.series;
-        insight.content += `\n\n[${t("materialPerfBalance")}]`;
-        series.forEach((s) => {
-          if (Array.isArray(s.value)) {
-            const pi = materialEngine.calculatePerformanceIndex(s.value);
-            const typeLabel = pi > 80 ? t("allRounder") : pi > 50 ? t("balanced") : t("specialized");
-            insight.content += `\n- ${s.name}: ${t("balanceScore")} ${pi.toFixed(1)} (${typeLabel})`;
-          }
-        });
+      if (activeChart === 'radar') {
+        insight.content = language === 'en' ? 'Within-cohort midrank profiles on shared finite properties. Axis values and polygon area are descriptive; they are not a quality score or certification.' : '共同有效属性的组内中位秩轮廓。坐标值与多边形面积仅用于描述，不是材料质量评分或认证。';
       }
-      
       return insight;
     }, [activeChart, currentChartData, language, t]);
 
     return (
-      <div className="flex flex-col lg:flex-row h-full gap-4 overflow-y-auto lg:overflow-hidden custom-scrollbar">
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row gap-4 overflow-y-auto lg:overflow-hidden custom-scrollbar">
         {/* Scientific Controls Sidebar */}
         <div
           className={`flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl lg:rounded-3xl transition-all duration-500 ease-out shrink-0 overflow-hidden shadow-xl print:hidden ${showConfig ? "w-full lg:w-72 opacity-100 translate-x-0" : "w-0 opacity-0 -translate-x-10 border-0 pointer-events-none"}`}
@@ -1022,7 +985,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                         }}
                         className="w-full py-2 bg-purple-500 text-white rounded font-bold text-xs hover:bg-purple-600 transition-colors"
                     >
-                       🔮 Auto PCA Projection
+                       {language === "en" ? "PCA projection" : "主成分投影"}
                     </motion.button>
                     <motion.button
                         whileHover={{ scale: 1.02 }}
@@ -1031,16 +994,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                            if (Object.keys(clusters).length > 0) {
                               computeKMeans([], []);
                            } else {
-                              const keys = Array.from(new Set(data.flatMap(p => Object.keys(p.properties || {})))).filter(k => {
-                                 const v = filteredData[0]?.properties?.[k]?.value;
-                                 return v !== undefined && !isNaN(parseFloat(String(v)));
-                              });
-                              const dataPayload = filteredData.map(d => {
-                                  const v: Record<string, number> = {};
-                                  keys.forEach(k => v[k] = parseFloat(String(d.properties?.[k]?.value)) || 0);
-                                  return { id: d.id, values: v };
-                              });
-                              computeKMeans(dataPayload, keys);
+                              void computeKMeans(scatterSamples, [...new Set([scatterXKey, scatterYKey])]);
                            }
                         }}
                         className={`w-full py-2 rounded font-bold text-xs transition-colors flex items-center justify-center gap-2 ${
@@ -1054,18 +1008,19 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                     <div>
                       <label className="text-xs font-bold text-slate-500 block mb-2">{language === "en" ? "X Axis" : "X 轴映射"}</label>
                       <select 
+                        aria-label={language === "en" ? "Scatter X axis" : "散点图 X 轴"}
                         value={scatterXKey} 
                         onChange={e => setScatterXKey(e.target.value)}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
                       >
                          <optgroup label={language === "en" ? "Properties" : "物理属性"}>
-                            {Array.from(new Set(data.flatMap(p => Object.keys(p.properties || {})))).map(key => (
-                              <option key={key} value={key}>{key}</option>
+                            {numericProperties.filter(key => !key.startsWith('formula_')).map(key => (
+                              <option key={key} value={key}>{tProp(key)}</option>
                             ))}
                          </optgroup>
                          {formulas.length > 0 && (
                            <optgroup label={language === "en" ? "Formulas" : "计算公式"}>
-                              {formulas.map(f => <option key={f.id} value={`formula-${f.id}`}>{f.name}</option>)}
+                              {formulas.map(f => <option key={f.id} value={`formula-${f.id}`}>{tProp(f.name)}</option>)}
                            </optgroup>
                          )}
                          <optgroup label={language === "en" ? "PCA Projection" : "主成分降维投影"}>
@@ -1077,18 +1032,19 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                     <div>
                       <label className="text-xs font-bold text-slate-500 block mb-2">{language === "en" ? "Y Axis" : "Y 轴映射"}</label>
                       <select 
+                        aria-label={language === "en" ? "Scatter Y axis" : "散点图 Y 轴"}
                         value={scatterYKey} 
                         onChange={e => setScatterYKey(e.target.value)}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
                       >
                          <optgroup label={language === "en" ? "Properties" : "物理属性"}>
-                            {Array.from(new Set(data.flatMap(p => Object.keys(p.properties || {})))).map(key => (
-                              <option key={key} value={key}>{key}</option>
+                            {numericProperties.filter(key => !key.startsWith('formula_')).map(key => (
+                              <option key={key} value={key}>{tProp(key)}</option>
                             ))}
                          </optgroup>
                          {formulas.length > 0 && (
                            <optgroup label={language === "en" ? "Formulas" : "计算公式"}>
-                              {formulas.map(f => <option key={f.id} value={`formula-${f.id}`}>{f.name}</option>)}
+                              {formulas.map(f => <option key={f.id} value={`formula-${f.id}`}>{tProp(f.name)}</option>)}
                            </optgroup>
                          )}
                          <optgroup label={language === "en" ? "PCA Projection" : "主成分降维投影"}>
@@ -1210,7 +1166,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                             <label className="text-xs font-bold text-slate-500 block mb-1">Similarity Threshold: {(similarityThreshold * 100).toFixed(0)}%</label>
                             <input 
                                type="range" min="0.5" max="0.99" step="0.01" value={similarityThreshold}
-                               onChange={e => setSimilarityThreshold(parseFloat(e.target.value))}
+                               onChange={e => setSimilarityThreshold(safeParse(e.target.value))}
                                className="w-full accent-amber-500"
                             />
                          </div>
@@ -1255,7 +1211,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     onChange={e => setRsmX1Key(e.target.value)}
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                                 >
-                                    {numericProperties.map(key => <option key={key} value={key}>{key}</option>)}
+                                    {numericProperties.map(key => <option key={key} value={key}>{tProp(key)}</option>)}
                                 </select>
                             </div>
                             <div>
@@ -1267,7 +1223,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     onChange={e => setRsmX2Key(e.target.value)}
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                                 >
-                                    {numericProperties.map(key => <option key={key} value={key}>{key}</option>)}
+                                    {numericProperties.map(key => <option key={key} value={key}>{tProp(key)}</option>)}
                                 </select>
                             </div>
                             <div>
@@ -1279,7 +1235,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     onChange={e => setRsmYKey(e.target.value)}
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                                 >
-                                    {numericProperties.map(key => <option key={key} value={key}>{key}</option>)}
+                                    {numericProperties.map(key => <option key={key} value={key}>{tProp(key)}</option>)}
                                 </select>
                             </div>
                             <motion.button
@@ -1327,7 +1283,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     onChange={e => setFiTargetKey(e.target.value)}
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 outline-none"
                                 >
-                                    {numericProperties.map(key => <option key={key} value={key}>{key}</option>)}
+                                    {numericProperties.map(key => <option key={key} value={key}>{tProp(key)}</option>)}
                                 </select>
                             </div>
                             <motion.button
@@ -1377,7 +1333,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     onChange={e => setKdeXKey(e.target.value)}
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
                                 >
-                                    {numericProperties.map(key => <option key={key} value={key}>{key}</option>)}
+                                    {numericProperties.map(key => <option key={key} value={key}>{tProp(key)}</option>)}
                                 </select>
                             </div>
                             <div>
@@ -1389,7 +1345,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     onChange={e => setKdeYKey(e.target.value)}
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none"
                                 >
-                                    {numericProperties.map(key => <option key={key} value={key}>{key}</option>)}
+                                    {numericProperties.map(key => <option key={key} value={key}>{tProp(key)}</option>)}
                                 </select>
                             </div>
                             <motion.button
@@ -1438,7 +1394,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-500 outline-none"
                                 >
                                     <option value="">{language === "en" ? "-- Select Analysis Property --" : "-- 选择分析属性 --"}</option>
-                                    {numericProperties.map(key => <option key={key} value={key}>{key}</option>)}
+                                    {numericProperties.map(key => <option key={key} value={key}>{tProp(key)}</option>)}
                                 </select>
                             </div>
                             <motion.button
@@ -1546,7 +1502,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     onChange={e => setCopulaXKey(e.target.value)}
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-fuchsia-500 outline-none"
                                 >
-                                    {numericProperties.map(key => <option key={key} value={key}>{key}</option>)}
+                                    {numericProperties.map(key => <option key={key} value={key}>{tProp(key)}</option>)}
                                 </select>
                             </div>
                             <div>
@@ -1556,7 +1512,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     onChange={e => setCopulaYKey(e.target.value)}
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-fuchsia-500 outline-none"
                                 >
-                                    {numericProperties.map(key => <option key={key} value={key}>{key}</option>)}
+                                    {numericProperties.map(key => <option key={key} value={key}>{tProp(key)}</option>)}
                                 </select>
                             </div>
                             <motion.button
@@ -1711,7 +1667,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 >
                                     <option value="">-- {language === "en" ? "Select Target Property" : "未指定 Y"} --</option>
                                     {numericProperties.map(key => (
-                                        <option key={key} value={key}>{key}</option>
+                                        <option key={key} value={key}>{tProp(key)}</option>
                                     ))}
                                 </select>
                             </div>
@@ -1729,7 +1685,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                                     type="number"
                                                     value={sobolVariances[key] || ""}
                                                     onChange={e => {
-                                                        const val = parseFloat(e.target.value);
+                                                        const val = safeParse(e.target.value);
                                                         setSobolVariances(prev => ({
                                                             ...prev,
                                                             [key]: isNaN(val) ? 0 : val
@@ -2596,9 +2552,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
             )}
           </div>
 
-          <div className="flex-1 w-full h-full p-4 relative">
-            {/* Scientific Expert Overlay */}
-            <div className="absolute top-6 left-6 z-30 max-w-xs md:max-w-md pointer-events-none">
+          <div className="shrink-0 px-4 pt-3">
+            {/* Explanation occupies layout space, never covers data. */}
+            <div className="w-full">
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -2620,6 +2576,8 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
               </motion.div>
             </div>
 
+          </div>
+          <div className="relative min-h-0 flex-1 w-full p-4">
             <Suspense fallback={
               <div className="absolute inset-0 flex items-center justify-center bg-white/30 dark:bg-slate-950/30 backdrop-blur-xs">
                 <div className="flex flex-col items-center gap-3">
@@ -2629,7 +2587,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
               </div>
             }>
             {activeChart === "correlation" ? (
-                <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
+                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white">{language === "en" ? "Spearman Rank Correlation Heatmap" : "Spearman 秩相关热力图"}</h3>
                       <p className="text-sm text-slate-500">{language === "en" ? `Discover hidden non-linear relationships across ${filteredData.length} materials.` : `在 ${filteredData.length} 种材料间发现潜在的非线性关联。`}</p>
@@ -2639,54 +2597,22 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                           data={filteredData} 
                           keys={Array.from(new Set(data.flatMap(p => Object.keys(p.properties || {})))).filter(k => {
                               const v = filteredData[0]?.properties?.[k]?.value;
-                              return v !== undefined && !isNaN(parseFloat(String(v)));
+                              return v !== undefined && !isNaN(safeParse(String(v)));
                           })} 
                        />
                    </div>
                 </div>
-            ) : activeChart === "canvas_scatter" ? (() => {
-               let xVals: number[] = [];
-               let yVals: number[] = [];
-               
-               if (scatterXKey === "PC1" || scatterYKey === "PC2" || scatterXKey === "PC2" || scatterYKey === "PC1") {
-                  // Run PCA
-                  const pcaKeys = Array.from(new Set(data.flatMap(p => Object.keys(p.properties || {})))).filter(k => {
-                      const v = filteredData[0]?.properties?.[k]?.value;
-                      return v !== undefined && !isNaN(parseFloat(String(v)));
-                  });
-                  const mat = filteredData.map(d => pcaKeys.map(k => parseFloat(String(d.properties?.[k]?.value)) || 0));
-                  const { projected } = PCA.getComponents(mat, 2);
-                  if (projected.length === filteredData.length) {
-                      xVals = projected.map(p => scatterXKey === "PC1" ? p[0] : scatterXKey === "PC2" ? p[1] : 0);
-                      yVals = projected.map(p => scatterYKey === "PC1" ? p[0] : scatterYKey === "PC2" ? p[1] : 0);
-                  }
-               } else {
-                  xVals = scatterXKey.startsWith('formula-') 
-                     ? filteredData.map(p => formulaExecutor(p)[scatterXKey.replace('formula-', '')] || 0) 
-                     : filteredData.map(p => parseFloat(String(p.properties?.[scatterXKey]?.value)) || 0);
-                  yVals = scatterYKey.startsWith('formula-') 
-                     ? filteredData.map(p => formulaExecutor(p)[scatterYKey.replace('formula-', '')] || 0) 
-                     : filteredData.map(p => parseFloat(String(p.properties?.[scatterYKey]?.value)) || 0);
-               }
-
-               return (
-                <div className="absolute inset-0 pt-32 pb-10 px-8">
-                    <CanvasScatterGraph 
-                        data={filteredData}
-                        xKey={scatterXKey}
-                        yKey={scatterYKey}
-                        xLabel={scatterXKey.startsWith('formula-') ? formulas.find(f => f.id === scatterXKey.replace('formula-', ''))?.name || scatterXKey : scatterXKey}
-                        yLabel={scatterYKey.startsWith('formula-') ? formulas.find(f => f.id === scatterYKey.replace('formula-', ''))?.name || scatterYKey : scatterYKey}
-                        xValues={xVals}
-                        yValues={yVals}
-                        clusters={Object.keys(clusters).length > 0 ? clusters : undefined}
-                        paretoFrontIds={enablePareto ? paretoFrontIds : undefined}
-                        enableConvexHull={enableConvexHull}
-                    />
+            ) : activeChart === "canvas_scatter" ? (
+                <div className="absolute inset-0 p-4">
+                    <CanvasScatterGraph data={scatterProjection.data} xKey={scatterXKey} yKey={scatterYKey}
+                      xLabel={tProp(formulas.find(f => f.id === scatterXKey.replace(/^formula[-_]/, ''))?.name ?? scatterXKey)}
+                      yLabel={tProp(formulas.find(f => f.id === scatterYKey.replace(/^formula[-_]/, ''))?.name ?? scatterYKey)}
+                      xValues={scatterProjection.xValues} yValues={scatterProjection.yValues} language={language}
+                      clusters={Object.keys(clusters).length > 0 ? clusters : undefined}
+                      paretoFrontIds={enablePareto ? paretoFrontIds : undefined} enableConvexHull={enableConvexHull} />
                 </div>
-               );
-            })() : activeChart === "similarity_graph" ? (
-                <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
+            ) : activeChart === "similarity_graph" ? (
+                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white">{language === "en" ? "Material Similarity Network" : "材料相似度网络"}</h3>
                       <p className="text-sm text-slate-500">{language === "en" ? "Cosine similarity representation highlighting identical performance topological regions based on selected dimensions." : "基于余弦相似度的网络图，凸显在所选性能维度下具有相似表现的拓扑区域。"}</p>
@@ -2707,7 +2633,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    </div>
                 </div>
             ) : activeChart === "rsm" ? (
-                <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
+                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white">{language === "en" ? "Response Surface Methodology (RSM) Optimization" : "响应面法 (RSM) 高通量配方优化"}</h3>
                       <p className="text-sm text-slate-500">{language === "en" ? "Multivariant Quadratic Surface Regression predicting optimal stationary points based on empirical data." : "多变量二次曲面回归模型，根据经验数据预测最佳性能极值点（鞍点或峰值）。"}</p>
@@ -2715,7 +2641,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    <div className="flex-1 overflow-hidden relative">
                        {rsmError ? (
                            <div className="absolute inset-0 flex items-center justify-center text-rose-500 font-bold text-sm bg-rose-50/50 rounded-2xl">
-                               无法计算: {rsmError}
+                                {language === "en" ? "Calculation unavailable: " : "无法计算："}{rsmError}
                            </div>
                        ) : isCalculatingRsm ? (
                            <div className="absolute inset-0 flex items-center justify-center text-indigo-500 flex-col gap-2">
@@ -2724,7 +2650,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                            </div>
                        ) : !rsmResult ? (
                            <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-bold text-sm">
-                               请在左侧面板选择变量并点击计算开始 RSM 分析。
+                                {language === "en" ? "Select variables in the left panel and run the RSM analysis." : "请在左侧面板选择变量并点击计算开始 RSM 分析。"}
                            </div>
                        ) : (
                            <div className="w-full h-full flex gap-4">
@@ -2784,7 +2710,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    </div>
                 </div>
             ) : activeChart === "feature_importance" ? (
-                <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
+                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white">{language === "en" ? "Feature Sensitivity Attribution (Feature Importance)" : "特征敏感度归因 (Feature Importance)"}</h3>
                       <p className="text-sm text-slate-500">{language === "en" ? <span>Multivariate regression analysis revealing the weight of each factor on the target property <strong>{fiTargetKey}</strong>.</span> : <span>多变量组合回归分析，揭示每一个特征要素对目标指标 <strong>{fiTargetKey}</strong> 的统计权重及影响度。</span>}</p>
@@ -2811,7 +2737,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    </div>
                 </div>
             ) : activeChart === "kde_topology" ? (
-                <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
+                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white">{language === "en" ? "Gaussian Topology 2D KDE Density (2D KDE Contour)" : "高斯拓扑等高密度热力谱 (2D KDE Contour)"}</h3>
                       <p className="text-sm text-slate-500">{language === "en" ? "2D Kernel Density Estimation mapping inner congestion and competitive layout of material formulations globally." : "二维核密度估计 (KDE)，全局映射材料配方的数据分布密集度及竞争格局空间拓扑分布。"}</p>
@@ -2843,7 +2769,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    </div>
                 </div>
             ) : activeChart === "weibull" ? (
-                <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
+                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white">{language === "en" ? "Batch Reliability Assessment (Weibull Reliability Analysis)" : "批次可靠性评估 (Weibull Reliability Analysis)"}</h3>
                       <p className="text-sm text-slate-500">{language === "en" ? "2-Parameter Weibull distribution fit to predict material failure probability and characteristic life thresholds." : "两参数威布尔分布模型拟合，用以预测材料的失效概率分布与特征寿命/特征强度阈值。"}</p>
@@ -2886,7 +2812,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                                 <span>Scale Parameter (η):</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{weibullResult.eta.toFixed(3)}</span>
                                             </div>
                                             <div className="flex justify-between border-b border-cyan-200/50 pb-1">
-                                                <span>R² (拟合优度):</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{weibullResult.rSquared.toFixed(4)}</span>
+                                                 <span>{language === "en" ? "R² (goodness of fit):" : "R²（拟合优度）："}</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{weibullResult.rSquared.toFixed(4)}</span>
                                             </div>
                                             <div className="flex justify-between font-black text-cyan-600 dark:text-cyan-400 pt-1">
                                                 <span>{language === "en" ? "95% Reliability Lower Limit:" : "95% 可靠性底线极限:"}</span> <span>{weibullResult.safeValue95.toFixed(3)}</span>
@@ -2903,7 +2829,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    </div>
                 </div>
             ) : activeChart === "wlf_tts" ? (
-                <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
+                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white">{language === "en" ? "Polymer Time-Temperature Superposition (WLF TTS Master Curve)" : "高分子时温等效 (WLF TTS Master Curve)"}</h3>
                       <p className="text-sm text-slate-500">Constructs a broad-frequency Master Curve from multi-temperature dynamic rheology using Williams-Landel-Ferry (WLF) shift factors.</p>
@@ -2973,7 +2899,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    </div>
                 </div>
             ) : activeChart === "copula" ? (
-                <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
+                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white">{language === "en" ? "Bivariate Gaussian Copula Joint Failure Analysis" : "高斯关联 Copula 联合失效概率分析 (Bivariate Gaussian Copula)"}</h3>
                       <p className="text-sm text-slate-500">{language === "en" ? <span>Transforming marginal distributions to uncouple dual-variable dependencies to compute <strong>joint probability of failure</strong>.</span> : <span>通过转换边缘分布以解耦双变量依赖关系，从而计算材料面临极值工况时的<strong>联合失效概率</strong>。</span>}</p>
@@ -3044,7 +2970,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                         
                                         {jointFailureProb !== null && (
                                             <div className="pt-3 border-t border-fuchsia-200 dark:border-fuchsia-800/50">
-                                                <div className="text-[10px] font-bold uppercase text-fuchsia-600 dark:text-fuchsia-400 mb-1">P(X &lt; 限值 ∩ Y &lt; 限值)</div>
+                                                 <div className="text-[10px] font-bold normal-case text-fuchsia-600 dark:text-fuchsia-400 mb-1">{language === "en" ? "P(X < threshold ∩ Y < threshold)" : "P(X < 限值 ∩ Y < 限值)"}</div>
                                                 <div className="text-2xl font-black text-fuchsia-600 dark:text-fuchsia-400">
                                                     {(jointFailureProb * 100).toFixed(2)}%
                                                 </div>
@@ -3079,7 +3005,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    </div>
                 </div>
             ) : activeChart === "arrhenius" ? (
-                <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
+                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2"><Flame className="text-orange-500"/> {language === "en" ? "Thermal Oxidative Aging Life Extrapolation (Arrhenius Plot)" : "热氧老化寿命预测 (Arrhenius Plot)"}</h3>
                       <p className="text-sm text-slate-500">{language === "en" ? "Estimating Activation Energy from high-temperature accelerated aging, extrapolating lifespan at ambient conditions." : "通过高温加速老化实测数据推算表观活化能，外推/预测常温或服役工况下的材料预期耐候寿命。"}</p>
@@ -3116,7 +3042,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                                 <span>{language === "en" ? "Apparent Activation Energy Ea:" : "表观活化能 Ea:"}</span> <span className="font-mono font-bold bg-white/50 dark:bg-black/20 px-1 rounded">{arrheniusResult.ea.toFixed(2)} kJ/mol</span>
                                             </div>
                                             <div className="flex justify-between border-b border-orange-200/50 dark:border-orange-800/50 pb-2">
-                                                <span>R² (拟合优度):</span> <span className="font-mono font-bold bg-white/50 dark:bg-black/20 px-1 rounded">{arrheniusResult.rSquared.toFixed(4)}</span>
+                                                 <span>{language === "en" ? "R² (goodness of fit):" : "R²（拟合优度）："}</span> <span className="font-mono font-bold bg-white/50 dark:bg-black/20 px-1 rounded">{arrheniusResult.rSquared.toFixed(4)}</span>
                                             </div>
                                             <div className="flex justify-between pb-1">
                                                 <span>{language === "en" ? "Pre-exponential Factor (ln A):" : "指前因子 (ln A):"}</span> <span className="font-mono font-bold">{arrheniusResult.equation.b.toFixed(2)}</span>
@@ -3160,7 +3086,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    </div>
                 </div>
             ) : activeChart === "sobol" ? (
-                <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
+                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2"><Activity className="text-indigo-500"/> {language === "en" ? "Sobol Sensitivity Variance Decomposition" : "Sobol 方差分解敏感度分析"}</h3>
                       <p className="text-sm text-slate-500">{language === "en" ? "Global Sensitivity Analysis evaluating main effects and interaction variance contributions using Quasi-Monte Carlo." : "全局敏感度分析，通过拟蒙特卡洛积分抽样（Quasi-Monte Carlo），评估配方中不同组分对最终性能波动的主效应和交互方差贡献。"}</p>
@@ -3192,7 +3118,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    </div>
                 </div>
             ) : activeChart === "spc" ? (
-                <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
+                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2"><Factory className="text-emerald-500"/> {language === "en" ? "SPC Capability Assessment (Process Capability)" : "SPC 制程控制与工序能力分析"}</h3>
                       <p className="text-sm text-slate-500">Statistical Process Control. Computing capability indices (Cp, Cpk) and evaluating process potential using 3-Sigma limits against specified tolerances.</p>
@@ -3302,7 +3228,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    </div>
                 </div>
             ) : activeChart === "bayes" ? (
-                <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
+                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2"><BrainCircuit className="text-pink-500"/> {language === "en" ? "Bayesian Autonomous Inverse Design (Gaussian Process)" : "基于高斯过程的贝叶斯逆向设计 (Bayesian Optimization)"}</h3>
                       <p className="text-sm text-slate-500">{language === "en" ? "Constructing Gaussian Process to infer posterior mean and variance, and querying Expected Improvement for optimal next exploration point." : "通过构建高斯过程回归推断后验均值与方差，利用期望提升 (Expected Improvement, EI) 策略进行下一个最优采样点的智能推荐。"}</p>
@@ -3367,7 +3293,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    </div>
                 </div>
             ) : activeChart === "moo" ? (
-                <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
+                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2"><GitMerge className="text-orange-500"/> {language === "en" ? "Pareto Frontier Exploration (Multi-Objective Pareto)" : "多目标帕累托前沿探索 (Multi-Objective Pareto)"}</h3>
                       <p className="text-sm text-slate-500">{language === "en" ? "Constructs parallel independent GP surrogates for selected properties and resolves non-dominated Pareto Front using scalarized candidate ranking." : "为多个目标特征分别构建并行的高斯过程代理模型，并使用切比雪夫标量化及非支配排序等算法解算多目标帕累托前沿。"}</p>
@@ -3398,7 +3324,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    </div>
                 </div>
             ) : activeChart === "mahalanobis" ? (
-                <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
+                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2"><Target className="text-rose-600"/> {language === "en" ? "Multivariate Mahalanobis Anomaly Detection (Mahalanobis Anomaly)" : "多元马氏距离异常检测 (Mahalanobis Anomaly)"}</h3>
                       <p className="text-sm text-slate-500">Based on multivariate normal distribution assumption. Uses inverted covariance matrix to find Mahalanobis distance ($D^2$) and evaluate against Chi-Square thresholds.</p>
@@ -3470,7 +3396,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    </div>
                 </div>
             ) : activeChart === "kinetics" ? (
-                <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
+                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2"><Zap className="text-teal-500"/> {language === "en" ? "Non-isothermal Curing Kinetics (Kissinger/Friedman)" : "非等温固化动力学 (Kissinger/Friedman Model)"}</h3>
                       <p className="text-sm text-slate-500">{language === "en" ? "Deriving curing activation energy and pre-exponential factor via OLS Linear Regression from DSC thermal profiles." : "基于在不同升温速率下通过 DSC 获取的固化放热峰温度 (Tp)，运用 OLS 线性回归推导出体系固化表观活化能与指前因子。"}</p>
@@ -3534,7 +3460,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    </div>
                 </div>
             ) : activeChart === "prony" ? (
-                <div className="absolute inset-0 pt-32 pb-10 px-8 flex flex-col">
+                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2"><Activity className="text-purple-500"/> {language === "en" ? "Generalized Maxwell / Prony Series Constitutive Extraction" : "广义麦克斯韦/Prony级数提取 (Prony Series)"}</h3>
                       <p className="text-sm text-slate-500">Extracts viscoelastic material constants E_inf, E_i, tau_i from master curves using Non-Negative Projected Gradient Descent.</p>
@@ -3601,7 +3527,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                                 }}
                                                 className="text-white hover:text-teal-400 text-xs px-3 py-1 bg-slate-800 rounded shadow border border-slate-600"
                                             >
-                                                复制卡片 / Copy Data
+                                                 {language === "en" ? "Copy data" : "复制卡片"}
                                             </motion.button>
                                         </div>
                                         <textarea 
@@ -3666,3 +3592,5 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
     );
   },
 );
+
+function safeParse(value: unknown, fallback = Number.NaN): number { return parseFiniteReal(value) ?? fallback; }

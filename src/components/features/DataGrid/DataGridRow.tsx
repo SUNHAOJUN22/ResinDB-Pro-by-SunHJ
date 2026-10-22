@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { QuickEditOverlay } from "./QuickEditOverlay";
+import { admittedPropertyValue } from "@/lib/propertyAdmission";
+import { parseFiniteReal } from "@/lib/quantityRecord";
 
 const renderCellContent = (
   val: unknown,
@@ -31,7 +33,7 @@ const renderCellContent = (
   }
 
   if (typeof val === "number") {
-    if (isNaN(val))
+    if (!Number.isFinite(val))
       return (
         <span className="text-slate-300 dark:text-slate-700 font-mono">-</span>
       );
@@ -46,7 +48,7 @@ const renderCellContent = (
         </span>
         {unit && (
           <span
-            className={`font-black uppercase tracking-tighter ${isBest ? "text-emerald-500/70" : isAnomaly ? "text-rose-500/70" : "text-slate-400"} ${isCompact ? "text-[10px]" : "text-[11px]"}`}
+            className={`font-black normal-case tracking-tighter ${isBest ? "text-emerald-500/70" : isAnomaly ? "text-rose-500/70" : "text-slate-400"} ${isCompact ? "text-[10px]" : "text-[11px]"}`}
           >
             {unit}
           </span>
@@ -240,7 +242,7 @@ export const DataGridRow = React.memo(
               />
             </div>
             <span
-              title="Material Data Quality Score: Evaluates Identification (25%), Core Specs (45%), Technical Depth (20%), and Data Richness (10%)."
+              title={language === "zh" ? "数据完整度评分：身份信息占25%、核心属性占45%、技术深度占20%、数据丰富度占10%。不代表材料性能或认证。" : "Record completeness score: identification (25%), core fields (45%), technical depth (20%), and richness (10%). This is not a material performance score or certification."}
               className={`font-mono text-xs tabular-nums cursor-help underline decoration-dotted decoration-slate-300 dark:decoration-slate-700 ${score > 80 ? "text-emerald-600 group-hover:text-emerald-400" : score > 50 ? "text-amber-600 group-hover:text-amber-400" : "text-rose-600 group-hover:text-rose-400"}`}
             >
               {score}%
@@ -253,14 +255,11 @@ export const DataGridRow = React.memo(
 
           let isBest = false;
           if (!col.isSystem) {
-            const val =
-              col.isComputed && col.formulaId
-                ? computedValues[col.formulaId]
-                : p.properties?.[col.key]?.value;
-
-            const numVal = parseFloat(String(val));
+            const numVal = col.isComputed && col.formulaId
+              ? parseFiniteReal(computedValues[col.formulaId])
+              : admittedPropertyValue(p.properties?.[col.key]);
             if (
-              !isNaN(numVal) &&
+              numVal !== null &&
               columnExtremes[col.key] !== undefined &&
               columnExtremes[col.key] === numVal
             ) {
@@ -465,7 +464,7 @@ export const DataGridRow = React.memo(
                       setQuickEditColKey(col.key);
                     }}
                     className="p-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-primary-600 dark:hover:text-primary-400 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors outline-none cursor-pointer"
-                    title={t("快速编辑", "Quick Edit")}
+                    title={t("quickEdit")}
                   >
                     <Edit size={10} />
                   </motion.button>
