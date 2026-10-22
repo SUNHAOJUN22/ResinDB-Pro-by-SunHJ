@@ -23,7 +23,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: '22.12.0'
+          node-version-file: .nvmrc
           cache: npm
       - name: Install frozen dependencies
         run: npm ci

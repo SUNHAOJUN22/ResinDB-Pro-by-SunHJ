@@ -23,7 +23,7 @@ npm ci
 npm run dev -- --host 127.0.0.1
 ```
 
-Use Node 22.23.3 from `.nvmrc` (engine range >=22.12.0 <23). The initial demo workspace contains 13 demo records; always review the live count. KaTeX and its fonts are bundled locally, without a formula CDN. Build with `npm run build` and inspect with `npm run preview`; deployment settings are in [.env.example](.env.example).
+Use Node 22.23.3 from `.nvmrc` (engine range >=22.13.0 <23). The initial demo workspace contains 13 demo records; always review the live count. KaTeX and its fonts are bundled locally, without a formula CDN. Build with `npm run build` and inspect with `npm run preview`; deployment settings are in [.env.example](.env.example).
 
 ## Working strategy
 

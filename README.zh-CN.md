@@ -23,7 +23,7 @@ npm ci
 npm run dev -- --host 127.0.0.1
 ```
 
-使用 `.nvmrc` 指定的 Node 22.23.3（引擎范围 >=22.12.0 <23）。首次进入演示工作区显示 13 条演示记录，实际数量始终以界面为准。KaTeX 与字体随本地构建打包，不依赖外部公式 CDN。生产构建运行 `npm run build`，用 `npm run preview` 预览；部署设置参见 [.env.example](.env.example)。
+使用 `.nvmrc` 指定的 Node 22.23.3（引擎范围 >=22.13.0 <23）。首次进入演示工作区显示 13 条演示记录，实际数量始终以界面为准。KaTeX 与字体随本地构建打包，不依赖外部公式 CDN。生产构建运行 `npm run build`，用 `npm run preview` 预览；部署设置参见 [.env.example](.env.example)。
 
 ## 使用策略
 
