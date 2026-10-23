@@ -1,4 +1,5 @@
 import type { EChartsOption } from '@/lib/echarts';
+import type { Language } from '@/types/index';
 
 export type ScientificFigureTheme = 'light' | 'dark';
 export const SCIENTIFIC_FIGURE_POLICY_VERSION = 'scientific-figure-policy-1.2.0';
@@ -27,6 +28,7 @@ export interface ScientificFigureContext {
   exportName?: string;
   dataCount?: number;
   reducedMotion?: boolean;
+  language?: Language;
 }
 
 export function scientificTooltipItem(params: unknown): Record<string, unknown> | null {
@@ -111,7 +113,7 @@ export function applyScientificFigurePolicy(option: EChartsOption, context: Scie
     animation: animate, animationDuration: animate ? 260 : 0, animationDurationUpdate: animate ? 180 : 0,
     textStyle: { color: scientificTextColor(theme), fontFamily: SCIENTIFIC_FONT_FAMILY, ...(source.textStyle as object | undefined) },
     aria: {
-      enabled: true, description: context.description ?? context.title ?? 'Scientific figure',
+      enabled: true, description: context.description ?? context.title ?? (context.language === 'zh' ? '科学图表' : 'Scientific figure'),
       decal: { show: false }, ...(source.aria as object | undefined),
     },
     tooltip: {
@@ -134,6 +136,7 @@ export function applyScientificFigurePolicy(option: EChartsOption, context: Scie
       feature: {
         ...feature,
         saveAsImage: {
+          title: context.language === 'zh' ? '保存图片' : 'Save as image',
           name: context.exportName ?? 'scientific-figure', pixelRatio: 3,
           backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff', ...saveAsImage,
         },

@@ -1,3 +1,4 @@
+import { empiricalCdf } from '@/compute/gaussianCopula';
 import { admittedPropertyValue } from '@/lib/propertyAdmission';
 import { parseFiniteReal } from '@/lib/quantityRecord';
 import React, {
@@ -938,6 +939,8 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
               ].map((item) => (
                 <motion.button
                   key={item.id}
+                  data-chart-mode={item.id}
+                  aria-pressed={activeChart === item.id}
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => setActiveChart(item.id as ViewChartType)}
@@ -1205,6 +1208,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                   {language === "en" ? "Variable X1 (e.g. Content 1)" : "变量 X1 (如含量1)"}
                                 </label>
                                 <select 
+                                    aria-label="RSM X1"
                                     value={rsmX1Key} 
                                     onChange={e => setRsmX1Key(e.target.value)}
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -1217,6 +1221,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                   {language === "en" ? "Variable X2 (e.g. Content 2)" : "变量 X2 (如含量2)"}
                                 </label>
                                 <select 
+                                    aria-label="RSM X2"
                                     value={rsmX2Key} 
                                     onChange={e => setRsmX2Key(e.target.value)}
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -1229,6 +1234,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                   {language === "en" ? "Target Response Y" : "目标响应 Y (性能追求值)"}
                                 </label>
                                 <select 
+                                    aria-label="RSM Y"
                                     value={rsmYKey} 
                                     onChange={e => setRsmYKey(e.target.value)}
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -1496,6 +1502,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                             <div>
                                 <label className="text-xs font-bold text-slate-500 block mb-2">{language === "en" ? "Variable X" : "变量 X"}</label>
                                 <select 
+                                    aria-label="Copula X"
                                     value={copulaXKey} 
                                     onChange={e => setCopulaXKey(e.target.value)}
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-fuchsia-500 outline-none"
@@ -1506,6 +1513,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                             <div>
                                 <label className="text-xs font-bold text-slate-500 block mb-2">{language === "en" ? "Variable Y" : "变量 Y"}</label>
                                 <select 
+                                    aria-label="Copula Y"
                                     value={copulaYKey} 
                                     onChange={e => setCopulaYKey(e.target.value)}
                                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-fuchsia-500 outline-none"
@@ -2056,7 +2064,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                     <div className="border-t border-slate-100 dark:border-slate-800 pt-4 mb-3">
                         <div className="flex items-center gap-2 font-black text-sm text-slate-800 dark:text-white uppercase tracking-widest mb-3">
                             <Target size={16} className="text-rose-600" />
-                            Mahalanobis Anomaly
+                            {language === "en" ? "Mahalanobis screening" : "马氏距离筛查"}
                         </div>
                         <div className="space-y-3">
                             <div>
@@ -2580,7 +2588,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
               <div className="absolute inset-0 flex items-center justify-center bg-white/30 dark:bg-slate-950/30 backdrop-blur-xs">
                 <div className="flex flex-col items-center gap-3">
                   <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
-                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">Loading Scientific Engine...</span>
+                  <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">{language === "en" ? "Loading scientific engine..." : "正在加载科学计算引擎……"}</span>
                 </div>
               </div>
             }>
@@ -2631,10 +2639,10 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    </div>
                 </div>
             ) : activeChart === "rsm" ? (
-                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
+                <div data-advanced-figure-panel="rsm" className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
-                      <h3 className="text-lg font-black text-slate-800 dark:text-white">{language === "en" ? "Response Surface Methodology (RSM) Optimization" : "响应面法 (RSM) 高通量配方优化"}</h3>
-                      <p className="text-sm text-slate-500">{language === "en" ? "Multivariant Quadratic Surface Regression predicting optimal stationary points based on empirical data." : "多变量二次曲面回归模型，根据经验数据预测最佳性能极值点（鞍点或峰值）。"}</p>
+                      <h3 className="text-lg font-black text-slate-800 dark:text-white">{language === "en" ? "Quadratic response-surface modeling (RSM)" : "二次响应面建模（RSM）"}</h3>
+                      <p className="text-sm text-slate-500">{language === "en" ? "Fits a two-variable quadratic model and solves for a stationary point. A stationary point may be a minimum, maximum or saddle; classification is not automatic." : "拟合双变量二次模型并求解驻点。驻点可能是极小值、极大值或鞍点，当前界面不自动判定类型。"}</p>
                    </div>
                    <div className="flex-1 overflow-hidden relative">
                        {rsmError ? (
@@ -2644,7 +2652,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                        ) : isCalculatingRsm ? (
                            <div className="absolute inset-0 flex items-center justify-center text-indigo-500 flex-col gap-2">
                                <Loader2 className="animate-spin" size={32} />
-                               <span className="text-sm font-bold animate-pulse">Running RSM Regression Model ({filteredData.length} points)...</span>
+                               <span className="text-sm font-bold animate-pulse">{language === "en" ? `Fitting the RSM model (${filteredData.length} records)...` : `正在拟合 RSM 模型（${filteredData.length} 条记录）……`}</span>
                            </div>
                        ) : !rsmResult ? (
                            <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-bold text-sm">
@@ -2665,29 +2673,29 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                             x2: getVal(p, rsmX2Key),
                                             y: getVal(p, rsmYKey)
                                         })).filter(p => !isNaN(p.x1) && !isNaN(p.x2) && !isNaN(p.y))}
-                                        x1Label={rsmX1Key}
-                                        x2Label={rsmX2Key}
-                                        yLabel={rsmYKey}
+                                        x1Label={tProp(rsmX1Key)}
+                                        x2Label={tProp(rsmX2Key)}
+                                        yLabel={tProp(rsmYKey)}
                                         theme={theme}
                                     />
                                </div>
                                <div className="w-80 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-4">
                                     <div className="bg-indigo-50 dark:bg-indigo-900/30 p-4 rounded-xl border border-indigo-200 dark:border-indigo-800">
-                                        <h4 className="font-bold text-indigo-800 dark:text-indigo-300 mb-2 flex items-center gap-2"><Calculator size={16}/> {language === "en" ? "Optimal Ratio / Extremum Point Prediction" : "最优配比 / 极值点预测"}</h4>
+                                        <h4 className="font-bold text-indigo-800 dark:text-indigo-300 mb-2 flex items-center gap-2"><Calculator size={16}/> {language === "en" ? "Model stationary point (unclassified)" : "模型驻点（未判定类型）"}</h4>
                                         {rsmResult.stationaryPoint ? (
                                             <div className="text-sm text-indigo-900 dark:text-indigo-200 space-y-2">
                                                 <div className="flex justify-between border-b border-indigo-200/50 pb-1">
-                                                    <span>{rsmX1Key}:</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{rsmResult.stationaryPoint.x1.toFixed(3)}</span>
+                                                    <span>{tProp(rsmX1Key)}:</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{rsmResult.stationaryPoint.x1.toFixed(3)}</span>
                                                 </div>
                                                 <div className="flex justify-between border-b border-indigo-200/50 pb-1">
-                                                    <span>{rsmX2Key}:</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{rsmResult.stationaryPoint.x2.toFixed(3)}</span>
+                                                    <span>{tProp(rsmX2Key)}:</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{rsmResult.stationaryPoint.x2.toFixed(3)}</span>
                                                 </div>
                                                 <div className="flex justify-between font-black text-indigo-600 dark:text-indigo-400 pt-1">
-                                                    <span>Max/Min {rsmYKey}:</span> <span>{rsmResult.stationaryPoint.y.toFixed(3)}</span>
+                                                    <span>{language === "en" ? "Fitted " : "拟合值 "}{tProp(rsmYKey)}:</span> <span>{rsmResult.stationaryPoint.y.toFixed(3)}</span>
                                                 </div>
                                             </div>
                                         ) : (
-                                            <span className="text-xs text-indigo-400">{language === "en" ? "Stationary point not found, model might be flat." : "未能找到鞍点/极值，模型可能是平面的。"}</span>
+                                            <span className="text-xs text-indigo-400">{language === "en" ? "No unique stationary point could be solved." : "无法求得唯一驻点。"}</span>
                                         )}
                                     </div>
 
@@ -2695,8 +2703,8 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">{language === "en" ? "Model Coefficients (Beta)" : "模型系数 (Beta)"}</h4>
                                         <div className="flex flex-col gap-1 text-xs font-mono">
                                             <span>{language === "en" ? "b0 (Intercept): " : "b0 (截距): "}{rsmResult.beta[0].toFixed(4)}</span>
-                                            <span>b1 ({rsmX1Key}): {rsmResult.beta[1].toFixed(4)}</span>
-                                            <span>b2 ({rsmX2Key}): {rsmResult.beta[2].toFixed(4)}</span>
+                                            <span>b1 ({tProp(rsmX1Key)}): {rsmResult.beta[1].toFixed(4)}</span>
+                                            <span>b2 ({tProp(rsmX2Key)}): {rsmResult.beta[2].toFixed(4)}</span>
                                             <span>b11: {rsmResult.beta[3].toFixed(4)}</span>
                                             <span>b22: {rsmResult.beta[4].toFixed(4)}</span>
                                             <span>b12: {rsmResult.beta[5].toFixed(4)}</span>
@@ -2711,7 +2719,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                 <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white">{language === "en" ? "Feature Sensitivity Attribution (Feature Importance)" : "特征敏感度归因 (Feature Importance)"}</h3>
-                      <p className="text-sm text-slate-500">{language === "en" ? <span>Multivariate regression analysis revealing the weight of each factor on the target property <strong>{fiTargetKey}</strong>.</span> : <span>多变量组合回归分析，揭示每一个特征要素对目标指标 <strong>{fiTargetKey}</strong> 的统计权重及影响度。</span>}</p>
+                      <p className="text-sm text-slate-500">{language === "en" ? <span>Multivariate regression analysis revealing the weight of each factor on the target property <strong>{tProp(fiTargetKey)}</strong>.</span> : <span>多变量组合回归分析，揭示每一个特征要素对目标指标 <strong>{tProp(fiTargetKey)}</strong> 的统计权重及影响度。</span>}</p>
                    </div>
                    <div className="flex-1 overflow-hidden relative">
                        {fiError ? (
@@ -2729,7 +2737,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                            </div>
                        ) : (
                            <div className="w-full h-full p-4 bg-white dark:bg-slate-800 rounded-xl shadow-inner border border-slate-100 dark:border-slate-700">
-                                <FeatureImportanceChart importances={importanceResult.importances} theme={theme} />
+                                <FeatureImportanceChart importances={importanceResult.importances.map((entry) => ({ ...entry, feature: tProp(entry.feature) }))} theme={theme} />
                            </div>
                        )}
                    </div>
@@ -2755,8 +2763,8 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                 <KdeTopologyChart 
                                     grid={kdeResult.grid} 
                                     theme={theme} 
-                                    xLabel={kdeXKey} 
-                                    yLabel={kdeYKey} 
+                                    xLabel={tProp(kdeXKey)}
+                                    yLabel={tProp(kdeYKey)}
                                     dataPoints={filteredData.map(p => ({
                                         x: getVal(p, kdeXKey), 
                                         y: getVal(p, kdeYKey)
@@ -2780,7 +2788,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                        ) : isCalculatingWeibull ? (
                            <div className="absolute inset-0 flex items-center justify-center text-cyan-500 flex-col gap-2">
                                <Loader2 className="animate-spin" size={32} />
-                               <span className="text-sm font-bold animate-pulse">Running Rank Sorting & Log-Log Linear Regression...</span>
+                               <span className="text-sm font-bold animate-pulse">{language === "en" ? "Running rank sorting and log-log linear regression..." : "正在进行秩排序和双对数线性回归……"}</span>
                            </div>
                        ) : !weibullResult ? (
                            <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-bold text-sm">
@@ -2795,7 +2803,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                         eta={weibullResult.eta} 
                                         rSquared={weibullResult.rSquared} 
                                         safeValue95={weibullResult.safeValue95} 
-                                        targetKey={weibullKey} 
+                                        targetKey={tProp(weibullKey)}
                                         theme={theme} 
                                     />
                                </div>
@@ -2804,10 +2812,10 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                         <h4 className="font-bold text-cyan-800 dark:text-cyan-300 mb-2 flex items-center gap-2"><ShieldAlert size={16}/> {language === "en" ? "Weibull Fitting Coefficients" : "威布尔拟合参数"}</h4>
                                         <div className="text-sm text-cyan-900 dark:text-cyan-200 space-y-2">
                                             <div className="flex justify-between border-b border-cyan-200/50 pb-1">
-                                                <span>Weibull Modulus (m):</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{weibullResult.m.toFixed(3)}</span>
+                                                <span>{language === "en" ? "Weibull shape (m):" : "Weibull 形状参数（m）："}</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{weibullResult.m.toFixed(3)}</span>
                                             </div>
                                             <div className="flex justify-between border-b border-cyan-200/50 pb-1">
-                                                <span>Scale Parameter (η):</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{weibullResult.eta.toFixed(3)}</span>
+                                                <span>{language === "en" ? "Scale parameter (η):" : "尺度参数（η）："}</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{weibullResult.eta.toFixed(3)}</span>
                                             </div>
                                             <div className="flex justify-between border-b border-cyan-200/50 pb-1">
                                                  <span>{language === "en" ? "R² (goodness of fit):" : "R²（拟合优度）："}</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{weibullResult.rSquared.toFixed(4)}</span>
@@ -2818,7 +2826,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                         </div>
                                     </div>
                                     <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-500">
-                                        <p className="mb-2">{language === "en" ? <span><strong>Weibull Modulus (m)</strong> represents sheet-to-sheet or batch-to-batch uniformity of physical attributes. High values denote narrow variance and robust consistency.</span> : <span><strong>m值 (Modulus)</strong> 代表材料批次性能的均一性。m值越高，数据的分散度越小，代表生产一致性极极强。通常金属等匀质材料该值较高，而陶瓷、复合材料等脆性材料较低。</span>}</p>
+                                        <p className="mb-2">{language === "en" ? <span><strong>Weibull Modulus (m)</strong> represents sheet-to-sheet or batch-to-batch uniformity of physical attributes. High values denote narrow variance and robust consistency.</span> : <span><strong>m值 (Modulus)</strong> 代表材料批次性能的均一性。m值越高，数据的分散度越小，代表观测数据较为集中。通常金属等匀质材料该值较高，而陶瓷、复合材料等脆性材料较低。</span>}</p>
                                         <p>{language === "en" ? <span><strong>Scale Factor (η)</strong> relates to the characteristic lifetime parameter where roughly 63.2% of tested material specimens are calculated to fail.</span> : <span><strong>η (Eta)</strong> 特征寿命缩放参数，代表会有 63.2% 的材料样条在该应力阈值以下发生失效/断裂的情况。</span>}</p>
                                     </div>
                                </div>
@@ -2830,7 +2838,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                 <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white">{language === "en" ? "Polymer Time-Temperature Superposition (WLF TTS Master Curve)" : "高分子时温等效 (WLF TTS Master Curve)"}</h3>
-                      <p className="text-sm text-slate-500">Constructs a broad-frequency Master Curve from multi-temperature dynamic rheology using Williams-Landel-Ferry (WLF) shift factors.</p>
+                      <p className="text-sm text-slate-500">{language === "en" ? "Constructs a master curve from multi-temperature dynamic rheology using WLF shift factors and the disclosed vertical-shift assumption." : "使用 WLF 移动因子及明确披露的纵向移动假设，将不同温度的动态流变数据叠加为主曲线。"}</p>
                    </div>
                    <div className="flex-1 overflow-hidden relative">
                        {wlfError ? (
@@ -2866,13 +2874,13 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                         </div>
                                         <div className="text-sm text-blue-900 dark:text-blue-200 space-y-2">
                                             <div className="flex justify-between border-b border-blue-200/50 pb-1">
-                                                <span>C1 Constant:</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{wlfResult.c1.toFixed(3)}</span>
+                                                <span>{language === "en" ? "C1 constant:" : "C1 常数："}</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{wlfResult.c1.toFixed(3)}</span>
                                             </div>
                                             <div className="flex justify-between border-b border-blue-200/50 pb-1">
-                                                <span>C2 Constant:</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{wlfResult.c2.toFixed(3)}</span>
+                                                <span>{language === "en" ? "C2 constant:" : "C2 常数："}</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{wlfResult.c2.toFixed(3)}</span>
                                             </div>
                                             <div className="flex justify-between border-b border-blue-200/50 pb-1">
-                                                <span>Reference Temp (T_r):</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{wlfResult.refTemp.toFixed(1)} °C</span>
+                                                <span>{language === "en" ? "Reference temperature (T_r):" : "参考温度（T_r）："}</span> <span className="font-mono font-bold bg-white/50 px-1 rounded">{wlfResult.refTemp.toFixed(1)} °C</span>
                                             </div>
                                         </div>
                                     </div>
@@ -2880,8 +2888,8 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">{language === "en" ? "Calculated Shift Factors a_T" : "计算得到的位移因子 a_T"}</h4>
                                         <div className="flex flex-col gap-1 text-xs font-mono">
                                             <div className="grid grid-cols-2 text-slate-400 border-b border-slate-200 dark:border-slate-700 pb-1 mb-1">
-                                                <span>Temp (°C)</span>
-                                                <span className="text-right">a_T Factor</span>
+                                                <span>{language === "en" ? "Temperature (°C)" : "温度（°C）"}</span>
+                                                <span className="text-right">{language === "en" ? "a_T factor" : "a_T 移动因子"}</span>
                                             </div>
                                             {wlfResult.shiftFactors.map(sf => (
                                                 <div key={sf.temp} className="grid grid-cols-2 text-slate-700 dark:text-slate-300">
@@ -2897,10 +2905,10 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                    </div>
                 </div>
             ) : activeChart === "copula" ? (
-                <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
+                <div data-advanced-figure-panel="copula" className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white">{language === "en" ? "Bivariate Gaussian Copula Joint Failure Analysis" : "高斯关联 Copula 联合失效概率分析 (Bivariate Gaussian Copula)"}</h3>
-                      <p className="text-sm text-slate-500">{language === "en" ? <span>Transforming marginal distributions to uncouple dual-variable dependencies to compute <strong>joint probability of failure</strong>.</span> : <span>通过转换边缘分布以解耦双变量依赖关系，从而计算材料面临极值工况时的<strong>联合失效概率</strong>。</span>}</p>
+                      <p className="text-sm text-slate-500">{language === "en" ? <span>Fits normal-score correlation after empirical marginal transforms to estimate <strong>joint probability of failure</strong>.</span> : <span>对经验边缘分布变换后的正态得分拟合相关系数，估计所选阈值下的<strong>联合失效概率</strong>。</span>}</p>
                    </div>
                    <div className="flex-1 overflow-hidden relative">
                        {copulaError ? (
@@ -2910,7 +2918,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                        ) : isCalculatingCopula ? (
                            <div className="absolute inset-0 flex items-center justify-center text-fuchsia-500 flex-col gap-2">
                                <Loader2 className="animate-spin" size={32} />
-                               <span className="text-sm font-bold animate-pulse">Running MLE for Multivariate Dependence (Pearson ρ on transformed pseudo-observations)...</span>
+                               <span className="text-sm font-bold animate-pulse">{language === "en" ? "Estimating normal-score correlation from rank pseudo-observations..." : "正在根据秩伪观测估计正态得分相关系数……"}</span>
                            </div>
                        ) : !copulaResult ? (
                            <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-bold text-sm">
@@ -2928,25 +2936,27 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     <div className="bg-fuchsia-50 dark:bg-fuchsia-900/30 p-4 rounded-xl border border-fuchsia-200 dark:border-fuchsia-800">
                                         <h4 className="font-bold text-fuchsia-800 dark:text-fuchsia-300 mb-2 flex items-center gap-2"><Combine size={16}/> {language === "en" ? "Joint Failure Criterion" : "联合失效判定"}</h4>
                                         <div className="text-sm text-fuchsia-900 dark:text-fuchsia-200 space-y-3 mb-4">
-                                            <p className="text-xs">{language === "en" ? <span>Assess the total joint hazard probability when {copulaXKey} and {copulaYKey} <strong>both fall below</strong> respective threshold values.</span> : <span>评估当 {copulaXKey} 和 {copulaYKey} <strong>同时跌破</strong> 临界值时的风险总概率。</span>}</p>
+                                            <p className="text-xs">{language === "en" ? <span>Assess the total joint hazard probability when {tProp(copulaXKey)} and {tProp(copulaYKey)} <strong>are both at or below</strong> respective threshold values.</span> : <span>评估当 {tProp(copulaXKey)} 和 {tProp(copulaYKey)} <strong>均不高于</strong> 临界值时的风险总概率。</span>}</p>
                                             
                                             <div>
-                                                <label className="text-[10px] uppercase font-bold text-fuchsia-700 dark:text-fuchsia-400 block mb-1">{language === "en" ? "Threshold " : "阈值 "}{copulaXKey}</label>
+                                                <label className="text-[10px] uppercase font-bold text-fuchsia-700 dark:text-fuchsia-400 block mb-1">{language === "en" ? "Threshold " : "阈值 "}{tProp(copulaXKey)}</label>
                                                 <input 
                                                     type="number"
+                                                    aria-label={language === "en" ? "Copula X threshold" : "Copula X 阈值"}
                                                     value={copulaThreshX}
                                                     onChange={e => setCopulaThreshX(e.target.value === "" ? "" : Number(e.target.value))}
-                                                    placeholder={`Min: ${copulaResult.minX.toFixed(1)}`}
+                                                    placeholder={`${language === "en" ? "Minimum" : "最小值"}: ${copulaResult.minX.toFixed(1)}`}
                                                     className="w-full bg-white dark:bg-slate-800 border border-fuchsia-200 dark:border-fuchsia-700/50 rounded px-2 py-1 text-xs outline-none"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="text-[10px] uppercase font-bold text-fuchsia-700 dark:text-fuchsia-400 block mb-1">{language === "en" ? "Threshold " : "阈值 "}{copulaYKey}</label>
+                                                <label className="text-[10px] uppercase font-bold text-fuchsia-700 dark:text-fuchsia-400 block mb-1">{language === "en" ? "Threshold " : "阈值 "}{tProp(copulaYKey)}</label>
                                                 <input 
                                                     type="number"
+                                                    aria-label={language === "en" ? "Copula Y threshold" : "Copula Y 阈值"}
                                                     value={copulaThreshY}
                                                     onChange={e => setCopulaThreshY(e.target.value === "" ? "" : Number(e.target.value))}
-                                                    placeholder={`Min: ${copulaResult.minY.toFixed(1)}`}
+                                                    placeholder={`${language === "en" ? "Minimum" : "最小值"}: ${copulaResult.minY.toFixed(1)}`}
                                                     className="w-full bg-white dark:bg-slate-800 border border-fuchsia-200 dark:border-fuchsia-700/50 rounded px-2 py-1 text-xs outline-none"
                                                 />
                                             </div>
@@ -2968,15 +2978,15 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                         
                                         {jointFailureProb !== null && (
                                             <div className="pt-3 border-t border-fuchsia-200 dark:border-fuchsia-800/50">
-                                                 <div className="text-[10px] font-bold normal-case text-fuchsia-600 dark:text-fuchsia-400 mb-1">{language === "en" ? "P(X < threshold ∩ Y < threshold)" : "P(X < 限值 ∩ Y < 限值)"}</div>
-                                                <div className="text-2xl font-black text-fuchsia-600 dark:text-fuchsia-400">
+                                                 <div className="text-[10px] font-bold normal-case text-fuchsia-600 dark:text-fuchsia-400 mb-1">{language === "en" ? "P(X ≤ threshold ∩ Y ≤ threshold)" : "P(X ≤ 限值 ∩ Y ≤ 限值)"}</div>
+                                                <div data-testid="copula-joint-probability" className="text-2xl font-black text-fuchsia-600 dark:text-fuchsia-400">
                                                     {(jointFailureProb * 100).toFixed(2)}%
                                                 </div>
-                                                <div className="text-xs mt-1 text-fuchsia-800 dark:text-fuchsia-300">
+                                                <div data-testid="copula-independent-probability" className="text-xs mt-1 text-fuchsia-800 dark:text-fuchsia-300">
                                                     ({language === "en" ? "independent assumption expectation is " : "独立事件累乘预期约为 "}{
                                                           (() => {
-                                                              const ux = copulaResult.sortedX.findIndex(v => v >= Number(copulaThreshX)) / copulaResult.sortedX.length;
-                                                              const uy = copulaResult.sortedY.findIndex(v => v >= Number(copulaThreshY)) / copulaResult.sortedY.length;
+                                                              const ux = empiricalCdf(copulaResult.sortedX, Number(copulaThreshX));
+                                                              const uy = empiricalCdf(copulaResult.sortedY, Number(copulaThreshY));
                                                               return (ux * uy * 100).toFixed(2);
                                                           })()
                                                     }%)
@@ -2988,12 +2998,12 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
                                         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">{language === "en" ? "Copula Dependence Parameter" : "相依性参数 (Dependence)"}</h4>
                                         <div className="flex flex-col gap-1 text-xs font-mono">
-                                            <span>Gaussian Copula ρ: </span>
+                                            <span>{language === "en" ? "Gaussian Copula ρ: " : "高斯 Copula ρ："}</span>
                                             <span className="text-base font-bold text-slate-700 dark:text-slate-300">
                                                 {copulaResult.rho.toFixed(4)}
                                             </span>
                                             <span className="text-slate-400 text-[10px] leading-tight mt-1">
-                                                {language === "en" ? "This coefficient decouples the influence of margins to purely represent the pure kinetic pairing strengths." : "该相依系数剥离了边缘分布的影响，纯粹反映高分子材料这双重性能底层耦合的强度关系。"}
+                                                {language === "en" ? "This is the fitted correlation of normal scores from rank pseudo-observations, not a causal or kinetic coefficient." : "该值是秩伪观测正态得分的拟合相关系数，不代表因果关系或动力学参数。"}
                                             </span>
                                         </div>
                                     </div>
@@ -3087,7 +3097,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                 <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2"><Activity className="text-indigo-500"/> {language === "en" ? "Sobol Sensitivity Variance Decomposition" : "Sobol 方差分解敏感度分析"}</h3>
-                      <p className="text-sm text-slate-500">{language === "en" ? "Global Sensitivity Analysis evaluating main effects and interaction variance contributions using Quasi-Monte Carlo." : "全局敏感度分析，通过拟蒙特卡洛积分抽样（Quasi-Monte Carlo），评估配方中不同组分对最终性能波动的主效应和交互方差贡献。"}</p>
+                      <p className="text-sm text-slate-500">{language === "en" ? "Jansen estimates use independent pseudo-random normal Saltelli A/B samples. ST−S1 is aggregate higher-order contribution, not a pairwise interaction." : "Jansen 估计使用独立伪随机正态 Saltelli A/B 抽样；ST−S1 是高阶贡献总量，不是成对交互效应。"}</p>
                    </div>
                    <div className="flex-1 overflow-hidden relative">
                        {sobolError ? (
@@ -3106,9 +3116,9 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                        ) : (
                            <div className="w-full h-full rounded-xl shadow-inner bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-2 relative">
                                 <SobolChart 
-                                    firstOrder={sobolResult.firstOrder}
-                                    totalEffect={sobolResult.totalEffect}
-                                    interactions={sobolResult.interactions}
+                                    firstOrder={sobolResult.firstOrder.map((entry) => ({ ...entry, name: tProp(entry.name) }))}
+                                    totalEffect={sobolResult.totalEffect.map((entry) => ({ ...entry, name: tProp(entry.name) }))}
+                                    interactions={sobolResult.interactions.map((entry) => ({ ...entry, name: tProp(entry.name) }))}
                                     theme={theme}
                                 />
                            </div>
@@ -3119,7 +3129,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                 <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2"><Factory className="text-emerald-500"/> {language === "en" ? "SPC Capability Assessment (Process Capability)" : "SPC 制程控制与工序能力分析"}</h3>
-                      <p className="text-sm text-slate-500">Statistical Process Control. Computing capability indices (Cp, Cpk) and evaluating process potential using 3-Sigma limits against specified tolerances.</p>
+                      <p className="text-sm text-slate-500">{language === "en" ? "Estimates Cp/Cpk from the sample distribution and declared specification limits. The μ±3σ references do not establish process stability." : "根据样本分布和声明的规格限估计 Cp/Cpk；μ±3σ 参考线不证明过程稳定。"}</p>
                    </div>
                    <div className="flex-1 overflow-hidden relative">
                        {spcError ? (
@@ -3239,7 +3249,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                        ) : isCalculatingBayes ? (
                            <div className="absolute inset-0 flex flex-col items-center justify-center text-pink-600 gap-2 bg-white/50 dark:bg-slate-900/50 rounded-2xl backdrop-blur-sm z-10">
                                <Loader2 className="animate-spin" size={32} />
-                               <span className="text-sm font-bold animate-pulse">Running Kriging & Expected Improvement Search...</span>
+                               <span className="text-sm font-bold animate-pulse">{language === "en" ? "Running Gaussian-process fitting and expected-improvement search..." : "正在拟合高斯过程并搜索期望改进候选点……"}</span>
                            </div>
                        ) : !bayesResult ? (
                            <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-bold text-sm bg-slate-50/50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 text-center max-w-md mx-auto p-4">
@@ -3252,7 +3262,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                     <BayesChart 
                                         historical={bayesResult.historical}
                                         suggestions={bayesResult.suggestions}
-                                        targetName={bayesResult.targetName}
+                                        targetName={tProp(bayesResult.targetName)}
                                         maximize={bayesResult.maximize}
                                         theme={theme}
                                     />
@@ -3272,14 +3282,14 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                                 {bayesResult.suggestions[0].mean.toFixed(3)}
                                                 <span className="text-xs text-slate-400 ml-1">± {bayesResult.suggestions[0].std.toFixed(3)}</span>
                                             </div>
-                                            <div className="text-[9px] text-pink-600/80 mt-1">Expected Improvement: {bayesResult.suggestions[0].ei.toExponential(2)}</div>
+                                            <div className="text-[9px] text-pink-600/80 mt-1">{language === "en" ? "Expected improvement: " : "期望改进："}{bayesResult.suggestions[0].ei.toExponential(2)}</div>
                                         </div>
 
                                         <h4 className="text-[10px] font-bold uppercase tracking-wider text-pink-500 mb-2">{language === "en" ? "Inverse Formulation Parameters Guide:" : "配方/参数逆向指引:"}</h4>
                                         <div className="space-y-1">
                                             {Object.entries(bayesResult.suggestions[0].params).map(([k, v]) => (
                                                 <div key={k} className="flex justify-between items-center bg-white/40 dark:bg-black/10 px-2 py-1.5 rounded">
-                                                    <span className="text-[10px] text-pink-900 dark:text-pink-200 truncate pr-2" title={k}>{k}</span>
+                                                    <span className="text-[10px] text-pink-900 dark:text-pink-200 truncate pr-2" title={tProp(k)}>{tProp(k)}</span>
                                                     <span className="font-mono font-bold text-xs text-slate-800 dark:text-white shrink-0">{Number(v).toFixed(3)}</span>
                                                 </div>
                                             ))}
@@ -3304,7 +3314,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                        ) : isCalculatingMoo ? (
                            <div className="absolute inset-0 flex flex-col items-center justify-center text-orange-600 gap-2 bg-white/50 dark:bg-slate-900/50 rounded-2xl backdrop-blur-sm z-10">
                                <Loader2 className="animate-spin" size={32} />
-                               <span className="text-sm font-bold animate-pulse">Running Surrogate Models & Generating Non-dominated Front...</span>
+                               <span className="text-sm font-bold animate-pulse">{language === "en" ? "Running surrogate models and generating the non-dominated front..." : "正在运行代理模型并生成非支配前沿……"}</span>
                            </div>
                        ) : !mooResult ? (
                            <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-bold text-sm bg-slate-50/50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 text-center max-w-md mx-auto p-4">
@@ -3325,7 +3335,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                 <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2"><Target className="text-rose-600"/> {language === "en" ? "Multivariate Mahalanobis Anomaly Detection (Mahalanobis Anomaly)" : "多元马氏距离异常检测 (Mahalanobis Anomaly)"}</h3>
-                      <p className="text-sm text-slate-500">Based on multivariate normal distribution assumption. Uses inverted covariance matrix to find Mahalanobis distance ($D^2$) and evaluate against Chi-Square thresholds.</p>
+                      <p className="text-sm text-slate-500">{language === "en" ? "Computes regularized Mahalanobis D² and compares it with a χ² screening reference under the multivariate-normal assumption; flags require review." : "计算正则化马氏距离 D²，并在多元正态假设下与 χ² 筛查参考线比较；标记结果需人工复核。"}</p>
                    </div>
                    <div className="flex-1 overflow-hidden relative">
                        {mahalanobisError ? (
@@ -3461,7 +3471,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                 <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2"><Activity className="text-purple-500"/> {language === "en" ? "Generalized Maxwell / Prony Series Constitutive Extraction" : "广义麦克斯韦/Prony级数提取 (Prony Series)"}</h3>
-                      <p className="text-sm text-slate-500">Extracts viscoelastic material constants E_inf, E_i, tau_i from master curves using Non-Negative Projected Gradient Descent.</p>
+                      <p className="text-sm text-slate-500">{language === "en" ? "Fits non-negative moduli on a fixed logarithmic relaxation-time grid using projected gradient descent." : "在固定的对数松弛时间网格上，通过投影梯度法拟合非负模量。"}</p>
                    </div>
                    <div className="flex-1 overflow-hidden relative">
                        {pronyError ? (

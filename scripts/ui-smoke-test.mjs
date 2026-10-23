@@ -23,6 +23,10 @@ const screenshotPaths = {
   dependencyMap: path.join(artifactDir, 'ui-dependency-map.png'),
   dashboardEnDark: path.join(artifactDir, 'ui-dashboard-en-dark.png'),
   mobile: path.join(artifactDir, 'ui-mobile-dashboard.png'),
+  copulaZh: path.join(artifactDir, 'ui-copula-zh.png'),
+  copulaEn: path.join(artifactDir, 'ui-copula-en.png'),
+  rsmZh: path.join(artifactDir, 'ui-rsm-zh.png'),
+  rsmEn: path.join(artifactDir, 'ui-rsm-en.png'),
 };
 
 const chromeCandidates = [
@@ -163,6 +167,51 @@ async function capture(session, targetPath) {
   writeFileSync(targetPath, Buffer.from(screenshot.data, 'base64'));
 }
 
+async function inspectAdvancedFigure(session, kind, language) {
+  const labels = {
+    copula: { zh: ['概率空间中的高斯 Copula 密度'], en: ['Gaussian-copula density in probability space'] },
+    rsm: { zh: ['二次响应面模型', '观测数据'], en: ['Quadratic response-surface model', 'Observed data'] },
+  };
+  const expected = labels[kind][language];
+  await waitForCondition(session, `(() => {
+    const surface = document.querySelector('[data-scientific-chart-rendered="true"]');
+    return surface?.querySelector('canvas') && ${JSON.stringify(expected)}.every(label => window.__resinDrawnText?.includes(label));
+  })()`, `${kind} ${language} localized Canvas draw calls`, 160);
+  if (language === 'en') {
+    const panelText = await evaluate(session, `document.querySelector('[data-advanced-figure-panel="${kind}"]').innerText`);
+    if (/\p{Script=Han}/u.test(panelText)) throw new Error(`${kind} retains Chinese system/property labels after switching to English: ${panelText}`);
+  }
+  const evidence = await evaluate(session, `(() => {
+    const surface = document.querySelector('[data-scientific-chart-rendered="true"]');
+    const canvas = surface.querySelector('canvas');
+    const bounds = canvas.getBoundingClientRect();
+    const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    let colored = 0;
+    for (let index = 0; index < pixels.length; index += 16) {
+      if (pixels[index + 3] > 8 && pixels[index + 2] - pixels[index] > 20) colored++;
+    }
+    return { colored, width: canvas.width, height: canvas.height,
+      aria: surface.getAttribute('aria-label'), drawnLabels: ${JSON.stringify(expected)}.filter(label => window.__resinDrawnText.includes(label)),
+      cursor: { x: bounds.left + bounds.width * 0.5, y: bounds.top + bounds.height * 0.48 } };
+  })()`);
+  if (evidence.colored < 100 || evidence.width < 250 || evidence.height < 250
+    || /\p{Script=Han}/u.test(evidence.aria || '') !== (language === 'zh')) {
+    throw new Error(`${kind} ${language} has a blank or incorrectly localized figure: ${JSON.stringify(evidence)}`);
+  }
+  await session.command('Input.dispatchMouseEvent', { type: 'mouseMoved', ...evidence.cursor });
+  const tooltipPattern = kind === 'copula'
+    ? (language === 'zh' ? '拟合密度:' : 'Fitted density:')
+    : (language === 'zh' ? '拟合值 ' : 'Fitted ');
+  await waitForCondition(session, `document.body.innerText.includes(${JSON.stringify(tooltipPattern)})`, `${kind} ${language} localized hover tooltip`);
+  evidence.tooltip = await evaluate(session, `(() => {
+    const text = document.body.innerText;
+    const start = text.lastIndexOf(${JSON.stringify(tooltipPattern)});
+    return text.slice(Math.max(0, start - 100), start + 100);
+  })()`);
+  await capture(session, screenshotPaths[`${kind}${language === 'zh' ? 'Zh' : 'En'}`]);
+  return evidence;
+}
+
 async function clickButtonByTitle(session, patterns) {
   const serialized = JSON.stringify(patterns);
   const clicked = await evaluate(session, `(() => {
@@ -217,6 +266,18 @@ try {
   await session.command('Page.enable');
   await session.command('Runtime.enable');
   await session.command('Log.enable');
+  // Observe real Canvas text calls while still invoking the native drawing
+  // methods. Pixel checks and screenshots independently verify painted output.
+  await session.command('Page.addScriptToEvaluateOnNewDocument', { source: `
+    window.__resinDrawnText = [];
+    for (const method of ['fillText', 'strokeText']) {
+      const native = CanvasRenderingContext2D.prototype[method];
+      CanvasRenderingContext2D.prototype[method] = function (...args) {
+        if (window.__resinDrawnText.length < 20000) window.__resinDrawnText.push(String(args[0]));
+        return Reflect.apply(native, this, args);
+      };
+    }
+  ` });
   await session.command('Emulation.setDeviceMetricsOverride', {
     width: 1600,
     height: 1000,
@@ -389,47 +450,101 @@ try {
     'completed non-empty rheology chart rendering',
     160,
   );
-  const analyticsEvidence = await evaluate(session, `(() => {
-    const figure = Array.from(document.querySelectorAll('[data-scientific-figure="true"]'))
-      .find((candidate) => candidate.dataset.scientificFigureState === 'ready'
-        && Number(candidate.dataset.scientificFigurePoints || 0) > 0);
-    const canvas = figure?.querySelector('[data-scientific-chart-rendered="true"] canvas');
-    if (!canvas) return { ready: false, reason: 'canvas-missing' };
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (!context) return { ready: false, reason: '2d-context-missing' };
-    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-    const pixelCount = canvas.width * canvas.height;
-    const stride = Math.max(1, Math.floor(Math.sqrt(pixelCount / 120000)));
-    let sampled = 0;
-    let nonBackground = 0;
-    let chromatic = 0;
-    for (let y = 0; y < canvas.height; y += stride) {
-      for (let x = 0; x < canvas.width; x += stride) {
-        const index = (y * canvas.width + x) * 4;
-        const red = pixels[index];
-        const green = pixels[index + 1];
-        const blue = pixels[index + 2];
-        const alpha = pixels[index + 3];
-        sampled += 1;
-        if (alpha > 8 && Math.min(red, green, blue) < 242) nonBackground += 1;
-        if (alpha > 8 && Math.max(red, green, blue) - Math.min(red, green, blue) > 12) chromatic += 1;
+  // A resize may start after the finished event; inspect current pixels inside
+  // the bounded wait rather than reusing a readiness flag from an older frame.
+  let analyticsEvidence = { ready: false, reason: 'render-pending' };
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    analyticsEvidence = await evaluate(session, `(() => {
+      const figure = Array.from(document.querySelectorAll('[data-scientific-figure="true"]'))
+        .find((candidate) => candidate.dataset.scientificFigureState === 'ready'
+          && Number(candidate.dataset.scientificFigurePoints || 0) > 0);
+      const canvas = figure?.querySelector('[data-scientific-chart-rendered="true"] canvas');
+      if (!canvas) return { ready: false, reason: 'canvas-missing' };
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) return { ready: false, reason: '2d-context-missing' };
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      const pixelCount = canvas.width * canvas.height;
+      const stride = Math.max(1, Math.floor(Math.sqrt(pixelCount / 120000)));
+      let sampled = 0;
+      let nonBackground = 0;
+      let chromatic = 0;
+      for (let y = 0; y < canvas.height; y += stride) {
+        for (let x = 0; x < canvas.width; x += stride) {
+          const index = (y * canvas.width + x) * 4;
+          const red = pixels[index];
+          const green = pixels[index + 1];
+          const blue = pixels[index + 2];
+          const alpha = pixels[index + 3];
+          sampled += 1;
+          if (alpha > 8 && Math.min(red, green, blue) < 242) nonBackground += 1;
+          if (alpha > 8 && Math.max(red, green, blue) - Math.min(red, green, blue) > 12) chromatic += 1;
+        }
       }
-    }
-    return {
-      ready: nonBackground > 500 && chromatic > 50,
-      width: canvas.width,
-      height: canvas.height,
-      sampled,
-      nonBackground,
-      chromatic,
-      points: Number(figure.dataset.scientificFigurePoints || 0)
-    };
-  })()`);
+      return {
+        ready: nonBackground > 500 && chromatic > 50,
+        width: canvas.width,
+        height: canvas.height,
+        sampled,
+        nonBackground,
+        chromatic,
+        points: Number(figure.dataset.scientificFigurePoints || 0)
+      };
+    })()`);
+    if (analyticsEvidence.ready) break;
+    await sleep(125);
+  }
   if (!analyticsEvidence.ready) {
     throw new Error(`Scientific chart canvas is blank or lacks plotted signal: ${JSON.stringify(analyticsEvidence)}`);
   }
   await sleep(250);
   await capture(session, screenshotPaths.analytics);
+
+  const advancedEvidence = {};
+  for (const kind of ['copula', 'rsm']) {
+    await evaluate(session, `(() => {
+      window.__resinDrawnText = [];
+      const mode = document.querySelector('[data-chart-mode="${kind}"]');
+      if (!mode) throw new Error('Advanced chart selector missing: ${kind}');
+      mode.click();
+    })()`);
+    await waitForCondition(session, `Boolean(document.querySelector('[aria-label="${kind === 'copula' ? 'Copula X' : 'RSM X1'}"]'))`, `${kind} input controls`);
+    await evaluate(session, `(() => {
+      const fields = ${JSON.stringify(kind === 'copula'
+        ? { 'Copula X': '密度', 'Copula Y': '熔体质量流动速率' }
+        : { 'RSM X1': '密度', 'RSM X2': '熔体质量流动速率', 'RSM Y': '拉伸屈服应力' })};
+      for (const [label, value] of Object.entries(fields)) {
+        const select = document.querySelector('[aria-label="' + label + '"]');
+        if (!Array.from(select.options).some(option => option.value === value)) throw new Error('Required finite demo variable unavailable: ' + value);
+        select.value = value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    })()`);
+    await evaluate(session, `(() => {
+      const run = Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes(${JSON.stringify(kind === 'copula' ? '生成 Copula 概率密度' : '开始 RSM 拟合计算')}));
+      if (!run || run.disabled) throw new Error('Advanced calculation is unavailable: ${kind}');
+      run.click();
+    })()`);
+    advancedEvidence[`${kind}Zh`] = await inspectAdvancedFigure(session, kind, 'zh');
+    if (kind === 'copula') {
+      await waitForCondition(session, `['X', 'Y'].every(axis => document.querySelector('[aria-label="Copula ' + axis + ' 阈值"]') instanceof HTMLInputElement)`, 'mounted Copula threshold inputs');
+      await evaluate(session, `(() => {
+        const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        for (const axis of ['X', 'Y']) {
+          const input = document.querySelector('[aria-label="Copula ' + axis + ' 阈值"]');
+          if (!(input instanceof HTMLInputElement)) throw new Error('Copula threshold input missing: ' + axis + '; language=' + document.documentElement.lang + '; controls=' + JSON.stringify(Array.from(document.querySelectorAll('input')).map(item => item.getAttribute('aria-label'))));
+          setValue.call(input, '1000');
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      })()`);
+      await evaluate(session, `Array.from(document.querySelectorAll('button')).find(button => button.textContent.includes('计算联合概率积分')).click()`);
+      await waitForCondition(session, `document.querySelector('[data-testid="copula-joint-probability"]')?.textContent.trim() === '100.00%' && document.querySelector('[data-testid="copula-independent-probability"]')?.textContent.includes('100.00')`, 'exact Copula upper boundary and independent ECDF comparison');
+      advancedEvidence.copulaProbability = { thresholds: [1000, 1000], jointPercent: 100, independentPercent: 100 };
+    }
+    await evaluate(session, `(() => { window.__resinDrawnText = []; document.querySelector('[data-testid="language-control"]').click(); })()`);
+    advancedEvidence[`${kind}En`] = await inspectAdvancedFigure(session, kind, 'en');
+    await evaluate(session, `(() => { window.__resinDrawnText = []; document.querySelector('[data-testid="language-control"]').click(); })()`);
+    await waitForCondition(session, `document.documentElement.lang === 'zh-CN'`, `${kind} return to Chinese`);
+  }
 
   await clickButtonByTitle(session, ['依赖网络谱图', 'Dependency']);
   await waitForCondition(session, `!!document.querySelector('[data-testid="dependency-map-svg"]')`, 'dependency map');
@@ -536,6 +651,7 @@ try {
     preferences: savedPreferences,
     cjkFont: cjkFontEvidence,
     scientificCanvas: analyticsEvidence,
+    advancedFigures: advancedEvidence,
   };
   writeFileSync(path.join(artifactDir, 'ui-smoke-manifest.json'), `${JSON.stringify(artifactManifest, null, 2)}
 `);

@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import type { EChartsOption } from '@/lib/echarts';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { ScientificEChart } from './ScientificEChart';
-import { SCIENTIFIC_PALETTE, formatScientificNumber } from './scientificFigurePolicy';
+import { SCIENTIFIC_PALETTE, escapeScientificHtml, formatScientificNumber } from './scientificFigurePolicy';
 
 interface BayesChartProps {
   historical: { index: number; y: number; y_pred: number; y_std: number }[];
@@ -43,7 +43,7 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
           }
           const row = historical[dataIndex];
           return row
-            ? `${t('bayesChartTooltipFeedback')}<br/>${t('bayesChartTooltipActual')} ${targetName}: ${formatScientificNumber(row.y)}<br/>${t('bayesChartTooltipGpMean')}: ${formatScientificNumber(row.y_pred)}<br/>${t('bayesChartTooltipGpStd')}: ${formatScientificNumber(row.y_std)}`
+            ? `${t('bayesChartTooltipFeedback')}<br/>${t('bayesChartTooltipActual')} ${escapeScientificHtml(targetName)}: ${formatScientificNumber(row.y)}<br/>${t('bayesChartTooltipGpMean')}: ${formatScientificNumber(row.y_pred)}<br/>${t('bayesChartTooltipGpStd')}: ${formatScientificNumber(row.y_std)}`
             : '';
         },
       },
@@ -104,5 +104,5 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
     };
   }, [historical, language, maximize, suggestions, t, targetName]);
 
-  return <ScientificEChart option={option} theme={theme} ariaLabel="Gaussian-process inverse-design model" description="Historical observations, Gaussian-process mean, model uncertainty band, and the expected-improvement candidate are separate layers." exportName="gaussian-process-inverse-design" dataCount={historical.length * 4 + 1} empty={!option} />;
+  return <ScientificEChart option={option} theme={theme} ariaLabel={language === 'zh' ? '高斯过程逆向设计模型' : 'Gaussian-process inverse-design model'} description={language === 'zh' ? '历史观测、高斯过程均值、模型不确定性带和期望改进候选点分别显示。' : 'Historical observations, Gaussian-process mean, model uncertainty band, and the expected-improvement candidate are separate layers.'} exportName="gaussian-process-inverse-design" dataCount={historical.length * 4 + 1} empty={!option} />;
 });

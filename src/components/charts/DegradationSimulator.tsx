@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { EChartsOption } from '@/lib/echarts';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { ADVANCED_CHART_TEXT } from './advancedChartText';
 import type { Product } from '@/types/index';
 import { useTheme } from '@/contexts/ThemeContext';
 import { ScientificEChart } from './ScientificEChart';
@@ -39,28 +41,30 @@ export const DegradationSimulator: React.FC<DegradationSimulatorProps> = ({ prod
     return { baseline, safeTemperature, safeYears, apparentActivationEnergy, points };
   }, [product, temperature, years]);
 
+  const { language } = useLanguage();
+  const text = ADVANCED_CHART_TEXT[language].degradation;
   const option = useMemo<EChartsOption>(() => ({
-    title: { text: 'Rule-based tensile-strength retention scenario', subtext: 'Cross-sectional property proxies and assumed Arrhenius parameters; heuristic band is not a confidence or prediction interval.', left: 'center', top: 6, textStyle: { fontSize: 13, fontWeight: 650 }, subtextStyle: { fontSize: 9 } },
-    legend: { bottom: 4, data: ['Scenario mean', 'Heuristic scenario band'] },
+    title: { text: text.title, subtext: text.subtitle, left: 'center', top: 6, textStyle: { fontSize: 13, fontWeight: 650 }, subtextStyle: { fontSize: 9 } },
+    legend: { bottom: 4, data: [text.mean, text.band] },
     grid: { top: 72, bottom: 64, left: 68, right: 34, containLabel: true },
     tooltip: { trigger: 'axis' },
-    xAxis: { type: 'value', name: 'Scenario time (years)', nameLocation: 'middle', nameGap: 32, min: 0, max: scenario.safeYears },
-    yAxis: { type: 'value', name: 'Tensile-strength proxy (MPa)', nameLocation: 'middle', nameGap: 48, min: 0 },
+    xAxis: { type: 'value', name: text.xAxis, nameLocation: 'middle', nameGap: 32, min: 0, max: scenario.safeYears },
+    yAxis: { type: 'value', name: text.yAxis, nameLocation: 'middle', nameGap: 48, min: 0 },
     series: [
-      { name: 'Band lower carrier', type: 'line', stack: 'scenario-band', data: scenario.points.map((point) => [point.time, point.lower]), symbol: 'none', lineStyle: { opacity: 0 }, silent: true },
-      { name: 'Heuristic scenario band', type: 'line', stack: 'scenario-band', data: scenario.points.map((point) => [point.time, point.upper - point.lower]), symbol: 'none', lineStyle: { opacity: 0 }, areaStyle: { color: 'rgba(0,114,178,0.16)' }, silent: true },
-      { name: 'Scenario mean', type: 'line', data: scenario.points.map((point) => [point.time, point.mean]), symbol: 'none', smooth: false, lineStyle: { color: SCIENTIFIC_PALETTE[0], width: 1.7 } },
+      { name: text.lower, type: 'line', stack: 'scenario-band', data: scenario.points.map((point) => [point.time, point.lower]), symbol: 'none', lineStyle: { opacity: 0 }, silent: true },
+      { name: text.band, type: 'line', stack: 'scenario-band', data: scenario.points.map((point) => [point.time, point.upper - point.lower]), symbol: 'none', lineStyle: { opacity: 0 }, areaStyle: { color: 'rgba(0,114,178,0.16)' }, silent: true },
+      { name: text.mean, type: 'line', data: scenario.points.map((point) => [point.time, point.mean]), symbol: 'none', smooth: false, lineStyle: { color: SCIENTIFIC_PALETTE[0], width: 1.7 } },
     ],
-  }), [scenario]);
+  }), [text, scenario]);
 
   return (
-    <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900" aria-label="Rule based degradation scenario">
+    <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900" aria-label={text.section}>
       <div className="mb-3 flex flex-wrap items-end gap-4">
-        <label className="grid gap-1 text-xs text-slate-500"><span>Scenario temperature (°C)</span><input type="number" value={temperature} min={-200} max={300} onChange={(event) => setTemperature(Number(event.target.value))} className="w-28 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white" /></label>
-        <label className="grid gap-1 text-xs text-slate-500"><span>Scenario horizon (years)</span><input type="number" value={years} min={1} max={50} onChange={(event) => setYears(Number(event.target.value))} className="w-28 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white" /></label>
-        <div className="rounded-lg bg-amber-50 px-3 py-2 text-[10px] leading-4 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">Screening scenario only. Ea={Math.round(scenario.apparentActivationEnergy / 1_000)} kJ·mol⁻¹ is a property-derived assumption, not an experimental fit.</div>
+        <label className="grid gap-1 text-xs text-slate-500"><span>{text.temperature}</span><input type="number" value={temperature} min={-200} max={300} onChange={(event) => setTemperature(Number(event.target.value))} className="w-28 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white" /></label>
+        <label className="grid gap-1 text-xs text-slate-500"><span>{text.years}</span><input type="number" value={years} min={1} max={50} onChange={(event) => setYears(Number(event.target.value))} className="w-28 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white" /></label>
+        <div className="rounded-lg bg-amber-50 px-3 py-2 text-[10px] leading-4 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">{language === 'zh' ? `仅供情景筛查。Ea=${Math.round(scenario.apparentActivationEnergy / 1_000)} kJ·mol⁻¹ 来自属性假设，并非实验拟合。` : `Screening scenario only. Ea=${Math.round(scenario.apparentActivationEnergy / 1_000)} kJ·mol⁻¹ is a property-derived assumption, not an experimental fit.`}</div>
       </div>
-      <ScientificEChart option={option} theme={theme} ariaLabel="Rule based tensile strength retention scenario" description="The scenario is derived from cross-sectional material properties and assumed Arrhenius parameters. The band is heuristic and is not a statistical confidence interval." exportName="rule-based-retention-scenario" dataCount={scenario.points.length * 3} />
+      <ScientificEChart option={option} theme={theme} ariaLabel={text.aria} description={text.description} exportName="rule-based-retention-scenario" dataCount={scenario.points.length * 3} />
     </section>
   );
 };

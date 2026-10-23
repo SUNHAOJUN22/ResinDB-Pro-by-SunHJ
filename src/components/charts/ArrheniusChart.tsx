@@ -1,5 +1,7 @@
 import React, { useMemo } from 'react';
 import type { EChartsOption } from '@/lib/echarts';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { ADVANCED_CHART_TEXT } from './advancedChartText';
 import { ScientificEChart } from './ScientificEChart';
 import { SCIENTIFIC_PALETTE, formatScientificNumber, scientificTooltipItem } from './scientificFigurePolicy';
 import { summarizeFinite } from '@/lib/numericAggregation';
@@ -12,6 +14,8 @@ interface ArrheniusChartProps {
 }
 
 export const ArrheniusChart: React.FC<ArrheniusChartProps> = React.memo(({ points, equation, rSquared, theme }) => {
+  const { language } = useLanguage();
+  const text = ADVANCED_CHART_TEXT[language].arrhenius;
   const option = useMemo<EChartsOption>(() => {
     const bounds = summarizeFinite(points, (point) => point.x);
     const minX = bounds?.minimum ?? 0;
@@ -21,23 +25,23 @@ export const ArrheniusChart: React.FC<ArrheniusChartProps> = React.memo(({ point
     const lineEnd = maxX + span * 0.08;
     return {
       title: {
-        text: 'Arrhenius lifetime linearization',
-        subtext: `OLS in ln(t / h) versus 1/T; R²=${rSquared.toFixed(4)}. Extrapolation assumes one dominant apparent activation process.`,
+        text: text.title,
+        subtext: `${text.subtitle}; R²=${rSquared.toFixed(4)}. ${text.caveat}`,
         left: 'center',
         top: 6,
         textStyle: { fontSize: 14, fontWeight: 650 },
         subtextStyle: { fontSize: 10 },
       },
-      legend: { bottom: 4, data: ['Observed lifetime', 'Linear fit (model)'] },
+      legend: { bottom: 4, data: [text.observed, text.model] },
       grid: { top: 76, bottom: 70, left: 70, right: 36, containLabel: true },
       tooltip: {
         trigger: 'item',
         formatter: (params: unknown) => {
           const item = scientificTooltipItem(params);
-          if (item?.seriesType === 'line') return `Linear fit (model)<br/>R²=${rSquared.toFixed(4)}`;
+          if (item?.seriesType === 'line') return `${text.model}<br/>R²=${rSquared.toFixed(4)}`;
           const value = item?.data as [number, number, number, number] | undefined;
           return value
-            ? `Observed lifetime<br/>T: ${formatScientificNumber(value[2])} °C<br/>1000/T: ${formatScientificNumber(value[0])} K⁻¹<br/>ln(t / h): ${formatScientificNumber(value[1])}<br/>t: ${formatScientificNumber(value[3])} h`
+            ? `${text.observed}<br/>T: ${formatScientificNumber(value[2])} °C<br/>1000/T: ${formatScientificNumber(value[0])} K⁻¹<br/>ln(t / h): ${formatScientificNumber(value[1])}<br/>t: ${formatScientificNumber(value[3])} h`
             : '';
         },
       },
@@ -45,14 +49,14 @@ export const ArrheniusChart: React.FC<ArrheniusChartProps> = React.memo(({ point
       yAxis: { type: 'value', name: 'ln(t / h)', nameLocation: 'middle', nameGap: 48, scale: true },
       series: [
         {
-          name: 'Observed lifetime',
+          name: text.observed,
           type: 'scatter',
           data: points.map((point) => [point.x * 1_000, point.y, point.tempC, point.time]),
           symbolSize: 7,
           itemStyle: { color: SCIENTIFIC_PALETTE[1] },
         },
         {
-          name: 'Linear fit (model)',
+          name: text.model,
           type: 'line',
           data: [
             [lineStart * 1_000, equation.m * lineStart + equation.b],
@@ -64,14 +68,14 @@ export const ArrheniusChart: React.FC<ArrheniusChartProps> = React.memo(({ point
         },
       ],
     };
-  }, [equation.b, equation.m, points, rSquared]);
+  }, [text, equation.b, equation.m, points, rSquared]);
 
   return (
     <ScientificEChart
       option={option}
       theme={theme}
-      ariaLabel="Arrhenius lifetime linearization"
-      description="Observed lifetime points and an ordinary least-squares Arrhenius fit are shown separately."
+      ariaLabel={text.aria}
+      description={text.description}
       exportName="arrhenius-lifetime-linearization"
       dataCount={points.length + 2}
       empty={points.length < 2}

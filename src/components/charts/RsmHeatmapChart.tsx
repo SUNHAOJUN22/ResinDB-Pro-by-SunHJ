@@ -1,7 +1,10 @@
 import React, { useMemo } from 'react';
 import type { EChartsOption } from '@/lib/echarts';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { ADVANCED_CHART_TEXT } from './advancedChartText';
 import { ScientificEChart } from './ScientificEChart';
-import { SCIENTIFIC_PALETTE, SCIENTIFIC_SEQUENTIAL, formatScientificNumber, scientificTooltipItem } from './scientificFigurePolicy';
+import { buildCartesianScalarCells, cartesianScalarSeries } from './cartesianCells';
+import { SCIENTIFIC_PALETTE, escapeScientificHtml, SCIENTIFIC_SEQUENTIAL, formatScientificNumber, scientificTooltipItem } from './scientificFigurePolicy';
 
 interface RsmHeatmapChartProps {
   grid: { x1: number; x2: number; y: number }[][];
@@ -19,32 +22,31 @@ interface RsmHeatmapChartProps {
 
 export const RsmHeatmapChart: React.FC<RsmHeatmapChartProps> = React.memo((props) => {
   const { grid, stationaryPoint, minX1, maxX1, minX2, maxX2, dataPoints, x1Label, x2Label, yLabel, theme } = props;
+  const { language } = useLanguage();
+  const text = ADVANCED_CHART_TEXT[language].rsm;
+  const cells = useMemo(() => buildCartesianScalarCells(grid.flatMap((row) => row.map((cell) => ({ x: cell.x1, y: cell.x2, z: cell.y })))), [grid]);
   const option = useMemo<EChartsOption>(() => {
-    const heatmapData = grid.flatMap((row) => row.map((cell) => [cell.x1, cell.x2, cell.y] as [number, number, number]));
     let minimum = Infinity;
     let maximum = -Infinity;
-    for (const point of heatmapData) {
+    for (const point of cells) {
       minimum = Math.min(minimum, point[2]);
       maximum = Math.max(maximum, point[2]);
     }
     const series: EChartsOption['series'] = [
       {
-        name: 'Quadratic response surface (model)',
-        type: 'heatmap',
-        data: heatmapData,
-        emphasis: { disabled: true },
+        ...cartesianScalarSeries(text.surface, cells),
         tooltip: {
           formatter: (params: unknown) => {
             const item = scientificTooltipItem(params);
             const value = item?.data as [number, number, number] | undefined;
             return value
-              ? `${x1Label}: ${formatScientificNumber(value[0])}<br/>${x2Label}: ${formatScientificNumber(value[1])}<br/>Fitted ${yLabel}: ${formatScientificNumber(value[2])}`
+              ? `${escapeScientificHtml(x1Label)}: ${formatScientificNumber(value[0])}<br/>${escapeScientificHtml(x2Label)}: ${formatScientificNumber(value[1])}<br/>${text.fitted} ${escapeScientificHtml(yLabel)}: ${formatScientificNumber(value[2])}`
               : '';
           },
         },
       },
       {
-        name: 'Observed data',
+        name: text.observed,
         type: 'scatter',
         data: dataPoints.map((point) => [point.x1, point.x2, point.y]),
         symbolSize: 7,
@@ -54,7 +56,7 @@ export const RsmHeatmapChart: React.FC<RsmHeatmapChartProps> = React.memo((props
             const item = scientificTooltipItem(params);
             const value = item?.data as [number, number, number] | undefined;
             return value
-              ? `Observed data<br/>${x1Label}: ${formatScientificNumber(value[0])}<br/>${x2Label}: ${formatScientificNumber(value[1])}<br/>${yLabel}: ${formatScientificNumber(value[2])}`
+              ? `${text.observed}<br/>${escapeScientificHtml(x1Label)}: ${formatScientificNumber(value[0])}<br/>${escapeScientificHtml(x2Label)}: ${formatScientificNumber(value[1])}<br/>${escapeScientificHtml(yLabel)}: ${formatScientificNumber(value[2])}`
               : '';
           },
         },
@@ -62,31 +64,34 @@ export const RsmHeatmapChart: React.FC<RsmHeatmapChartProps> = React.memo((props
     ];
     if (stationaryPoint) {
       series.push({
-        name: 'Stationary point (classification not implied)',
+        name: text.stationary,
         type: 'scatter',
         data: [[stationaryPoint.x1, stationaryPoint.x2, stationaryPoint.y]],
         symbol: 'diamond',
         symbolSize: 12,
         itemStyle: { color: SCIENTIFIC_PALETTE[1], borderColor: '#ffffff', borderWidth: 1.5 },
         tooltip: {
-          formatter: () => `Stationary point — not automatically an optimum<br/>${x1Label}: ${formatScientificNumber(stationaryPoint.x1)}<br/>${x2Label}: ${formatScientificNumber(stationaryPoint.x2)}<br/>Fitted ${yLabel}: ${formatScientificNumber(stationaryPoint.y)}`,
+          formatter: () => `${text.stationaryNote}<br/>${escapeScientificHtml(x1Label)}: ${formatScientificNumber(stationaryPoint.x1)}<br/>${escapeScientificHtml(x2Label)}: ${formatScientificNumber(stationaryPoint.x2)}<br/>${text.fitted} ${escapeScientificHtml(yLabel)}: ${formatScientificNumber(stationaryPoint.y)}`,
         },
         z: 4,
       });
     }
     return {
       title: {
-        text: 'Quadratic response-surface model',
-        subtext: 'Heatmap is fitted model output; outlined markers are observations. Stationary-point classification is not implied.',
+        text: text.title,
+        subtext: text.subtitle,
         left: 'center',
         top: 6,
         textStyle: { fontSize: 14, fontWeight: 650 },
         subtextStyle: { fontSize: 10 },
       },
       grid: { top: 76, bottom: 62, left: 68, right: 86, containLabel: true },
+      legend: { bottom: 4, data: [text.observed, ...(stationaryPoint ? [text.stationary] : [])] },
       xAxis: { type: 'value', name: x1Label, nameLocation: 'middle', nameGap: 34, min: minX1, max: maxX1 },
       yAxis: { type: 'value', name: x2Label, nameLocation: 'middle', nameGap: 48, min: minX2, max: maxX2 },
       visualMap: {
+        dimension: 2,
+        seriesIndex: 0,
         min: Number.isFinite(minimum) ? minimum : 0,
         max: Number.isFinite(maximum) ? maximum : 1,
         calculable: true,
@@ -98,18 +103,18 @@ export const RsmHeatmapChart: React.FC<RsmHeatmapChartProps> = React.memo((props
       },
       series,
     };
-  }, [dataPoints, grid, maxX1, maxX2, minX1, minX2, stationaryPoint, theme, x1Label, x2Label, yLabel]);
+  }, [text, dataPoints, cells, maxX1, maxX2, minX1, minX2, stationaryPoint, theme, x1Label, x2Label, yLabel]);
 
-  const dataCount = grid.reduce((sum, row) => sum + row.length, 0) + dataPoints.length + (stationaryPoint ? 1 : 0);
+  const dataCount = cells.length + dataPoints.length + (stationaryPoint ? 1 : 0);
   return (
     <ScientificEChart
       option={option}
       theme={theme}
-      ariaLabel="Quadratic response surface with observed points"
-      description="The heatmap is fitted model output. Observations and the stationary point are drawn as separate marker layers."
+      ariaLabel={text.aria}
+      description={text.description}
       exportName="quadratic-response-surface"
       dataCount={dataCount}
-      empty={grid.length === 0}
+      empty={cells.length === 0}
     />
   );
 });

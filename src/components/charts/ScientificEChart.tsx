@@ -86,9 +86,10 @@ export const ScientificEChart: React.FC<ScientificEChartProps> = React.memo(({
           exportName,
           dataCount,
           reducedMotion,
+          language,
         })
       : null
-  ), [ariaLabel, dataCount, description, exportName, option, reducedMotion, theme]);
+  ), [ariaLabel, dataCount, description, exportName, language, option, reducedMotion, theme]);
 
   useEffect(() => {
     onChartReadyRef.current = onChartReady;
@@ -98,7 +99,7 @@ export const ScientificEChart: React.FC<ScientificEChartProps> = React.memo(({
     const container = containerRef.current;
     if (!container) return undefined;
     const chart = echarts.getInstanceByDom(container)
-      ?? echarts.init(container, undefined, { renderer: 'canvas', useDirtyRect: true });
+      ?? echarts.init(container, undefined, { renderer: 'canvas', useDirtyRect: true, locale: language === 'zh' ? 'ZH' : 'EN' });
     chartRef.current = chart;
     onChartReadyRef.current?.(chart);
 
@@ -129,7 +130,7 @@ export const ScientificEChart: React.FC<ScientificEChartProps> = React.memo(({
       if (!chart.isDisposed()) chart.dispose();
       chartRef.current = null;
     };
-  }, []);
+  }, [language]);
 
   useEffect(() => {
     const chart = chartRef.current;

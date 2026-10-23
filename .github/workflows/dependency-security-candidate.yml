@@ -46,9 +46,9 @@ jobs:
           npm install --global npm@11.6.4 --ignore-scripts
           npm --version
           npm ci --ignore-scripts
-          npm view dompurify@3.4.16 version dist.integrity --json > "$RUNNER_TEMP/dependency-candidate/dompurify-registry.json"
+          npm view dompurify@3.4.17 version dist.integrity --json > "$RUNNER_TEMP/dependency-candidate/dompurify-registry.json"
           npm view vitest@4.1.12 version dist.integrity --json > "$RUNNER_TEMP/dependency-candidate/vitest-registry.json"
-          npm pkg set overrides.dompurify=3.4.16 devDependencies.vitest=4.1.12 'devDependencies.@vitest/coverage-v8=4.1.12'
+          npm pkg set overrides.dompurify=3.4.17 devDependencies.vitest=4.1.12 'devDependencies.@vitest/coverage-v8=4.1.12'
           npm install --package-lock-only --ignore-scripts --no-audit
           npm update --package-lock-only --ignore-scripts --no-audit brace-expansion undici fflate
           cp package.json package-lock.json "$RUNNER_TEMP/dependency-candidate/"

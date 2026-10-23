@@ -1,6 +1,6 @@
 {
   "schemaVersion": "resindb-compute-catalog-1.0.0",
-  "updatedAt": "2026-08-03",
+  "updatedAt": "2026-10-23",
   "modules": [
     {
       "id": "arrhenius",
@@ -47,8 +47,8 @@
       "chartId": "copula",
       "inputContract": "Complete finite paired observations with enough non-constant rank variation.",
       "outputContract": "Normal-score correlation and finite Gaussian-copula density grid.",
-      "mathematicalContract": "u=(rank-0.5)/n, z=Phi^-1(u), rho=corr(zx,zy)",
-      "scientificBoundary": "Dependence model, not causal attribution."
+      "mathematicalContract": "Average-rank normal-score correlation and Gaussian-copula density; threshold CDF uses a separate angle-transformed correlation integral with exact margins and inclusive empirical CDFs, independent of the display grid.",
+      "scientificBoundary": "Fitted Gaussian dependence, not causal or kinetic coupling or measured failure rates. Density correlation is limited to ±0.999; empirical margins and sample size limit tail interpretation."
     },
     {
       "id": "data-quality",

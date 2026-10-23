@@ -16,7 +16,7 @@ export const KineticsChart: React.FC<KineticsChartProps> = React.memo(({ points,
   const { language } = useLanguage();
   const option = useMemo<EChartsOption>(() => ({
     title: [
-      { text: 'Kissinger linearization', subtext: language === 'en' ? 'Observed DSC peak points and fitted line.' : 'DSC 峰温观测点与拟合直线。', left: 'center', top: 4, textStyle: { fontSize: 13, fontWeight: 650 }, subtextStyle: { fontSize: 9 } },
+      { text: language === 'en' ? 'Kissinger linearization' : 'Kissinger 线性化', subtext: language === 'en' ? 'Observed DSC peak points and fitted line.' : 'DSC 峰温观测点与拟合直线。', left: 'center', top: 4, textStyle: { fontSize: 13, fontWeight: 650 }, subtextStyle: { fontSize: 9 } },
       { text: language === 'en' ? `Isothermal conversion scenario at ${isoTemp} °C` : `${isoTemp} °C 等温转化情景`, subtext: language === 'en' ? 'Derived first-order extrapolation, not a measured isothermal experiment.' : '由峰温拟合外推的一阶情景，不是实测等温实验。', left: 'center', top: '51%', textStyle: { fontSize: 13, fontWeight: 650 }, subtextStyle: { fontSize: 9 } },
     ],
     legend: { bottom: 4 },
@@ -39,5 +39,5 @@ export const KineticsChart: React.FC<KineticsChartProps> = React.memo(({ points,
       { name: language === 'en' ? 'Isothermal scenario' : '等温情景外推', type: 'line', xAxisIndex: 1, yAxisIndex: 1, data: isoCurve.map((point) => [point.time, point.alpha]), symbol: 'none', smooth: false, lineStyle: { width: 1.8, color: SCIENTIFIC_PALETTE[1] } },
     ],
   }), [isoCurve, isoTemp, language, line, points]);
-  return <ScientificEChart option={option} theme={theme} ariaLabel="Kissinger kinetics and isothermal conversion scenario" description="Observed DSC peak points and their Kissinger fit are separated from the derived isothermal scenario." exportName="kissinger-kinetics" dataCount={points.length + line.length + isoCurve.length} empty={points.length < 3} height="100%" />;
+  return <ScientificEChart option={option} theme={theme} ariaLabel={language === 'zh' ? 'Kissinger 动力学与等温转化情景' : 'Kissinger kinetics and isothermal conversion scenario'} description={language === 'zh' ? 'DSC 峰温观测点及其 Kissinger 拟合，与推导出的等温情景分别显示。' : 'Observed DSC peak points and their Kissinger fit are separated from the derived isothermal scenario.'} exportName="kissinger-kinetics" dataCount={points.length + line.length + isoCurve.length} empty={points.length < 3} height="100%" />;
 });

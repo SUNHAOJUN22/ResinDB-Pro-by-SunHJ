@@ -54,7 +54,10 @@ requireText('src/components/charts/ScientificEChart.tsx', 'useLanguage', 'scient
 requireText('src/components/charts/ScientificEChart.tsx', "typeof ResizeObserver === 'undefined'", 'scientific chart resize fallback missing');
 requireText('src/components/charts/GpcDistribution.ts', 'not measured GPC data', 'GPC proxy boundary missing');
 requireText('src/components/charts/RheologyCurve.ts', 'not fitted rheometry', 'rheology proxy boundary missing');
-requireText('src/components/charts/FeatureImportanceChart.tsx', 'not causality or SHAP', 'ridge boundary missing');
+requireText('src/components/charts/FeatureImportanceChart.tsx', 'ADVANCED_CHART_TEXT[language].ridge', 'localized ridge catalog is not connected');
+requireText('src/components/charts/FeatureImportanceChart.tsx', 'subtext: text.subtitle', 'ridge boundary is not displayed');
+requireText('src/components/charts/advancedChartText.ts', 'not causality or SHAP', 'English ridge boundary missing');
+requireText('src/components/charts/advancedChartText.ts', '不表示因果或 SHAP', 'Chinese ridge boundary missing');
 requireText('src/components/charts/WeibullChart.tsx', 'not MLE', 'Weibull estimator boundary missing');
 requireText('src/components/charts/DataVisualizer.tsx', 'Ridge attribution is associative', 'workspace scientific boundary missing');
 requireText('src/components/features/Analytics/ResinCapacityForecast.tsx', 'not 95% confidence intervals', 'capacity boundary missing');

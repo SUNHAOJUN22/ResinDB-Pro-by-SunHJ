@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useWorkerManager } from './useWorkerManager';
 import type { CopulaMessage, CopulaResponse } from '@/workers/copulaWorker';
+import { empiricalCdf, gaussianCopulaCdf } from '@/compute/gaussianCopula';
 
 export function useCopulaWorker() {
   const {
@@ -22,31 +23,9 @@ export function useCopulaWorker() {
 
   const getJointFailureProb = useCallback((thresholdX: number, thresholdY: number) => {
     if (!copulaResult) return null;
-    const { sortedX, sortedY, grid } = copulaResult;
-    
-    // Find u and v for thresholds
-    let uIdx = 0;
-    while(uIdx < sortedX.length && sortedX[uIdx] <= thresholdX) uIdx++;
-    const u = sortedX.length > 0 ? uIdx / sortedX.length : 0;
-    
-    let vIdx = 0;
-    while(vIdx < sortedY.length && sortedY[vIdx] <= thresholdY) vIdx++;
-    const v = sortedY.length > 0 ? vIdx / sortedY.length : 0;
-    
-    // Integrate copula PDF numerically from grid (Riemann sum approximation)
-    // grid is 50x50, step is 1/50 = 0.02
-    // We sum up C_uv * du * dv where u_grid <= u and v_grid <= v
-    let sum = 0;
-    const du = 1/50;
-    const dv = 1/50;
-    
-    for (const point of grid) {
-        if (point.u <= u && point.v <= v) {
-            sum += point.z * du * dv;
-        }
-    }
-    
-    return sum; // Joint probability
+    const { sortedX, sortedY, rho } = copulaResult;
+    if (!Number.isFinite(thresholdX) || !Number.isFinite(thresholdY)) return null;
+    return gaussianCopulaCdf(empiricalCdf(sortedX, thresholdX), empiricalCdf(sortedY, thresholdY), rho);
   }, [copulaResult]);
 
   return { isCalculating, copulaResult, error, calculateCopula, getJointFailureProb };

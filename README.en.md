@@ -173,6 +173,42 @@ $$
 
 KDE smoothing depends on bandwidth. Gaussian Process, Bayesian optimization, multiobjective surrogates and response surfaces produce model predictions; acquisition candidates are not validated formulations. Regularization and finite-cohort checks handle numerical issues, not sampling bias.
 
+### Copula probability and the display grid
+
+$$
+\widehat F_X(t)=\frac1n\sum_{i=1}^n\mathbf1\{x_i\le t\},\qquad
+P(X\le x,Y\le y)=C_\rho\!\left(\widehat F_X(x),\widehat F_Y(y)\right)
+$$
+
+The worker assigns average ranks to ties, forms pseudo-observations $(r_i-0.5)/n$, transforms them to normal scores and estimates their correlation. The density model limits correlation to $[-0.999,0.999]$. Threshold probabilities use the inclusive empirical CDF, including ties; thresholds above the sample return the complete margin. The independent comparison uses the same ECDF.
+
+For $0<u,v<1$ and $|\rho|<1$, let $a=\Phi^{-1}(u)$ and $b=\Phi^{-1}(v)$. The code evaluates
+
+$$
+C_\rho(u,v)=uv+\frac1{2\pi}\int_0^{\arcsin\rho}
+\exp\!\left[-\frac{(a-b)^2}{4(1-\sin\theta)}-\frac{(a+b)^2}{4(1+\sin\theta)}\right]\,d\theta.
+$$
+
+`src/compute/gaussianCopula.ts` applies an angle substitution to [Plackett's correlation derivative](https://doi.org/10.1093/biomet/41.3-4.351), then uses bounded adaptive Simpson quadrature. Independence, probability boundaries and perfect-correlation limits are handled separately. Thus $C(u,1)=u$, $C(1,v)=v$, $C(1,1)=1$ and $C_0(u,v)=uv$, with numerical output respecting the Fréchet bounds. The density grid is used only for display; changing its resolution cannot change a threshold probability. Regressions compare the analytic median-quadrant identity and independent conditional-normal quadrature reference values. Results estimate the fitted dependence model, not measured failure rates or causality. Tail inference remains limited by the sample and marginal assumptions.
+
+### Continuous response surfaces and layers
+
+$$
+\widehat y=\beta_0+\beta_1x_1+\beta_2x_2+\beta_{11}x_1^2+\beta_{22}x_2^2+\beta_{12}x_1x_2,\qquad
+\begin{bmatrix}2\beta_{11}&\beta_{12}\\\beta_{12}&2\beta_{22}\end{bmatrix}x_*=-\begin{bmatrix}\beta_1\\\beta_2\end{bmatrix}.
+$$
+
+RSM preserves signed responses and physical coordinates. Copula and RSM render bounded custom color cells whose boundaries lie halfway between adjacent grid centers. Continuous `value` axes no longer use ECharts' category-only `heatmap` series. Observations and stationary points have distinct marker layers; the color map applies only to model cells. A single coordinate cannot define a cell width and yields the no-plottable-data state. The RSM grid extends each observed range by 20% at either end; those regions remain model extrapolation. A stationary point can lie outside the observations or be a saddle; the UI does not automatically claim an optimal formulation.
+
+### Jansen variance sensitivity
+
+$$
+\widehat S_{T,j}=\frac{\sum_{i=1}^{N}[f(A_i)-f(A_{B,i}^{(j)})]^2}{2N\widehat V},\qquad
+\widehat S_{1,j}=1-\frac{\sum_{i=1}^{N}[f(B_i)-f(A_{B,i}^{(j)})]^2}{2N\widehat V}.
+$$
+
+$A_B^{(j)}$ replaces column j of A with column j of B. The worker uses independent pseudo-random normal Saltelli A/B samples with its implemented input bounds; it does not implement a Sobol low-discrepancy sequence. Numerically zero output variance is an error. Displayed estimates are nonnegative, with first order no greater than total effect. $S_T-S_1$ is aggregate higher-order contribution, not a particular pairwise interaction or causal effect.
+
 ### Relative sensitivity and reviewable evidence
 
 $$
@@ -180,6 +216,12 @@ S_{yx}\approx\frac{f(x+\delta x)-f(x-\delta x)}{2\delta x}\frac{x}{f(x)}
 $$
 
 Dependency heatmaps perturb copied admitted quantities using finite differences and preserve source records. Formula outputs and rule-generated proxies are labeled separately. Zero input/output baselines, rejected quantities and unavailable dependencies remain unavailable. Software tests and data audits establish software checks, not material certification.
+
+## Bilingual figure workflow and validation
+
+Advanced figure titles, subtitles, legends, tooltips, axis descriptions and accessibility descriptions regenerate when the language changes. ECharts' built-in locale and Save as image control switch with it. User-supplied material names remain unchanged; registered properties use the property translation map. Equations, units and proper names may remain common to both languages. Real ECharts SVG regressions cover Copula, RSM, Sobol, Mahalanobis, similarity networks, WLF, Pareto, Prony, SPC, ridge attribution, Arrhenius, Kissinger, Bayesian models and degradation scenarios in both languages.
+
+For acceptance, open Copula or RSM in Scientific Visualization, calculate from finite paired or triple observations, switch between Chinese and English, and hover over model cells. The real Chromium suite checks nonempty native Canvas pixels, text actually drawn, hover tooltips and accessibility language, and captures both locales. SVG SSR tests run in Node and validate real ECharts options; they do not establish browser Canvas behavior or installed CJK font rendering. The browser suites test those paths without substituting mocked Canvas drawing.
 
 ## Separate data and code layers
 
@@ -203,6 +245,8 @@ node --test scripts/tests/*.node.mjs
 ```
 
 `validate:ci` runs docs/Unicode/source/scientific-UI/compute/data contracts, ESLint, TypeScript, Vitest, build and smoke, K-Means benchmark smoke, grouped tests, coverage, three Chromium UI suites and the full dependency audit. Original thresholds remain in configuration: passing requires real checks, not reduced coverage gates, hidden failures or empty test substitutes. Browser acceptance needs executable Chromium (`CHROME_BIN`) and Chinese/English fonts. A canvas element alone does not establish rendered data; scatter evidence must inspect real pixels and eligible-point counts.
+
+The lockfile pins DOMPurify 3.4.17, the patched release for [GHSA-cg2g-xh64-v4q7](https://github.com/advisories/GHSA-cg2g-xh64-v4q7) and [GHSA-mrv2-3pqr-j5jr](https://github.com/advisories/GHSA-mrv2-3pqr-j5jr); the dependency candidate workflow uses the same version. Rerun production and complete dependency audits for every delivery. A version pin does not replace current vulnerability checks.
 
 Reports and coverage are generated in local `artifacts/` and `coverage/`. Every result belongs to a particular source revision and environment. Delivery must verify the exact GitHub main commit and its Actions result; old results do not certify new code. A six-hour run requires real timestamps and logs, not a README assertion. See the [validation contract](docs/VALIDATION.md).
 

@@ -3,6 +3,7 @@ import { act, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { ScientificEChart } from '@/components/charts/ScientificEChart';
 import { LanguageProvider } from '@/contexts/LanguageContext';
+import * as echarts from '@/lib/echarts';
 
 const { chart, handlers } = vi.hoisted(() => {
   const eventHandlers = new Map<string, () => void>();
@@ -96,5 +97,17 @@ describe('ScientificEChart language and render states', () => {
       expect.any(Object),
       { notMerge: true, lazyUpdate: false },
     );
+    expect(echarts.init).toHaveBeenLastCalledWith(expect.any(HTMLElement), undefined, expect.objectContaining({ locale: 'ZH' }));
+    expect(chart.setOption).toHaveBeenLastCalledWith(expect.objectContaining({
+      toolbox: expect.objectContaining({ feature: expect.objectContaining({ saveAsImage: expect.objectContaining({ title: '保存图片' }) }) }),
+    }), expect.any(Object));
+
+    act(() => { window.dispatchEvent(new CustomEvent('resindb-language-change', { detail: 'en' })); });
+    expect(chart.dispose).toHaveBeenCalledTimes(1);
+    expect(echarts.init).toHaveBeenLastCalledWith(expect.any(HTMLElement), undefined, expect.objectContaining({ locale: 'EN' }));
+    expect(chart.setOption).toHaveBeenLastCalledWith(expect.objectContaining({
+      toolbox: expect.objectContaining({ feature: expect.objectContaining({ saveAsImage: expect.objectContaining({ title: 'Save as image' }) }) }),
+    }), expect.any(Object));
+    expect(surface).toHaveAttribute('data-scientific-chart-rendered', 'true');
   });
 });

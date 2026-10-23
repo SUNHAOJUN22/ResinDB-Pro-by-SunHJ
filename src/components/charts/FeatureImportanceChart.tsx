@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
 import type { EChartsOption } from '@/lib/echarts';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { ADVANCED_CHART_TEXT } from './advancedChartText';
 import { ScientificEChart } from './ScientificEChart';
-import { SCIENTIFIC_PALETTE, formatScientificNumber } from './scientificFigurePolicy';
+import { SCIENTIFIC_PALETTE, escapeScientificHtml, formatScientificNumber } from './scientificFigurePolicy';
 
 interface FeatureImportanceChartProps {
   importances: { feature: string; importance: number; positive: boolean }[];
@@ -9,12 +11,14 @@ interface FeatureImportanceChartProps {
 }
 
 export const FeatureImportanceChart: React.FC<FeatureImportanceChartProps> = React.memo(({ importances, theme }) => {
+  const { language } = useLanguage();
+  const text = ADVANCED_CHART_TEXT[language].ridge;
   const option = useMemo<EChartsOption>(() => {
     const sorted = [...importances].sort((left, right) => left.importance - right.importance);
     return {
       title: {
-        text: 'Standardized ridge sensitivity attribution',
-        subtext: 'Absolute standardized coefficients normalized to 100%; signs show conditional association, not causality or SHAP.',
+        text: text.title,
+        subtext: text.subtitle,
         left: 'center',
         top: 6,
         textStyle: { fontSize: 14, fontWeight: 650 },
@@ -28,12 +32,12 @@ export const FeatureImportanceChart: React.FC<FeatureImportanceChartProps> = Rea
           const entry = Array.isArray(params) ? params[0] as { dataIndex: number; name: string; value: number } : null;
           if (!entry) return '';
           const source = sorted[entry.dataIndex];
-          return `<strong>${entry.name}</strong><br/>Normalized |β| share: ${formatScientificNumber(entry.value)}%<br/>Standardized coefficient direction: ${source.positive ? 'positive' : 'negative'}<br/><em>Association only; not causal effect.</em>`;
+          return `<strong>${escapeScientificHtml(entry.name)}</strong><br/>${text.share}: ${formatScientificNumber(entry.value)}%<br/>${text.direction}: ${source.positive ? text.positive : text.negative}<br/><em>${text.caveat}</em>`;
         },
       },
       xAxis: {
         type: 'value',
-        name: 'Normalized |standardized ridge coefficient| (%)',
+        name: text.xAxis,
         nameLocation: 'middle',
         nameGap: 32,
         min: 0,
@@ -46,7 +50,7 @@ export const FeatureImportanceChart: React.FC<FeatureImportanceChartProps> = Rea
         axisTick: { show: false },
       },
       series: [{
-        name: 'Ridge sensitivity attribution',
+        name: text.series,
         type: 'bar',
         barMaxWidth: 22,
         data: sorted.map((entry) => ({
@@ -56,14 +60,14 @@ export const FeatureImportanceChart: React.FC<FeatureImportanceChartProps> = Rea
         label: { show: true, position: 'right', formatter: ({ value }: { value?: unknown }) => `${formatScientificNumber(Number(value))}%` },
       }],
     };
-  }, [importances]);
+  }, [text, importances]);
 
   return (
     <ScientificEChart
       option={option}
       theme={theme}
-      ariaLabel="Standardized ridge regression sensitivity attribution"
-      description="Bars show normalized absolute standardized ridge coefficients. Sign is association direction and does not imply causality."
+      ariaLabel={text.aria}
+      description={text.description}
       exportName="ridge-sensitivity-attribution"
       dataCount={importances.length}
       empty={importances.length === 0}

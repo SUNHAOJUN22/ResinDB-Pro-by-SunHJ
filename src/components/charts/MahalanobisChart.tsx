@@ -1,5 +1,7 @@
 import React, { useMemo } from 'react';
 import type { EChartsOption } from '@/lib/echarts';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { ADVANCED_CHART_TEXT } from './advancedChartText';
 import { ScientificEChart } from './ScientificEChart';
 import { SCIENTIFIC_PALETTE, escapeScientificHtml, formatScientificNumber, scientificTooltipItem } from './scientificFigurePolicy';
 
@@ -10,18 +12,20 @@ interface MahalanobisChartProps {
 }
 
 export const MahalanobisChart: React.FC<MahalanobisChartProps> = React.memo(({ distances, threshold, theme }) => {
+  const { language } = useLanguage();
+  const text = ADVANCED_CHART_TEXT[language].mahalanobis;
   const option = useMemo<EChartsOption>(() => {
     let maximum = threshold;
     for (const entry of distances) maximum = Math.max(maximum, entry.distance);
     return {
-      title: { text: 'Regularized Mahalanobis distance screening', subtext: 'Threshold is a χ² screening reference under the model assumptions; flagged points require review.', left: 'center', top: 6, textStyle: { fontSize: 14, fontWeight: 650 }, subtextStyle: { fontSize: 10 } },
+      title: { text: text.title, subtext: text.subtitle, left: 'center', top: 6, textStyle: { fontSize: 14, fontWeight: 650 }, subtextStyle: { fontSize: 10 } },
       grid: { top: 76, bottom: 62, left: 70, right: 36, containLabel: true },
       dataZoom: [{ type: 'inside', xAxisIndex: 0, filterMode: 'filter' }],
-      tooltip: { formatter: (params: unknown) => { const item = scientificTooltipItem(params); const data = item?.data as { name?: string; distance?: number; isOutlier?: boolean } | undefined; return data ? `<strong>${escapeScientificHtml(data.name)}</strong><br/>D²: ${formatScientificNumber(Number(data.distance))}<br/>Screening status: ${data.isOutlier ? 'above χ² reference' : 'within χ² reference'}` : ''; } },
-      xAxis: { type: 'value', name: 'Sample index', nameLocation: 'middle', nameGap: 32, min: 0, max: distances.length + 1 },
-      yAxis: { type: 'value', name: 'Mahalanobis D²', nameLocation: 'middle', nameGap: 46, min: 0, max: maximum > 0 ? maximum * 1.15 : 1 },
+      tooltip: { formatter: (params: unknown) => { const item = scientificTooltipItem(params); const data = item?.data as { name?: string; distance?: number; isOutlier?: boolean } | undefined; return data ? `<strong>${escapeScientificHtml(data.name)}</strong><br/>D²: ${formatScientificNumber(Number(data.distance))}<br/>${text.status}: ${data.isOutlier ? text.above : text.within}` : ''; } },
+      xAxis: { type: 'value', name: text.xAxis, nameLocation: 'middle', nameGap: 32, min: 0, max: distances.length + 1 },
+      yAxis: { type: 'value', name: text.yAxis, nameLocation: 'middle', nameGap: 46, min: 0, max: maximum > 0 ? maximum * 1.15 : 1 },
       series: [{
-        name: 'Sample distance',
+        name: text.series,
         type: 'scatter',
         symbolSize: 7,
         progressive: 1_000,
@@ -36,11 +40,11 @@ export const MahalanobisChart: React.FC<MahalanobisChartProps> = React.memo(({ d
           symbol: ['none', 'none'],
           silent: true,
           lineStyle: { color: SCIENTIFIC_PALETTE[1], type: 'dashed', width: 1.5 },
-          label: { formatter: 'χ² screening reference: {c}' },
+          label: { formatter: text.reference },
           data: [{ yAxis: threshold }],
         },
       }],
     };
-  }, [distances, threshold]);
-  return <ScientificEChart option={option} theme={theme} ariaLabel="Mahalanobis distance screening" description="Each point is a regularized multivariate distance. The horizontal line is a screening reference, not automatic proof of failure." exportName="mahalanobis-screening" dataCount={distances.length} empty={distances.length === 0} />;
+  }, [text, distances, threshold]);
+  return <ScientificEChart option={option} theme={theme} ariaLabel={text.aria} description={text.description} exportName="mahalanobis-screening" dataCount={distances.length} empty={distances.length === 0} />;
 });

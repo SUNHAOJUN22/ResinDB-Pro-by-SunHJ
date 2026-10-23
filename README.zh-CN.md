@@ -173,6 +173,42 @@ $$
 
 KDE 平滑程度取决于带宽。Gaussian Process、贝叶斯优化、多目标代理及响应面输出都是模型预测；采集候选不是已验证配方。核矩阵正则化与有效样本检查只处理数值问题，不消除样本偏差。
 
+### Copula 联合概率与显示网格
+
+$$
+\widehat F_X(t)=\frac1n\sum_{i=1}^n\mathbf1\{x_i\le t\},\qquad
+P(X\le x,Y\le y)=C_\rho\!\left(\widehat F_X(x),\widehat F_Y(y)\right)
+$$
+
+Worker 先对并列观测采用平均秩，以 $(r_i-0.5)/n$ 构造伪观测并变换为正态得分，再估计相关系数；用于密度的相关系数限制在 $[-0.999,0.999]$。阈值概率采用包含等号的经验累积分布，包含并列值；上界之外返回完整边缘概率，独立比较基线使用同一 ECDF。
+
+对于 $0<u,v<1$、$|\rho|<1$，令 $a=\Phi^{-1}(u)$、$b=\Phi^{-1}(v)$，代码计算
+
+$$
+C_\rho(u,v)=uv+\frac1{2\pi}\int_0^{\arcsin\rho}
+\exp\!\left[-\frac{(a-b)^2}{4(1-\sin\theta)}-\frac{(a+b)^2}{4(1+\sin\theta)}\right]\,d\theta.
+$$
+
+`src/compute/gaussianCopula.ts` 对 [Plackett 相关导数公式](https://doi.org/10.1093/biomet/41.3-4.351) 作角变量代换，使用有界自适应 Simpson 积分；零相关、概率边界和完全相关极限单独处理。由此 $C(u,1)=u$、$C(1,v)=v$、$C(1,1)=1$、$C_0(u,v)=uv$，概率还受 Fréchet 界限约束。显示密度网格只用于绘图，不再用于固定步长概率累加；调节网格密度不能改变阈值概率。回归测试使用解析中位象限公式及独立的条件正态积分参考值。此结果是拟合相依模型下的估计，不是实测失效率或因果关系；尾部推断受样本量和边缘分布假设限制。
+
+### 连续坐标响应面与图层
+
+$$
+\widehat y=\beta_0+\beta_1x_1+\beta_2x_2+\beta_{11}x_1^2+\beta_{22}x_2^2+\beta_{12}x_1x_2,\qquad
+\begin{bmatrix}2\beta_{11}&\beta_{12}\\\beta_{12}&2\beta_{22}\end{bmatrix}x_*=-\begin{bmatrix}\beta_1\\\beta_2\end{bmatrix}.
+$$
+
+RSM 保留负响应和真实物理坐标。Copula 与 RSM 使用有界自定义色彩单元，在相邻网格中心的中点建立单元边界；连续 `value` 轴不再使用只支持类别轴的 ECharts `heatmap`。观测点和驻点分别显示，颜色映射仅作用于模型层，不改变观测标记。单一坐标不足以定义单元宽度时显示无可绘制数据。RSM 计算网格扩展至观测范围两端各 20%，外延区域仍是模型外推；驻点可能位于观测范围外，也可能是鞍点，界面不自动宣称最优配方。
+
+### Jansen 方差敏感性
+
+$$
+\widehat S_{T,j}=\frac{\sum_{i=1}^{N}[f(A_i)-f(A_{B,i}^{(j)})]^2}{2N\widehat V},\qquad
+\widehat S_{1,j}=1-\frac{\sum_{i=1}^{N}[f(B_i)-f(A_{B,i}^{(j)})]^2}{2N\widehat V}.
+$$
+
+$A_B^{(j)}$ 表示用 B 的第 j 列替换 A 的相应列。当前 Worker 使用独立伪随机正态 Saltelli A/B 样本，支持已实现的输入边界；没有实现 Sobol 低差异序列。数值零方差返回错误；显示值取非负并令一阶值不大于总效应。$S_T-S_1$ 是高阶贡献总量，不能读成某一对变量的交互指数，也不能读成因果影响。
+
 ### 相对灵敏度与可复核证据
 
 $$
@@ -180,6 +216,12 @@ S_{yx}\approx\frac{f(x+\delta x)-f(x-\delta x)}{2\delta x}\frac{x}{f(x)}
 $$
 
 依赖热图对拷贝后的有效数量做有限差分扰动，保留原记录；公式输出与规则代理分别标记。x=0、输出为 0、无效数量或不可计算依赖显示不可用。代码测试与数据审计是软件验收证据，不是材料性能认证。
+
+## 双语图形使用与验收
+
+高级图的标题、副标题、图例、提示框、轴说明和无障碍描述随当前语言重新生成；内置 ECharts 本地化与“保存图片”也会随语言切换。用户提供的材料名称保持原文，已登记属性通过属性翻译映射显示。公式、单位和专有名称可以跨语言保留。Copula、RSM、Sobol、马氏距离、相似性网络、WLF、Pareto、Prony、SPC、岭回归、Arrhenius、Kissinger、贝叶斯模型和降解情景均有双语真实 ECharts SVG 回归。
+
+验收先在科研可视化中选择 Copula 或 RSM，使用有效成对／三元观测计算，再切换中文和英文并悬停模型单元。真实 Chromium 套件检查非空原生 Canvas 像素、实际绘制文字、提示框和无障碍语言，并保存两种语言的截图。SVG SSR 测试在 Node 环境运行；它验证真实 ECharts 配置，不证明浏览器 Canvas 或已安装中文字体的效果。浏览器套件承担这些验证，未使用 Canvas 替身代替真实绘图。
 
 ## 数据层与代码层分离
 
@@ -203,6 +245,8 @@ node --test scripts/tests/*.node.mjs
 ```
 
 `validate:ci` 执行文档/Unicode/源代码/科学 UI/计算/数据契约、ESLint、TypeScript、Vitest、构建及 smoke、K-Means 基准 smoke、分类测试、覆盖率、三个 Chromium 界面套件与完整依赖安全审计。门槛定义留在原配置中，不通过降低覆盖率、隐藏失败或替换空测试制造通过。浏览器验收需要可执行 Chromium（可设置 `CHROME_BIN`）及可用中英文字体；只有 canvas 元素存在不足以证明图已画出，散点须验证真实像素与有效点数。
+
+锁文件固定 DOMPurify 3.4.17，包含 [GHSA-cg2g-xh64-v4q7](https://github.com/advisories/GHSA-cg2g-xh64-v4q7) 与 [GHSA-mrv2-3pqr-j5jr](https://github.com/advisories/GHSA-mrv2-3pqr-j5jr) 的修复版本；依赖候选流程使用同一版本。每次交付仍须重新运行生产和完整依赖审计，版本固定不能替代最新漏洞检查。
 
 报告和覆盖率写入本地 `artifacts/`、`coverage/`；每次结果对应具体代码和运行环境。最终交付应核对 GitHub main 的确切提交及该提交 Actions 结果，不能把旧提交结果充当新代码验收。六小时运行只能按真实起止时间与日志认定，README 不预先宣称完成时长。详见 [验收契约](docs/VALIDATION.md)。
 

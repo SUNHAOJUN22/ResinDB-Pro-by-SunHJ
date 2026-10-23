@@ -1,3 +1,6 @@
+// @vitest-environment node
+// Real ECharts SVG SSR belongs in Node. Browser Canvas/font rendering is tested
+// by the Chromium suite, without substituting a jsdom Canvas implementation.
 import { describe, expect, it } from 'vitest';
 import * as echarts from '@/lib/echarts';
 import { SVGRenderer } from 'echarts/renderers';
