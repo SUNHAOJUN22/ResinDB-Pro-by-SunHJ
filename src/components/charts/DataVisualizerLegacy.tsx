@@ -168,7 +168,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
     // KDE Topology configuration
     const [kdeXKey, setKdeXKey] = useState<string>("");
     const [kdeYKey, setKdeYKey] = useState<string>("");
-    const { isCalculating: isCalculatingKDE, kdeResult, calculateKde } = useKdeWorker();
+    const { isCalculating: isCalculatingKDE, kdeResult, error: kdeError, calculateKde, clearKde } = useKdeWorker();
 
     // Weibull configuration
     const [weibullKey, setWeibullKey] = useState<string>("");
@@ -380,6 +380,10 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
       }
       return res;
     }, [baseData, filters]);
+
+    useEffect(() => {
+      clearKde();
+    }, [filteredData, kdeXKey, kdeYKey, clearKde]);
     
     // Trigger similarity calculation
     useEffect(() => {
@@ -2749,7 +2753,11 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                       <p className="text-sm text-slate-500">{language === "en" ? "2D Kernel Density Estimation mapping inner congestion and competitive layout of material formulations globally." : "二维核密度估计 (KDE)，全局映射材料配方的数据分布密集度及竞争格局空间拓扑分布。"}</p>
                    </div>
                    <div className="flex-1 overflow-hidden relative">
-                       {isCalculatingKDE ? (
+                       {kdeError ? (
+                           <div role="alert" className="absolute inset-0 flex items-center justify-center p-6 text-center text-rose-600 dark:text-rose-300 font-bold text-sm bg-rose-50/50 dark:bg-rose-950/20 rounded-2xl">
+                               {language === "en" ? "Calculation failed: " : "计算失败："}{kdeError}
+                           </div>
+                       ) : isCalculatingKDE ? (
                            <div className="absolute inset-0 flex items-center justify-center text-orange-500 flex-col gap-2">
                                <Loader2 className="animate-spin" size={32} />
                                <span className="text-sm font-bold animate-pulse">{language === "en" ? "Running 2D Gaussian Kernel Convolution..." : "正在运行 2D 高斯核卷积计算..."}</span>

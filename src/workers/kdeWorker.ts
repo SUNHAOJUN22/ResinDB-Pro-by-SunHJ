@@ -1,6 +1,8 @@
 import { createWorkerProgressMessage } from '@/compute/workerProtocol';
 
 const KDE_MODEL_VERSION = 'bivariate-gaussian-kde-separable-3.0.0';
+const MAX_KDE_OBSERVATIONS = 250_000;
+const MAX_KDE_DENSITY_ACCUMULATIONS = 50_000_000;
 
 export interface KdeMessage {
   type: 'CALCULATE_KDE';
@@ -28,6 +30,7 @@ export interface KdeResponse {
       kernelStrategy: 'separable-precomputed-x';
       exponentEvaluations: number;
       naiveExponentEvaluations: number;
+      gridKernelMultiplications: number;
       xKernelValues: number;
     };
   };
@@ -50,26 +53,41 @@ self.onmessage = (event: MessageEvent<KdeMessage>) => {
     if (!Number.isInteger(requestedGridSize) || requestedGridSize < 5 || requestedGridSize > 300) {
       throw new RangeError('KDE gridSize must be an integer between 5 and 300.');
     }
-    const validPoints = (points ?? []).filter((point) => (
-      point && Number.isFinite(point.x) && Number.isFinite(point.y)
-    ));
-    if (validPoints.length === 0) throw new Error('No complete finite points were provided for KDE.');
+    const inputPoints = points ?? [];
+    if (!Array.isArray(inputPoints)) throw new TypeError('KDE points must be an array.');
+    let observationCount = 0;
+    for (const point of inputPoints) {
+      if (point && Number.isFinite(point.x) && Number.isFinite(point.y)) {
+        observationCount += 1;
+        if (observationCount > MAX_KDE_OBSERVATIONS) {
+          throw new RangeError(`KDE exceeds the ${MAX_KDE_OBSERVATIONS}-observation resource limit.`);
+        }
+      }
+    }
+    if (observationCount === 0) throw new Error('No complete finite points were provided for KDE.');
+    const gridKernelMultiplications = observationCount * requestedGridSize * requestedGridSize;
+    if (!Number.isSafeInteger(gridKernelMultiplications) || gridKernelMultiplications > MAX_KDE_DENSITY_ACCUMULATIONS) {
+      throw new RangeError(
+        `KDE exceeds the ${MAX_KDE_DENSITY_ACCUMULATIONS} grid-kernel operation budget. Reduce the input rows or grid size.`,
+      );
+    }
 
-    const observationCount = validPoints.length;
     const xValues = new Float64Array(observationCount);
     const yValues = new Float64Array(observationCount);
-    let minX = validPoints[0].x;
-    let maxX = validPoints[0].x;
-    let minY = validPoints[0].y;
-    let maxY = validPoints[0].y;
-    for (let index = 0; index < observationCount; index++) {
-      const point = validPoints[index];
-      xValues[index] = point.x;
-      yValues[index] = point.y;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let validIndex = 0;
+    for (const point of inputPoints) {
+      if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
+      xValues[validIndex] = point.x;
+      yValues[validIndex] = point.y;
       minX = Math.min(minX, point.x);
       maxX = Math.max(maxX, point.x);
       minY = Math.min(minY, point.y);
       maxY = Math.max(maxY, point.y);
+      validIndex += 1;
     }
     const rangeX = maxX - minX || Math.max(Math.abs(minX), 1);
     const rangeY = maxY - minY || Math.max(Math.abs(minY), 1);
@@ -92,11 +110,11 @@ self.onmessage = (event: MessageEvent<KdeMessage>) => {
     }
 
     const xKernel = new Float64Array(observationCount * requestedGridSize);
-    for (let observation = 0; observation < observationCount; observation++) {
-      const offset = observation * requestedGridSize;
-      for (let column = 0; column < requestedGridSize; column++) {
+    for (let column = 0; column < requestedGridSize; column++) {
+      const offset = column * observationCount;
+      for (let observation = 0; observation < observationCount; observation++) {
         const standardized = (xValues[observation] - xGrid[column]) * inverseBandwidthX;
-        xKernel[offset + column] = Math.exp(-0.5 * standardized * standardized);
+        xKernel[offset + observation] = Math.exp(-0.5 * standardized * standardized);
       }
     }
 
@@ -112,8 +130,9 @@ self.onmessage = (event: MessageEvent<KdeMessage>) => {
       }
       for (let column = 0; column < requestedGridSize; column++) {
         let kernelSum = 0;
+        const xKernelOffset = column * observationCount;
         for (let observation = 0; observation < observationCount; observation++) {
-          kernelSum += xKernel[observation * requestedGridSize + column] * yWeights[observation];
+          kernelSum += xKernel[xKernelOffset + observation] * yWeights[observation];
         }
         const z = kernelSum * normalization;
         minZ = Math.min(minZ, z);
@@ -146,6 +165,7 @@ self.onmessage = (event: MessageEvent<KdeMessage>) => {
           kernelStrategy: 'separable-precomputed-x',
           exponentEvaluations: 2 * observationCount * requestedGridSize,
           naiveExponentEvaluations: observationCount * requestedGridSize * requestedGridSize,
+          gridKernelMultiplications,
           xKernelValues: xKernel.length,
         },
       },

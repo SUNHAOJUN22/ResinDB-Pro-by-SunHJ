@@ -25,6 +25,7 @@ async function runKde(points: { x: number; y: number }[], gridSize: number) {
     performance: {
       exponentEvaluations: number;
       naiveExponentEvaluations: number;
+      gridKernelMultiplications: number;
       kernelStrategy: string;
     };
   } };
@@ -60,6 +61,7 @@ describe('separable KDE acceleration', () => {
       kernelStrategy: 'separable-precomputed-x',
       exponentEvaluations: 2 * points.length * gridSize,
       naiveExponentEvaluations: points.length * gridSize * gridSize,
+      gridKernelMultiplications: points.length * gridSize * gridSize,
       xKernelValues: points.length * gridSize,
     });
   });

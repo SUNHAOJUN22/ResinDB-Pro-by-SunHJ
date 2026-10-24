@@ -6,6 +6,10 @@ export function useKdeWorker() {
   const {
     isCalculating,
     result: kdeResult,
+    error,
+    setResult,
+    setError,
+    cancel,
     postMessage
   } = useWorkerManager<KdeMessage, KdeResponse['payload']>(
     useCallback(() => new Worker(new URL('../../workers/kdeWorker.ts', import.meta.url), { type: 'module' }), []),
@@ -13,12 +17,20 @@ export function useKdeWorker() {
   );
 
   const calculateKde = useCallback((points: {x: number, y: number}[]) => {
+    setResult(null);
+    setError(null);
     if (points.length === 0) return;
     postMessage({
       type: 'CALCULATE_KDE',
       payload: { points }
     });
-  }, [postMessage]);
+  }, [postMessage, setError, setResult]);
 
-  return { isCalculating, kdeResult, calculateKde };
+  const clearKde = useCallback(() => {
+    cancel('KDE inputs changed');
+    setResult(null);
+    setError(null);
+  }, [cancel, setError, setResult]);
+
+  return { isCalculating, kdeResult, error, calculateKde, clearKde };
 }

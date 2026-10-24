@@ -11,7 +11,15 @@ const healthHost = '127.0.0.1';
 const previewPort = 4174;
 const debugPort = 9224;
 const healthUrl = `http://${healthHost}:${previewPort}`;
-const networkHosts = Object.values(networkInterfaces()).flat().filter(Boolean).filter((entry) => entry.family === 'IPv4' && !entry.internal).map((entry) => entry.address);
+let networkHosts = [];
+try {
+  networkHosts = Object.values(networkInterfaces()).flat().filter(Boolean)
+    .filter((entry) => entry.family === 'IPv4' && !entry.internal)
+    .map((entry) => entry.address);
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.warn(`Unable to enumerate external IPv4 interfaces; using loopback UI smoke candidates: ${message}`);
+}
 const appUrlCandidates = [...new Set([process.env.RESINDB_UI_HOST, '127.0.0.1', 'localhost', ...networkHosts].filter(Boolean).map((candidate) => `http://${candidate}:${previewPort}`))];
 const artifactDir = path.join(projectRoot, 'artifacts');
 const screenshotPaths = {
