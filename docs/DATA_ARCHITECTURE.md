@@ -118,3 +118,28 @@ If an external data asset fails, the loader records the exact failure and expose
 5. Preserve units, standards, temperatures, provenance and record status.
 6. Keep `demo`, `reference`, `measured` and `imported` data semantically separate.
 7. Never replace missing evidence with a numeric zero.
+
+## 7. Raw/canonical consistency at import and storage boundaries
+
+For a core quantity declared `VALID`, its canonical value, unit and dimension
+must agree with a fresh conversion of the preserved `raw` declaration. The
+check also reuses the required method and measurement-condition rules. Equivalent
+unit typography is accepted; numeric comparison permits only binary64 rounding
+noise relative to the quantity, with no absolute physical-scale tolerance.
+
+Structured native imports and remote Product payloads reject conflicting
+declarations before admitting them to the application. First writes and unchanged
+updates quarantine inconsistent core quantities as `INVALID` with
+`CANONICAL_RAW_MISMATCH`, retaining raw declarations and provenance. Historical
+IndexedDB reads and restored snapshots apply the same quarantine to their in-memory
+cache without rewriting the original stored source records. Formula dependencies
+then become unavailable instead of calculating with the conflicting canonical value.
+History restoration also checks the live React state, so it cannot bypass the
+adapter's checked cache by displaying the unverified snapshot directly.
+
+An existing `UNKNOWN` or `INVALID` quantity is never promoted by this consistency
+check. Properties outside the core quantity registry retain their existing
+contract. This is a conversion-consistency check, not measurement authentication:
+synthetic, inferred, imported, restricted and not-for-release governance metadata
+remain unchanged. No source becomes an observed experimental fact because its
+units are internally consistent.

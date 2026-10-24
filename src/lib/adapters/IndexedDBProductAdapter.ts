@@ -1,4 +1,4 @@
-import { admittedPropertyValue, refreshProperties } from '@/lib/propertyAdmission';
+import { admittedPropertyValue, refreshProperties, verifyPropertyQuantities } from '@/lib/propertyAdmission';
 import { logger } from '@/lib/logger';
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Category, Product, ProductUpdates, PropertyValue } from '@/types/index';
@@ -270,7 +270,9 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     await this.simulateLatency();
     const db = await this.getDB();
     if (!this.cachedProducts) {
-      this.cachedProducts = await db.getAll('products');
+      this.cachedProducts = (await db.getAll('products')).map(product => ({
+        ...product, properties: verifyPropertyQuantities(product.properties),
+      }));
       this.rebuildIndices();
     } else if (!this.indicesRebuilt) {
       this.rebuildIndices();
@@ -630,7 +632,9 @@ ${props}
       await tx.store.add(p);
     }
     await tx.done;
-    this.cachedProducts = [...products];
+    this.cachedProducts = products.map(product => ({
+      ...product, properties: verifyPropertyQuantities(product.properties),
+    }));
     this.rebuildIndices();
   }
 }

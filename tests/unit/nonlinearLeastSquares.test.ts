@@ -116,4 +116,28 @@ describe('bounded nonlinear least squares', () => {
       evaluateResiduals() {},
     })).toThrow(/min < max/);
   });
+
+  it('rejects a truly unrepresentable step norm rather than comparing Infinity to Infinity', () => {
+    // The initial objective is 4e306. Four finite coordinate updates near
+    // -1e308 have a combined norm near 2e308, beyond binary64's finite range.
+    expect(() => solveBoundedNonlinearLeastSquares({
+      parameters: Array.from({ length: 4 }, () => ({ initial: 0, min: -1, max: 1 })),
+      observationCount: 5,
+      maxIterations: 1,
+      initialDamping: 1e-300,
+      evaluateResiduals(parameters, residuals) {
+        for (let index = 0; index < 4; index++) {
+          const position = parameters[index];
+          residuals[index] = 1e153 * (1 - position * position) + 2e-155 * position;
+        }
+        residuals[4] = 0;
+      },
+      evaluateJacobian(parameters, jacobian) {
+        jacobian.fill(0);
+        for (let index = 0; index < 4; index++) {
+          jacobian[index * 4 + index] = -2e153 * parameters[index] + 2e-155;
+        }
+      },
+    })).toThrow(/vector norm exceeds the finite floating-point range/);
+  });
 });

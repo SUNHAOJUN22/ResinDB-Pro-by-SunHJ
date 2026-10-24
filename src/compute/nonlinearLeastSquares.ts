@@ -106,6 +106,9 @@ function residualObjective(residuals: Float64Array): number {
 function vectorNorm(values: Float64Array): number {
   let norm = 0;
   for (const value of values) norm = Math.hypot(norm, value);
+  if (!Number.isFinite(norm)) {
+    throw new RangeError('Nonlinear vector norm exceeds the finite floating-point range');
+  }
   return norm;
 }
 

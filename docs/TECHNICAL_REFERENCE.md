@@ -384,13 +384,18 @@ $$
 \|\boldsymbol{r}(\boldsymbol{\theta})\|_2^2
 $$
 
-阻尼更新：
+实现通过 logistic 变换以无约束变量 $\boldsymbol{z}$表示有界参数，并对变换后的雅可比列范数进行缩放阻尼。对应的正规方程为：
 
 $$
-(\mathbf{J}^{\mathsf T}\mathbf{J}+\lambda\mathbf{I})
-\Delta\boldsymbol{\theta}
-=-\mathbf{J}^{\mathsf T}\boldsymbol{r}
+(\mathbf{J}^{\mathsf T}\mathbf{J}+\lambda\mathbf{D}^{\mathsf T}\mathbf{D})
+\Delta\boldsymbol{z}
+=-\mathbf{J}^{\mathsf T}\boldsymbol{r},\qquad
+D_{jj}=\max(s_j,10^{-8})
 $$
+
+通常 $s_j=\|J_{:j}\|_2$；若列元素有限而二范数不可表示，则沿用最大元素绝对值作为缩放因子。代码求解增广最小二乘系统，不显式构造或求逆正规方程。返回的 `objective` 是残差平方和（不含上述最小化目标中的 $1/2$ 常数因子）。
+
+残差、步长与雅可比列范数通过 `Math.hypot` 累计，避免平方中间值溢出。初始残差平方和超出可表示范围时会明确失败。步长或无约束变量向量的范数如果本身也超出 binary64 可表示范围，则明确报错，避免以 `Infinity <= Infinity` 误判步长收敛；雅可比列的既有最大幅度回退保持不变。收敛标记仍只表示数值停止条件，不等于拟合充分、模型有效或工业放行。
 
 ### 5.9 Carreau–Yasuda 流变模型 / Rheology
 

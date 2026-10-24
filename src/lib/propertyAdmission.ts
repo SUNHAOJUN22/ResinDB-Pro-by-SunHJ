@@ -1,5 +1,5 @@
 import type { Product, PropertyValue, RawQuantity } from '@/types/index';
-import { canonicalizeCoreProperty, parseFiniteReal, resolveCorePropertyKey } from '@/lib/quantityRecord';
+import { canonicalizeCoreProperty, parseFiniteReal, resolveCorePropertyKey, verifyCoreQuantityRecord } from '@/lib/quantityRecord';
 
 /** An explicit rejection is authoritative; raw text must never resurrect it. */
 export function admittedPropertyValue(property: PropertyValue | undefined): number | null {
@@ -25,11 +25,23 @@ export function refreshProperty(key: string, property: PropertyValue, previous?:
   const raw = rawDeclaration(property);
   const unchanged = previous && JSON.stringify(raw) === JSON.stringify(rawDeclaration(previous))
     && JSON.stringify(property.provenanceRefs) === JSON.stringify(previous.provenanceRefs);
-  if (unchanged && !force) return { ...property, ...(previous.quantity ? { quantity: previous.quantity } : {}) };
-  if (!previous && property.quantity !== undefined) return { ...property };
+  if (unchanged && !force) return verifyPropertyQuantity(key, { ...property, ...(previous.quantity ? { quantity: previous.quantity } : {}) });
+  if (!previous && property.quantity !== undefined) return verifyPropertyQuantity(key, { ...property });
   if (!resolveCorePropertyKey(key) && property.quantity === undefined && previous?.quantity === undefined) return { ...property };
   const provenance = property.provenanceRefs ?? previous?.quantity?.provenanceRefs ?? property.quantity?.provenanceRefs ?? [];
   return { ...property, quantity: canonicalizeCoreProperty(key, raw, provenance) };
+}
+
+function verifyPropertyQuantity(key: string, property: PropertyValue): PropertyValue {
+  if (property.quantity === undefined) return property;
+  const quantity = verifyCoreQuantityRecord(key, property.quantity);
+  return quantity === property.quantity ? property : { ...property, quantity };
+}
+
+/** Quarantine inconsistent historical quantities in memory without rewriting
+ * source records, inventing legacy metadata, or admitting rejected quantities. */
+export function verifyPropertyQuantities(properties: Product['properties']): Product['properties'] {
+  return Object.fromEntries(Object.entries(properties).map(([key, property]) => [key, verifyPropertyQuantity(key, property)]));
 }
 
 export function refreshProperties(properties: Product['properties'], previous?: Product['properties']): Product['properties'] {

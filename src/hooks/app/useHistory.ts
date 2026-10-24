@@ -1,4 +1,5 @@
 import { logger } from '@/lib/logger';
+import { verifyPropertyQuantities } from '@/lib/propertyAdmission';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Product } from '@/types/index';
 import { HistoryRecord } from '@/lib/adapters/types';
@@ -42,7 +43,9 @@ export function useHistory(
           } as HistoryWorkerMessage);
 
           await api.restoreSnapshot(snapshotToRestore);
-          setAllProducts(snapshotToRestore);
+          setAllProducts(snapshotToRestore.map(product => ({
+            ...product, properties: verifyPropertyQuantities(product.properties),
+          })));
           addToast('success', `Restored successful!`);
         } catch (e) {
           logger.error(e);

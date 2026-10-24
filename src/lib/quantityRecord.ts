@@ -348,6 +348,12 @@ const CORE_DECLARED_UNITS: Readonly<Record<keyof typeof CORE_QUANTITY_CONTRACTS,
   charpyImpact: ['J/m2', 'kJ/m2'],
 };
 
+function coreUnitSpelling(unit: unknown): string {
+  return typeof unit === 'string'
+    ? unit.normalize('NFKC').trim().replace(/\s+/g, '').replace(/\^([23])/g, '$1').replace(/10minutes?|10mins?/g, '10min')
+    : '';
+}
+
 export function canonicalizeCoreProperty(
   key: string,
   raw: RawQuantity,
@@ -362,12 +368,38 @@ export function canonicalizeCoreProperty(
       provenanceRefs: deduplicate([...provenanceRefs]),
     };
   }
-  const spelling = typeof raw.unit === 'string'
-    ? raw.unit.normalize('NFKC').trim().replace(/\s+/g, '').replace(/\^([23])/g, '$1').replace(/10minutes?|10mins?/g, '10min')
-    : '';
+  const spelling = coreUnitSpelling(raw.unit);
   const contract = CORE_QUANTITY_CONTRACTS[resolved];
   // The generic conversion API can have caller-defined aliases. Core contracts
   // admit only explicitly supported spellings, preserving the original raw unit.
   const strictContract = CORE_DECLARED_UNITS[resolved].includes(spelling) ? contract : { ...contract, factors: {} };
   return canonicalizeQuantity(raw, strictContract, provenanceRefs);
+}
+
+/** Check a stored/imported VALID declaration against its raw core measurement.
+ * This verifies conversion consistency, not the authenticity of a measurement.
+ * Rejected states and quantities outside the core registry keep their semantics.
+ */
+export function verifyCoreQuantityRecord(key: string, quantity: QuantityRecord): QuantityRecord {
+  if (!quantity || quantity.status !== 'VALID' || resolveCorePropertyKey(key) === null) return quantity;
+  const expected = quantity.raw && typeof quantity.raw === 'object' && !Array.isArray(quantity.raw)
+    ? canonicalizeCoreProperty(key, quantity.raw, quantity.provenanceRefs)
+    : undefined;
+  const actual = quantity.canonical;
+  const canonical = expected?.canonical;
+  // Independent serializers may round the same conversion by a few binary64 ULPs.
+  // The tolerance is relative to the quantity, with no physical-scale floor.
+  const compatibleValue = actual && canonical && Number.isFinite(actual.value)
+    && Math.abs(actual.value - canonical.value)
+      <= 8 * Number.EPSILON * Math.max(Math.abs(actual.value), Math.abs(canonical.value));
+  if (expected?.status === 'VALID' && actual && canonical && compatibleValue
+      && coreUnitSpelling(actual.unit) === coreUnitSpelling(canonical.unit)
+      && actual.dimension === canonical.dimension) return quantity;
+  const rejected = { ...quantity };
+  delete rejected.canonical;
+  return {
+    ...rejected,
+    status: 'INVALID',
+    reasonCodes: deduplicate([...quantity.reasonCodes, 'CANONICAL_RAW_MISMATCH', ...(expected?.reasonCodes ?? [])]),
+  };
 }
