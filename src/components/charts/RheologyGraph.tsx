@@ -172,7 +172,8 @@ function exportPng(chart: ECharts | null, theme: ScientificFigureTheme): void {
 }
 
 function finiteMfr(product: Product | undefined): number {
-  const value = admittedPropertyValue(product?.properties['熔体质量流动速率'] ?? product?.properties.MFR);
+  const key = product?.properties['熔体质量流动速率'] ? '熔体质量流动速率' : 'MFR';
+  const value = admittedPropertyValue(product?.properties[key], key);
   return value !== null && value > 0 ? value : Number.NaN;
 }
 

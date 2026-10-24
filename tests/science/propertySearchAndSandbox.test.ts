@@ -5,19 +5,19 @@ import { sandboxCarreau, sandboxWeibull, sandboxWlf } from '@/lib/sandboxModels'
 
 describe('whole-string property search', () => {
   it('distinguishes exponents, signed ranges, and malformed comparisons', () => {
-    expect(matchesPropertyCondition({ value: 0.001 }, parsePropertyCondition('1e-3'))).toBe(true);
-    expect(matchesPropertyCondition({ value: -2 }, parsePropertyCondition('-3--1'))).toBe(true);
-    expect(matchesPropertyCondition({ value: 1 }, parsePropertyCondition('>0.9'))).toBe(true);
+    expect(matchesPropertyCondition({ value: 0.001 }, parsePropertyCondition('1e-3'), 'value')).toBe(true);
+    expect(matchesPropertyCondition({ value: -2 }, parsePropertyCondition('-3--1'), 'value')).toBe(true);
+    expect(matchesPropertyCondition({ value: 1 }, parsePropertyCondition('>0.9'), 'value')).toBe(true);
     for (const input of ['>0.9junk', '>=Infinity', '<1e-999', '3-1', '1e-999']) {
-      expect(matchesPropertyCondition({ value: 1 }, parsePropertyCondition(input))).toBe(false);
+      expect(matchesPropertyCondition({ value: 1 }, parsePropertyCondition(input), 'value')).toBe(false);
     }
-    expect(matchesPropertyCondition({ value: '12abc' }, parsePropertyCondition('12'))).toBe(false);
+    expect(matchesPropertyCondition({ value: '12abc' }, parsePropertyCondition('12'), 'value')).toBe(false);
   });
   it('uses canonical values and never resurrects explicit quantity rejections', () => {
     const valid = { value: 950, quantity: canonicalizeCoreProperty('density', { value: 950, unit: 'kg/m³' }) };
-    expect(matchesPropertyCondition(valid, parsePropertyCondition('0.9-1'))).toBe(true);
+    expect(matchesPropertyCondition(valid, parsePropertyCondition('0.9-1'), 'density')).toBe(true);
     const unknown = { value: 950, quantity: canonicalizeCoreProperty('density', { value: 950 }) };
-    expect(matchesPropertyCondition(unknown, parsePropertyCondition('>0'))).toBe(false);
+    expect(matchesPropertyCondition(unknown, parsePropertyCondition('>0'), 'density')).toBe(false);
   });
 });
 

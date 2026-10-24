@@ -69,7 +69,7 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
               return parseFiniteNumeric(formulaExecutor(item)[col.formulaId]);
             }
             const property = item.properties[key];
-            return property ? admittedPropertyValue(property) : parseFiniteNumeric((item as unknown as Record<string, unknown>)[key]);
+            return property ? admittedPropertyValue(property, key) : parseFiniteNumeric((item as unknown as Record<string, unknown>)[key]);
           });
 
           sortedData = [...filteredData].sort((a, b) => {
@@ -137,7 +137,7 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
             const col = columns.find(c => c.key === key);
             const raw = col?.isComputed && col.formulaId
               ? formulaExecutor(product)[col.formulaId]
-              : product.properties[key] ? admittedPropertyValue(product.properties[key]) : (product as unknown as Record<string, unknown>)[key];
+              : product.properties[key] ? admittedPropertyValue(product.properties[key], key) : (product as unknown as Record<string, unknown>)[key];
             const numeric = parseFiniteNumeric(raw);
             if (numeric !== null) values.push({ id: product.id, value: numeric });
           }

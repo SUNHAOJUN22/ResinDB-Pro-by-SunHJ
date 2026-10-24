@@ -126,12 +126,12 @@ function localize(language: 'zh' | 'en', zh: string, en: string): string {
 
 
 function directValue(product: Product, key: string): number | null {
-  return admittedPropertyValue(product.properties?.[key]);
+  return admittedPropertyValue(product.properties?.[key], key);
 }
 
 function aliasedValue(product: Product, keys: readonly string[]): number | null {
   for (const key of keys) {
-    const value = admittedPropertyValue(product.properties?.[key]);
+    const value = admittedPropertyValue(product.properties?.[key], key);
     if (value !== null) return value;
   }
   return null;
@@ -164,7 +164,7 @@ export function evaluateDependencyOutput(
         const declared = Object.values(product.properties).some(property => property.unit || property.quantity);
         if (declared) {
           for (const [key, property] of Object.entries(product.properties)) {
-            const value = admittedPropertyValue(property);
+            const value = admittedPropertyValue(property, key);
             const definition = unitDefinition(property.quantity?.canonical?.unit ?? property.unit ?? '');
             if (value !== null && definition) properties[key] = toSI(value, definition);
           }

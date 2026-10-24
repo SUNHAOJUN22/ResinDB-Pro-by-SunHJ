@@ -251,7 +251,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
       for (let i = 0; i < numData; i++) {
         const props = currentViewData[i].properties;
         for (let c = 0; c < numCols; c++) {
-          const val = admittedPropertyValue(props[colKeys[c]]);
+          const val = admittedPropertyValue(props[colKeys[c]], colKeys[c]);
           if (val !== null) {
             hasDataArr[c] = 1;
             if (val < minArr[c]) minArr[c] = val;
@@ -724,7 +724,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
                       const dataPayload = sortedData.map(d => {
                           const v: Record<string, number> = {};
                           for (const o of objectives) {
-                             v[o.key] = admittedPropertyValue(d.properties[o.key]) ?? Number.NaN;
+                             v[o.key] = admittedPropertyValue(d.properties[o.key], o.key) ?? Number.NaN;
                           }
                           return { id: d.id, values: v };
                       });

@@ -50,7 +50,7 @@ function compileCondition(condition: FilterCondition): ProductPredicate {
     }
 
     const strVal = String(val ?? "").toLowerCase();
-    const numVal = (product.properties?.[field] ? admittedPropertyValue(product.properties[field]) : parseFiniteReal(val)) ?? Number.NaN;
+    const numVal = (product.properties?.[field] ? admittedPropertyValue(product.properties[field], field) : parseFiniteReal(val)) ?? Number.NaN;
 
     switch (operator) {
       case "contains":

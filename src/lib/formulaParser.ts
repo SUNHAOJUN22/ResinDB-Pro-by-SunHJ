@@ -270,7 +270,7 @@ export class FormulaEngine {
       const metadata = Object.entries(product.properties).map(([key, property]) => {
         const unit = property.quantity?.status === 'VALID' ? property.quantity.canonical?.unit : property.unit;
         return {
-          key, admitted: admittedPropertyValue(property) !== null,
+          key, admitted: admittedPropertyValue(property, key) !== null,
           declared: property.quantity !== undefined || Boolean(unit?.trim()),
           definition: unit ? unitDefinition(unit) : undefined,
         };

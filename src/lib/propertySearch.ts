@@ -31,10 +31,10 @@ export function parsePropertyCondition(input: string): PropertyCondition {
   return { operator: 'text', value: text.toLowerCase() };
 }
 
-export function matchesPropertyCondition(property: PropertyValue | undefined, condition: PropertyCondition): boolean {
+export function matchesPropertyCondition(property: PropertyValue | undefined, condition: PropertyCondition, key: string): boolean {
   if (!property || condition.operator === 'invalid') return false;
   if (condition.operator === 'text') return String(property.value).toLowerCase().includes(condition.value);
-  const value = admittedPropertyValue(property);
+  const value = admittedPropertyValue(property, key);
   if (value === null) return false;
   switch (condition.operator) {
     case '>': return value > condition.value;

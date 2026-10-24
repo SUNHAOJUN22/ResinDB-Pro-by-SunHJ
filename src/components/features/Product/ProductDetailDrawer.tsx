@@ -208,7 +208,7 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
     return findSimilarProducts(
       displayProduct,
       allProducts,
-      (candidate, key) => admittedPropertyValue(candidate.properties[key]),
+      (candidate, key) => admittedPropertyValue(candidate.properties[key], key),
     ).slice(0, 3);
   }, [displayProduct, allProducts]);
 

@@ -275,7 +275,7 @@ export function useDatabase(
       }
 
       for (const filter of syntaxFilters) {
-        if (!matchesPropertyCondition(product.properties[filter.key], filter.condition)) return false;
+        if (!matchesPropertyCondition(product.properties[filter.key], filter.condition, filter.key)) return false;
       }
 
       return !hasAdvancedFilters || advancedPredicate(product);

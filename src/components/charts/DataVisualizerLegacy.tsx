@@ -300,7 +300,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
         const properties = baseData[i].properties;
         for (const key in properties) {
           if (props.has(key)) continue;
-          const num = admittedPropertyValue(properties[key]);
+          const num = admittedPropertyValue(properties[key], key);
           if (num !== null) {
             props.add(key);
           }
@@ -400,7 +400,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
         const value = formulaExecutor(product)[key.replace(/^formula[-_]/, '')];
         return Number.isFinite(value) ? value : Number.NaN;
       }
-      return admittedPropertyValue(product.properties[key]) ?? Number.NaN;
+      return admittedPropertyValue(product.properties[key], key) ?? Number.NaN;
     }, [formulaExecutor]);
 
     useEffect(() => {

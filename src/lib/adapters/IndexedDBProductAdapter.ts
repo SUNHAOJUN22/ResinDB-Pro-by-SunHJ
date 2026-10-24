@@ -98,7 +98,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     if (product.properties) {
       for (const [key, prop] of Object.entries(product.properties)) {
         if (prop && prop.value !== undefined && prop.value !== null) {
-          const numValue = admittedPropertyValue(prop);
+          const numValue = admittedPropertyValue(prop, key);
           if (numValue !== null) {
             if (!this.propertyIndex.has(key)) {
               this.propertyIndex.set(key, []);

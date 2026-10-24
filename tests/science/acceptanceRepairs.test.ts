@@ -17,7 +17,7 @@ describe('acceptance repair boundaries', () => {
   it('retains actual zero and scientific notation', () => { expect(parseFiniteReal('0e-999')).toBe(0); expect(parseFiniteReal('1.25e2')).toBe(125); });
   it('never revives an explicitly rejected quantity', () => {
     const property = { value: 12, unit: 'MPa', quantity: canonicalizeCoreProperty('density', { value: 12, unit: 'MPa' }) };
-    expect(admittedPropertyValue(property)).toBeNull();
+    expect(admittedPropertyValue(property, 'density')).toBeNull();
     expect(evaluateFilterGroup(product({ density: property }), { id: 'g', type: 'group', logic: 'AND', conditions: [{ id: 'c', field: 'density', operator: 'gt', value: 1 }] })).toBe(false);
   });
   it('preserves declaration metadata and rebuilds canonical values after edits', () => {

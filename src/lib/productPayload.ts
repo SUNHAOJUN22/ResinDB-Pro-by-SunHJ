@@ -1,5 +1,5 @@
 import type { Product, PropertyValue } from '@/types/index';
-import { verifyCoreQuantityRecord } from '@/lib/quantityRecord';
+import { propertyQuantityMatchesDeclaration } from '@/lib/propertyAdmission';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -51,7 +51,7 @@ export function parseProductPayload(payload: unknown, context: string, source = 
   }
   const product = payload as unknown as Product;
   for (const [key, property] of Object.entries(product.properties)) {
-    if (property.quantity?.status === 'VALID' && verifyCoreQuantityRecord(key, property.quantity).status !== 'VALID') {
+    if (property.quantity?.status === 'VALID' && !propertyQuantityMatchesDeclaration(key, property)) {
       throw new Error(`${source} returned an inconsistent quantity for ${context}.${key}`);
     }
   }

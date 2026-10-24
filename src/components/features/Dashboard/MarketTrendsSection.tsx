@@ -59,7 +59,7 @@ export const MarketTrendsSection: React.FC<MarketTrendsSectionProps> = ({ produc
     };
     products.forEach(p => {
       const matches = Object.entries(p.properties).filter(([key]) => resolveCorePropertyKey(key) === 'mfr');
-      const mfr = matches.length === 1 ? admittedPropertyValue(matches[0][1]) : null;
+      const mfr = matches.length === 1 ? admittedPropertyValue(matches[0][1], matches[0][0]) : null;
       if (mfr === null || mfr < 0) return;
       if (mfr <= 5) bins['0-5']++;
       else if (mfr <= 10) bins['5-10']++;

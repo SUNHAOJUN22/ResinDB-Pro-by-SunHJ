@@ -257,7 +257,7 @@ export const DataGridRow = React.memo(
           if (!col.isSystem) {
             const numVal = col.isComputed && col.formulaId
               ? parseFiniteReal(computedValues[col.formulaId])
-              : admittedPropertyValue(p.properties?.[col.key]);
+              : admittedPropertyValue(p.properties?.[col.key], col.key);
             if (
               numVal !== null &&
               columnExtremes[col.key] !== undefined &&

@@ -2,8 +2,9 @@ import type { Product, PropertyValue, RawQuantity } from '@/types/index';
 import { canonicalizeCoreProperty, parseFiniteReal, resolveCorePropertyKey, verifyCoreQuantityRecord } from '@/lib/quantityRecord';
 
 /** An explicit rejection is authoritative; raw text must never resurrect it. */
-export function admittedPropertyValue(property: PropertyValue | undefined): number | null {
+export function admittedPropertyValue(property: PropertyValue | undefined, key: string): number | null {
   if (!property) return null;
+  if (!propertyQuantityMatchesDeclaration(key, property)) return null;
   if (property.quantity !== undefined) {
     const canonical = property.quantity?.status === 'VALID' ? property.quantity.canonical : undefined;
     return canonical && Number.isFinite(canonical.value) ? canonical.value : null;
@@ -19,6 +20,57 @@ function rawDeclaration(property: PropertyValue): RawQuantity {
     if (Object.hasOwn(property, key)) Object.assign(raw, { [key]: property[key] });
   }
   return raw;
+}
+
+function sameMeasurementField(field: 'temperature' | 'temp' | 'load', declared: unknown, persisted: unknown): boolean {
+  if (Object.is(declared, persisted)) return true;
+  const declaredNumber = parseFiniteReal(declared);
+  const persistedNumber = parseFiniteReal(persisted);
+  return declaredNumber !== null && declaredNumber === persistedNumber;
+}
+
+function propertyMetadataMatchesRaw(property: PropertyValue, raw: RawQuantity): boolean {
+  for (const field of ['method', 'standard'] as const) {
+    if (Object.hasOwn(property, field) && raw[field] !== undefined && !Object.is(property[field], raw[field])) return false;
+  }
+
+  const rawTemperature = raw.temperature ?? raw.temp ?? raw.conditions?.temperature;
+  const rawLoad = raw.load ?? raw.conditions?.load;
+  for (const field of ['temperature', 'temp'] as const) {
+    if (Object.hasOwn(property, field) && property[field] !== undefined && rawTemperature !== undefined
+        && !sameMeasurementField(field, property[field], rawTemperature)) return false;
+  }
+  if (Object.hasOwn(property, 'load') && property.load !== undefined && rawLoad !== undefined
+      && !sameMeasurementField('load', property.load, rawLoad)) return false;
+
+  for (const field of ['sampleId', 'batchId', 'referenceId', 'sourceUrl'] as const) {
+    if (Object.hasOwn(property, field) && raw[field] !== undefined && !Object.is(property[field], raw[field])) return false;
+  }
+  return true;
+}
+
+/** A VALID embedded quantity must represent the same measurement shown on the property. */
+export function propertyQuantityMatchesDeclaration(key: string, property: PropertyValue): boolean {
+  const quantity = property.quantity;
+  if (!quantity || quantity.status !== 'VALID' || resolveCorePropertyKey(key) === null) return true;
+
+  const verified = verifyCoreQuantityRecord(key, quantity);
+  const declared = canonicalizeCoreProperty(
+    key,
+    rawDeclaration(property),
+    property.provenanceRefs ?? quantity.provenanceRefs,
+  );
+  const actual = verified.canonical;
+  const expected = declared.canonical;
+  if (verified.status !== 'VALID' || declared.status !== 'VALID' || !actual || !expected
+      || !quantity.raw || !propertyMetadataMatchesRaw(property, quantity.raw)) return false;
+
+  const unitIdentity = (unit: string) => unit.normalize('NFKC').trim().replace(/\s+/g, '').replace(/\^([23])/g, '$1');
+  const compatibleValue = Math.abs(actual.value - expected.value)
+    <= 8 * Number.EPSILON * Math.max(Math.abs(actual.value), Math.abs(expected.value));
+  return compatibleValue
+    && unitIdentity(actual.unit) === unitIdentity(expected.unit)
+    && actual.dimension === expected.dimension;
 }
 
 export function refreshProperty(key: string, property: PropertyValue, previous?: PropertyValue, force = false): PropertyValue {
@@ -39,7 +91,20 @@ export function refreshProperty(key: string, property: PropertyValue, previous?:
 function verifyPropertyQuantity(key: string, property: PropertyValue): PropertyValue {
   if (property.quantity === undefined) return property;
   const quantity = verifyCoreQuantityRecord(key, property.quantity);
-  return quantity === property.quantity ? property : { ...property, quantity };
+  const verifiedProperty = quantity === property.quantity ? property : { ...property, quantity };
+  if (quantity.status === 'VALID' && !propertyQuantityMatchesDeclaration(key, verifiedProperty)) {
+    const rejected = { ...quantity };
+    delete rejected.canonical;
+    return {
+      ...property,
+      quantity: {
+        ...rejected,
+        status: 'INVALID',
+        reasonCodes: [...new Set([...quantity.reasonCodes, 'PROPERTY_DECLARATION_MISMATCH'])],
+      },
+    };
+  }
+  return verifiedProperty;
 }
 
 /** Quarantine inconsistent historical quantities in memory without rewriting

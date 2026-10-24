@@ -1,6 +1,6 @@
 import { Product, ColumnConfig, PropertyValue, RawQuantity } from '@/types/index';
 import { DEFAULT_VISIBLE_COLUMNS } from '@/config/uiDefaults';
-import { admittedPropertyValue } from '@/lib/propertyAdmission';
+import { admittedPropertyValue, propertyQuantityMatchesDeclaration } from '@/lib/propertyAdmission';
 import { canonicalizeCoreProperty, parseFiniteReal, resolveCorePropertyKey, verifyCoreQuantityRecord } from '@/lib/quantityRecord';
 
 const EXPLICIT_PLACEHOLDERS = new Set([
@@ -197,14 +197,15 @@ function numericComparisonBasis(key: string, property: PropertyValue): NumericCo
 }
 
 function admittedNumericPropertyValue(key: string, property: PropertyValue): number | null {
+  if (!propertyQuantityMatchesDeclaration(key, property)) return null;
   const coreProperty = resolveCorePropertyKey(key);
   if (property.quantity !== undefined) {
     if (coreProperty !== null) {
       const verified = verifyCoreQuantityRecord(key, property.quantity);
       if (verified.status !== 'VALID') return null;
-      return admittedPropertyValue({ ...property, quantity: verified });
+      return admittedPropertyValue({ ...property, quantity: verified }, key);
     }
-    return admittedPropertyValue(property);
+    return admittedPropertyValue(property, key);
   }
 
   if (coreProperty !== null) {
@@ -218,7 +219,7 @@ function admittedNumericPropertyValue(key: string, property: PropertyValue): num
     });
     if (declared.status !== 'VALID') return null;
   }
-  return admittedPropertyValue(property);
+  return admittedPropertyValue(property, key);
 }
 
 function sameNumericComparisonBasis(left: NumericComparisonBasis, right: NumericComparisonBasis): boolean {

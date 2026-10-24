@@ -179,4 +179,43 @@ describe('data grid worker contract', () => {
     expect(response.payload.topsisTop3Ids).toEqual(['p2', 'p1']);
     vi.unstubAllGlobals();
   });
+
+  it('excludes conflicting property declarations from a stale TOPSIS cohort', async () => {
+    const validCohort = [products[0], products[1]];
+    const staleColumns = getDynamicColumns(validCohort);
+    expect(staleColumns.find(column => column.key === 'Density')?.type).toBe('number');
+    const conflicting = {
+      ...products[0],
+      id: 'conflict',
+      properties: {
+        Density: {
+          value: 0.92,
+          unit: 'g/cm3',
+          quantity: canonicalizeCoreProperty('Density', { value: 1, unit: 'g/cm3' }),
+        },
+      },
+    };
+    const cohort = [conflicting, products[1]];
+
+    vi.resetModules();
+    const replies: unknown[] = [];
+    const scope: WorkerScope = { postMessage: value => replies.push(value) };
+    vi.stubGlobal('self', scope);
+    await import('@/workers/dataWorker');
+
+    scope.onmessage!({
+      data: { type: 'INIT_DATA', payload: { allProducts: cohort, formulas: [], columns: staleColumns } },
+    } as MessageEvent);
+    scope.onmessage!({
+      data: { type: 'QUERY', payload: { activeFilters: [], sortConfig: [], useTopsis: true } },
+    } as MessageEvent);
+
+    const response = replies.at(-1) as {
+      type: string;
+      payload: { resultIds: string[]; topsisTop3Ids: string[] };
+    };
+    expect(response.type).toBe('QUERY_RESULT');
+    expect(response.payload.topsisTop3Ids).toEqual([]);
+    vi.unstubAllGlobals();
+  });
 });

@@ -26,7 +26,7 @@ export function useMahalanobisWorker() {
   }, [result, addToast, language]);
 
   const detectOutliers = useCallback((products: Product[], features: string[]) => {
-      const eligible = products.filter(product => features.every(key => admittedPropertyValue(product.properties[key]) !== null));
+      const eligible = products.filter(product => features.every(key => admittedPropertyValue(product.properties[key], key) !== null));
       if (features.length === 0 || eligible.length <= features.length) {
          setOutlierResults({});
          addToast('error', language === 'en'
@@ -36,7 +36,7 @@ export function useMahalanobisWorker() {
       }
       const dataRecord = eligible.map(product => {
         const record = { _id: product.id, name: product.gradeName } as Record<string, number> & { _id: string; name: string };
-        features.forEach(key => { record[key] = admittedPropertyValue(product.properties[key])!; });
+        features.forEach(key => { record[key] = admittedPropertyValue(product.properties[key], key)!; });
         return record;
       });
       runAnalysis(dataRecord, features, 0.05); // using 0.05 alpha instead of raw threshold

@@ -180,7 +180,7 @@ export const BulkValidation: React.FC<BulkValidationProps> = ({
         if (candidates.length !== 1) return null;
         const [name, property] = candidates[0];
         const quantity = property.quantity ?? canonicalizeCoreProperty(name, property);
-        return admittedPropertyValue({ ...property, quantity });
+        return admittedPropertyValue({ ...property, quantity }, name);
       };
       const unavailable = (type: 'mfr' | 'tensile' | 'formula', label: string, reason: string) => violations.push({
         type, severity: 'warning',
