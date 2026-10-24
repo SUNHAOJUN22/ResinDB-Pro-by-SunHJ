@@ -74,6 +74,64 @@ interface NumericComparisonBasis {
   context: string;
 }
 
+function canonicalizeConditionObjectKeys(value: unknown, ancestors = new Set<object>()): unknown {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || (Number.isInteger(value) && !Number.isSafeInteger(value))) {
+      throw new TypeError('Unrepresentable condition number');
+    }
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    if (Object.getPrototypeOf(value) !== Array.prototype || Object.getOwnPropertySymbols(value).length > 0) {
+      throw new TypeError('Unsupported condition array');
+    }
+    const ownKeys = Object.getOwnPropertyNames(value);
+    if (ownKeys.length !== value.length + 1) throw new TypeError('Unsupported condition array properties');
+    if (ancestors.has(value)) throw new TypeError('Cyclic condition value');
+    ancestors.add(value);
+    try {
+      const canonical: unknown[] = [];
+      for (let index = 0; index < value.length; index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+        if (!descriptor?.enumerable || !('value' in descriptor)) {
+          throw new TypeError('Unsupported condition array item');
+        }
+        canonical.push(canonicalizeConditionObjectKeys(descriptor.value, ancestors));
+      }
+      Object.setPrototypeOf(canonical, null);
+      return canonical;
+    } finally {
+      ancestors.delete(value);
+    }
+  }
+  if (typeof value !== 'object') throw new TypeError('Unsupported condition value');
+
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new TypeError('Unsupported condition object');
+  }
+  if (Object.getOwnPropertySymbols(value).length > 0) throw new TypeError('Unsupported condition object keys');
+  if (ancestors.has(value)) throw new TypeError('Cyclic condition value');
+  ancestors.add(value);
+  try {
+    const canonical: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+    const ownKeys = Object.getOwnPropertyNames(value);
+    if (ownKeys.length !== Object.keys(value).length) throw new TypeError('Unsupported condition object properties');
+    ownKeys.sort().forEach((key) => {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor?.enumerable || !('value' in descriptor)) {
+        throw new TypeError('Unsupported condition object property');
+      }
+      canonical[key] = canonicalizeConditionObjectKeys(descriptor.value, ancestors);
+    });
+    return canonical;
+  } finally {
+    ancestors.delete(value);
+  }
+}
+
 function numericComparisonBasis(property: PropertyValue): NumericComparisonBasis | null {
   const quantity = property.quantity;
   const raw = quantity?.raw;
@@ -95,7 +153,7 @@ function numericComparisonBasis(property: PropertyValue): NumericComparisonBasis
     return {
       unit,
       dimension,
-      context: JSON.stringify(raw ? [
+      context: JSON.stringify(canonicalizeConditionObjectKeys(raw ? [
         raw.method ?? null,
         raw.standard ?? null,
         raw.temperature ?? null,
@@ -109,7 +167,7 @@ function numericComparisonBasis(property: PropertyValue): NumericComparisonBasis
         property.temp ?? null,
         property.load ?? null,
         null,
-      ]),
+      ])) as string,
     };
   } catch {
     return null;

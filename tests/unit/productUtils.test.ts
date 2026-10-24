@@ -168,6 +168,94 @@ describe('product data quality utilities', () => {
     ])).toContain('MFR');
   });
 
+  it('treats raw condition objects as equal regardless of key insertion order', () => {
+    const mfr = (value: number, conditions: Record<string, unknown>) => ({
+      value,
+      unit: 'g/10min',
+      method: 'ISO 1133',
+      temperature: 190,
+      load: 2.16,
+      quantity: canonicalizeCoreProperty('MFR', {
+        value,
+        unit: 'g/10min',
+        method: 'ISO 1133',
+        temperature: 190,
+        load: 2.16,
+        conditions,
+      }),
+    });
+    const sameConditionsDifferentOrder = [
+      product({ properties: { MFR: mfr(2, { humidity: 20, atmosphere: 'N2' }) } }),
+      product({ id: 'p-2', properties: { MFR: mfr(4, { atmosphere: 'N2', humidity: 20 }) } }),
+    ];
+
+    expect(getComparableNumericPropertyKeys(sameConditionsDifferentOrder)).toContain('MFR');
+    const visibleMfrColumns = getDynamicColumns(sameConditionsDifferentOrder)
+      .map((column) => column.key === 'MFR' ? { ...column, visible: true } : column);
+    expect(getVisibleNumericPropertyKeys(visibleMfrColumns, sameConditionsDifferentOrder)).toContain('MFR');
+
+    const genuinelyDifferentConditions = [
+      product({ properties: { MFR: mfr(2, { humidity: 20, atmosphere: 'N2' }) } }),
+      product({ id: 'p-2', properties: { MFR: mfr(4, { atmosphere: 'N2', humidity: 50 }) } }),
+    ];
+    expect(getComparableNumericPropertyKeys(genuinelyDifferentConditions)).not.toContain('MFR');
+
+    const orderedArrayConditions = [
+      product({ properties: { MFR: mfr(2, { sequence: [1, 2] }) } }),
+      product({ id: 'p-2', properties: { MFR: mfr(4, { sequence: [2, 1] }) } }),
+    ];
+    expect(getComparableNumericPropertyKeys(orderedArrayConditions)).not.toContain('MFR');
+
+    const mapConditionMfr = (value: number, declaration: string) => {
+      const property = mfr(value, {});
+      property.quantity.raw.conditions = new Map([['condition', declaration]]) as unknown as Record<string, unknown>;
+      return property;
+    };
+    const unsupportedConditionObjects = [
+      product({ properties: { MFR: mapConditionMfr(2, 'A') } }),
+      product({ id: 'p-2', properties: { MFR: mapConditionMfr(4, 'B') } }),
+    ];
+    expect(getComparableNumericPropertyKeys(unsupportedConditionObjects)).not.toContain('MFR');
+
+    const overflowConditions = JSON.parse('{"humidity":1e400,"atmosphere":"N2"}') as Record<string, unknown>;
+    const nullHumidityConditions = { humidity: null, atmosphere: 'N2' };
+    expect(Number.isFinite(overflowConditions.humidity)).toBe(false);
+    expect(getComparableNumericPropertyKeys([
+      product({ properties: { MFR: mfr(2, overflowConditions) } }),
+      product({ id: 'p-2', properties: { MFR: mfr(4, nullHumidityConditions) } }),
+    ])).not.toContain('MFR');
+
+    const roundedLargeInteger = JSON.parse('{"humidity":9007199254740993}') as Record<string, unknown>;
+    const representableLargeInteger = JSON.parse('{"humidity":9007199254740992}') as Record<string, unknown>;
+    expect(roundedLargeInteger.humidity).toBe(representableLargeInteger.humidity);
+    expect(getComparableNumericPropertyKeys([
+      product({ properties: { MFR: mfr(2, roundedLargeInteger) } }),
+      product({ id: 'p-2', properties: { MFR: mfr(4, representableLargeInteger) } }),
+    ])).not.toContain('MFR');
+
+    const omittedConditions = { atmosphere: 'N2', humidity: undefined };
+    const absentConditions = { atmosphere: 'N2' };
+    expect(getComparableNumericPropertyKeys([
+      product({ properties: { MFR: mfr(2, omittedConditions) } }),
+      product({ id: 'p-2', properties: { MFR: mfr(4, absentConditions) } }),
+    ])).not.toContain('MFR');
+
+    const prototypeHookConditions = [
+      product({ properties: { MFR: mfr(2, { humidity: 20 }) } }),
+      product({ id: 'p-2', properties: { MFR: mfr(4, { humidity: 80 }) } }),
+    ];
+    const priorArrayToJson = Object.getOwnPropertyDescriptor(Array.prototype, 'toJSON');
+    let keysWithArrayToJsonHook: string[];
+    try {
+      Object.defineProperty(Array.prototype, 'toJSON', { configurable: true, value: () => 'constant' });
+      keysWithArrayToJsonHook = getComparableNumericPropertyKeys(prototypeHookConditions);
+    } finally {
+      if (priorArrayToJson) Object.defineProperty(Array.prototype, 'toJSON', priorArrayToJson);
+      else Reflect.deleteProperty(Array.prototype, 'toJSON');
+    }
+    expect(keysWithArrayToJsonHook).not.toContain('MFR');
+  });
+
   it('re-evaluates comparable property keys for the current cohort instead of stale column types', () => {
     const mfr = (value: number, temperature: number) => ({
       value,

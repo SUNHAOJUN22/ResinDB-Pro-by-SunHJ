@@ -135,4 +135,48 @@ describe('data grid worker contract', () => {
     expect(response.payload.topsisTop3Ids).toEqual([]);
     vi.unstubAllGlobals();
   });
+
+  it('keeps equivalent raw condition objects in TOPSIS when their keys arrive in a different order', async () => {
+    const mfr = (value: number, conditions: Record<string, unknown>) => ({
+      value,
+      unit: 'g/10min',
+      method: 'ISO 1133',
+      temperature: 190,
+      load: 2.16,
+      quantity: canonicalizeCoreProperty('MFR', {
+        value,
+        unit: 'g/10min',
+        method: 'ISO 1133',
+        temperature: 190,
+        load: 2.16,
+        conditions,
+      }),
+    });
+    const cohort = [
+      { ...products[0], properties: { MFR: mfr(4, { temperature: 190, load: 2.16 }) } },
+      { ...products[1], properties: { MFR: mfr(2, { load: 2.16, temperature: 190 }) } },
+    ];
+    const cohortColumns = getDynamicColumns(cohort);
+
+    vi.resetModules();
+    const replies: unknown[] = [];
+    const scope: WorkerScope = { postMessage: (value) => replies.push(value) };
+    vi.stubGlobal('self', scope);
+    await import('@/workers/dataWorker');
+
+    scope.onmessage!({
+      data: { type: 'INIT_DATA', payload: { allProducts: cohort, formulas: [], columns: cohortColumns } },
+    } as MessageEvent);
+    scope.onmessage!({
+      data: { type: 'QUERY', payload: { activeFilters: [], sortConfig: [], useTopsis: true } },
+    } as MessageEvent);
+
+    const response = replies.at(-1) as {
+      type: string;
+      payload: { resultIds: string[]; topsisTop3Ids: string[] };
+    };
+    expect(response.type).toBe('QUERY_RESULT');
+    expect(response.payload.topsisTop3Ids).toEqual(['p2', 'p1']);
+    vi.unstubAllGlobals();
+  });
 });
