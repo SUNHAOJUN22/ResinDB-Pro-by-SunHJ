@@ -1,7 +1,7 @@
 import { parseFiniteReal as parseFiniteNumeric } from '@/lib/quantityRecord';
 import { admittedPropertyValue } from '@/lib/propertyAdmission';
 import { Product, SortConfig, ColumnConfig, FilterItem, FormulaConfig } from '@/types/index';
-import { calculateCompleteness, isLowBest } from '@/utils/productUtils';
+import { calculateCompleteness, getComparableNumericPropertyKeys, isLowBest } from '@/utils/productUtils';
 import { FormulaEngine } from '@/lib/formulaParser';
 import { calculateTopsis } from '@/lib/topsisAnalyzer';
 
@@ -54,13 +54,16 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
         let topsisTop3Ids: string[] = [];
 
         if (msg.payload.useTopsis && filteredData.length > 0) {
-          const activeCols = columns.filter(c => c.type === 'number' || c.isComputed);
+          // Column metadata can lag a product edit. Revalidate property criteria
+          // against the exact cohort being ranked instead of trusting stale types.
+          const comparableKeys = new Set(getComparableNumericPropertyKeys(filteredData));
+          const activeCols = columns.filter(c => c.isComputed || (!c.isSystem && comparableKeys.has(c.key)));
           const topsisCols = activeCols.map(c => ({
             key: c.key,
             isLowBest: isLowBest(c.key),
             unit: c.unit,
           }));
-          const scores = calculateTopsis(filteredData, topsisCols, (item, key) => {
+          const scores = activeCols.length === 0 ? new Map<string, number>() : calculateTopsis(filteredData, topsisCols, (item, key) => {
             const col = columns.find(c => c.key === key);
             if (col?.isComputed && col.formulaId) {
               return parseFiniteNumeric(formulaExecutor(item)[col.formulaId]);

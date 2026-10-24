@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import { createPortal } from "react-dom";
 import { Product, ColumnConfig } from '@/types/index';
-import { calculateCompleteness, isLowBest } from '@/utils/productUtils';
+import { calculateCompleteness, getVisibleNumericPropertyKeys, isLowBest } from '@/utils/productUtils';
 import {
   CheckSquare,
   Square,
@@ -749,7 +749,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
                    if (Object.keys(outlierResults).length > 0) {
                       clearOutliers();
                    } else {
-                      const numericFeatures = visibleCols.filter(c => c.type === 'number' && !c.isSystem && !c.isComputed).map(c => c.key);
+                      const numericFeatures = getVisibleNumericPropertyKeys(visibleCols, sortedData);
                       detectOutliers(sortedData, numericFeatures);
                    }
                }}

@@ -1,5 +1,7 @@
-import { Product, ColumnConfig, PropertyValue } from '@/types/index';
+import { Product, ColumnConfig, PropertyValue, RawQuantity } from '@/types/index';
 import { DEFAULT_VISIBLE_COLUMNS } from '@/config/uiDefaults';
+import { admittedPropertyValue } from '@/lib/propertyAdmission';
+import { canonicalizeCoreProperty, parseFiniteReal, resolveCorePropertyKey, verifyCoreQuantityRecord } from '@/lib/quantityRecord';
 
 const EXPLICIT_PLACEHOLDERS = new Set([
   '',
@@ -32,17 +34,166 @@ function propertyHasValue(properties: Record<string, PropertyValue>, keys: strin
   });
 }
 
+function normalizedUnit(unit: unknown): string | null {
+  if (typeof unit !== 'string') return null;
+  const normalized = unit.normalize('NFKC').trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function quantityFieldMatchesProperty(
+  field: 'unit' | 'method' | 'standard' | 'temperature' | 'temp' | 'load',
+  declared: unknown,
+  persisted: unknown,
+): boolean {
+  if (Object.is(declared, persisted)) return true;
+  if (field === 'unit' && typeof declared === 'string' && typeof persisted === 'string') {
+    return normalizedUnit(declared) === normalizedUnit(persisted);
+  }
+  if (field === 'temperature' || field === 'temp' || field === 'load') {
+    const declaredNumber = parseFiniteReal(declared);
+    const persistedNumber = parseFiniteReal(persisted);
+    return declaredNumber !== null && declaredNumber === persistedNumber;
+  }
+  return false;
+}
+
+function propertyMatchesQuantityRaw(property: PropertyValue, raw: RawQuantity): boolean {
+  const rawValue = raw.value;
+  const declaredValue = parseFiniteReal(property.value);
+  const persistedValue = parseFiniteReal(rawValue);
+  if (declaredValue === null || declaredValue !== persistedValue) return false;
+
+  const fields = ['unit', 'method', 'standard', 'temperature', 'temp', 'load'] as const;
+  return fields.every((field) => !Object.hasOwn(property, field)
+    || quantityFieldMatchesProperty(field, property[field], raw[field]));
+}
+
+interface NumericComparisonBasis {
+  unit: string;
+  dimension: string | null;
+  context: string;
+}
+
+function numericComparisonBasis(property: PropertyValue): NumericComparisonBasis | null {
+  const quantity = property.quantity;
+  const raw = quantity?.raw;
+  if (quantity !== undefined && (!raw || !propertyMatchesQuantityRaw(property, raw))) return null;
+  let unit: string | null;
+  let dimension: string | null = null;
+
+  if (quantity !== undefined) {
+    const canonical = quantity.status === 'VALID' ? quantity.canonical : undefined;
+    unit = normalizedUnit(canonical?.unit);
+    if (!canonical || !unit || typeof canonical.dimension !== 'string' || !canonical.dimension.trim()) return null;
+    dimension = canonical.dimension.trim();
+  } else {
+    unit = normalizedUnit(property.unit);
+    if (!unit) return null;
+  }
+
+  try {
+    return {
+      unit,
+      dimension,
+      context: JSON.stringify(raw ? [
+        raw.method ?? null,
+        raw.standard ?? null,
+        raw.temperature ?? null,
+        raw.temp ?? null,
+        raw.load ?? null,
+        raw.conditions ?? null,
+      ] : [
+        property.method ?? null,
+        property.standard ?? null,
+        property.temperature ?? null,
+        property.temp ?? null,
+        property.load ?? null,
+        null,
+      ]),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function admittedNumericPropertyValue(key: string, property: PropertyValue): number | null {
+  const coreProperty = resolveCorePropertyKey(key);
+  if (property.quantity !== undefined) {
+    if (coreProperty !== null) {
+      const verified = verifyCoreQuantityRecord(key, property.quantity);
+      if (verified.status !== 'VALID') return null;
+      return admittedPropertyValue({ ...property, quantity: verified });
+    }
+    return admittedPropertyValue(property);
+  }
+
+  if (coreProperty !== null) {
+    const declared = canonicalizeCoreProperty(key, {
+      value: property.value,
+      unit: property.unit,
+      method: property.method,
+      standard: property.standard,
+      temperature: property.temperature ?? property.temp,
+      load: property.load,
+    });
+    if (declared.status !== 'VALID') return null;
+  }
+  return admittedPropertyValue(property);
+}
+
+function sameNumericComparisonBasis(left: NumericComparisonBasis, right: NumericComparisonBasis): boolean {
+  return left.unit === right.unit
+    && (left.dimension === null || right.dimension === null || left.dimension === right.dimension)
+    && left.context === right.context;
+}
+
+function isComparableNumericColumn(key: string, properties: readonly PropertyValue[]): boolean {
+  let comparisonBasis: NumericComparisonBasis | null = null;
+  let hasAdmittedValue = false;
+
+  for (const property of properties) {
+    if (!property) continue;
+    if (property.quantity !== undefined && property.quantity.status !== 'VALID') continue;
+    if (property.quantity === undefined && isPlaceholderValue(property.value)) continue;
+    if (admittedNumericPropertyValue(key, property) === null) return false;
+
+    const basis = numericComparisonBasis(property);
+    if (basis === null || (comparisonBasis !== null && !sameNumericComparisonBasis(comparisonBasis, basis))) return false;
+    comparisonBasis = basis;
+    hasAdmittedValue = true;
+  }
+
+  return hasAdmittedValue;
+}
+
+export function getComparableNumericPropertyKeys(products: readonly Product[]): string[] {
+  const propertyValues = new Map<string, PropertyValue[]>();
+  products.forEach((product) => {
+    Object.entries(product.properties ?? {}).forEach(([key, property]) => {
+      const values = propertyValues.get(key) ?? [];
+      values.push(property);
+      propertyValues.set(key, values);
+    });
+  });
+
+  return Array.from(propertyValues.entries())
+    .filter(([key, values]) => isComparableNumericColumn(key, values))
+    .map(([key]) => key);
+}
+
 export const getDynamicColumns = (products: Product[]): ColumnConfig[] => {
   const propertyKeys = new Set<string>();
   products.forEach((product) => {
     Object.keys(product.properties ?? {}).forEach((key) => propertyKeys.add(key));
   });
+  const numericPropertyKeys = new Set(getComparableNumericPropertyKeys(products));
   const dynamicCols: ColumnConfig[] = Array.from(propertyKeys)
     .map((key) => ({
       key,
       label: key,
       visible: DEFAULT_VISIBLE_COLUMNS.includes(key),
       isSystem: false,
+      ...(numericPropertyKeys.has(key) ? { type: 'number' as const } : {}),
     }))
     .sort((a, b) => {
       const aIsLikelyImportant = DEFAULT_VISIBLE_COLUMNS.includes(a.key);
@@ -57,6 +208,16 @@ export const getDynamicColumns = (products: Product[]): ColumnConfig[] => {
     ...dynamicCols,
   ];
 };
+
+export function getVisibleNumericPropertyKeys(columns: readonly ColumnConfig[], products?: readonly Product[]): string[] {
+  const comparableKeys = products === undefined ? null : new Set(getComparableNumericPropertyKeys(products));
+  return columns
+    .filter((column) => column.visible
+      && (comparableKeys === null ? column.type === 'number' : comparableKeys.has(column.key))
+      && !column.isSystem
+      && !column.isComputed)
+    .map((column) => column.key);
+}
 
 /**
  * Calculates a multi-dimensional material data quality score (0-100).

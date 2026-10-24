@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Product } from '@/types/index';
+import { canonicalizeCoreProperty } from '@/lib/quantityRecord';
 import {
   calculateCompleteness,
+  getComparableNumericPropertyKeys,
   getDynamicColumns,
+  getVisibleNumericPropertyKeys,
   getPerformanceFingerprint,
   getProductValidationWarnings,
   getValidPropertiesCount,
@@ -64,6 +67,170 @@ describe('product data quality utilities', () => {
     ]);
     expect(columns.slice(0, 2).map((column) => column.key)).toEqual(['gradeName', 'manufacturer']);
     expect(columns.map((column) => column.key)).toEqual(expect.arrayContaining(['Density', 'MFR']));
+  });
+
+  it('marks only complete, comparable quantity columns as numeric', () => {
+    const columns = getDynamicColumns([
+      product({ properties: { Density: {
+        value: 0.9,
+        unit: 'g/cm3',
+        quantity: canonicalizeCoreProperty('Density', { value: 0.9, unit: 'g/cm3' }),
+      } } }),
+      product({ id: 'p-2', properties: { Density: {
+        value: 900,
+        unit: 'kg/m3',
+        quantity: canonicalizeCoreProperty('Density', { value: 900, unit: 'kg/m3' }),
+      } } }),
+    ]);
+
+    expect(columns.find((column) => column.key === 'Density')?.type).toBe('number');
+  });
+
+  it('keeps legacy and canonical values comparable only when their declared units match', () => {
+    const canonicalAndLegacy = getDynamicColumns([
+      product({ properties: { Density: {
+        value: 0.9,
+        unit: 'g/cm3',
+        quantity: canonicalizeCoreProperty('Density', { value: 0.9, unit: 'g/cm3' }),
+      } } }),
+      product({ id: 'p-2', properties: { Density: { value: 0.95, unit: 'g/cm3' } } }),
+    ]);
+    const mixedUnits = getDynamicColumns([
+      product({ properties: { Density: {
+        value: 0.9,
+        unit: 'g/cm3',
+        quantity: canonicalizeCoreProperty('Density', { value: 0.9, unit: 'g/cm3' }),
+      } } }),
+      product({ id: 'p-2', properties: { Density: { value: 950, unit: 'kg/m3' } } }),
+    ]);
+
+    expect(canonicalAndLegacy.find((column) => column.key === 'Density')?.type).toBe('number');
+    expect(mixedUnits.find((column) => column.key === 'Density')?.type).not.toBe('number');
+  });
+
+  it('does not infer a numeric criterion from unitless, mixed, or condition-incompatible data', () => {
+    const mfr = (value: number, temperature: number) => ({
+      value,
+      unit: 'g/10min',
+      method: 'ISO 1133',
+      temperature,
+      load: 2.16,
+      quantity: canonicalizeCoreProperty('MFR', {
+        value,
+        unit: 'g/10min',
+        method: 'ISO 1133',
+        temperature,
+        load: 2.16,
+      }),
+    });
+    const columns = getDynamicColumns([
+      product({ properties: {
+        Unitless: { value: 1 },
+        Mixed: { value: '12abc' },
+        MFR: mfr(2, 190),
+      } }),
+      product({ id: 'p-2', properties: {
+        Unitless: { value: 2 },
+        Mixed: { value: 12, unit: 'count' },
+        MFR: mfr(4, 230),
+      } }),
+    ]);
+
+    expect(columns.find((column) => column.key === 'Unitless')?.type).not.toBe('number');
+    expect(columns.find((column) => column.key === 'Mixed')?.type).not.toBe('number');
+    expect(columns.find((column) => column.key === 'MFR')?.type).not.toBe('number');
+  });
+
+  it('uses quantity raw conditions as the comparison basis and rejects conflicting top-level copies', () => {
+    const mfr = (value: number, rawTemperature: number, declaredTemperature: number) => ({
+      value,
+      unit: 'g/10min',
+      method: 'ISO 1133',
+      temperature: declaredTemperature,
+      load: 2.16,
+      quantity: canonicalizeCoreProperty('MFR', {
+        value,
+        unit: 'g/10min',
+        method: 'ISO 1133',
+        temperature: rawTemperature,
+        load: 2.16,
+      }),
+    });
+    const columns = getDynamicColumns([
+      product({ properties: { MFR: mfr(2, 190, 190) } }),
+      product({ id: 'p-2', properties: { MFR: mfr(4, 230, 190) } }),
+    ]);
+
+    expect(columns.find((column) => column.key === 'MFR')?.type).not.toBe('number');
+    expect(getComparableNumericPropertyKeys([
+      product({ properties: { MFR: mfr(2, 190, 190) } }),
+      product({ id: 'p-2', properties: { MFR: mfr(4, 190, 190) } }),
+    ])).toContain('MFR');
+  });
+
+  it('re-evaluates comparable property keys for the current cohort instead of stale column types', () => {
+    const mfr = (value: number, temperature: number) => ({
+      value,
+      unit: 'g/10min',
+      method: 'ISO 1133',
+      temperature,
+      load: 2.16,
+    });
+    const initialProducts = [
+      product({ properties: { MFR: mfr(2, 190) } }),
+      product({ id: 'p-2', properties: { MFR: mfr(4, 190) } }),
+    ];
+    const staleColumns = getDynamicColumns(initialProducts);
+    const changedCohort = [initialProducts[0], product({ id: 'p-2', properties: { MFR: mfr(4, 230) } })];
+
+    expect(staleColumns.find((column) => column.key === 'MFR')?.type).toBe('number');
+    expect(getVisibleNumericPropertyKeys(staleColumns, changedCohort)).not.toContain('MFR');
+  });
+
+  it('requires legacy core properties to satisfy their quantity contract', () => {
+    const columns = getDynamicColumns([
+      product({ properties: {
+        MFR: { value: 2, unit: 'g/10min' },
+        tensileYield: { value: 20, unit: 'MPa' },
+      } }),
+      product({ id: 'p-2', properties: {
+        MFR: { value: 4, unit: 'g/10min' },
+        tensileYield: { value: 22, unit: 'MPa' },
+      } }),
+    ]);
+    const completeLegacyMfr = (value: number) => ({
+      value,
+      unit: 'g/10min',
+      method: 'ISO 1133',
+      temperature: 190,
+      load: 2.16,
+    });
+    const completeColumns = getDynamicColumns([
+      product({ properties: { MFR: completeLegacyMfr(2) } }),
+      product({ id: 'p-2', properties: { MFR: completeLegacyMfr(4) } }),
+    ]);
+
+    expect(columns.find((column) => column.key === 'MFR')?.type).not.toBe('number');
+    expect(columns.find((column) => column.key === 'tensileYield')?.type).not.toBe('number');
+    expect(completeColumns.find((column) => column.key === 'MFR')?.type).toBe('number');
+  });
+
+  it('fails closed on malformed canonical quantity dimensions', () => {
+    const malformed = {
+      value: 0.9,
+      unit: 'test-unit',
+      quantity: {
+        raw: { value: 0.9, unit: 'test-unit' },
+        canonical: { value: 0.9, unit: 'test-unit', dimension: 42 },
+        status: 'VALID',
+        reasonCodes: [],
+        provenanceRefs: [],
+      },
+    } as unknown as Product['properties'][string];
+
+    const columns = getDynamicColumns([product({ properties: { TestProperty: malformed } })]);
+
+    expect(columns.find((column) => column.key === 'TestProperty')?.type).not.toBe('number');
   });
 
   it('uses finite values only in the performance fingerprint', () => {

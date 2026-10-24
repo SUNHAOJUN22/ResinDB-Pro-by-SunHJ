@@ -52,11 +52,14 @@ export function useColumns(allProducts: Product[]) {
     }
   }, [computedColumns]);
 
-  // Initial column generation and persistence loading
+  // Initialize columns once, then refresh inferred types without losing user settings.
   useEffect(() => {
-    if (allProducts.length > 0 && !isInitialized.current) {
+    if (allProducts.length === 0) return;
+    const inferredColumns = getDynamicColumns(allProducts);
+
+    if (!isInitialized.current) {
       isInitialized.current = true;
-      let baseCols = [...getDynamicColumns(allProducts), ...computedColumns];
+      let baseCols = [...inferredColumns, ...computedColumns];
       
       const savedVisibility = safeStorage.local.getItem('resindb-visible-columns-v2');
       const savedOrder = safeStorage.local.getItem('resindb-column-order');
@@ -97,7 +100,47 @@ export function useColumns(allProducts: Product[]) {
       } else {
         setColumns(baseCols);
       }
+      return;
     }
+
+    const inferredByKey = new Map(inferredColumns.map((column) => [column.key, column]));
+    let persistedVisibleKeys: Set<string> | null = null;
+    const savedVisibility = safeStorage.local.getItem('resindb-visible-columns-v2');
+    if (savedVisibility !== null) {
+      try {
+        const parsed: unknown = JSON.parse(savedVisibility);
+        if (Array.isArray(parsed)) {
+          persistedVisibleKeys = new Set(parsed.filter((key): key is string => typeof key === 'string'));
+        }
+      } catch (error) {
+        logger.error('Failed to parse column visibility:', error);
+      }
+    }
+
+    setColumns((previous) => {
+      let changed = false;
+      const next = previous.map((column) => {
+        if (column.isSystem || column.isComputed) return column;
+        const inferred = inferredByKey.get(column.key);
+        const nextColumn = { ...column };
+        if (inferred?.type === undefined) delete nextColumn.type;
+        else nextColumn.type = inferred.type;
+        const typeChanged = nextColumn.type !== column.type;
+        if (typeChanged) changed = true;
+        return typeChanged ? nextColumn : column;
+      });
+
+      const existingKeys = new Set(previous.map((column) => column.key));
+      inferredColumns.forEach((column) => {
+        if (column.isSystem || existingKeys.has(column.key)) return;
+        next.push(persistedVisibleKeys === null
+          ? column
+          : { ...column, visible: persistedVisibleKeys.has(column.key) });
+        existingKeys.add(column.key);
+        changed = true;
+      });
+      return changed ? next : previous;
+    });
   }, [allProducts, computedColumns]);
 
   // Persist visibility and order changes
