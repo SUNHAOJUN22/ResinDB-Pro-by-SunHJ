@@ -10,7 +10,25 @@ import { useColumns } from '@/hooks/datagrid/useColumns';
 import { propertyMap } from '@/config/i18n';
 import { generateId, safeStorage } from '@/lib/utils';
 
-const __globalProductTextIndex = new WeakMap<Product, string>();
+type ProductTextBuilder = (product: Product) => string;
+
+// A builder closes over one hook's locale and category labels. Weak keys keep
+// caches isolated between those contexts without retaining retired callbacks.
+const productTextIndices = new WeakMap<ProductTextBuilder, WeakMap<Product, string>>();
+
+function cachedProductText(product: Product, build: ProductTextBuilder): string {
+  let index = productTextIndices.get(build);
+  if (!index) {
+    index = new WeakMap<Product, string>();
+    productTextIndices.set(build, index);
+  }
+  let tokens = index.get(product);
+  if (tokens === undefined) {
+    tokens = build(product);
+    index.set(product, tokens);
+  }
+  return tokens;
+}
 
 export function useDatabase(
   categoryNameMap: Map<string, string>,
@@ -168,9 +186,7 @@ export function useDatabase(
       const end = Math.min(currentIndex + batchSize, allProducts.length);
       for (let index = currentIndex; index < end; index += 1) {
         const product = allProducts[index];
-        if (!__globalProductTextIndex.has(product)) {
-          __globalProductTextIndex.set(product, buildProductTextIndex(product));
-        }
+        cachedProductText(product, buildProductTextIndex);
       }
       currentIndex = end;
     };
@@ -254,11 +270,7 @@ export function useDatabase(
       }
 
       if (textKeywords.length > 0) {
-        let searchTokens = __globalProductTextIndex.get(product);
-        if (searchTokens === undefined) {
-          searchTokens = buildProductTextIndex(product);
-          __globalProductTextIndex.set(product, searchTokens);
-        }
+        const searchTokens = cachedProductText(product, buildProductTextIndex);
         if (textKeywords.some((keyword) => !searchTokens.includes(keyword))) return false;
       }
 

@@ -175,6 +175,22 @@ async function capture(session, targetPath) {
   writeFileSync(targetPath, Buffer.from(screenshot.data, 'base64'));
 }
 
+async function searchDashboard(session, query, expectedCount) {
+  await evaluate(session, `(() => {
+    const input = document.querySelector('#global-search-input');
+    if (!input) throw new Error('Global search input is unavailable');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    setter.call(input, ${JSON.stringify(query)});
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await waitForCondition(session, `(() => {
+    const input = document.querySelector('#global-search-input');
+    return input?.value === ${JSON.stringify(query)}
+      && Number(document.querySelector('[data-testid="record-count"]')?.dataset.count) === ${expectedCount};
+  })()`, `search ${JSON.stringify(query)} yields ${expectedCount} records`);
+  return expectedCount;
+}
+
 async function inspectAdvancedFigure(session, kind, language) {
   const labels = {
     copula: { zh: ['概率空间中的高斯 Copula 密度'], en: ['Gaussian-copula density in probability space'] },
@@ -370,6 +386,28 @@ try {
 
   mkdirSync(artifactDir, { recursive: true });
   await capture(session, screenshotPaths.dashboard);
+
+  // Exercise public controls without reloading or altering component state.
+  // Empty intermediate cohorts make every asserted transition wait for the
+  // debounced query and worker result rather than accepting the previous count.
+  const noSearchMatch = '__NO_MATCH_LOCALE_CACHE_REGRESSION__';
+  await searchDashboard(session, noSearchMatch, 0);
+  const chineseMatches = await searchDashboard(session, '密度', 13);
+  await evaluate(session, `document.querySelector('[data-testid="language-control"]').click()`);
+  await waitForCondition(session, `document.documentElement.lang === 'en'`, 'English search controls');
+  await searchDashboard(session, noSearchMatch, 0);
+  const englishMatches = await searchDashboard(session, 'Density', 13);
+  await evaluate(session, `document.querySelector('[data-testid="language-control"]').click()`);
+  await waitForCondition(session, `document.documentElement.lang === 'zh-CN'`, 'Chinese search controls restored');
+  await searchDashboard(session, noSearchMatch, 0);
+  const restoredChineseMatches = await searchDashboard(session, '密度', 13);
+  const untranslatedEnglishMatches = await searchDashboard(session, 'Density', 0);
+  await searchDashboard(session, '', 13);
+  const localeSearch = {
+    chineseMatches, englishMatches, restoredChineseMatches, untranslatedEnglishMatches,
+    reloadedBetweenLanguages: false,
+    productIdentityAssertion: 'covered-by-hook-regressions-not-inspected-in-browser',
+  };
 
   await evaluate(session, `(() => {
     const input = document.querySelector('#global-search-input');
@@ -654,6 +692,7 @@ try {
     generatedAt: new Date().toISOString(),
     appUrl,
     scatterCanvas: scatterEvidence,
+    localeSearch,
     recordCount: await evaluate(session, `Number(document.querySelector('[data-testid="record-count"]')?.dataset.count)`),
     screenshots: Object.fromEntries(Object.entries(screenshotPaths).map(([name, file]) => [name, path.basename(file)])),
     preferences: savedPreferences,
