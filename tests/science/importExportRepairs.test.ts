@@ -27,6 +27,40 @@ describe('actual adapter metadata and structured export contracts', () => {
     expect(parsed.meta.fields).toContain('PropertiesJSON');
     expect(nativeImportRecord(parsed.data[0])).toEqual(original);
   });
+  it('neutralizes spreadsheet formulas in CSV display cells while retaining lossless RecordJSON', async () => {
+    const original: Product = {
+      ...record(),
+      id: '=HYPERLINK("https://example.invalid","open")',
+      gradeName: ' =1+1',
+      manufacturer: '\t=HYPERLINK("https://example.invalid","open")',
+      categoryIds: ['-1+1'],
+      properties: {
+        ...record().properties,
+        '@SUM(1,1)': { value: '+2+2', unit: 'unit' },
+        '＝1+1': { value: '\r\n=1+1', unit: 'text' },
+      },
+    };
+
+    const csv = await text(await adapter().exportReport([original], 'csv'));
+    const parsed = Papa.parse<Record<string, unknown>>(csv, { header: true });
+    const row = parsed.data[0];
+
+    expect(parsed.errors).toEqual([]);
+    expect(row.ID).toBe(`\t${original.id}`);
+    expect(row.Grade).toBe(`\t${original.gradeName}`);
+    expect(row.Manufacturer).toBe(`'${original.manufacturer}`);
+    expect(row.Category).toBe('\t-1+1');
+    expect(parsed.meta.fields).toContain('\t@SUM(1,1)');
+    expect(row['\t@SUM(1,1)']).toBe('\t+2+2');
+    expect(parsed.meta.fields).toContain("'＝1+1");
+    expect(row["'＝1+1"]).toBe("'\r\n=1+1");
+    expect(nativeImportRecord(row)).toEqual(original);
+
+    const alternateSeparatorCsv = await text(await adapter().exportReport([
+      { ...original, manufacturer: 'Vendor;=1+1' },
+    ], 'csv'));
+    expect(alternateSeparatorCsv).toContain('"Vendor;=1+1"');
+  });
   it('escapes XML identities and preserves complete property/governance payloads', async () => {
     const original = record();
     const xml = new DOMParser().parseFromString(await text(await adapter().exportReport([original], 'xml')), 'application/xml');

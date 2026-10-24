@@ -35,8 +35,26 @@ function findAndAddSubcategories(id: string, tree: Category[], targetSet: Set<st
 }
 
 function formatCsvValue(val: unknown): string {
-  const s = String(val ?? '');
-  if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+  let s = String(val ?? '');
+  let prefixedForSpreadsheet = false;
+  if (typeof val === 'string') {
+    if (s.charCodeAt(0) <= 0x1f) {
+      s = `'${s}`;
+      prefixedForSpreadsheet = true;
+    } else {
+      const firstNonWhitespace = s.trimStart();
+      if (/^[=+\-@]/u.test(firstNonWhitespace)) {
+        // OWASP's Excel-oriented mitigation keeps the formula marker as text inside a quoted cell.
+        s = `\t${s}`;
+        prefixedForSpreadsheet = true;
+      } else if (/^[＝＋－＠]/u.test(firstNonWhitespace)) {
+        // Some locales recognize full-width formula markers; use a conservative text prefix.
+        s = `'${s}`;
+        prefixedForSpreadsheet = true;
+      }
+    }
+  }
+  if (prefixedForSpreadsheet || /[,;"\n\r\t]/u.test(s)) {
     return `"${s.replace(/"/g, '""')}"`;
   }
   return s;

@@ -42,6 +42,8 @@ Production deployments should use an authenticated server-side gateway with:
 
 User-defined formulas are parsed by a white-listed numeric grammar. Dynamic JavaScript execution (`eval` and `new Function`) is not permitted. Supported constructs are numeric literals, `Props['property']` references, arithmetic operators, parentheses, constants, and documented mathematical functions.
 
+CSV exports treat untrusted string values as spreadsheet-facing cells: formula-leading ASCII markers are prefixed with a tab inside a quoted field, and leading control/full-width formula markers receive a text prefix. Dynamic property headers are sanitized too. The structured `RecordJSON` column remains lossless for programmatic round-trips. CSV formula handling varies by spreadsheet and locale; this is not a universal sanitizer, so review exports before redistributing them or opening them in systems outside the tested workflow. See [OWASP CSV Injection guidance](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Injection/21-CSV_Injection/).
+
 ## Dependency response
 
 Use `npm ci` for reproducible installation. Release CI runs both `npm audit --omit=dev --audit-level=high` and `npm audit --audit-level=high`; a high or critical advisory in either graph blocks release until the dependency is upgraded, removed, isolated with a verified non-applicability rationale, or replaced. The browser build does not claim an embedded Content Security Policy: production deployments must set and test CSP and other HTTP security headers at the hosting or gateway layer.
