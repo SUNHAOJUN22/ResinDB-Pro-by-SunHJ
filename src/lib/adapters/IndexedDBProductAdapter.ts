@@ -552,14 +552,16 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     const tx = db.transaction('products', 'readwrite');
     for (const id of ids) {
       await tx.store.delete(id);
-      // Sync delete to UniversalStorageBridge
+    }
+    await tx.done;
+    // A failed transaction rolls back IndexedDB changes; mirror only after commit.
+    for (const id of ids) {
       try {
         UniversalStorageBridge.deleteLabRecord(id);
       } catch (err) {
         logger.error("Failed to sync delete to storage bridge", err);
       }
     }
-    await tx.done;
     this.registerMutationDelete(ids);
   }
 
