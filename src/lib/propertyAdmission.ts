@@ -141,7 +141,45 @@ export function patchProperty(key: string, previous: PropertyValue | undefined, 
   if ((Object.hasOwn(patch, 'temperature') && patch.temperature === undefined)
       || (Object.hasOwn(patch, 'temp') && patch.temp === undefined)) clearedConditions.add('temperature');
   if (Object.hasOwn(patch, 'load') && patch.load === undefined) clearedConditions.add('load');
-  const updated = refreshProperty(key, { ...(previous ?? { value: '' }), ...patch }, previous ?? { value: '' }, force, clearedConditions);
+  let previousForRefresh = previous;
+  let patchForRefresh = patch;
+  const hasTemperatureUpdate = !clearedConditions.has('temperature')
+    && ((Object.hasOwn(patch, 'temperature') && patch.temperature !== undefined)
+      || (Object.hasOwn(patch, 'temp') && patch.temp !== undefined));
+  if (hasTemperatureUpdate) {
+    const temperature = Object.hasOwn(patch, 'temperature') ? patch.temperature : patch.temp;
+    patchForRefresh = { ...patch };
+    if (previous?.temperature !== undefined || (Object.hasOwn(patch, 'temperature') && patch.temperature !== undefined)) {
+      patchForRefresh.temperature = temperature;
+    }
+    if (previous?.temp !== undefined || (Object.hasOwn(patch, 'temp') && patch.temp !== undefined)) {
+      patchForRefresh.temp = String(temperature);
+    }
+
+    if (previous) {
+      const normalizedPrevious: PropertyValue = { ...previous };
+      if (previous.temperature !== undefined) normalizedPrevious.temperature = temperature;
+      if (previous.temp !== undefined) normalizedPrevious.temp = String(temperature);
+      if (previous.quantity) {
+        const raw = { ...previous.quantity.raw };
+        for (const alias of ['temperature', 'temp'] as const) {
+          if (raw[alias] !== undefined) raw[alias] = temperature;
+        }
+        if (raw.conditions && Object.hasOwn(raw.conditions, 'temperature')) {
+          raw.conditions = { ...raw.conditions, temperature };
+        }
+        normalizedPrevious.quantity = { ...previous.quantity, raw };
+      }
+      previousForRefresh = normalizedPrevious;
+    }
+  }
+  const updated = refreshProperty(
+    key,
+    { ...(previousForRefresh ?? { value: '' }), ...patchForRefresh },
+    previousForRefresh ?? { value: '' },
+    force || hasTemperatureUpdate,
+    clearedConditions,
+  );
   if (clearedConditions.has('temperature')) {
     delete updated.temperature;
     delete updated.temp;

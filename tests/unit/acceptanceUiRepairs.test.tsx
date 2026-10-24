@@ -6,6 +6,9 @@ import { FormulaEditorModal } from '@/components/modals/FormulaEditorModalLegacy
 import { LanguageProvider } from '@/contexts/LanguageContext';
 import { useMahalanobisWorker } from '@/hooks/math/useMahalanobis';
 import { canonicalizeCoreProperty } from '@/lib/quantityRecord';
+import { getComparableNumericPropertyKeys } from '@/utils/productUtils';
+import { UniversalStorageBridge } from '@/lib/adapters/UniversalStorageBridge';
+import type { MaterialRecord } from '@/lib/adapters/types';
 import type { Product } from '@/types/index';
 const mocks = vi.hoisted(() => ({ addToast: vi.fn(), runAnalysis: vi.fn() }));
 vi.mock('@/contexts/ToastContext', () => ({ useToasts: () => ({ addToast: mocks.addToast }) }));
@@ -33,6 +36,56 @@ describe('actual acceptance UI actions', () => {
     fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
     expect(onSave.mock.calls[0][0].properties.density).toMatchObject({ value: 1200, sampleId: 's', batchId: 'b', load: 'declared load', quantity: { canonical: { value: 1.2 } } });
+  });
+  it('shows and synchronizes nested-only MFR temperature through edit and storage', async () => {
+    const source: MaterialRecord = {
+      id: 'nested-temperature', source: 'my_lab', category: 'PP', grade: 'PP-NESTED-TEMP',
+      manufacturer: 'Research Lab', timestamp: Date.parse('2026-10-24T00:00:00Z'),
+      properties: {
+        density: { value: 0.91, unit: 'g/cm³' },
+        mfr: {
+          value: 2.1, unit: 'g/10min', method: 'ISO 1133',
+          raw: { value: 2.1, unit: 'g/10min', method: 'ISO 1133', conditions: { temperature: '190 °C', load: '2.16 kg' } },
+        },
+      },
+    };
+    const original = UniversalStorageBridge.recordToProduct(source);
+    const onSave = vi.fn().mockResolvedValue(true);
+    render(<LanguageProvider><EditProductModal isOpen product={original} onClose={vi.fn()} onSave={onSave} /></LanguageProvider>);
+    fireEvent.click(screen.getAllByTitle('More Options')[1]);
+    const temperature = screen.getByDisplayValue('190 °C');
+    fireEvent.change(temperature, { target: { value: '200 °C' } });
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+
+    const edited = onSave.mock.calls[0][0] as Product;
+    const persisted = UniversalStorageBridge.productToRecord(edited);
+    expect(persisted.properties.mfr?.raw).toMatchObject({
+      temperature: '200 °C',
+      conditions: { temperature: '200 °C', load: '2.16 kg' },
+    });
+    expect(original.properties['熔体质量流动速率'].quantity?.raw.conditions?.temperature).toBe('190 °C');
+
+    const sameConditionRecord: MaterialRecord = {
+      ...source,
+      id: 'same-condition',
+      properties: {
+        ...source.properties,
+        mfr: {
+          ...source.properties.mfr!,
+          temperature: '200 °C',
+          raw: {
+            ...source.properties.mfr!.raw!,
+            temperature: '200 °C',
+            conditions: { temperature: '200 °C', load: '2.16 kg' },
+          },
+        },
+      },
+    };
+    const comparison = UniversalStorageBridge.recordToProduct(sameConditionRecord);
+    const restored = UniversalStorageBridge.recordToProduct(persisted);
+    expect(restored.properties['熔体质量流动速率'].quantity?.raw.conditions?.temperature).toBe('200 °C');
+    expect(getComparableNumericPropertyKeys([restored, comparison])).toContain('熔体质量流动速率');
   });
   it('passes the actual output unit from the formula Test control', () => {
     renderFormula(); enterExpression();

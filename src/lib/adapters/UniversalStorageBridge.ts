@@ -19,6 +19,10 @@ function finiteDisplayValue(value: unknown): string | number {
   return 'UNKNOWN';
 }
 
+function conditionDisplayValue(value: unknown): string | number | undefined {
+  return typeof value === 'string' || typeof value === 'number' ? value : undefined;
+}
+
 function conservativeGovernance(record: MaterialRecord): DataGovernanceMetadata {
   if (record.governance) {
     return {
@@ -67,7 +71,7 @@ function materialToProductProperty(property: MaterialPropertyValue): PropertyVal
     unit: quantity.canonical?.unit ?? quantity.raw.unit,
     method: quantity.raw.method,
     standard: quantity.raw.standard,
-    temperature: quantity.raw.temperature ?? quantity.raw.temp,
+    temperature: quantity.raw.temperature ?? quantity.raw.temp ?? conditionDisplayValue(quantity.raw.conditions?.temperature),
     temp: typeof quantity.raw.temp === 'string' ? quantity.raw.temp : undefined,
     load: quantity.raw.load,
     sampleId: quantity.raw.sampleId,
