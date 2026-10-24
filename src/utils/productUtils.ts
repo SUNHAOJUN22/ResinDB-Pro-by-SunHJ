@@ -68,6 +68,28 @@ function propertyMatchesQuantityRaw(property: PropertyValue, raw: RawQuantity): 
     || quantityFieldMatchesProperty(field, property[field], raw[field]));
 }
 
+/** Accept either the preserved raw declaration or its verified canonical mirror.
+ * Storage adapters intentionally expose canonical value/unit for comparison while
+ * retaining the original declaration in quantity.raw. Never infer a conversion:
+ * the canonical mirror must first verify against that raw declaration.
+ */
+function propertyMatchesQuantity(key: string, property: PropertyValue, raw: RawQuantity): boolean {
+  if (propertyMatchesQuantityRaw(property, raw)) return true;
+  const quantity = property.quantity;
+  if (!quantity || resolveCorePropertyKey(key) === null) return false;
+  const verified = verifyCoreQuantityRecord(key, quantity);
+  const canonical = verified.status === 'VALID' ? verified.canonical : undefined;
+  if (!canonical || parseFiniteReal(property.value) !== canonical.value
+      || normalizedUnit(property.unit) !== normalizedUnit(canonical.unit)) return false;
+
+  const conditionFields = ['method', 'standard', 'temperature', 'temp', 'load'] as const;
+  return conditionFields.every((field) => {
+    if (!Object.hasOwn(property, field) || (field === 'temp' && property.temp === undefined)) return true;
+    const persisted = field === 'temperature' ? raw.temperature ?? raw.temp : raw[field];
+    return quantityFieldMatchesProperty(field, property[field], persisted);
+  });
+}
+
 interface NumericComparisonBasis {
   unit: string;
   dimension: string | null;
@@ -132,10 +154,10 @@ function canonicalizeConditionObjectKeys(value: unknown, ancestors = new Set<obj
   }
 }
 
-function numericComparisonBasis(property: PropertyValue): NumericComparisonBasis | null {
+function numericComparisonBasis(key: string, property: PropertyValue): NumericComparisonBasis | null {
   const quantity = property.quantity;
   const raw = quantity?.raw;
-  if (quantity !== undefined && (!raw || !propertyMatchesQuantityRaw(property, raw))) return null;
+  if (quantity !== undefined && (!raw || !propertyMatchesQuantity(key, property, raw))) return null;
   let unit: string | null;
   let dimension: string | null = null;
 
@@ -215,7 +237,7 @@ function isComparableNumericColumn(key: string, properties: readonly PropertyVal
     if (property.quantity === undefined && isPlaceholderValue(property.value)) continue;
     if (admittedNumericPropertyValue(key, property) === null) return false;
 
-    const basis = numericComparisonBasis(property);
+    const basis = numericComparisonBasis(key, property);
     if (basis === null || (comparisonBasis !== null && !sameNumericComparisonBasis(comparisonBasis, basis))) return false;
     comparisonBasis = basis;
     hasAdmittedValue = true;
