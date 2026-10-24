@@ -12,12 +12,24 @@ export function admittedPropertyValue(property: PropertyValue | undefined, key: 
   return parseFiniteReal(property.value);
 }
 
-function rawDeclaration(property: PropertyValue): RawQuantity {
+type ClearedCondition = 'temperature' | 'load';
+
+function rawDeclaration(property: PropertyValue, clearedConditions: ReadonlySet<ClearedCondition> = new Set()): RawQuantity {
   // Conditions present only in the original quantity record remain declarations.
   // An explicitly cleared top-level field still overrides the original value.
   const raw: RawQuantity = { ...property.quantity?.raw, value: property.value };
   for (const key of ['unit', 'method', 'standard', 'temperature', 'temp', 'load', 'sampleId', 'batchId', 'referenceId', 'sourceUrl'] as const) {
     if (Object.hasOwn(property, key)) Object.assign(raw, { [key]: property[key] });
+  }
+  if (clearedConditions.has('temperature')) {
+    delete raw.temperature;
+    delete raw.temp;
+  }
+  if (clearedConditions.has('load')) delete raw.load;
+  if (raw.conditions && clearedConditions.size > 0) {
+    const conditions = { ...raw.conditions };
+    for (const condition of clearedConditions) delete conditions[condition];
+    raw.conditions = conditions;
   }
   return raw;
 }
@@ -73,8 +85,14 @@ export function propertyQuantityMatchesDeclaration(key: string, property: Proper
     && actual.dimension === expected.dimension;
 }
 
-export function refreshProperty(key: string, property: PropertyValue, previous?: PropertyValue, force = false): PropertyValue {
-  const raw = rawDeclaration(property);
+export function refreshProperty(
+  key: string,
+  property: PropertyValue,
+  previous?: PropertyValue,
+  force = false,
+  clearedConditions: ReadonlySet<ClearedCondition> = new Set(),
+): PropertyValue {
+  const raw = rawDeclaration(property, clearedConditions);
   const previousProvenance = previous?.provenanceRefs ?? previous?.quantity?.provenanceRefs;
   const provenance = property.provenanceRefs
     ?? property.quantity?.provenanceRefs
@@ -118,5 +136,16 @@ export function refreshProperties(properties: Product['properties'], previous?: 
 }
 
 export function patchProperty(key: string, previous: PropertyValue | undefined, patch: Partial<PropertyValue>, force = false): PropertyValue {
-  return refreshProperty(key, { ...(previous ?? { value: '' }), ...patch }, previous ?? { value: '' }, force);
+  const clearedConditions = new Set<ClearedCondition>();
+  // temperature and temp are aliases; clearing either removes the logical condition.
+  if ((Object.hasOwn(patch, 'temperature') && patch.temperature === undefined)
+      || (Object.hasOwn(patch, 'temp') && patch.temp === undefined)) clearedConditions.add('temperature');
+  if (Object.hasOwn(patch, 'load') && patch.load === undefined) clearedConditions.add('load');
+  const updated = refreshProperty(key, { ...(previous ?? { value: '' }), ...patch }, previous ?? { value: '' }, force, clearedConditions);
+  if (clearedConditions.has('temperature')) {
+    delete updated.temperature;
+    delete updated.temp;
+  }
+  if (clearedConditions.has('load')) delete updated.load;
+  return updated;
 }

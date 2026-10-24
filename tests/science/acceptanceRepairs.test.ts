@@ -31,6 +31,43 @@ describe('acceptance repair boundaries', () => {
     const updated = patchProperty('mfr', original, { value: 3 });
     expect(updated.quantity).toMatchObject({ status: 'VALID', canonical: { value: 3 }, raw: { conditions: { temperature: '190 °C', load: '2.16 kg' } } });
   });
+  it('keeps a nested-only MFR condition cleared instead of reviving it during formula admission', () => {
+    const original = { value: 2, quantity: canonicalizeCoreProperty('mfr', { value: 2, unit: 'g/10 min', method: 'ISO 1133', conditions: { temperature: '190 °C', load: '2.16 kg' } }) };
+    const updated = patchProperty('mfr', original, { temperature: undefined });
+    expect(updated.quantity).toMatchObject({ status: 'UNKNOWN', reasonCodes: ['MISSING_TEMPERATURE'] });
+    expect(updated.quantity?.raw.conditions).toEqual({ load: '2.16 kg' });
+    expect(admittedPropertyValue(updated, 'mfr')).toBeNull();
+    expect(evaluate("p['mfr']", 'g/10 min', { mfr: updated })).toMatchObject({ status: 'UNKNOWN', value: null });
+  });
+  it.each([
+    ['temperature', 'TEMPERATURE', 'temperature'],
+    ['temp', 'TEMPERATURE', 'temperature'],
+    ['load', 'LOAD', 'load'],
+  ] as const)('does not restore an explicitly cleared %s from another raw representation', (field, reason, condition) => {
+    const raw = { value: 2, unit: 'g/10 min', method: 'ISO 1133', temperature: 190, temp: '190 °C', load: '2.16 kg', conditions: { temperature: '190 °C', load: '2.16 kg' } };
+    const original = { value: 2, temperature: 190, temp: '190 °C', load: '2.16 kg', provenanceRefs: ['source'], quantity: canonicalizeCoreProperty('mfr', raw, ['source']) };
+    const updated = patchProperty('mfr', original, { [field]: undefined });
+    expect(updated.quantity?.status).toBe('UNKNOWN');
+    expect(updated.quantity?.reasonCodes).toContain(`MISSING_${reason}`);
+    expect(updated.quantity?.canonical).toBeUndefined();
+    expect(updated.quantity?.raw.conditions).not.toHaveProperty(condition);
+    expect(updated.quantity?.provenanceRefs).toEqual(['source']);
+    expect(original.quantity.raw).toEqual(raw);
+    expect(original.quantity.status).toBe('VALID');
+    if (condition === 'temperature') {
+      expect(updated.quantity?.raw).not.toHaveProperty('temperature');
+      expect(updated.quantity?.raw).not.toHaveProperty('temp');
+      expect(updated.quantity?.raw.conditions).toHaveProperty('load');
+      expect(updated).not.toHaveProperty('temperature');
+      expect(updated).not.toHaveProperty('temp');
+    } else {
+      expect(updated.quantity?.raw).not.toHaveProperty('load');
+      expect(updated.quantity?.raw.conditions).toHaveProperty('temperature');
+      expect(updated).not.toHaveProperty('load');
+    }
+    expect(admittedPropertyValue(updated, 'mfr')).toBeNull();
+    expect(evaluate("p['mfr']", 'g/10 min', { mfr: updated })).toMatchObject({ status: 'UNKNOWN', value: null });
+  });
   it('converts compatible declared units before arithmetic', () => {
     expect(evaluate("p['a'] + p['b']", 'GPa', { a: { value: 25, unit: 'MPa' }, b: { value: 0.1, unit: 'GPa' } })).toMatchObject({ status: 'OK', value: 0.125, scope: 'DIMENSION_CHECKED' });
   });
