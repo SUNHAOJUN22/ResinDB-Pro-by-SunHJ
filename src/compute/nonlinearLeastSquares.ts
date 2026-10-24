@@ -95,18 +95,18 @@ function toPhysical(
 }
 
 function residualObjective(residuals: Float64Array): number {
-  let objective = 0;
+  let norm = 0;
   for (const residual of residuals) {
     if (!Number.isFinite(residual)) throw new Error('Nonlinear residual function produced a non-finite value');
-    objective += residual * residual;
+    norm = Math.hypot(norm, residual);
   }
-  return objective;
+  return norm * norm;
 }
 
 function vectorNorm(values: Float64Array): number {
-  let squared = 0;
-  for (const value of values) squared += value * value;
-  return Math.sqrt(squared);
+  let norm = 0;
+  for (const value of values) norm = Math.hypot(norm, value);
+  return norm;
 }
 
 export function solveBoundedNonlinearLeastSquares(
@@ -205,6 +205,9 @@ export function solveBoundedNonlinearLeastSquares(
   };
 
   let objective = evaluate(unconstrained, residuals);
+  if (!Number.isFinite(objective)) {
+    throw new RangeError('Nonlinear least-squares objective exceeds the finite floating-point range');
+  }
   let iterations = 0;
   let converged = false;
   let termination: NonlinearTermination = 'maximum-iterations';
@@ -220,13 +223,15 @@ export function solveBoundedNonlinearLeastSquares(
     gradientInfinityNorm = 0;
     for (let parameter = 0; parameter < parameterCount; parameter++) {
       let gradientValue = 0;
-      let squaredNorm = 0;
+      let columnNorm = 0;
+      let maximumAbsoluteDerivative = 0;
       for (let observation = 0; observation < observationCount; observation++) {
         const derivative = jacobian[observation][parameter];
         gradientValue += derivative * residuals[observation];
-        squaredNorm += derivative * derivative;
+        columnNorm = Math.hypot(columnNorm, derivative);
+        maximumAbsoluteDerivative = Math.max(maximumAbsoluteDerivative, Math.abs(derivative));
       }
-      columnNorms[parameter] = Math.sqrt(squaredNorm);
+      columnNorms[parameter] = Number.isFinite(columnNorm) ? columnNorm : maximumAbsoluteDerivative;
       gradientInfinityNorm = Math.max(gradientInfinityNorm, Math.abs(gradientValue));
     }
     if (gradientInfinityNorm <= gradientTolerance) {

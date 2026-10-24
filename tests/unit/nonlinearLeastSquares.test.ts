@@ -58,6 +58,36 @@ describe('bounded nonlinear least squares', () => {
     expect(analytic.evaluations).toBeLessThan(finiteDifference.evaluations / 2);
   });
 
+  it('handles large finite Jacobian columns without overflowing the damping scale', () => {
+    const result = solveBoundedNonlinearLeastSquares({
+      parameters: [{ initial: 2, min: 0, max: 4 }],
+      observationCount: 3,
+      maxIterations: 20,
+      evaluateResiduals(parameters, residuals) {
+        for (let index = 0; index < residuals.length; index++) {
+          residuals[index] = (parameters[0] - 2) * 1e155 + 1e152;
+        }
+      },
+      evaluateJacobian(_parameters, jacobian) {
+        jacobian.fill(1e155);
+      },
+    });
+
+    expect(result.parameters[0]).toBeLessThan(2);
+    expect(result.objective).toBeLessThan(3e304);
+    expect(result.termination).not.toBe('damping-limit');
+  });
+
+  it('rejects a finite residual vector whose squared objective is not representable', () => {
+    expect(() => solveBoundedNonlinearLeastSquares({
+      parameters: [{ initial: 1, min: 0, max: 2 }],
+      observationCount: 2,
+      evaluateResiduals(_parameters, residuals) {
+        residuals.fill(1e200);
+      },
+    })).toThrow(/objective exceeds the finite floating-point range/);
+  });
+
   it('rejects non-finite analytic Jacobians', () => {
     expect(() => solveBoundedNonlinearLeastSquares({
       parameters: [{ initial: 1, min: 0, max: 2 }],
