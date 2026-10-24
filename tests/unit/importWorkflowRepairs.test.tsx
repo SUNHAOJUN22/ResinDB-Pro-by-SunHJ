@@ -92,4 +92,44 @@ describe('actual import workflow', () => {
     expect(onImport.mock.calls[0][0][0]).toMatchObject({ id: 'existing', manufacturer: 'Original maker', manufacturerId: 'original-maker', categoryIds: ['cat_pp'], properties: { label: { value: 'retain this' }, 密度: { value: 0.95 } } });
   });
 
+  it.each([
+    { policy: 'Merge properties', expectedCount: 1, expectedDensity: 0.96 },
+    { policy: 'Replace record', expectedCount: 1, expectedDensity: 0.96 },
+    { policy: 'Skip duplicates', expectedCount: 1, expectedDensity: 0.95 },
+  ])('applies $policy to duplicate grades inside one import batch', async ({ policy, expectedCount, expectedDensity }) => {
+    const onImport = renderImport();
+    fireEvent.click(screen.getByRole('button', { name: '📋 Paste a table' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Table to import' }), {
+      target: { value: 'Grade,Manufacturer,Density (g/cm³)\nBatch-A,Lab,0.95\nBatch-A,Lab,0.96' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Parse table' }));
+    fireEvent.click(screen.getByRole('radio', { name: new RegExp(policy) }));
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare import preview' }));
+    fireEvent.click(screen.getByRole('button', { name: /Confirm and merge\/import/ }));
+
+    await waitFor(() => expect(onImport).toHaveBeenCalledOnce());
+    const imported = onImport.mock.calls[0][0];
+    expect(imported).toHaveLength(expectedCount);
+    expect(imported.map((product) => product.gradeName)).toEqual(Array(expectedCount).fill('Batch-A'));
+    expect(imported[0].properties['密度'].value).toBe(expectedDensity);
+  });
+
+  it('keeps duplicate-grade batch rows only when the explicit keep-as-new policy is selected', async () => {
+    const onImport = renderImport();
+    fireEvent.click(screen.getByRole('button', { name: '📋 Paste a table' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Table to import' }), {
+      target: { value: 'Grade,Manufacturer,Density (g/cm³)\nBatch-A,Lab,0.95\nBatch-A,Lab,0.96' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Parse table' }));
+    fireEvent.click(screen.getByRole('radio', { name: /Keep as a new record/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare import preview' }));
+    fireEvent.click(screen.getByRole('button', { name: /Confirm and merge\/import/ }));
+
+    await waitFor(() => expect(onImport).toHaveBeenCalledOnce());
+    const imported = onImport.mock.calls[0][0];
+    expect(imported).toHaveLength(2);
+    expect(new Set(imported.map((product) => product.id)).size).toBe(2);
+    expect(imported.map((product) => product.properties['密度'].value)).toEqual([0.95, 0.96]);
+  });
+
 });

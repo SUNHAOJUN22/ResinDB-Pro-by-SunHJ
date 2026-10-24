@@ -472,18 +472,33 @@ export const ImportModal: React.FC<ImportModalProps> = React.memo(({
               governance: { sourceType: fileContent.isSynthetic ? 'SYNTHETIC' : 'IMPORTED', recordStatus: 'NOT_FOR_RELEASE', confidentiality: 'UNKNOWN', license: 'UNKNOWN', provenanceRefs: [fileContent.fileName] },
             };
           }
-          const existing = allProducts.find(item => item.id === incoming.id || item.gradeName.trim().toUpperCase() === incoming.gradeName.trim().toUpperCase());
+          const normalizedGrade = incoming.gradeName.trim().toUpperCase();
+          const matchesIncoming = (item: Product) => item.id === incoming.id || item.gradeName.trim().toUpperCase() === normalizedGrade;
+          const stagedIndex = products.findIndex(matchesIncoming);
+          const existingIndex = allProducts.findIndex(matchesIncoming);
+          const existing = stagedIndex >= 0 ? products[stagedIndex] : allProducts[existingIndex];
+          if (duplicateAction === 'duplicate') {
+            if (existing) {
+              products.push({ ...incoming, id: `imported-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}` });
+            } else {
+              products.push(incoming);
+            }
+            continue;
+          }
           if (existing && duplicateAction === 'skip') continue;
+          let candidate: Product;
           if (existing && duplicateAction === 'merge') {
-            products.push({ ...existing, ...incoming,
+            candidate = { ...existing, ...incoming,
               ...(!structured ? { categoryIds: existing.categoryIds, ...(!isExperimentalImport && !Object.entries(columnMappings).some(([header, key]) => key === 'manufacturer' && String(row[header] ?? '').trim()) ? { manufacturer: existing.manufacturer, manufacturerId: existing.manufacturerId } : {}) } : {}),
               id: existing.id, createdAt: existing.createdAt, updatedAt: now,
-              properties: { ...existing.properties, ...incoming.properties }, governance: mergedImportGovernance(existing.governance, incoming.governance) });
+              properties: { ...existing.properties, ...incoming.properties }, governance: mergedImportGovernance(existing.governance, incoming.governance) };
           } else if (existing && duplicateAction === 'overwrite') {
-            products.push({ ...incoming, id: existing.id, createdAt: existing.createdAt, updatedAt: now });
+            candidate = { ...incoming, id: existing.id, createdAt: existing.createdAt, updatedAt: now };
           } else {
-            products.push(existing ? { ...incoming, id: `imported-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}` } : incoming);
+            candidate = incoming;
           }
+          if (stagedIndex >= 0) products[stagedIndex] = candidate;
+          else products.push(candidate);
         } catch (error) {
           errors.push(`${fileContent.fileName}:${index + 1}: ${error instanceof Error ? error.message : String(error)}`);
         }
