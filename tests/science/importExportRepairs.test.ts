@@ -71,6 +71,73 @@ describe('actual adapter metadata and structured export contracts', () => {
 });
 
 describe('import persistence and duplicate identities', () => {
+  it('uses incoming nested quantity provenance when replacing a measured value', async () => {
+    const original = record();
+    const incoming: Product = {
+      ...original,
+      properties: {
+        density: {
+          value: 950,
+          unit: 'kg/m³',
+          quantity: canonicalizeCoreProperty('density', { value: 950, unit: 'kg/m³' }, ['source:new']),
+        },
+      },
+    };
+    const stored: Product[] = [];
+    const instance = adapter();
+    Object.assign(instance, {
+      getDB: async () => ({
+        transaction: () => ({
+          store: {
+            get: async (id: string) => id === original.id ? original : undefined,
+            put: async (product: Product) => { stored.push(product); },
+          },
+          done: Promise.resolve(),
+        }),
+      }),
+    });
+
+    const [imported] = await instance.importRecords([incoming]);
+
+    expect(stored[0].properties.density.quantity).toMatchObject({
+      raw: { value: 950, unit: 'kg/m³' },
+      provenanceRefs: ['source:new'],
+    });
+    expect(imported.properties.density.quantity?.provenanceRefs).toEqual(['source:new']);
+  });
+
+  it('updates nested quantity provenance when the raw measurement is unchanged', async () => {
+    const original = record();
+    const incoming: Product = {
+      ...original,
+      properties: {
+        density: {
+          value: 1000,
+          unit: 'kg/m³',
+          quantity: canonicalizeCoreProperty('density', { value: 1000, unit: 'kg/m³' }, ['source:new']),
+        },
+      },
+    };
+    const stored: Product[] = [];
+    const instance = adapter();
+    Object.assign(instance, {
+      getDB: async () => ({
+        transaction: () => ({
+          store: {
+            get: async (id: string) => id === original.id ? original : undefined,
+            put: async (product: Product) => { stored.push(product); },
+          },
+          done: Promise.resolve(),
+        }),
+      }),
+    });
+
+    const [imported] = await instance.importRecords([incoming]);
+
+    expect(stored[0].properties.density.quantity?.provenanceRefs).toEqual(['source:new']);
+    expect(imported.properties.density.quantity?.provenanceRefs).toEqual(['source:new']);
+  });
+
   it('atomically replaces existing IDs and adds new IDs without duplicate cache entries', async () => {
     const original = record();
     const stored: Product[] = [];

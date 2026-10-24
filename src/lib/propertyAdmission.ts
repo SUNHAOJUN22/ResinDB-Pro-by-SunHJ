@@ -23,12 +23,16 @@ function rawDeclaration(property: PropertyValue): RawQuantity {
 
 export function refreshProperty(key: string, property: PropertyValue, previous?: PropertyValue, force = false): PropertyValue {
   const raw = rawDeclaration(property);
+  const previousProvenance = previous?.provenanceRefs ?? previous?.quantity?.provenanceRefs;
+  const provenance = property.provenanceRefs
+    ?? property.quantity?.provenanceRefs
+    ?? previousProvenance
+    ?? [];
   const unchanged = previous && JSON.stringify(raw) === JSON.stringify(rawDeclaration(previous))
-    && JSON.stringify(property.provenanceRefs) === JSON.stringify(previous.provenanceRefs);
+    && JSON.stringify(provenance) === JSON.stringify(previousProvenance);
   if (unchanged && !force) return verifyPropertyQuantity(key, { ...property, ...(previous.quantity ? { quantity: previous.quantity } : {}) });
   if (!previous && property.quantity !== undefined) return verifyPropertyQuantity(key, { ...property });
   if (!resolveCorePropertyKey(key) && property.quantity === undefined && previous?.quantity === undefined) return { ...property };
-  const provenance = property.provenanceRefs ?? previous?.quantity?.provenanceRefs ?? property.quantity?.provenanceRefs ?? [];
   return { ...property, quantity: canonicalizeCoreProperty(key, raw, provenance) };
 }
 
