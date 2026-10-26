@@ -96,6 +96,8 @@ interface NumericComparisonBasis {
   context: string;
 }
 
+export interface NumericObservation extends NumericComparisonBasis { value: number }
+
 function canonicalizeConditionObjectKeys(value: unknown, ancestors = new Set<object>()): unknown {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') {
@@ -226,6 +228,77 @@ function sameNumericComparisonBasis(left: NumericComparisonBasis, right: Numeric
   return left.unit === right.unit
     && (left.dimension === null || right.dimension === null || left.dimension === right.dimension)
     && left.context === right.context;
+}
+
+/** Scientific consumers need a value and the basis on which it can be compared.
+ * Core legacy declarations are canonicalized; stored quantities are reverified
+ * against both their raw record and the displayed declaration. No state is
+ * upgraded and no input record is rewritten here.
+ */
+export function numericObservation(key: string, property: PropertyValue | undefined, allowUnitless = false): NumericObservation | null {
+  if (!property || !propertyQuantityMatchesDeclaration(key, property)) return null;
+  const core = resolveCorePropertyKey(key);
+  let quantity = property.quantity;
+  if (quantity !== undefined) {
+    if (core !== null) quantity = verifyCoreQuantityRecord(key, quantity);
+    if (quantity.status !== 'VALID' || !quantity.canonical || !propertyMatchesQuantity(key, { ...property, quantity }, quantity.raw)) return null;
+  } else if (core !== null) {
+    quantity = canonicalizeCoreProperty(key, {
+      value: property.value, unit: property.unit, method: property.method, standard: property.standard,
+      temperature: property.temperature ?? property.temp, load: property.load,
+    }, property.provenanceRefs);
+    if (quantity.status !== 'VALID' || !quantity.canonical) return null;
+  }
+  const value = quantity?.canonical?.value ?? parseFiniteReal(property.value);
+  if (value === null || !Number.isFinite(value)) return null;
+  const unit = normalizedUnit(quantity?.canonical?.unit ?? property.unit);
+  if (unit === null && (!allowUnitless || quantity !== undefined || core !== null)) return null;
+  const raw = quantity?.raw ?? property;
+  const conditions = 'conditions' in raw ? raw.conditions : undefined;
+  try {
+    const normalizedConditions = conditions === undefined ? undefined : canonicalizeConditionObjectKeys(conditions);
+    if (normalizedConditions !== undefined && (normalizedConditions === null || typeof normalizedConditions !== 'object' || Array.isArray(normalizedConditions))) return null;
+    const remaining = { ...(normalizedConditions as Record<string, unknown> | undefined) };
+    const condition = (values: unknown[]): unknown => {
+      const present = values.filter(item => item !== undefined && item !== null).map(item => parseFiniteReal(item) ?? item);
+      if (present.some(item => item !== present[0])) throw new TypeError('Contradictory comparison conditions');
+      return present[0] ?? null;
+    };
+    const temperature = condition([raw.temperature, raw.temp, remaining.temperature, remaining.temp]);
+    const load = condition([raw.load, remaining.load]);
+    delete remaining.temperature; delete remaining.temp; delete remaining.load;
+    const context = JSON.stringify(canonicalizeConditionObjectKeys([
+      raw.method ?? null, raw.standard ?? null, temperature, load, remaining,
+    ]));
+    return { value, unit: unit ?? '', dimension: quantity?.canonical?.dimension ?? null, context };
+  } catch { return null; }
+}
+
+export function comparableObservations(left: NumericObservation | null, right: NumericObservation | null): boolean {
+  return left !== null && right !== null && sameNumericComparisonBasis(left, right);
+}
+
+export function findProperty(product: Product, requestedKey: string): { key: string; property: PropertyValue } | null {
+  if (product.properties[requestedKey]) return { key: requestedKey, property: product.properties[requestedKey] };
+  const core = resolveCorePropertyKey(requestedKey);
+  if (core === null) return null;
+  const matches = Object.entries(product.properties).filter(([key]) => resolveCorePropertyKey(key) === core);
+  return matches.length === 1 ? { key: matches[0][0], property: matches[0][1] } : null;
+}
+
+/** A matrix column has one comparison basis. Incompatible test conditions or
+ * dimensions exclude that column rather than silently choosing a cohort.
+ * Unitless legacy features remain supported only when explicitly requested by
+ * generic statistical consumers; core physical quantities still require units.
+ */
+export function comparisonObservations(products: readonly Product[], key: string, allowUnitless = false, aliases = false): Array<NumericObservation | null> {
+  const observations = products.map(product => {
+    const found = aliases ? findProperty(product, key) : product.properties[key] ? { key, property: product.properties[key] } : null;
+    return found ? numericObservation(found.key, found.property, allowUnitless) : null;
+  });
+  const basis = observations.find((item): item is NumericObservation => item !== null);
+  if (basis && observations.some(item => item !== null && !sameNumericComparisonBasis(basis, item))) return observations.map(() => null);
+  return observations;
 }
 
 function isComparableNumericColumn(key: string, properties: readonly PropertyValue[]): boolean {

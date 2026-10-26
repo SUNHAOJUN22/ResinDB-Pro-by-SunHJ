@@ -80,7 +80,7 @@ function oneSidedJacobiSvd(matrix: readonly (readonly number[])[]): JacobiSvdRes
         const zeta = (rightNormSquared - leftNormSquared) / (2 * cross);
         const tangent = zeta === 0
           ? 1
-          : Math.sign(zeta) / (Math.abs(zeta) + Math.sqrt(1 + zeta * zeta));
+          : Math.sign(zeta) / (Math.abs(zeta) + Math.hypot(1, zeta));
         const cosine = 1 / Math.sqrt(1 + tangent * tangent);
         const sine = cosine * tangent;
 
@@ -197,6 +197,136 @@ function svdPseudoInverseSolve(svd: JacobiSvdResult, target: readonly number[], 
   return solution;
 }
 
+function rescaleCoefficient(value: number, numerator: number, denominator: number): number {
+  const ratio = numerator / denominator;
+  const coefficient = Number.isFinite(ratio) && ratio !== 0
+    ? value * ratio
+    : (value * numerator) / denominator;
+  if (!Number.isFinite(coefficient)) {
+    throw new RangeError('Least-squares coefficient exceeds the finite floating-point range');
+  }
+  return coefficient;
+}
+
+interface ScaledCoefficient {
+  fraction: number;
+  exponent: number;
+}
+
+function scaledCoefficient(value: number, exponent = 0): ScaledCoefficient {
+  if (value === 0) return { fraction: 0, exponent: 0 };
+  const shift = Math.min(1023, Math.floor(Math.log2(Math.abs(value))));
+  return { fraction: value / 2 ** shift, exponent: exponent + shift };
+}
+
+function multiplyScaled(value: ScaledCoefficient, factor: number, divide = false): ScaledCoefficient {
+  const scaledFactor = scaledCoefficient(factor);
+  return scaledCoefficient(
+    divide ? value.fraction / scaledFactor.fraction : value.fraction * scaledFactor.fraction,
+    divide ? value.exponent - scaledFactor.exponent : value.exponent + scaledFactor.exponent,
+  );
+}
+
+function addScaled(left: ScaledCoefficient, right: ScaledCoefficient): ScaledCoefficient {
+  if (left.fraction === 0) return right;
+  if (right.fraction === 0) return left;
+  const exponent = Math.max(left.exponent, right.exponent);
+  return scaledCoefficient(
+    left.fraction * 2 ** (left.exponent - exponent) + right.fraction * 2 ** (right.exponent - exponent),
+    exponent,
+  );
+}
+
+function finiteCoefficient(value: ScaledCoefficient): number {
+  // Keep the orthogonal coordinates scaled until they have been rotated back:
+  // ||x|| may overflow even though every final x_j is representable. Splitting
+  // the last power also avoids overflowing/underflowing a standalone 2^exponent.
+  const boundedExponent = Math.max(-1022, Math.min(1023, value.exponent));
+  const result = (value.fraction * 2 ** (value.exponent - boundedExponent)) * 2 ** boundedExponent;
+  if (!Number.isFinite(result)) {
+    throw new RangeError('Least-squares coefficient exceeds the finite floating-point range');
+  }
+  return result;
+}
+
+function svdMinimumNormSolve(
+  svd: JacobiSvdResult,
+  target: readonly number[],
+  columnScales: readonly number[],
+  targetScale: number,
+  rank: number,
+): number[] {
+  const columns = columnScales.length;
+  const constraints: number[][] = [];
+  const rightHandSide: ScaledCoefficient[] = [];
+  // A D^-1 = U S V^T. All residual-minimizing x satisfy
+  // V_r^T D x = S_r^-1 U_r^T b. Minimizing ||D x|| instead of
+  // ||x|| would silently change the pseudoinverse's coefficient metric.
+  for (let component = 0; component < rank; component++) {
+    const constraint = columnScales.map((scale, column) => svd.rightVectors[column][component] * scale);
+    const rowScale = constraint.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0);
+    if (!Number.isFinite(rowScale) || rowScale === 0) {
+      throw new RangeError('Minimum-norm constraint exceeds the finite floating-point range');
+    }
+    constraints.push(constraint.map((value) => value / rowScale));
+    let projection = 0;
+    for (let row = 0; row < target.length; row++) {
+      projection += svd.leftVectors[row][component] * target[row];
+    }
+    rightHandSide.push(multiplyScaled(
+      multiplyScaled(scaledCoefficient(projection / svd.singularValues[component]), targetScale),
+      rowScale,
+      true,
+    ));
+  }
+
+  // Right Givens rotations form C G = [L, 0]. Row scaling above leaves the
+  // constraint set unchanged. G is orthogonal in the original coordinates,
+  // so x = G [L^-1 c, 0] has minimum Euclidean norm. No normal equations or
+  // subtraction of a potentially enormous null-space component are used.
+  const rotations: { left: number; right: number; cosine: number; sine: number }[] = [];
+  for (let left = 0; left < rank; left++) {
+    for (let right = columns - 1; right > left; right--) {
+      const a = constraints[left][left];
+      const b = constraints[left][right];
+      if (b === 0) continue;
+      const norm = Math.hypot(a, b);
+      const cosine = a / norm;
+      const sine = b / norm;
+      for (let row = left; row < rank; row++) {
+        const leftValue = constraints[row][left];
+        const rightValue = constraints[row][right];
+        constraints[row][left] = cosine * leftValue + sine * rightValue;
+        constraints[row][right] = -sine * leftValue + cosine * rightValue;
+      }
+      constraints[left][left] = norm;
+      constraints[left][right] = 0;
+      rotations.push({ left, right, cosine, sine });
+    }
+  }
+
+  const solution = Array.from({ length: columns }, () => scaledCoefficient(0));
+  for (let row = 0; row < rank; row++) {
+    let value = rightHandSide[row];
+    for (let column = 0; column < row; column++) {
+      value = addScaled(value, multiplyScaled(solution[column], -constraints[row][column]));
+    }
+    const diagonal = constraints[row][row];
+    if (!Number.isFinite(diagonal) || diagonal === 0) {
+      throw new Error('Minimum-norm factorization cannot resolve the retained rank');
+    }
+    solution[row] = multiplyScaled(value, diagonal, true);
+  }
+  for (let index = rotations.length - 1; index >= 0; index--) {
+    const { left, right, cosine, sine } = rotations[index];
+    const leftValue = solution[left];
+    const rightValue = solution[right];
+    solution[left] = addScaled(multiplyScaled(leftValue, cosine), multiplyScaled(rightValue, -sine));
+    solution[right] = addScaled(multiplyScaled(leftValue, sine), multiplyScaled(rightValue, cosine));
+  }
+  return solution.map(finiteCoefficient);
+}
+
 function residualNorm(design: readonly (readonly number[])[], target: readonly number[], solution: readonly number[]): number {
   let norm = 0;
   for (let row = 0; row < design.length; row++) {
@@ -249,26 +379,27 @@ export function solveLeastSquares(
   // Normalize the right-hand side too: orthogonal projections can overflow
   // even when the final coefficients and all supplied values are finite.
   const targetScale = target.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0) || 1;
-  const scaledTarget = target.map((value) => value / targetScale);
+  const scaledTarget = target.map((value) => {
+    const scaledValue = value / targetScale;
+    if (value !== 0 && scaledValue === 0) {
+      throw new RangeError('Least-squares target normalization would discard a nonzero observation');
+    }
+    return scaledValue;
+  });
   let solver: LeastSquaresSolver;
-  let scaledSolution: number[];
-  if (rows >= columns && rank === columns && finiteConditionNumber <= conditionLimit) {
+  let solution: number[];
+  if (rank < columns) {
+    solver = 'svd-jacobi-pseudoinverse';
+    solution = svdMinimumNormSolve(svd, scaledTarget, columnScales, targetScale, rank);
+  } else if (rows >= columns && finiteConditionNumber <= conditionLimit) {
     solver = 'qr-householder';
-    scaledSolution = householderQrSolve(scaledDesign, scaledTarget, tolerance);
+    solution = householderQrSolve(scaledDesign, scaledTarget, tolerance)
+      .map((value, column) => rescaleCoefficient(value, targetScale, columnScales[column]));
   } else {
     solver = 'svd-jacobi-pseudoinverse';
-    scaledSolution = svdPseudoInverseSolve(svd, scaledTarget, tolerance);
+    solution = svdPseudoInverseSolve(svd, scaledTarget, tolerance)
+      .map((value, column) => rescaleCoefficient(value, targetScale, columnScales[column]));
   }
-  const solution = scaledSolution.map((value, column) => {
-    const ratio = targetScale / columnScales[column];
-    const coefficient = Number.isFinite(ratio) && ratio !== 0
-      ? value * ratio
-      : (value * targetScale) / columnScales[column];
-    if (!Number.isFinite(coefficient)) {
-      throw new RangeError('Least-squares coefficient exceeds the finite floating-point range');
-    }
-    return coefficient;
-  });
 
   return {
     solution,

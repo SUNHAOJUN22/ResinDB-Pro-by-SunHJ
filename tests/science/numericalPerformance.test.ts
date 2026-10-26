@@ -202,7 +202,7 @@ describe('numerical performance contracts', () => {
       },
       'SIMILARITY_CALCULATED',
     );
-    expect(payload.modelVersion).toBe('zscore-cosine-overlap-f64-3.0.0');
+    expect(payload.modelVersion).toBe('zscore-cosine-overlap-canonical-f64-4.0.0');
     expect((payload.edges as unknown[])).toHaveLength(10);
     expect(payload.diagnostics).toMatchObject({
       pairsEvaluated: 780,

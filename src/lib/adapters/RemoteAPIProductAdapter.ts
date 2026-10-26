@@ -93,17 +93,23 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
 
   async search(query: string, categoryId: string | null): Promise<Product[]> {
     return this.withReadFallback(
-      async () => {
-        const params = new URLSearchParams();
-        if (query) params.set('q', query);
-        if (categoryId) params.set('categoryId', categoryId);
-        const suffix = params.size > 0 ? `?${params.toString()}` : '';
-        const response = await this.request(`/products${suffix}`);
-        return parseProductList(await response.json(), 'search');
-      },
+      () => this.searchRemote(query, categoryId),
       (adapter) => adapter.search(query, categoryId),
       'Remote product search failed',
     );
+  }
+
+  private async searchRemote(query: string, categoryId: string | null): Promise<Product[]> {
+    const params = new URLSearchParams();
+    if (query) params.set('q', query);
+    if (categoryId) params.set('categoryId', categoryId);
+    const suffix = params.size > 0 ? `?${params.toString()}` : '';
+    const response = await this.request(`/products${suffix}`);
+    return parseProductList(await response.json(), 'search');
+  }
+
+  async readAuthoritative(): Promise<Product[]> {
+    return this.searchRemote('', null);
   }
 
   async create(product: Partial<Product>): Promise<Product> {

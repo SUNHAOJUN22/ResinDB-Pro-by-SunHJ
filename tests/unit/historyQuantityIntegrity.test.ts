@@ -24,10 +24,17 @@ it('quarantines historical quantities before restoring the live UI, preserving s
   }];
   const original = structuredClone(snapshot);
   const setProducts = vi.fn();
-  const hook = renderHook(() => useHistory([], setProducts));
-  await act(async () => {
-    await worker.onmessage!({ data: { type: 'SNAPSHOT_DATA', payload: { id: 'saved', snapshot } } } as MessageEvent<HistoryWorkerResponse>);
+  worker.postMessage.mockImplementation((message) => {
+    if (message.type === 'PUSH_SNAPSHOT') queueMicrotask(() => worker.onmessage!({ data: { type: 'HISTORY_UPDATED', requestId: message.requestId, payload: { history: [] } } } as MessageEvent<HistoryWorkerResponse>));
   });
+  const hook = renderHook(() => useHistory([], setProducts));
+  let restore!: Promise<void>;
+  act(() => { restore = hook.result.current.restoreSnapshot('saved'); });
+  const requestId = worker.postMessage.mock.calls.find(([message]) => message.type === 'GET_SNAPSHOT')![0].requestId;
+  await act(async () => {
+    await worker.onmessage!({ data: { type: 'SNAPSHOT_DATA', requestId, payload: { id: 'saved', snapshot } } } as MessageEvent<HistoryWorkerResponse>);
+  });
+  await act(async () => { await restore; });
   expect(mocks.restoreSnapshot).toHaveBeenCalledWith(snapshot);
   expect(setProducts).toHaveBeenCalledOnce();
   const restored = setProducts.mock.calls[0][0] as Product[];

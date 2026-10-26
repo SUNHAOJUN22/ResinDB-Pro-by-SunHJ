@@ -132,11 +132,11 @@ export const SystemNav: React.FC<{
                   </span>
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] font-mono text-slate-400/80 dark:text-slate-500">
-                      12ms • RTT
+                      {t("latencyUnmeasured", "RTT unmeasured")}
                     </span>
                     <span className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-600 dark:text-emerald-500">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 animate-pulse hidden sm:block"></span>
-                      {systemStatus === "online" ? "SYS.READY" : "SYNCING"}
+                      {systemStatus === "online" ? "SYS.READY" : systemStatus === "syncing" ? "SYNCING" : "SYS.ERROR"}
                     </span>
                   </div>
                 </div>

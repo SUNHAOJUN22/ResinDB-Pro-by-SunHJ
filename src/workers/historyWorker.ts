@@ -1,5 +1,6 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Product } from '@/types/index';
+import { completeTransaction } from '@/lib/idbTransaction';
 import { HistoryRecord } from '@/lib/adapters/types';
 
 interface HistoryDB extends DBSchema {
@@ -28,19 +29,20 @@ async function getDB() {
   return dbPromise;
 }
 
-export type HistoryWorkerMessage = 
+export type HistoryWorkerMessage = (
   | { type: 'PUSH_SNAPSHOT', payload: { description: string; snapshot: Product[] } }
   | { type: 'GET_HISTORY' }
-  | { type: 'GET_SNAPSHOT', payload: { id: string } };
+  | { type: 'GET_SNAPSHOT', payload: { id: string } }) & { requestId?: string };
 
-export type HistoryWorkerResponse = 
+export type HistoryWorkerResponse = (
   | { type: 'HISTORY_UPDATED', payload: { history: Omit<HistoryRecord, 'snapshot'>[] } }
   | { type: 'SNAPSHOT_DATA', payload: { id: string; snapshot: Product[] } }
-  | { type: 'ERROR', payload: { message: string } };
+  | { type: 'ERROR', payload: { message: string } }) & { requestId?: string };
 
 self.onmessage = async (e: MessageEvent<HistoryWorkerMessage>) => {
+  const msg = e.data;
+  const respond = (response: HistoryWorkerResponse) => self.postMessage({ ...response, requestId: msg.requestId });
   try {
-    const msg = e.data;
     const db = await getDB();
 
     if (msg.type === 'PUSH_SNAPSHOT') {
@@ -55,18 +57,19 @@ self.onmessage = async (e: MessageEvent<HistoryWorkerMessage>) => {
        
        // Prune keeping only last 50
        const tx = db.transaction('history', 'readwrite');
-       const store = tx.objectStore('history');
-       const index = store.index('by-timestamp');
-       let cursor = await index.openCursor(null, 'prev');
-       let count = 0;
-       while (cursor) {
-          count++;
-          if (count > 50) {
-             await cursor.delete();
-          }
-          cursor = await cursor.continue();
-       }
-       await tx.done;
+       await completeTransaction(tx, async () => {
+         const store = tx.objectStore('history');
+         const index = store.index('by-timestamp');
+         let cursor = await index.openCursor(null, 'prev');
+         let count = 0;
+         while (cursor) {
+            count++;
+            if (count > 50) {
+               await cursor.delete();
+            }
+            cursor = await cursor.continue();
+         }
+       });
 
        // Broadcast updated history (without snapshot payload)
        const allRecords = await db.getAllFromIndex('history', 'by-timestamp');
@@ -77,7 +80,7 @@ self.onmessage = async (e: MessageEvent<HistoryWorkerMessage>) => {
            description: r.description
        })) as HistoryRecord[];
        
-       self.postMessage({ type: 'HISTORY_UPDATED', payload: { history: summary } } as HistoryWorkerResponse);
+       respond({ type: 'HISTORY_UPDATED', payload: { history: summary } } as HistoryWorkerResponse);
     } 
     else if (msg.type === 'GET_HISTORY') {
        const allRecords = await db.getAllFromIndex('history', 'by-timestamp');
@@ -87,17 +90,17 @@ self.onmessage = async (e: MessageEvent<HistoryWorkerMessage>) => {
            timestamp: r.timestamp,
            description: r.description
        })) as HistoryRecord[];
-       self.postMessage({ type: 'HISTORY_UPDATED', payload: { history: summary } } as HistoryWorkerResponse);
+       respond({ type: 'HISTORY_UPDATED', payload: { history: summary } } as HistoryWorkerResponse);
     }
     else if (msg.type === 'GET_SNAPSHOT') {
        const record = await db.get('history', msg.payload.id);
        if (record) {
-           self.postMessage({ type: 'SNAPSHOT_DATA', payload: { id: record.id, snapshot: record.snapshot } } as HistoryWorkerResponse);
+           respond({ type: 'SNAPSHOT_DATA', payload: { id: record.id, snapshot: record.snapshot } } as HistoryWorkerResponse);
        } else {
            throw new Error('Snapshot not found');
        }
     }
   } catch (err) {
-    self.postMessage({ type: 'ERROR', payload: { message: err instanceof Error ? err.message : 'Unknown error' } } as HistoryWorkerResponse);
+    respond({ type: 'ERROR', payload: { message: err instanceof Error ? err.message : 'Unknown error' } } as HistoryWorkerResponse);
   }
 };

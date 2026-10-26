@@ -1,5 +1,5 @@
 import type { Product } from '@/types/index';
-import { parseFiniteNumericValue } from '@/services/mathUtils';
+import { comparisonObservations } from '@/utils/productUtils';
 
 export interface SpearmanPayloadRow {
   id: string;
@@ -16,11 +16,12 @@ export function buildSpearmanPayload(
   data: readonly Product[],
   keys: readonly string[],
 ): SpearmanPayloadRow[] {
-  return data.map((product) => {
+  const observations = new Map(keys.map(key => [key, comparisonObservations(data, key, true)]));
+  return data.map((product, index) => {
     const values: Partial<Record<string, number>> = {};
     for (const key of keys) {
-      const parsed = parseFiniteNumericValue(product.properties?.[key]?.value);
-      if (parsed !== null) values[key] = parsed;
+      const observation = observations.get(key)?.[index];
+      if (observation) values[key] = observation.value;
     }
     return { id: product.id, values };
   });

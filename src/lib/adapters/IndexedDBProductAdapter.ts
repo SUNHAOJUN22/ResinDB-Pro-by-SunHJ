@@ -1,11 +1,13 @@
 import { admittedPropertyValue, refreshProperties, verifyPropertyQuantities } from '@/lib/propertyAdmission';
 import { logger } from '@/lib/logger';
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Category, Product, ProductUpdates, PropertyValue } from '@/types/index';
+import { Category, Product, ProductUpdates } from '@/types/index';
 import { PRODUCT_CATALOG, CATEGORY_TREE } from '@/config/constants';
 import { IProductAdapter } from "@/lib/adapters/types";
 import { UniversalStorageBridge } from './UniversalStorageBridge';
 import { generateId } from '@/lib/utils';
+import { applyProductUpdates } from '@/lib/productMutations';
+import { completeTransaction } from '@/lib/idbTransaction';
 
 interface ResinDB extends DBSchema {
   products: {
@@ -169,50 +171,6 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     }
   }
 
-  private registerMutationBatchUpdate(ids: string[], updates: ProductUpdates): void {
-    if (!this.cachedProducts) return;
-    const { _propertyUpdates, ...restUpdates } = updates;
-    
-    for (const id of ids) {
-      const p = this.cachedProducts.find(x => x.id === id);
-      if (p) {
-        const newProperties = { ...(restUpdates.properties ?? p.properties) };
-        if (_propertyUpdates) {
-          Object.entries(_propertyUpdates).forEach(([key, updateVal]) => {
-            if (updateVal !== null && typeof updateVal === "object" && "value" in updateVal) {
-              newProperties[key] = { ...newProperties[key], ...updateVal as PropertyValue };
-            } else {
-              newProperties[key] = { 
-                ...(newProperties[key] || { unit: "" }), 
-                value: updateVal as string | number 
-              };
-            }
-          });
-        }
-        
-        const updated = {
-          ...p,
-          ...restUpdates,
-          properties: refreshProperties(newProperties, p.properties),
-          updatedAt: new Date().toISOString().split('T')[0]
-        };
-        
-        const idx = this.cachedProducts.findIndex(x => x.id === id);
-        if (idx !== -1) {
-          this.cachedProducts[idx] = updated;
-        }
-        
-        if (this.indicesRebuilt) {
-          this.deindexProduct(id);
-          this.indexProduct(updated);
-        }
-      }
-    }
-    if (this.indicesRebuilt) {
-      this.sortPropertyIndices();
-    }
-  }
-
   private async getDB(): Promise<IDBPDatabase<ResinDB>> {
     if (!this.dbPromise) {
       this.dbPromise = this.initDB();
@@ -247,23 +205,17 @@ export class IndexedDBProductAdapter implements IProductAdapter {
       // Seed initial data if empty
       const count = await db.count('products');
       if (count === 0) {
-        const tx = db.transaction('products', 'readwrite');
-        for (const product of PRODUCT_CATALOG) {
-          tx.store.add(product);
-        }
-        
-        // Dynamic seeding of custom experimental labs from UniversalStorageBridge
+        let labProducts: Product[] = [];
         try {
-          const labs = UniversalStorageBridge.getLabRecords();
-          for (const lab of labs) {
-            const product = UniversalStorageBridge.recordToProduct(lab);
-            tx.store.add(product);
-          }
-        } catch (e) {
-          logger.error("Failed to seed initial experimental products", e);
+          labProducts = UniversalStorageBridge.getLabRecords().map(lab => UniversalStorageBridge.recordToProduct(lab));
+        } catch (error) {
+          logger.error('Failed to read initial experimental products', error);
         }
-
-        await tx.done;
+        const tx = db.transaction('products', 'readwrite');
+        await completeTransaction(tx, async () => {
+          for (const product of PRODUCT_CATALOG) await tx.store.add(product);
+          for (const product of labProducts) await tx.store.add(product);
+        });
       }
       
       return db;
@@ -282,6 +234,17 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     const delay = ms ?? (isProd ? 0 : 50);
     if (delay <= 0) return;
     return new Promise((resolve) => setTimeout(resolve, delay));
+  }
+
+  async readAuthoritative(): Promise<Product[]> {
+    const db = await this.getDB();
+    this.cachedProducts = (await db.getAll('products')).map(product => ({
+      ...product, properties: verifyPropertyQuantities(product.properties),
+    }));
+    this.rebuildIndices();
+    // A confirmed snapshot must not share its array with incremental cache
+    // maintenance or miss changes committed by another browser connection.
+    return [...this.cachedProducts];
   }
 
   async search(query: string, categoryId: string | null): Promise<Product[]> {
@@ -429,40 +392,26 @@ export class IndexedDBProductAdapter implements IProductAdapter {
 
   async batchUpdate(ids: string[], updates: ProductUpdates): Promise<void> {
     await this.simulateLatency();
-    
-    if (!ids.length) return; // Silent return for empty batch
-
+    if (!ids.length) return;
     const db = await this.getDB();
     const tx = db.transaction('products', 'readwrite');
-    const { _propertyUpdates, ...restUpdates } = updates;
- 
-    for (const id of ids) {
-      const p = await tx.store.get(id);
-      if (p) {
-        const newProperties = { ...(restUpdates.properties ?? p.properties) };
-        if (_propertyUpdates) {
-          Object.entries(_propertyUpdates).forEach(([key, updateVal]) => {
-            if (updateVal !== null && typeof updateVal === "object" && "value" in updateVal) {
-              newProperties[key] = { ...newProperties[key], ...updateVal as PropertyValue };
-            } else {
-              newProperties[key] = { 
-                ...(newProperties[key] || { unit: "" }), 
-                value: updateVal as string | number 
-              };
-            }
-          });
-        }
-        
-        await tx.store.put({
-          ...p,
-          ...restUpdates,
-          properties: refreshProperties(newProperties, p.properties),
-          updatedAt: new Date().toISOString().split('T')[0]
-        });
+    const updated: Product[] = [];
+    await completeTransaction(tx, async () => {
+      for (const id of new Set(ids)) {
+        const product = await tx.store.get(id);
+        if (!product) throw new Error(`404 Not Found: Product ${id} does not exist`);
+        const saved = applyProductUpdates(product, updates);
+        await tx.store.put(saved);
+        updated.push(saved);
+      }
+    });
+    for (const product of updated) {
+      this.registerMutationUpdate(product);
+      if (product.isExperimental) {
+        try { UniversalStorageBridge.saveLabRecord(UniversalStorageBridge.productToRecord(product, 'my_lab')); }
+        catch (error) { logger.error('Lab mirror failed after batch update commit', error); }
       }
     }
-    await tx.done;
-    this.registerMutationBatchUpdate(ids, updates);
   }
 
   async batchCreate(products: Partial<Product>[]): Promise<Product[]> {
@@ -475,24 +424,25 @@ export class IndexedDBProductAdapter implements IProductAdapter {
 
     const now = new Date().toISOString().split('T')[0];
 
-    for (const p of products) {
-      const newProduct: Product = {
-        ...p,
-        id: p.id || generateId(),
-        gradeName: p.gradeName || "New Product",
-        manufacturer: p.manufacturer || "Unknown",
-        manufacturerId: p.manufacturerId || "m-unknown",
-        categoryIds: p.categoryIds || [],
-        properties: refreshProperties(p.properties || {}),
-        updatedAt: now,
-        createdAt: now,
-        isExperimental: p.isExperimental ?? false,
-      };
-      
-      await tx.store.add(newProduct);
-      createdProducts.push(newProduct);
-    }
-    await tx.done;
+    await completeTransaction(tx, async () => {
+      for (const p of products) {
+        const newProduct: Product = {
+          ...p,
+          id: p.id || generateId(),
+          gradeName: p.gradeName || "New Product",
+          manufacturer: p.manufacturer || "Unknown",
+          manufacturerId: p.manufacturerId || "m-unknown",
+          categoryIds: p.categoryIds || [],
+          properties: refreshProperties(p.properties || {}),
+          updatedAt: now,
+          createdAt: now,
+          isExperimental: p.isExperimental ?? false,
+        };
+
+        await tx.store.add(newProduct);
+        createdProducts.push(newProduct);
+      }
+    });
     // A failed transaction must not publish lab mirrors or cache entries.
     for (const product of createdProducts.filter(product => product.isExperimental)) {
       try { UniversalStorageBridge.saveLabRecord(UniversalStorageBridge.productToRecord(product, 'my_lab')); }
@@ -526,11 +476,8 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     }
     const db = await this.getDB();
     const tx = db.transaction('products', 'readwrite');
-    const completion = tx.done;
-    // Observe rejection even if an individual request fails before awaiting done.
-    void completion.catch(() => undefined);
     const imported: Product[] = [];
-    try {
+    await completeTransaction(tx, async () => {
       for (const product of products) {
         const previous = await tx.store.get(product.id);
         const saved: Product = {
@@ -542,12 +489,7 @@ export class IndexedDBProductAdapter implements IProductAdapter {
         await tx.store.put(saved);
         imported.push(saved);
       }
-      await completion;
-    } catch (error) {
-      try { tx.abort(); } catch { /* A failed request may already have aborted it. */ }
-      await completion.catch(() => undefined);
-      throw error;
-    }
+    });
     if (this.cachedProducts) {
       const replacements = new Map(imported.map(product => [product.id, product]));
       this.cachedProducts = [...this.cachedProducts.filter(product => !replacements.has(product.id)), ...imported];
@@ -568,10 +510,9 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     
     const db = await this.getDB();
     const tx = db.transaction('products', 'readwrite');
-    for (const id of ids) {
-      await tx.store.delete(id);
-    }
-    await tx.done;
+    await completeTransaction(tx, async () => {
+      for (const id of ids) await tx.store.delete(id);
+    });
     // A failed transaction rolls back IndexedDB changes; mirror only after commit.
     for (const id of ids) {
       try {
@@ -647,11 +588,10 @@ ${props}
     await this.simulateLatency();
     const db = await this.getDB();
     const tx = db.transaction('products', 'readwrite');
-    await tx.store.clear();
-    for (const p of products) {
-      await tx.store.add(p);
-    }
-    await tx.done;
+    await completeTransaction(tx, async () => {
+      await tx.store.clear();
+      for (const product of products) await tx.store.add(product);
+    });
     this.cachedProducts = products.map(product => ({
       ...product, properties: verifyPropertyQuantities(product.properties),
     }));

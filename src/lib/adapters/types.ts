@@ -58,6 +58,8 @@ export interface HistoryRecord {
 
 export interface IProductAdapter {
   search(query: string, categoryId: string | null): Promise<Product[]>;
+  /** Read the write target, never an alternative/fallback database. */
+  readAuthoritative?(): Promise<Product[]>;
   create(product: Partial<Product>): Promise<Product>;
   update(product: Product): Promise<Product>;
   batchUpdate(ids: string[], updates: ProductUpdates): Promise<void>;

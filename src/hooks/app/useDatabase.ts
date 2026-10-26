@@ -9,6 +9,7 @@ import api from '@/lib/adapters';
 import { useColumns } from '@/hooks/datagrid/useColumns';
 import { propertyMap } from '@/config/i18n';
 import { generateId, safeStorage } from '@/lib/utils';
+import { ProductMutationCoordinator } from '@/lib/productMutationCoordinator';
 
 type ProductTextBuilder = (product: Product) => string;
 
@@ -37,6 +38,10 @@ export function useDatabase(
   t: (key: string, fallback?: string) => string
 ) {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [mutations] = useState(() => new ProductMutationCoordinator(
+    () => api.readAuthoritative ? api.readAuthoritative() : api.search('', null),
+    setAllProducts,
+  ));
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [syncEvents, setSyncEvents] = useState<SyncEvent[]>(() => {
@@ -86,15 +91,12 @@ export function useDatabase(
 
   const fetchRequestId = useRef(0);
   const fetchProducts = useCallback(async (
-    query = '',
-    categoryId: string | null = null,
     silent = false,
   ): Promise<boolean> => {
     const requestId = ++fetchRequestId.current;
     if (!silent) setIsLoading(true);
     try {
-      const data = await api.search(query, categoryId);
-      if (requestId === fetchRequestId.current) setAllProducts(data);
+      await mutations.refresh();
       return true;
     } catch (error) {
       if (requestId === fetchRequestId.current) {
@@ -104,12 +106,12 @@ export function useDatabase(
     } finally {
       if (requestId === fetchRequestId.current && !silent) setIsLoading(false);
     }
-  }, [addToast, t]);
+  }, [addToast, t, mutations]);
 
   const refreshData = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const refreshed = await fetchProducts('', null, true);
+      const refreshed = await fetchProducts(true);
       if (refreshed) {
         addToast('success', t('dataRefreshed'));
         addSyncEvent({ status: 'success', message: t('dataRefreshed', 'Data refreshed successfully') });
@@ -295,6 +297,7 @@ export function useDatabase(
     filteredData,
     allProducts,
     setAllProducts,
+    mutations,
     isLoading,
     isRefreshing,
     refreshData,
@@ -310,6 +313,7 @@ export function useDatabase(
     minCompleteness,
     filteredData,
     allProducts,
+    mutations,
     isLoading,
     isRefreshing,
     refreshData,

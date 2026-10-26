@@ -295,10 +295,10 @@ export class UniversalStorageBridge {
     defaultSource: 'open_market' | 'my_lab' = 'open_market',
   ): MaterialRecord {
     const props = product.properties ?? {};
-    const density = props['密度'] || props.Density;
-    const mfr = props['熔体质量流动速率'] || props.MFR;
-    const tensile = props['拉伸屈服应力'] || props.Tensile;
-    const modulus = props['弯曲模量'] || props.Modulus;
+    const density = props['密度'] || props.Density || props.density;
+    const mfr = props['熔体质量流动速率'] || props.MFR || props.mfr;
+    const tensile = props['拉伸屈服应力'] || props.Tensile || props.tensileYield;
+    const modulus = props['弯曲模量'] || props.Modulus || props.flexuralModulus;
     const izodImpact = props['悬臂梁缺口冲击强度'] || props['Izod Impact'] || props.izodImpact;
     const charpyImpact = props['简支梁缺口冲击强度'] || props['Charpy Impact'] || props.charpyImpact;
     const specs: MaterialPhysicsSpecs = {};

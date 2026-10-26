@@ -71,4 +71,15 @@ describe('RemoteAPIProductAdapter runtime boundary', () => {
     await adapter.delete([]);
     expect(fetch).not.toHaveBeenCalled();
   });
+
+  it('never substitutes an opt-in read fallback for authoritative mutation readback', async () => {
+    vi.mocked(fetch).mockResolvedValue(response('offline', { status: 503 }));
+    const adapter = new RemoteAPIProductAdapter('https://api.example.test', true);
+    const fallback = { search: vi.fn(async () => [product()]) };
+    vi.spyOn(adapter as any, 'getFallback').mockResolvedValue(fallback);
+    await expect(adapter.search('', null)).resolves.toEqual([product()]);
+    expect(fallback.search).toHaveBeenCalledOnce();
+    await expect(adapter.readAuthoritative()).rejects.toThrow(/503/);
+    expect(fallback.search).toHaveBeenCalledOnce();
+  });
 });

@@ -67,6 +67,7 @@ export const DashboardView = React.memo(() => {
     isLoading,
     isRefreshing,
     refreshData,
+    syncEvents,
     columns,
     searchQuery,
     setSearchQuery,
@@ -108,7 +109,7 @@ export const DashboardView = React.memo(() => {
       case "stats":
         return (
           <DraggableSection key="stats" itemKey="stats" className="w-full relative group">
-            <DashboardStats allProducts={allProducts} showSummary={showSummary} t={t} />
+            <DashboardStats allProducts={allProducts} showSummary={showSummary} t={t} syncEvents={syncEvents} />
           </DraggableSection>
         );
       case "trends":

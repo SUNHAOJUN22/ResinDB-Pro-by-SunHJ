@@ -21,6 +21,20 @@ const renderFormula = () => render(<LanguageProvider><FormulaEditorModal isOpen 
 const enterExpression = () => fireEvent.change(screen.getByPlaceholderText("props['Density'] * 0.1"), { target: { value: "props['yield'] / props['density']" } });
 
 describe('actual acceptance UI actions', () => {
+  it('keeps the editor open until persistence succeeds and supplies its original edit base', async () => {
+    const original = record();
+    let finish!: (saved: boolean) => void;
+    const onSave = vi.fn(() => new Promise<boolean>(resolve => { finish = resolve; }));
+    const onClose = vi.fn();
+    render(<LanguageProvider><EditProductModal isOpen product={original} onClose={onClose} onSave={onSave} /></LanguageProvider>);
+    fireEvent.change(screen.getByDisplayValue('1000'), { target: { value: '1200' } });
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    expect(onClose).not.toHaveBeenCalled();
+    await act(async () => { finish(false); });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onSave.mock.calls[0][1]).toEqual(original);
+    expect(original.properties.density.value).toBe(1000);
+  });
   it('saves unchanged property metadata and governance through EditProductModal', async () => {
     const original = record(); const onSave = vi.fn().mockResolvedValue(true);
     render(<LanguageProvider><EditProductModal isOpen product={original} onClose={vi.fn()} onSave={onSave} /></LanguageProvider>);

@@ -584,20 +584,12 @@ export const AdminModal: React.FC<AdminModalProps> = React.memo(({ isOpen, onClo
                             </h5>
                           </div>
                           <span className="text-xs font-mono font-bold text-emerald-600">
-                            88%
+                            {t("governanceUnassessed", "Not assessed")}
                           </span>
-                        </div>
-                        <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden relative z-10">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: "88%" }}
-                            transition={{ duration: 2, ease: "easeOut" }}
-                            className="h-full bg-emerald-500"
-                          />
                         </div>
                         <p className="text-[10px] font-mono font-bold text-slate-500 mt-4 flex items-center gap-2 relative z-10">
                           <Sparkles size={12} className="text-emerald-500" />
-                          {t("governanceDesc")}
+                          {t("governanceEvidenceRequired", "Review source evidence and unit checks before making a governance assessment.")}
                         </p>
                       </motion.div>
                     </motion.div>

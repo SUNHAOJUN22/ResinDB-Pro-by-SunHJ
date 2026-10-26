@@ -1,7 +1,7 @@
 import { patchProperty } from '@/lib/propertyAdmission';
 import { parseFiniteReal } from '@/lib/quantityRecord';
 import { logger } from '@/lib/logger';
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   X,
   Save,
@@ -27,7 +27,7 @@ import { aiService } from "@/services/aiService";
 interface EditProductModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (product: Product) => Promise<boolean> | void;
+  onSave: (product: Product, base?: Product) => Promise<boolean | void> | void;
   product: Product | null;
 }
 
@@ -60,6 +60,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = React.memo(({
   const [isSaving, setIsSaving] = useState(false);
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const editBase = useRef<Product | null>(null);
+  const wasOpen = useRef(false);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -134,7 +136,10 @@ export const EditProductModal: React.FC<EditProductModalProps> = React.memo(({
   };
 
   useEffect(() => {
-    if (product) {
+    const initialize = isOpen && product && (!wasOpen.current || editBase.current?.id !== product.id);
+    wasOpen.current = isOpen;
+    if (initialize && product) {
+      editBase.current = structuredClone(product);
       setFormData({
         gradeName: product.gradeName,
         manufacturer: product.manufacturer,
@@ -163,7 +168,8 @@ export const EditProductModal: React.FC<EditProductModalProps> = React.memo(({
   }, [product, isOpen]);
 
   const handleSave = async () => {
-    if (!product || isSaving) return;
+    const original = editBase.current;
+    if (!original || isSaving) return;
     if (!validate()) return;
     setIsSaving(true);
 
@@ -181,15 +187,15 @@ export const EditProductModal: React.FC<EditProductModalProps> = React.memo(({
     });
 
     const updatedProduct = {
-      ...product,
+      ...original,
       ...(formData as Product),
       properties: newProperties,
       updatedAt: new Date().toISOString().split("T")[0],
     };
 
     try {
-      await onSave(updatedProduct);
-      onClose();
+      const saved = await onSave(updatedProduct, original);
+      if (saved !== false) onClose();
     } catch {
       // Error handling done in parent
     } finally {

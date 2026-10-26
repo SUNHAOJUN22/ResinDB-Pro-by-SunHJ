@@ -6,7 +6,7 @@ import {
   type RowMajorFloat64Matrix,
 } from '@/compute/numericBuffers';
 
-const RSM_MODEL_VERSION = 'quadratic-rsm-qr-svd-f64-2.0.0';
+const RSM_MODEL_VERSION = 'quadratic-rsm-qr-svd-f64-2.1.0';
 const DEFAULT_GRID_SIZE = 30;
 const MAX_GRID_SIZE = 300;
 

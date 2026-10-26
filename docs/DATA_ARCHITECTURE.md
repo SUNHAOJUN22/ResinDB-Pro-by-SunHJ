@@ -143,3 +143,70 @@ contract. This is a conversion-consistency check, not measurement authentication
 synthetic, inferred, imported, restricted and not-for-release governance metadata
 remain unchanged. No source becomes an observed experimental fact because its
 units are internally consistent.
+
+## 8. Concurrent mutations and confirmed state
+
+`ProductMutationCoordinator` owns a confirmed storage snapshot and an ordered
+list of scoped pending intents. The displayed list is a projection of those
+intents. A failed write no longer restores an earlier whole-list copy over
+another completed update. Tags, priority changes and editor saves persist only
+their intended fields; editor saves carry the original edit base so unrelated
+fields changed while the form was open are retained.
+
+Overlapping fields on the same record are serialized through readback. Disjoint
+field patches can execute concurrently. Create, delete, import and restore are
+catalog barriers. Writes against an identity that is missing or still provisional
+are refused. Multi-request tagging/reordering waits for every request to settle
+before reconciliation, including partially failed remote batches.
+
+Every settled mutation triggers a read from the write target. IndexedDB rereads
+storage rather than treating its search cache as fresh evidence; remote readback
+never uses the optional alternative-database read fallback. A read acknowledges
+only intents already settled when that read began. Later completions remain
+projected until their own readback. A failed readback blocks subsequent writes
+until a successful explicit refresh. An HTTP error may still follow a partial
+remote write; the display therefore reconciles storage instead of assuming a
+transactional rollback.
+
+The public `setAllProducts` setter remains available for UI compatibility. It is
+a display override, not a storage commit or a new confirmed snapshot. It must not
+be used to persist data. Immutable record identity/creation time are retained in
+scoped edits. This coordinator serializes writes within one provider; it is not a
+distributed compare-and-swap protocol and does not replace server-side conflict
+control between independent clients.
+
+History workers echo request identifiers. Unsolicited or mismatched snapshot
+responses cannot execute a restore. A restore waits for its requested snapshot,
+then records an undo snapshot from the confirmed state at its catalog barrier,
+and awaits persistence and readback before reporting completion. IndexedDB write
+helpers observe the separate transaction-completion promise before issuing
+requests and abort/drain on request errors while preserving the original error.
+Caches and lab mirrors are published only after transaction commit.
+
+## 9. Comparable scientific observations and UI evidence
+
+Comparison percentages, radar axes, numeric reorder presets, Spearman payloads
+and similarity matrices consume a numeric observation together with its unit,
+dimension and test-condition basis. Supported core quantities use verified
+canonical values. Explicit `UNKNOWN`/`INVALID` quantities, contradictory
+declarations and incompatible measurement conditions are unavailable to these
+consumers. Generic legacy statistical features can remain unitless when all
+observed values share that basis; no physical unit is inferred for core fields.
+
+For example, 900 kg/m³ and 0.9 g/cm³ have the same canonical density. A radar chart
+requires at least three compatible properties observed for every displayed
+product; absent axes are not fabricated as zero. Missing diagnostic targets yield
+an incomplete screening statement, and constant Spearman features display N/A.
+Similarity admission changes the evidence version to
+`zscore-cosine-overlap-canonical-f64-4.0.0`; z-score normalization, overlap policy,
+minimum shared-feature requirement, thresholds and binary64 computation remain
+unchanged.
+
+Correlation displays and AI insights are bound to the current request/product.
+Late or failed computations cannot relabel a previous result as current evidence.
+Dashboard refresh counts come from observed successful client refresh events;
+latency and governance assessments remain unmeasured/unassessed where no
+measurement exists. Product views do not claim external manufacturer-database
+verification merely because a record is present. These software checks support
+screening; they neither authenticate a measurement nor release an industrial
+material or parameter.

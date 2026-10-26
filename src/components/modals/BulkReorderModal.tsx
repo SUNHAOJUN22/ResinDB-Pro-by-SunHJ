@@ -1,4 +1,4 @@
-import { parseFiniteReal } from '@/lib/quantityRecord';
+import { comparisonObservations } from '@/utils/productUtils';
 import React, { useState, useEffect } from "react";
 import {
   X,
@@ -85,6 +85,9 @@ export const BulkReorderModal: React.FC<BulkReorderModalProps> = ({
   // Instant pre-sorting options
   const handlePresetSort = (key: "gradeName" | "manufacturer" | "completeness" | "density" | "tensile") => {
     const nextList = [...items];
+    const observations = key === 'density' || key === 'tensile'
+      ? comparisonObservations(items, key === 'density' ? 'density' : 'tensileYield', false, true) : [];
+    const values = new Map(items.map((product, index) => [product.id, observations[index]?.value ?? null]));
     nextList.sort((a, b) => {
       let aVal: string | number;
       let bVal: string | number;
@@ -102,10 +105,11 @@ export const BulkReorderModal: React.FC<BulkReorderModalProps> = ({
         return bVal - aVal; // Higher completeness comes first
       } else {
         // Numeric properties like density, tensile
-        const propKey = key === "density" ? "Density" : "Tensile Strength";
-        aVal = strictNumber(String(a.properties[propKey]?.value || "0"));
-        bVal = strictNumber(String(b.properties[propKey]?.value || "0"));
-        return bVal - aVal; // descending
+        const left = values.get(a.id);
+        const right = values.get(b.id);
+        if (left === null || left === undefined) return right === null || right === undefined ? 0 : 1;
+        if (right === null || right === undefined) return -1;
+        return right - left; // Descending, with unavailable observations last.
       }
 
       const sA = String(aVal).toLowerCase();
@@ -448,5 +452,3 @@ export const BulkReorderModal: React.FC<BulkReorderModalProps> = ({
     </AnimatePresence>
   );
 };
-
-function strictNumber(value: unknown): number { return parseFiniteReal(value) ?? Number.NaN; }

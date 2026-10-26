@@ -1,7 +1,8 @@
 import { createWorkerProgressMessage } from '@/compute/workerProtocol';
+import { comparisonObservations } from '@/utils/productUtils';
 import type { Product } from '@/types/index';
 
-const SIMILARITY_MODEL_VERSION = 'zscore-cosine-overlap-f64-3.0.0';
+const SIMILARITY_MODEL_VERSION = 'zscore-cosine-overlap-canonical-f64-4.0.0';
 const MINIMUM_SHARED_FEATURES = 2;
 
 export interface SimilarityMessage {
@@ -54,6 +55,7 @@ export interface SimilarityResponse {
       overlapAdjustment: 'linear-shared-active-ratio';
       varianceDenominatorPolicy: 'observed-count-minus-one';
       numericParsingPolicy: 'strict-finite-full-string';
+      observationAdmissionPolicy: 'verified-canonical-compatible-basis';
       matrixStorage: 'flat-float64-unit-vectors';
       observationMaskStorage: 'flat-uint8';
       matrixAllocationPolicy: 'single-in-place-float64-plus-mask';
@@ -170,6 +172,7 @@ function emptyResponse(
         overlapAdjustment: 'linear-shared-active-ratio',
         varianceDenominatorPolicy: 'observed-count-minus-one',
         numericParsingPolicy: 'strict-finite-full-string',
+        observationAdmissionPolicy: 'verified-canonical-compatible-basis',
         matrixStorage: 'flat-float64-unit-vectors',
         observationMaskStorage: 'flat-uint8',
         matrixAllocationPolicy: 'single-in-place-float64-plus-mask',
@@ -217,16 +220,17 @@ self.onmessage = (event: MessageEvent<SimilarityMessage>) => {
     const finiteCounts = new Uint32Array(featureCount);
     let strictNumericRejections = 0;
 
-    for (let product = 0; product < productCount; product++) {
-      const offset = product * featureCount;
-      for (let feature = 0; feature < featureCount; feature++) {
-        const parsed = parseFinitePropertyValue(products[product].properties?.[features[feature]]?.value);
-        normalized[offset + feature] = parsed.value;
-        if (parsed.observed) {
+    for (let feature = 0; feature < featureCount; feature++) {
+      const admitted = comparisonObservations(products, features[feature], true);
+      for (let product = 0; product < productCount; product++) {
+        const offset = product * featureCount;
+        const observation = admitted[product];
+        normalized[offset + feature] = observation?.value ?? Number.NaN;
+        if (observation !== null) {
           observed[offset + feature] = 1;
-          means[feature] += parsed.value;
+          means[feature] += observation.value;
           finiteCounts[feature] += 1;
-        } else if (parsed.rejected) {
+        } else if (parseFinitePropertyValue(products[product].properties?.[features[feature]]?.value).rejected) {
           strictNumericRejections += 1;
         }
       }
@@ -392,6 +396,7 @@ self.onmessage = (event: MessageEvent<SimilarityMessage>) => {
           overlapAdjustment: 'linear-shared-active-ratio',
           varianceDenominatorPolicy: 'observed-count-minus-one',
           numericParsingPolicy: 'strict-finite-full-string',
+        observationAdmissionPolicy: 'verified-canonical-compatible-basis',
           matrixStorage: 'flat-float64-unit-vectors',
           observationMaskStorage: 'flat-uint8',
           matrixAllocationPolicy: 'single-in-place-float64-plus-mask',

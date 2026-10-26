@@ -77,7 +77,7 @@ export const HistoryDrawer: React.FC<HistoryDrawerProps> = ({ isOpen, onClose })
                           {record.description}
                         </p>
                         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                          onClick={() => restoreSnapshot(record.id)}
+                          onClick={() => { void restoreSnapshot(record.id).catch(() => undefined); }}
                           className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold text-primary-600 bg-primary-50 hover:bg-primary-100 dark:text-primary-400 dark:bg-primary-900/30 dark:hover:bg-primary-900/50 rounded transition-colors w-full justify-center"
                         >
                           <Undo2 size={12} />

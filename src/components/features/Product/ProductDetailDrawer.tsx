@@ -75,9 +75,11 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
   const chartInstance = useRef<echarts.ECharts | null>(null);
   const pdfTemplateRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
-  const [aiInsight, setAiInsight] = useState<string | null>(null);
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiResponse, setAiResponse] = useState<{ product: Product; insight: string | null; error: string | null } | null>(null);
+  const [pendingAiProduct, setPendingAiProduct] = useState<Product | null>(null);
+  const aiInsight = aiResponse?.product === product ? aiResponse.insight : null;
+  const aiError = aiResponse?.product === product ? aiResponse.error : null;
+  const isAiLoading = product !== null && pendingAiProduct === product;
 
   const cachedProduct = useRef<Product | null>(null);
   if (product) {
@@ -86,35 +88,29 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
   const displayProduct = product || cachedProduct.current;
 
   useEffect(() => {
-    // Reset AI insight when product changes
-    setAiInsight(null);
-    setAiError(null);
     setActiveTab("overview");
-  }, [product?.id]);
+  }, [product, isOpen]);
 
   useEffect(() => {
-    const fetchAiInsight = async () => {
-      if (!displayProduct) return;
-      setIsAiLoading(true);
-      setAiError(null);
+    if (!isOpen || !product || activeTab !== 'ai' || aiResponse?.product === product) return;
+    let cancelled = false;
+    const requestedProduct = product;
+    setPendingAiProduct(requestedProduct);
+    void (async () => {
       try {
-        const { getAiInsights } = await import("@/services/aiService");
-        const result = await getAiInsights(
-          [displayProduct],
-          `Provide a technical deep-dive into this specific material. Discuss its unique property balance and suggest the most challenging automotive or electrical application it would excel in.`,
-        );
-        setAiInsight(result || null);
+        const { getAiInsights } = await import('@/services/aiService');
+        if (cancelled) return;
+        const insight = await getAiInsights([requestedProduct],
+          'Analyze the supplied property observations and identify evidence needed to assess proposed automotive or electrical applications.');
+        if (!cancelled) setAiResponse({ product: requestedProduct, insight: insight || null, error: null });
       } catch {
-        setAiError("AI insights unavailable. Connection error.");
+        if (!cancelled) setAiResponse({ product: requestedProduct, insight: null, error: 'AI insights unavailable. Connection error.' });
       } finally {
-        setIsAiLoading(false);
+        if (!cancelled) setPendingAiProduct(null);
       }
-    };
-
-    if (activeTab === "ai" && !aiInsight && !aiError && !isAiLoading) {
-      fetchAiInsight();
-    }
-  }, [activeTab, displayProduct, aiInsight, aiError, isAiLoading]);
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, product, isOpen, aiResponse]);
 
   // Build a flat map of categories for easy name lookup
   const flatCategoryMap = useMemo(() => {
@@ -539,10 +535,7 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
                                   whileHover={{ scale: 1.05 }}
                                   whileTap={{ scale: 0.95 }}
                                   onClick={() => {
-                                    setAiInsight(null);
-                                    setAiError(null);
-                                    setActiveTab("overview");
-                                    setTimeout(() => setActiveTab("ai"), 50);
+                                    setAiResponse(null);
                                   }}
                                   className="mt-4 px-6 py-2 bg-rose-500 text-white rounded-xl text-xs font-black uppercase tracking-widest"
                                 >
@@ -598,7 +591,7 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
                                           className="text-emerald-500 shrink-0"
                                         />
                                         <span className="text-[9px] font-mono font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest truncate">
-                                          {t("verifiedManufacturer")}
+                                          {t("listedManufacturer", "Listed manufacturer") }
                                         </span>
                                       </div>
                                     </div>
@@ -1023,7 +1016,7 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
               <div className="flex justify-center items-center gap-2 text-[9px] font-mono text-slate-500 uppercase tracking-widest">
                 <ShieldCheck size={12} className="text-emerald-500" />
                 <span>
-                  Data verified against PetroChina Standards Database.
+                  {t("sourceVerificationUnconfirmed", "External verification is not established by this view. Review the source evidence.")}
                 </span>
               </div>
             </div>

@@ -58,7 +58,7 @@ interface DataGridProps {
   columns: ColumnConfig[];
   isLoading: boolean;
   onDelete: (ids: string[]) => void;
-  onUpdate: (product: Product) => void;
+  onUpdate: (product: Product, base?: Product) => Promise<boolean | void> | void;
   onBatchUpdate: (ids: string[], updates: Partial<Product>) => void;
   onCategorySelect: (id: string) => void;
   onViewDetails: (product: Product) => void;
@@ -87,7 +87,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
     activeFilters = [],
     onMoveColumn,
   }) => {
-    const { formulas, togglePin } = useData();
+    const { formulas, togglePin, refreshData, isRefreshing } = useData();
 
     const formulaExecutor = useMemo(() => {
       return formulaEngine.compileGraph(formulas);
@@ -124,7 +124,6 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
       const saved = safeStorage.local.getItem("resindb-compact");
       return saved !== null ? saved === "true" : true;
     });
-    const [isRefreshing, setIsRefreshing] = useState(false);
 
     const [focusedIndex, setFocusedIndex] = useState(-1);
     const [contextMenu, setContextMenu] = useState<{
@@ -183,10 +182,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [deletingIds, setDeletingIds] = useState<string[]>([]);
 
-    const handleRefresh = () => {
-      setIsRefreshing(true);
-      setTimeout(() => setIsRefreshing(false), 1000);
-    };
+    const handleRefresh = () => { void refreshData(); };
 
     useEffect(() => {
       safeStorage.local.setItem("resindb-compact", String(isCompact));
@@ -1156,11 +1152,7 @@ export const DataGrid: React.FC<DataGridProps> = React.memo(
           isOpen={!!editingProduct}
           onClose={() => setEditingProduct(null)}
           product={editingProduct}
-          onSave={async (p) => {
-            onUpdate(p);
-            setEditingProduct(null);
-            return true;
-          }}
+          onSave={(product, base) => onUpdate(product, base)}
         />
         <DeleteConfirmationModal
           isOpen={deletingIds.length > 0}

@@ -1,4 +1,3 @@
-import { parseFiniteReal } from '@/lib/quantityRecord';
 import React, { useMemo, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -15,7 +14,7 @@ import {
 import { Product } from '@/types/index';
 import { UniversalStorageBridge } from "@/lib/adapters/UniversalStorageBridge";
 import { PROPERTY_GROUPS } from '@/config/constants';
-import { RADAR_KEYS, isLowBest } from '@/utils/productUtils';
+import { RADAR_KEYS, isLowBest, comparisonObservations, numericObservation, comparableObservations, findProperty } from '@/utils/productUtils';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import * as echarts from "@/lib/echarts";
@@ -71,10 +70,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
     );
 
     allPropKeys.forEach((key) => {
-      const summary = summarizeFinite(displayProducts, (product) => {
-        const value = product.properties[key]?.value;
-        return typeof value === "number" ? value : strictNumber(String(value));
-      });
+      const summary = summarizeFinite(comparisonObservations(displayProducts, key), observation => observation?.value);
 
       if (summary && summary.count > 1) {
         map[key] = isLowBest(key) ? summary.minimum : summary.maximum;
@@ -118,14 +114,17 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
     let scoredPropsCount = 0;
 
     targetProps.forEach(propKey => {
-      const expProp = expProduct.properties[propKey] || expProduct.properties[Object.keys(expProduct.properties).find(k => k.includes(propKey)) || ""];
-      const stdProp = stdProduct.properties[propKey] || stdProduct.properties[Object.keys(stdProduct.properties).find(k => k.includes(propKey)) || ""];
+      const expFound = findProperty(expProduct, propKey);
+      const stdFound = findProperty(stdProduct, propKey);
+      const expProp = expFound?.property;
+      const stdProp = stdFound?.property;
+      const exp = expFound ? numericObservation(expFound.key, expProp) : null;
+      const std = stdFound ? numericObservation(stdFound.key, stdProp) : null;
+      const expVal = exp?.value;
+      const stdVal = std?.value;
+      const unit = exp?.unit || std?.unit || '';
 
-      const expVal = expProp ? Number(expProp.value) : NaN;
-      const stdVal = stdProp ? Number(stdProp.value) : NaN;
-      const unit = expProp?.unit || stdProp?.unit || "";
-
-      if (!isNaN(expVal) && !isNaN(stdVal) && stdVal !== 0) {
+      if (expVal !== undefined && stdVal !== undefined && comparableObservations(exp, std) && stdVal !== 0) {
         const diff = ((expVal - stdVal) / stdVal) * 100;
         const absDiff = Math.abs(diff);
 
@@ -140,8 +139,8 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
           propKey,
           expName: expProduct.gradeName,
           stdName: stdProduct.gradeName,
-          expVal: expProp.value,
-          stdVal: stdProp.value,
+          expVal,
+          stdVal,
           diffPercent: diff,
           status,
           unit,
@@ -199,8 +198,10 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
       }
     });
 
-    if (suggestions.length === 0 && scoredPropsCount > 0) {
-      suggestions.push(t("diag_perfect_fit"));
+    if (scoredPropsCount < targetProps.length) {
+      suggestions.push(t('comparisonEvidenceIncomplete', 'Some target properties lack compatible validated observations; this is an incomplete screening comparison.'));
+    } else if (suggestions.length === 0) {
+      suggestions.push(t('comparisonWithinThresholds', 'The compared observations meet the displayed screening thresholds; independent material validation is still required.'));
     }
 
     return {
@@ -248,28 +249,15 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
 
   // Radar Chart Data Prep (ECharts format)
   const radarKeys = useMemo(() => {
-    let availableProps = RADAR_KEYS.filter((key) =>
-      displayProducts.some((p) => p.properties[key] !== undefined),
-    );
-
-    if (availableProps.length < 3) {
-      const numericProps = new Set<string>();
-      displayProducts.forEach((p) => {
-        Object.keys(p.properties).forEach((k) => {
-          const val = p.properties[k]?.value;
-          if (typeof val === "number" || !isNaN(strictNumber(String(val)))) {
-            numericProps.add(k);
-          }
-        });
-      });
-      availableProps = Array.from(numericProps).slice(0, 6);
-    }
-
-    return availableProps.length >= 3 ? availableProps : RADAR_KEYS;
+    const candidates = new Set([...RADAR_KEYS, ...displayProducts.flatMap(product => Object.keys(product.properties))]);
+    return [...candidates].filter(key => {
+      const observations = comparisonObservations(displayProducts, key);
+      return observations.length > 0 && observations.every(observation => observation !== null);
+    }).slice(0, 6);
   }, [displayProducts]);
 
   useEffect(() => {
-    if (!chartRef.current || displayProducts.length === 0 || !isOpen) return;
+    if (!chartRef.current || displayProducts.length === 0 || !isOpen || radarKeys.length < 3) return;
 
     // Initialize Chart
     const chart =
@@ -283,8 +271,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
 
     const seriesData = displayProducts.map((p, idx) => ({
       value: radarKeys.map((key) => {
-        const val = Number(p.properties[key]?.value);
-        return isNaN(val) ? 0 : val;
+        return numericObservation(key, p.properties[key])!.value;
       }),
       name: p.gradeName,
       areaStyle: {
@@ -482,7 +469,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
                   <Radar size={12} className="text-primary-500" /> Property Overlap Analysis
                 </h3>
                 <div className="h-[260px] md:h-[280px] w-full shrink-0 relative bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 group/radar">
-                  {displayProducts.length > 0 ? (
+                  {displayProducts.length > 0 && radarKeys.length >= 3 ? (
                     <div ref={chartRef} className="w-full h-full" />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-4">
@@ -493,7 +480,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
                         />
                       </div>
                       <p className="text-[10px] font-mono uppercase tracking-widest text-slate-500 dark:text-slate-400">
-                        No products selected
+                        At least three compatible observed properties are required for a radar chart
                       </p>
                     </div>
                   )}
@@ -509,7 +496,7 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
                         {diagnosticReport.complianceScore !== null && (
                           <div className="text-right">
                             <span className="text-[8px] font-mono text-slate-400 block uppercase leading-none">
-                              {t("baselineFit")}
+                              {t('observedScreeningFit', 'Observed screening fit')}
                             </span>
                             <span className={`text-[13px] font-mono font-bold ${diagnosticReport.complianceScore > 85 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}>
                               {diagnosticReport.complianceScore}%
@@ -849,10 +836,9 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
                             </td>
                             {displayProducts.map((p) => {
                               const prop = p.properties[propKey];
-                              const numVal = Number(prop?.value);
-                              const isBest =
-                                !isNaN(numVal) &&
-                                bestValuesMap[propKey] === numVal;
+                              const observation = numericObservation(propKey, prop);
+                              const numVal = observation?.value;
+                              const isBest = numVal !== undefined && bestValuesMap[propKey] === numVal;
                               const lowBest = isLowBest(propKey);
 
                               // Baseline comparison logic
@@ -860,12 +846,13 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
                               if (
                                 baselineId &&
                                 baselineId !== p.id &&
-                                !isNaN(numVal)
+                                numVal !== undefined
                               ) {
                                 const baselineProp =
                                   baselineProduct?.properties[propKey];
-                                const baselineVal = Number(baselineProp?.value);
-                                if (!isNaN(baselineVal) && baselineVal !== 0) {
+                                const baseline = numericObservation(propKey, baselineProp);
+                                const baselineVal = baseline?.value;
+                                if (baselineVal !== undefined && baselineVal !== 0 && comparableObservations(observation, baseline)) {
                                   const diff =
                                     ((numVal - baselineVal) / baselineVal) *
                                     100;
@@ -929,5 +916,3 @@ export const ComparisonView: React.FC<ComparisonViewProps> = React.memo(({
     </AnimatePresence>
   );
 });
-
-function strictNumber(value: unknown): number { return parseFiniteReal(value) ?? Number.NaN; }

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useMemo, useCallback, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, useMemo, useCallback, useEffect } from "react";
 import { Product, ColumnConfig, FilterGroup, ProductUpdates, FormulaConfig, FilterItem, Category, SyncEvent } from '@/types/index';
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToasts } from "@/contexts/ToastContext";
@@ -7,9 +7,12 @@ import { useDatabase } from '@/hooks/app/useDatabase';
 import { CATEGORY_TREE } from '@/config/constants';
 import api from '@/lib/adapters';
 import { persistImportedProducts } from '@/lib/importProducts';
-import { safeStorage } from "@/lib/utils";
+import { generateId, safeStorage } from "@/lib/utils";
 import { useHistory } from '@/hooks/app/useHistory';
 import { HistoryRecord } from "@/lib/adapters/types";
+import { applyProductUpdates, awaitAllWrites, productEdit, updateFields } from '@/lib/productMutations';
+import { refreshProperties, verifyPropertyQuantities } from '@/lib/propertyAdmission';
+import type { ProductMutation } from '@/lib/productMutationCoordinator';
 
 export interface RecentSearch {
   id: string;
@@ -53,7 +56,7 @@ interface DataContextType {
   setSelectedIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   setAllProducts: React.Dispatch<React.SetStateAction<Product[]>>;
   handleDelete: (ids: string[]) => Promise<void>;
-  handleUpdate: (p: Product) => Promise<void>;
+  handleUpdate: (p: Product, base?: Product) => Promise<boolean>;
   handleCreate: (p: Partial<Product>) => Promise<void>;
   handleBatchUpdate: (ids: string[], updates: ProductUpdates) => Promise<void>;
   handleBatchTagging: (ids: string[], tags: string[], mode: "append" | "overwrite" | "remove") => Promise<void>;
@@ -101,6 +104,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const {
     allProducts,
     setAllProducts,
+    mutations,
     searchQuery,
     setSearchQuery,
     selectedCategoryIds,
@@ -110,11 +114,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setMinCompleteness,
   } = db;
 
-  const { history, pushToHistory, restoreSnapshot } = useHistory(allProducts, setAllProducts);
+  const restoreProducts = useCallback(async (snapshot: Product[], saveUndo: (confirmed: Product[]) => Promise<void>) => {
+    await mutations.run({
+      scope: null,
+      project: () => snapshot.map(product => ({ ...product, properties: verifyPropertyQuantities(product.properties) })),
+      write: async confirmed => {
+        await saveUndo(confirmed);
+        await api.restoreSnapshot(snapshot);
+      },
+    });
+  }, [mutations]);
+  const confirmedSnapshot = useCallback(() => mutations.snapshot(), [mutations]);
+  const { history, pushToHistory, restoreSnapshot } = useHistory(allProducts, setAllProducts, restoreProducts, confirmedSnapshot);
 
-  /** Concurrent-mode-safe ref: always holds the latest committed allProducts value. */
-  const allProductsRef = useRef<Product[]>(allProducts);
-  useEffect(() => { allProductsRef.current = allProducts; }, [allProducts]);
+  const runMutation = useCallback(async <T,>(specification: ProductMutation<T>, description: string): Promise<T> => {
+    let previous: Product[] = [];
+    const result = await mutations.run({ ...specification, write: (confirmed) => {
+      previous = confirmed;
+      return specification.write(confirmed);
+    } });
+    pushToHistory(description, previous);
+    return result;
+  }, [mutations, pushToHistory]);
 
   const categoryCounts = useMemo(() => {
     const products = allProducts;
@@ -147,247 +168,120 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [allProducts]);
 
   const handleCreate = useCallback(async (p: Partial<Product>) => {
-    const tempId = `temp-${Date.now()}`;
+    const tempId = `temp-${generateId()}`;
+    const now = new Date().toISOString().split('T')[0];
     const optimisticProduct: Product = {
-      id: tempId,
-      gradeName: p.gradeName || "New Product",
-      manufacturer: p.manufacturer || "Unknown",
-      manufacturerId: "m-unknown",
-      categoryIds: p.categoryIds || [],
-      properties: p.properties || {},
-      updatedAt: new Date().toISOString().split('T')[0],
-      createdAt: new Date().toISOString().split('T')[0],
+      ...p, id: tempId, gradeName: p.gradeName || "New Product", manufacturer: p.manufacturer || "Unknown",
+      manufacturerId: p.manufacturerId || "m-unknown", categoryIds: p.categoryIds || [],
+      properties: refreshProperties(p.properties || {}), updatedAt: now, createdAt: now,
     };
-
-    const previousProducts = allProductsRef.current;
-    setAllProducts((prev) => [optimisticProduct, ...prev]);
-
     try {
-      const created = await api.create(p);
-      setAllProducts((prev) =>
-        prev.map((old) => (old.id === tempId ? created : old)),
-      );
-      pushToHistory(`Create product ${p.gradeName || 'New Product'}`, previousProducts);
+      await runMutation({ scope: null, project: rows => [optimisticProduct, ...rows], write: () => api.create(p) }, `Create product ${p.gradeName || 'New Product'}`);
       addToast("success", t("createSuccess") || "Product created successfully");
     } catch (error) {
-      setAllProducts((prev) => prev.filter((product) => product.id !== tempId));
-      addToast(
-        "error",
-        (t("createFailed") || "Failed to create product: ") +
-          (error instanceof Error ? t(error.message) : t("unknownError")),
-      );
+      addToast("error", (t("createFailed") || "Failed to create product: ") + (error instanceof Error ? error.message : t("unknownError")));
     }
-  }, [setAllProducts, addToast, t, pushToHistory]);
+  }, [runMutation, addToast, t]);
 
   const handleDelete = useCallback(async (ids: string[]) => {
-    const previousProducts = allProductsRef.current;
-    setAllProducts((prev) => prev.filter((p) => !ids.includes(p.id)));
-    setSelectedIds(new Set());
-
     try {
-      await api.delete(ids);
-      pushToHistory(`Delete ${ids.length} product(s)`, previousProducts);
-      addToast(
-        "success",
-        t("deleteSuccess").replace("{count}", ids.length.toString()),
-      );
+      const selected = new Set(ids);
+      await runMutation({ scope: null, requiredIds: ids, project: rows => rows.filter(row => !selected.has(row.id)), write: () => api.delete(ids) }, `Delete ${ids.length} product(s)`);
+      setSelectedIds(new Set());
+      addToast("success", t("deleteSuccess").replace("{count}", ids.length.toString()));
       setShowSidebar(true);
     } catch (error) {
-      setAllProducts(previousProducts);
-      addToast(
-        "error",
-        t("deleteFailed") +
-          (error instanceof Error ? t(error.message) : t("unknownError")),
-      );
+      addToast("error", t("deleteFailed") + (error instanceof Error ? error.message : t("unknownError")));
     }
-  }, [setAllProducts, setSelectedIds, addToast, t, setShowSidebar, pushToHistory]);
+  }, [runMutation, addToast, t, setShowSidebar]);
 
-  const handleUpdate = useCallback(async (p: Product) => {
-    const previousProducts = allProductsRef.current;
-    setAllProducts((prev) => prev.map((old) => (old.id === p.id ? p : old)));
-
+  const handleUpdate = useCallback(async (p: Product, base?: Product): Promise<boolean> => {
     try {
-      const updated = await api.update(p);
-      setAllProducts((prev) =>
-        prev.map((old) => (old.id === updated.id ? updated : old)),
-      );
-      pushToHistory(`Update product ${p.gradeName}`, previousProducts);
+      mutations.requireIds([p.id]);
+      const edit = productEdit(base ?? mutations.snapshot().find(row => row.id === p.id)!, p);
+      if (edit.fields.length === 0) return true;
+      const now = new Date().toISOString().split('T')[0];
+      await runMutation({
+        scope: new Map([[p.id, edit.fields]]), requiredIds: [p.id],
+        project: rows => rows.map(row => row.id === p.id ? applyProductUpdates(row, edit.updates(row), now) : row),
+        write: confirmed => api.batchUpdate([p.id], edit.updates(confirmed.find(row => row.id === p.id)!)),
+      }, `Update product ${p.gradeName}`);
       addToast("success", t("updateSuccessMsg"));
-      setShowSidebar(true);
-    } catch (error) {
-      setAllProducts(previousProducts);
-      addToast(
-        "error",
-        t("updateFailed") +
-          (error instanceof Error ? t(error.message) : t("unknownError")),
-      );
-    }
-  }, [setAllProducts, addToast, t, setShowSidebar, pushToHistory]);
-
-  const handleBatchUpdate = useCallback(async (ids: string[], updates: ProductUpdates) => {
-    const previousProducts = allProductsRef.current;
-    const { _propertyUpdates, ...restUpdates } = updates;
-
-    setAllProducts((prev) => prev.map((p) => {
-        if (!ids.includes(p.id)) return p;
-
-        const newProperties = { ...p.properties };
-        if (_propertyUpdates) {
-          Object.keys(_propertyUpdates).forEach((key) => {
-            const updateVal = _propertyUpdates[key];
-
-            if (
-              updateVal !== null &&
-              typeof updateVal === "object" &&
-              "value" in updateVal
-            ) {
-              newProperties[key] = { ...newProperties[key], ...updateVal };
-            } else if (
-              updateVal !== null &&
-              (typeof updateVal === "string" || typeof updateVal === "number")
-            ) {
-              if (newProperties[key]) {
-                newProperties[key] = {
-                  ...newProperties[key],
-                  value: updateVal,
-                };
-              } else {
-                newProperties[key] = { value: updateVal, unit: "" };
-              }
-            }
-          });
-        }
-
-        return { ...p, ...restUpdates, properties: newProperties };
-      }),
-    );
-
-    try {
-      await api.batchUpdate(ids, updates);
-      pushToHistory(`Batch updated ${ids.length} products`, previousProducts);
-      addToast("success", t("batchUpdateSuccess"));
-      setShowSidebar(true);
-    } catch (error) {
-      setAllProducts(previousProducts);
-      addToast(
-        "error",
-        t("batchUpdateFailed") +
-          (error instanceof Error ? t(error.message) : t("unknownError")),
-      );
-    }
-  }, [setAllProducts, addToast, t, setShowSidebar, pushToHistory]);
-
-  const handleBatchTagging = useCallback(async (
-    ids: string[],
-    tagsToApply: string[],
-    mode: "append" | "overwrite" | "remove"
-  ) => {
-    const previousProducts = allProductsRef.current;
-
-    // Compute the updated list eagerly so we can reference it after the setter
-    const applyTags = (list: Product[]): Product[] => list.map((p) => {
-      if (!ids.includes(p.id)) return p;
-
-      let newTags = p.tags ? [...p.tags] : [];
-      if (mode === "append") {
-        tagsToApply.forEach((tag) => {
-          if (!newTags.includes(tag)) newTags.push(tag);
-        });
-      } else if (mode === "overwrite") {
-        newTags = [...tagsToApply];
-      } else if (mode === "remove") {
-        newTags = newTags.filter((tag) => !tagsToApply.includes(tag));
-      }
-
-      return {
-        ...p,
-        tags: newTags,
-        updatedAt: new Date().toISOString().split("T")[0],
-      };
-    });
-
-    const updatedList = applyTags(previousProducts);
-    setAllProducts((prev) => applyTags(prev));
-
-    try {
-      const affectedProducts = updatedList.filter(p => ids.includes(p.id));
-      await Promise.all(affectedProducts.map(p => api.update(p)));
-
-      const modeText = mode === "append" ? t("tagModeAppend", "append") : mode === "overwrite" ? t("tagModeOverwrite", "overwrite") : t("tagModeRemove", "remove");
-      pushToHistory(t("batchTagHistory", "Bulk tag {mode} ({count} items)").replace("{mode}", modeText).replace("{count}", String(ids.length)), previousProducts);
-      addToast("success", t("batchTagSuccess", "Bulk tagging updated successfully!"));
-    } catch (error) {
-      setAllProducts(previousProducts);
-      addToast(
-        "error",
-        t("batchTagFailed", "Bulk tagging failed: ") +
-          (error instanceof Error ? t(error.message) : t("unknownError")),
-      );
-    }
-  }, [setAllProducts, addToast, t, pushToHistory]);
-
-  const handleBatchReorder = useCallback(async (
-    updates: { id: string; priority: number }[]
-  ) => {
-    const previousProducts = allProductsRef.current;
-
-    const updateMap = new Map<string, number>();
-    updates.forEach((u) => updateMap.set(u.id, u.priority));
-
-    // Compute eagerly from ref snapshot for API call, but use functional updater for state
-    const applyReorder = (list: Product[]): Product[] => list.map((p) => {
-      if (!updateMap.has(p.id)) return p;
-      return {
-        ...p,
-        priority: updateMap.get(p.id)!,
-        updatedAt: new Date().toISOString().split("T")[0],
-      };
-    });
-
-    const updatedList = applyReorder(previousProducts);
-    setAllProducts((prev) => applyReorder(prev));
-
-    try {
-      const affectedProducts = updatedList.filter((p) => updateMap.has(p.id));
-      await Promise.all(affectedProducts.map((p) => api.update(p)));
-
-      const titleText = t("batchReorderHistory", "Bulk reorder/prioritize ({count} items)").replace("{count}", String(updates.length));
-      pushToHistory(titleText, previousProducts);
-      addToast("success", t("batchReorderSuccess", "Bulk reordering & priority updated successfully!"));
-    } catch (error) {
-      setAllProducts(previousProducts);
-      addToast(
-        "error",
-        t("batchReorderFailed", "Bulk reordering failed: ") +
-          (error instanceof Error ? t(error.message) : t("unknownError")),
-      );
-    }
-  }, [setAllProducts, addToast, t, pushToHistory]);
-
-  const handleImportData = useCallback(async (newProducts: Product[]) => {
-    try {
-      const previousProducts = allProductsRef.current;
-      const created = await persistImportedProducts(api, newProducts, previousProducts);
-      const importedIds = new Set(created.map(product => product.id));
-      setAllProducts((prev) => [...created, ...prev.filter(product => !importedIds.has(product.id))]);
-      pushToHistory(`Imported ${newProducts.length} products`, previousProducts);
-      addToast(
-        "success",
-        t("importSuccess").replace("{count}", created.length.toString()),
-      );
       setShowSidebar(true);
       return true;
     } catch (error) {
-      // Remote adapters may have completed some requests. Reconcile persisted
-      // records, and keep the modal open instead of displaying a false success.
-      try { setAllProducts(await api.search('', null)); } catch { /* Preserve the visible snapshot when reconciliation is unavailable. */ }
-      addToast(
-        "error",
-        t("importFailed", "Import failed: ") + (error instanceof Error ? error.message : t("unknownError")),
-      );
+      addToast("error", t("updateFailed") + (error instanceof Error ? error.message : t("unknownError")));
       return false;
     }
-  }, [setAllProducts, addToast, t, setShowSidebar, pushToHistory]);
+  }, [mutations, runMutation, addToast, t, setShowSidebar]);
+
+  const handleBatchUpdate = useCallback(async (ids: string[], updates: ProductUpdates) => {
+    try {
+      const selected = new Set(ids);
+      const fields = updateFields(updates);
+      const now = new Date().toISOString().split('T')[0];
+      await runMutation({
+        scope: new Map(ids.map(id => [id, fields])), requiredIds: ids,
+        project: rows => rows.map(row => selected.has(row.id) ? applyProductUpdates(row, updates, now) : row),
+        write: () => api.batchUpdate(ids, updates),
+      }, `Batch updated ${ids.length} products`);
+      addToast("success", t("batchUpdateSuccess"));
+      setShowSidebar(true);
+    } catch (error) {
+      addToast("error", t("batchUpdateFailed") + (error instanceof Error ? error.message : t("unknownError")));
+    }
+  }, [runMutation, addToast, t, setShowSidebar]);
+
+  const handleBatchTagging = useCallback(async (ids: string[], tags: string[], mode: "append" | "overwrite" | "remove") => {
+    const selected = new Set(ids);
+    const applyTags = (row: Product): ProductUpdates => ({
+      tags: mode === 'overwrite' ? [...tags] : mode === 'remove'
+        ? (row.tags ?? []).filter(tag => !tags.includes(tag))
+        : [...new Set([...(row.tags ?? []), ...tags])],
+    });
+    try {
+      const modeText = mode === 'append' ? t('tagModeAppend', 'append') : mode === 'overwrite' ? t('tagModeOverwrite', 'overwrite') : t('tagModeRemove', 'remove');
+      await runMutation({
+        scope: new Map(ids.map(id => [id, ['tags']])), requiredIds: ids,
+        project: rows => rows.map(row => selected.has(row.id) ? applyProductUpdates(row, applyTags(row)) : row),
+        write: confirmed => awaitAllWrites(confirmed.filter(row => selected.has(row.id)).map(row => api.batchUpdate([row.id], applyTags(row)))),
+      }, t('batchTagHistory', 'Bulk tag {mode} ({count} items)').replace('{mode}', modeText).replace('{count}', String(ids.length)));
+      addToast('success', t('batchTagSuccess', 'Bulk tagging updated successfully!'));
+    } catch (error) {
+      addToast('error', t('batchTagFailed', 'Bulk tagging failed: ') + (error instanceof Error ? error.message : t('unknownError')));
+    }
+  }, [runMutation, addToast, t]);
+
+  const handleBatchReorder = useCallback(async (updates: { id: string; priority: number }[]) => {
+    const priorities = new Map(updates.map(update => [update.id, update.priority]));
+    try {
+      await runMutation({
+        scope: new Map([...priorities.keys()].map(id => [id, ['priority']])), requiredIds: [...priorities.keys()],
+        project: rows => rows.map(row => priorities.has(row.id) ? applyProductUpdates(row, { priority: priorities.get(row.id)! }) : row),
+        write: () => awaitAllWrites([...priorities].map(([id, priority]) => api.batchUpdate([id], { priority }))),
+      }, t('batchReorderHistory', 'Bulk reorder/prioritize ({count} items)').replace('{count}', String(updates.length)));
+      addToast('success', t('batchReorderSuccess', 'Bulk reordering & priority updated successfully!'));
+    } catch (error) {
+      addToast('error', t('batchReorderFailed', 'Bulk reordering failed: ') + (error instanceof Error ? error.message : t('unknownError')));
+    }
+  }, [runMutation, addToast, t]);
+
+  const handleImportData = useCallback(async (incoming: Product[]): Promise<boolean> => {
+    try {
+      const importedIds = new Set(incoming.map(product => product.id));
+      const created = await runMutation({
+        scope: null,
+        project: rows => [...incoming.map(product => ({ ...product, properties: refreshProperties(product.properties) })), ...rows.filter(product => !importedIds.has(product.id))],
+        write: confirmed => persistImportedProducts(api, incoming, confirmed),
+      }, `Imported ${incoming.length} products`);
+      addToast('success', t('importSuccess').replace('{count}', created.length.toString()));
+      setShowSidebar(true);
+      return true;
+    } catch (error) {
+      addToast('error', t('importFailed', 'Import failed: ') + (error instanceof Error ? error.message : t('unknownError')));
+      return false;
+    }
+  }, [runMutation, addToast, t, setShowSidebar]);
 
   const clearFilters = useCallback(() => {
     setSearchQuery("");

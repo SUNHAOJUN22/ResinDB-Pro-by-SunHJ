@@ -1,18 +1,19 @@
 import React, { useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Layers, Database, Zap, RefreshCw } from "lucide-react";
-import { Product } from '@/types/index';
+import { Product, SyncEvent } from '@/types/index';
 import { SummaryCard } from '@/components/features/Dashboard/DashboardComponents';
 import { calculateCompleteness } from '@/utils/productUtils';
 
 interface DashboardStatsProps {
   allProducts: Product[];
   showSummary: boolean;
+  syncEvents?: SyncEvent[];
   t: (key: string, fallback?: string) => string;
 }
 
 export const DashboardStats: React.FC<DashboardStatsProps> = React.memo(
-  ({ allProducts, showSummary, t }) => {
+  ({ allProducts, showSummary, t, syncEvents = [] }) => {
     const summaryStats = useMemo(() => {
       const len = allProducts.length;
       if (!len) return { mfgCount: 0, avgComp: 0 };
@@ -29,6 +30,9 @@ export const DashboardStats: React.FC<DashboardStatsProps> = React.memo(
         avgComp: Math.round(totalScore / len),
       };
     }, [allProducts]);
+
+    const today = new Date().toDateString();
+    const successfulRefreshes = syncEvents.filter(event => event.status === 'success' && new Date(event.timestamp).toDateString() === today).length;
 
     return (
       <div className="flex flex-col gap-2 shrink-0">
@@ -68,7 +72,7 @@ export const DashboardStats: React.FC<DashboardStatsProps> = React.memo(
                 <SummaryCard
                   title={t("totalGrades")}
                   value={allProducts.length}
-                  subtitle={t("growthLastMonth")}
+                  subtitle={t('catalogRecordsShown', 'Records in the current catalog')}
                   icon={Layers}
                   color="primary"
                 />
@@ -82,7 +86,7 @@ export const DashboardStats: React.FC<DashboardStatsProps> = React.memo(
                 <SummaryCard
                   title={t("activeManufacturers")}
                   value={summaryStats.mfgCount}
-                  subtitle={t("globalCoverage")}
+                  subtitle={t('catalogManufacturersShown', 'Distinct manufacturer labels in this catalog')}
                   icon={Database}
                   color="indigo"
                 />
@@ -96,7 +100,7 @@ export const DashboardStats: React.FC<DashboardStatsProps> = React.memo(
                 <SummaryCard
                   title={t("avgCompleteness")}
                   value={`${summaryStats.avgComp}%`}
-                  subtitle={t("continuousOptimization")}
+                  subtitle={t('catalogCompletenessDescription', 'Recorded-field completeness, not scientific validation')}
                   icon={Zap}
                   color="amber"
                 />
@@ -108,9 +112,9 @@ export const DashboardStats: React.FC<DashboardStatsProps> = React.memo(
                 }}
               >
                 <SummaryCard
-                  title={t("syncCountToday")}
-                  value={42}
-                  subtitle={t("realtimeCloudSync")}
+                  title={t("observedRefreshesToday", "Successful refreshes today")}
+                  value={successfulRefreshes}
+                  subtitle={t("observedRefreshesSource", "Observed client refresh events")}
                   icon={RefreshCw}
                   color="emerald"
                 />
