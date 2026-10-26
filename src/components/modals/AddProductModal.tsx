@@ -18,6 +18,8 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useToasts } from "@/contexts/ToastContext";
 import { motion, AnimatePresence } from "motion/react";
 import { aiService } from "@/services/aiService";
+import { refreshProperty } from '@/lib/propertyAdmission';
+import { isPlaceholderValue } from '@/utils/productUtils';
 
 interface AddProductModalProps {
   isOpen: boolean;
@@ -37,6 +39,8 @@ interface PropertyRow {
   referenceId: string;
   sourceUrl: string;
   isExpanded: boolean;
+  suggestionSource?: string;
+  suggestionRef?: string;
 }
 
 export const AddProductModal: React.FC<AddProductModalProps> = React.memo(({
@@ -67,50 +71,31 @@ export const AddProductModal: React.FC<AddProductModalProps> = React.memo(({
 
   const getPropertySuggestions = useCallback((key: string) => {
     if (!key.trim()) return null;
-    const valueCounts: Record<string, number> = {};
-    let min: number | null = null;
-    let max: number | null = null;
-    const unitCounts: Record<string, number> = {};
-
-    allProducts.forEach(p => {
-      const matchKey = Object.keys(p.properties).find(k => k.toLowerCase() === key.toLowerCase());
-      if (matchKey) {
-        const prop = p.properties[matchKey];
-        if (prop.value !== undefined && prop.value !== null && prop.value !== "") {
-          const strVal = String(prop.value);
-          valueCounts[strVal] = (valueCounts[strVal] || 0) + 1;
-          
-          if (!isNaN(Number(prop.value))) {
-            const num = Number(prop.value);
-            if (min === null || num < min) min = num;
-            if (max === null || num > max) max = num;
-          }
-        }
-        if (prop.unit) {
-          unitCounts[prop.unit] = (unitCounts[prop.unit] || 0) + 1;
-        }
-      }
-    });
-
-    let mostCommonUnit = "";
-    let maxUnitCount = 0;
-    for (const [u, c] of Object.entries(unitCounts)) {
-       if (c > maxUnitCount) {
-         maxUnitCount = c;
-         mostCommonUnit = u;
-       }
-    }
-
-    const sortedValues = Object.entries(valueCounts).sort((a, b) => b[1] - a[1]).map(e => e[0]).slice(0, 5);
-
-    if (sortedValues.length === 0 && min === null) return null;
-
-    return {
-      values: sortedValues,
-      min,
-      max,
-      unit: mostCommonUnit
-    };
+    // Keep each declaration together. A value from kg/m³ cannot inherit the
+    // most frequent g/cm³ label, and different test conditions are not a range.
+    const values = allProducts.flatMap(product => {
+      const matchKey = Object.keys(product.properties).find(k => k.toLowerCase() === key.trim().toLowerCase());
+      if (!matchKey) return [];
+      const property = refreshProperty(matchKey, product.properties[matchKey]);
+      if (isPlaceholderValue(property.value)
+          || (property.quantity !== undefined && property.quantity.status !== 'VALID')) return [];
+      const raw = property.quantity?.raw;
+      const conditions = [
+        property.standard ?? raw?.standard,
+        property.method ?? raw?.method,
+        property.temperature ?? property.temp ?? raw?.temperature ?? raw?.temp,
+        property.load ?? raw?.load,
+        raw?.conditions ? JSON.stringify(raw.conditions) : undefined,
+      ].filter(value => value !== undefined && value !== '').join('; ');
+      const source = `${product.gradeName} (${product.manufacturer})${conditions ? `; ${conditions}` : ''}`;
+      return [{
+        id: `${product.id}:${matchKey}`,
+        value: String(property.value),
+        unit: property.unit ?? '',
+        source,
+      }];
+    }).slice(0, 5);
+    return values.length > 0 ? { values } : null;
   }, [allProducts]);
 
   const handleAiFill = async () => {
@@ -180,6 +165,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = React.memo(({
           temperature: row.temperature.trim() || undefined,
           referenceId: row.referenceId.trim() || undefined,
           sourceUrl: row.sourceUrl.trim() || undefined,
+          ...(row.suggestionSource ? {
+            annotation: `Suggested from existing record ${row.suggestionSource}; not a measurement of this product. Verify the value, unit and test conditions before use.`,
+            provenanceRefs: [`suggestion:${row.suggestionRef}`],
+          } : {}),
         };
       }
     });
@@ -187,6 +176,15 @@ export const AddProductModal: React.FC<AddProductModalProps> = React.memo(({
     const newProduct: Partial<Product> = {
       ...formData,
       properties: newProperties,
+      ...(propertyRows.some(row => row.suggestionSource) ? {
+        governance: {
+          sourceType: 'UNKNOWN' as const,
+          recordStatus: 'NOT_FOR_RELEASE' as const,
+          confidentiality: 'UNKNOWN' as const,
+          license: 'UNKNOWN',
+          provenanceRefs: propertyRows.flatMap(row => row.suggestionRef ? [`suggestion:${row.suggestionRef}`] : []),
+        },
+      } : {}),
     };
 
     try {
@@ -221,18 +219,18 @@ export const AddProductModal: React.FC<AddProductModalProps> = React.memo(({
   };
 
   const removeRow = (id: string) => {
-    setPropertyRows(propertyRows.filter((r) => r.id !== id));
+    setPropertyRows(previous => previous.filter((r) => r.id !== id));
   };
 
   const updateRow = (id: string, field: keyof PropertyRow, val: string | boolean) => {
     setPropertyRows(
-      propertyRows.map((r) => (r.id === id ? { ...r, [field]: val } : r)),
+      previous => previous.map((r) => (r.id === id ? { ...r, [field]: val } : r)),
     );
   };
 
   const toggleExpand = (id: string) => {
     setPropertyRows(
-      propertyRows.map((r) =>
+      previous => previous.map((r) =>
         r.id === id ? { ...r, isExpanded: !r.isExpanded } : r,
       ),
     );
@@ -469,27 +467,21 @@ export const AddProductModal: React.FC<AddProductModalProps> = React.memo(({
                                       exit={{ opacity: 0, y: -5 }}
                                       className="absolute left-0 top-full mt-1 w-full max-h-40 overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-50 py-1 flex flex-col"
                                     >
-                                      {suggestions.min !== null && suggestions.max !== null && suggestions.min !== suggestions.max && (
-                                        <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-700/50">
-                                          <div className="text-[8px] text-slate-400 uppercase tracking-widest mb-0.5">Historical Range</div>
-                                          <div className="text-[10px] font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                                            {suggestions.min} {suggestions.unit} - {suggestions.max} {suggestions.unit}
-                                          </div>
-                                        </div>
-                                      )}
-                                      <div className="text-[8px] text-slate-400 uppercase tracking-widest px-3 pt-1.5 pb-0.5">Frequent Values</div>
+                                      <div className="text-[8px] text-slate-400 px-3 pt-1.5 pb-0.5">Existing record suggestions — verify for the new sample</div>
                                       {suggestions.values.map(v => (
                                         <div
-                                          key={v}
+                                          key={v.id}
+                                          title={v.source}
                                           onClick={() => {
-                                            updateRow(row.id, "value", v);
-                                            const unit = suggestions.unit;
-                                            if (unit && !row.unit) updateRow(row.id, "unit", unit);
+                                            setPropertyRows(previous => previous.map(entry => entry.id === row.id ? {
+                                              ...entry, value: v.value, unit: v.unit,
+                                              suggestionSource: v.source, suggestionRef: v.id,
+                                            } : entry));
                                           }}
                                           className="px-3 py-1.5 text-[10px] font-mono text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer flex justify-between items-center"
                                         >
-                                          <span>{v}</span>
-                                          {suggestions.unit && <span className="text-[8px] text-slate-400">{suggestions.unit}</span>}
+                                          <span>{v.value}</span>
+                                          {v.unit && <span className="text-[8px] text-slate-400">{v.unit}</span>}
                                         </div>
                                       ))}
                                     </motion.div>

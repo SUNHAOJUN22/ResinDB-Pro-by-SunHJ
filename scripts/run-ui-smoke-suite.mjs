@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnOwnedProcess } from './lib/owned-process.mjs';
 import {
   readFileSync,
   rmSync,
@@ -45,6 +45,7 @@ function replaceExactlyOnce(source, pattern, replacement, label) {
 function buildHardenedRuntimeCopy(relativePath) {
   const sourcePath = path.join(root, relativePath);
   let source = readFileSync(sourcePath, 'utf8');
+  source = `import { stopOwnedChild } from './lib/owned-process.mjs';\n${source}`;
   source = replaceExactlyOnce(
     source,
     /const debugPort = \d+;/g,
@@ -70,7 +71,7 @@ function buildHardenedRuntimeCopy(relativePath) {
   source = replaceExactlyOnce(
     source,
     /function stop\(processHandle\) \{\s*if \(processHandle\.exitCode === null\) processHandle\.kill\('SIGTERM'\);\s*\}/g,
-    `async function stop(processHandle) {\n  if (processHandle.exitCode !== null) return;\n  const waitForExit = () => new Promise((resolve) => {\n    if (processHandle.exitCode !== null) {\n      resolve();\n      return;\n    }\n    processHandle.once('exit', resolve);\n  });\n  processHandle.kill('SIGTERM');\n  await Promise.race([waitForExit(), sleep(2_000)]);\n  if (processHandle.exitCode === null) {\n    processHandle.kill('SIGKILL');\n    await Promise.race([waitForExit(), sleep(2_000)]);\n  }\n}`,
+    `async function stop(processHandle) {\n  await stopOwnedChild(processHandle);\n}`,
     `${relativePath} process cleanup contract`,
   );
   source = replaceExactlyOnce(
@@ -89,34 +90,29 @@ function buildHardenedRuntimeCopy(relativePath) {
   return runtimePath;
 }
 
-function terminateMatchingProcesses(signal, pattern) {
-  if (process.platform === 'win32') return;
-  spawnSync('pkill', [`-${signal}`, '-f', pattern], {
-    cwd: root,
-    stdio: 'ignore',
+const activeRuns = new Set();
+for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]]) {
+  process.once(signal, () => {
+    void Promise.allSettled([...activeRuns].map(run => run.stop())).then(() => process.exit(code));
   });
 }
 
-async function cleanupRun({ childPid, previewPort, profilePrefix, runtimePath }) {
-  const profilePath = path.join('/tmp', `${profilePrefix}-${childPid}`);
-  if (process.platform === 'win32') {
-    spawnSync('taskkill', ['/PID', String(childPid), '/T', '/F'], { stdio: 'ignore' });
-  } else {
-    terminateMatchingProcesses('TERM', profilePath);
-    terminateMatchingProcesses('TERM', `vite.js preview.*--port ${previewPort}`);
-    await sleep(1_000);
-    terminateMatchingProcesses('KILL', profilePath);
-    terminateMatchingProcesses('KILL', `vite.js preview.*--port ${previewPort}`);
+async function cleanupRun({ owned, profilePrefix, runtimePath }) {
+  await owned.stop();
+  activeRuns.delete(owned);
+  // A failed spawn has no process ID and could not create a browser profile.
+  if (owned.child.pid) {
+    const profilePath = path.join('/tmp', `${profilePrefix}-${owned.child.pid}`);
+    rmSync(profilePath, { recursive: true, force: true });
   }
-  rmSync(profilePath, { recursive: true, force: true });
   rmSync(runtimePath, { force: true });
 }
 
-async function runHardenedScript({ relativePath, previewPort, profilePrefix }) {
+async function runHardenedScript({ relativePath, profilePrefix }) {
   const debugPort = await reserveLoopbackPort();
   const runtimePath = buildHardenedRuntimeCopy(relativePath);
-  return new Promise((resolve) => {
-    const child = spawn(process.execPath, [runtimePath], {
+  return new Promise((resolve, reject) => {
+    const owned = spawnOwnedProcess(process.execPath, [runtimePath], {
       cwd: root,
       env: {
         ...process.env,
@@ -124,6 +120,9 @@ async function runHardenedScript({ relativePath, previewPort, profilePrefix }) {
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    activeRuns.add(owned);
+    const { child } = owned;
+    let settled = false;
     let output = '';
     child.stdout.on('data', (chunk) => {
       output += chunk.toString();
@@ -133,20 +132,18 @@ async function runHardenedScript({ relativePath, previewPort, profilePrefix }) {
       output += chunk.toString();
       process.stderr.write(chunk);
     });
-    child.on('close', async (code, signal) => {
-      await cleanupRun({
-        childPid: child.pid,
-        previewPort,
-        profilePrefix,
-        runtimePath,
-      });
-      resolve({
-        code: code ?? 1,
-        signal,
-        output,
-        debugPort,
-      });
-    });
+    const finish = async (code, signal, error) => {
+      if (settled) return;
+      settled = true;
+      try {
+        await cleanupRun({ owned, profilePrefix, runtimePath });
+        if (error) throw error;
+        resolve({ code: code ?? 1, signal, output, debugPort });
+      } catch (cleanupError) { reject(cleanupError); }
+    };
+    // exit is emitted even when orphaned descendants still hold stdio pipes.
+    child.once('exit', (code, signal) => { void finish(code, signal); });
+    child.once('error', error => { void finish(1, null, error); });
   });
 }
 

@@ -31,5 +31,7 @@ jobs:
         run: npm run typecheck
       - name: Run V17 screening regression contracts
         run: npx vitest run src/lib/__tests__/contractsV17.test.ts --pool=forks --maxWorkers=1
+      - name: Verify owned process cleanup contracts
+        run: node --test scripts/tests/owned-process.node.mjs
       - name: Validate production build
         run: npm run build

@@ -17,7 +17,7 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
   const option = useMemo<EChartsOption | null>(() => {
     const best = suggestions[0];
     if (!best) return null;
-    const suggestionIndex = historical.length + 2;
+    const suggestionIndex = historical.length;
     const lower = historical.map((entry) => entry.y_pred - 2 * entry.y_std);
     const upperWidth = historical.map((entry, index) => 4 * entry.y_std || Math.max(0, entry.y_pred + 2 * entry.y_std - lower[index]));
     return {
@@ -36,9 +36,9 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
       tooltip: {
         trigger: 'axis',
         formatter: (params: unknown) => {
-          const entries = Array.isArray(params) ? params as Array<{ dataIndex: number }> : [];
+          const entries = Array.isArray(params) ? params as Array<{ dataIndex: number; seriesId?: string }> : [];
           const dataIndex = entries[0]?.dataIndex ?? -1;
-          if (dataIndex === historical.length) {
+          if (entries.some(entry => entry.seriesId === 'bayes-candidate')) {
             return `${t('bayesChartTooltipBest')}<br/>${t('bayesChartTooltipMean')}: ${formatScientificNumber(best.mean)}<br/>${t('bayesChartTooltipStd')}: ${formatScientificNumber(best.std)}<br/>EI: ${formatScientificNumber(best.ei)}`;
           }
           const row = historical[dataIndex];
@@ -49,7 +49,7 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
       },
       xAxis: {
         type: 'category',
-        data: [...historical.map((_, index) => index + 1), suggestionIndex],
+        data: [...historical.map((_, index) => String(index + 1)), t('bayesChartNextBest')],
         name: t('bayesChartXAxis'),
         nameLocation: 'middle',
         nameGap: 34,
@@ -59,13 +59,15 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
       yAxis: { type: 'value', name: targetName, nameLocation: 'middle', nameGap: 50, scale: true },
       series: [
         {
+          id: 'bayes-observed',
           name: t('bayesChartGroundTruth'),
           type: 'scatter',
-          data: historical.map((entry, index) => [index + 1, entry.y]),
+          data: historical.map((entry, index) => [index, entry.y]),
           symbolSize: 6,
           itemStyle: { color: SCIENTIFIC_PALETTE[7], opacity: 0.75 },
         },
         {
+          id: 'bayes-mean',
           name: t('bayesChartMean'),
           type: 'line',
           data: historical.map((entry) => entry.y_pred),
@@ -73,25 +75,30 @@ export const BayesChart: React.FC<BayesChartProps> = React.memo(({ historical, s
           lineStyle: { color: SCIENTIFIC_PALETTE[0], width: 1.6 },
         },
         {
+          id: 'bayes-lower',
           name: t('bayesChartLowerConfidence'),
           type: 'line',
           data: lower,
           stack: 'gp-band',
+          stackStrategy: 'all',
           symbol: 'none',
           lineStyle: { opacity: 0 },
           silent: true,
         },
         {
+          id: 'bayes-band',
           name: t('bayesChartConfidenceInterval'),
           type: 'line',
           data: upperWidth,
           stack: 'gp-band',
+          stackStrategy: 'all',
           symbol: 'none',
           lineStyle: { opacity: 0 },
           areaStyle: { color: 'rgba(0,114,178,0.16)' },
           silent: true,
         },
         {
+          id: 'bayes-candidate',
           name: t('bayesChartNextBest'),
           type: 'scatter',
           data: [[suggestionIndex, best.mean]],

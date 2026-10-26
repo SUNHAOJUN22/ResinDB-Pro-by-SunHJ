@@ -6,6 +6,10 @@
  * values remain NOT_ASSESSED. No release or regulatory decision is produced.
  */
 
+import type { PropertyValue } from '@/types/index';
+import { admittedPropertyValue, refreshProperty } from '@/lib/propertyAdmission';
+import { parseFiniteReal as strictFiniteNumber } from '@/lib/quantityRecord';
+
 export type ScreeningStatus =
   | "ASSESSED_WITHIN_DECLARED_THRESHOLD"
   | "ASSESSED_OUTSIDE_DECLARED_THRESHOLD"
@@ -22,6 +26,9 @@ export type ScreeningReasonCode =
   | "MISSING_METHOD"
   | "MISSING_SOURCE"
   | "MISSING_SAMPLE_OR_BATCH_ID"
+  | "QUANTITY_UNKNOWN"
+  | "QUANTITY_INVALID"
+  | "QUANTITY_DECLARATION_INVALID"
   | "INVALID_THRESHOLD_CONFIGURATION"
   | "BELOW_DECLARED_MINIMUM"
   | "ABOVE_DECLARED_MAXIMUM";
@@ -38,6 +45,7 @@ export interface ScreeningPropertyValue {
   referenceId?: string;
   sampleId?: string;
   batchId?: string;
+  quantity?: PropertyValue['quantity'];
 }
 
 export interface ScreeningProduct {
@@ -103,27 +111,46 @@ function normalizeText(value: string): string {
     .replace(/[.,，。·]/gu, "");
 }
 
-function normalizeUnit(value: string): string {
+function normalizeMfrUnit(value: string): string {
   return value
     .normalize("NFKC")
-    .toLocaleLowerCase("en-US")
     .replace(/\s+/gu, "")
     .replace(/[·⋅]/gu, "*")
     .replace(/−/gu, "-");
 }
 
-function strictFiniteNumber(value: unknown): number | null {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : null;
+/** Screening uses the same observation admission as formula/quantity consumers.
+ * A rejected or inconsistent stored quantity must never be rebuilt as VALID.
+ * Legacy records without a quantity retain their explicit supported unit aliases.
+ */
+function screeningObservation(
+  property: ScreeningPropertyValue,
+  key: 'mfr' | 'tensileYield',
+): { value: number | null; reasonCodes: ScreeningReasonCode[] } {
+  if (property.quantity !== undefined && property.quantity?.status !== 'VALID') {
+    return {
+      value: null,
+      reasonCodes: [property.quantity?.status === 'UNKNOWN' ? 'QUANTITY_UNKNOWN' : 'QUANTITY_INVALID'],
+    };
   }
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/u.test(trimmed)) {
-    return null;
+  // The caller has checked the finite display value, unit and evidence fields.
+  // Normalize only these historical MFR spellings on a detached declaration;
+  // preserve the original raw value/unit in the source record and report.
+  let declaration = { ...property } as PropertyValue;
+  if (key === 'mfr' && property.quantity === undefined && property.unit
+      && ['g/10mins', 'g/(10min)', 'g*10min-1'].includes(normalizeMfrUnit(property.unit))) {
+    declaration = { ...declaration, unit: 'g/10 min' };
   }
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : null;
+  const verified = refreshProperty(key, declaration);
+  const value = admittedPropertyValue(verified, key);
+  if (value === null) {
+    return {
+      value: null,
+      reasonCodes: [verified.quantity?.reasonCodes.includes('UNKNOWN_OR_INCOMPATIBLE_UNIT')
+        ? 'UNIT_MISMATCH' : 'QUANTITY_DECLARATION_INVALID'],
+    };
+  }
+  return { value, reasonCodes: [] };
 }
 
 function hasDeclaredCondition(value: unknown): boolean {
@@ -238,12 +265,6 @@ function assessMfr(
   if (!match.property.unit?.trim()) {
     return notAssessed("MFR", "g/10 min", ["MISSING_UNIT"], declaredRange, match);
   }
-  const unit = normalizeUnit(match.property.unit);
-  const acceptedMfrUnits = new Set(["g/10min", "g/10mins", "g/(10min)", "g*10min-1"]);
-  if (!acceptedMfrUnits.has(unit)) {
-    return notAssessed("MFR", "g/10 min", ["UNIT_MISMATCH"], declaredRange, match);
-  }
-
   const reasons: ScreeningReasonCode[] = minimumEvidenceReasons(match.property);
   if (!hasDeclaredCondition(match.property.temperature ?? match.property.temp)) {
     reasons.push("MISSING_MFR_TEMPERATURE");
@@ -253,9 +274,15 @@ function assessMfr(
     return notAssessed("MFR", "g/10 min", reasons, declaredRange, match);
   }
 
+  const observation = screeningObservation(match.property, 'mfr');
+  if (observation.value === null) {
+    return notAssessed("MFR", "g/10 min", observation.reasonCodes, declaredRange, match);
+  }
+  const canonicalValue = observation.value;
+
   const reasonCodes: ScreeningReasonCode[] = [];
-  if (value < validatedThresholds.mfrMin) reasonCodes.push("BELOW_DECLARED_MINIMUM");
-  if (value > validatedThresholds.mfrMax) reasonCodes.push("ABOVE_DECLARED_MAXIMUM");
+  if (canonicalValue < validatedThresholds.mfrMin) reasonCodes.push("BELOW_DECLARED_MINIMUM");
+  if (canonicalValue > validatedThresholds.mfrMax) reasonCodes.push("ABOVE_DECLARED_MAXIMUM");
   return {
     criterion: "MFR",
     status:
@@ -265,20 +292,11 @@ function assessMfr(
     rawPropertyName: match.name,
     rawValue: match.property.value,
     rawUnit: match.property.unit,
-    canonicalValue: value,
+    canonicalValue,
     canonicalUnit: "g/10 min",
     declaredRange,
     reasonCodes,
   };
-}
-
-function tensileToMpa(value: number, unit: string): number | null {
-  const normalized = normalizeUnit(unit);
-  if (normalized === "mpa") return value;
-  if (normalized === "gpa") return value * 1_000;
-  if (normalized === "kpa") return value / 1_000;
-  if (normalized === "pa") return value / 1_000_000;
-  return null;
 }
 
 function assessTensile(
@@ -342,16 +360,17 @@ function assessTensile(
       match,
     );
   }
-  const canonicalValue = tensileToMpa(rawValue, match.property.unit);
-  if (canonicalValue === null || !Number.isFinite(canonicalValue)) {
+  const observation = screeningObservation(match.property, 'tensileYield');
+  if (observation.value === null) {
     return notAssessed(
       "TENSILE_STRENGTH",
       "MPa",
-      ["UNIT_MISMATCH"],
+      observation.reasonCodes,
       declaredRange,
       match,
     );
   }
+  const canonicalValue = observation.value;
   const reasonCodes: ScreeningReasonCode[] = [];
   if (canonicalValue < validatedThresholds.tensileMinMpa) {
     reasonCodes.push("BELOW_DECLARED_MINIMUM");

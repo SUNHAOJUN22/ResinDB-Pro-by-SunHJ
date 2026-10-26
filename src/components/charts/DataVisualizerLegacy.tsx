@@ -1,6 +1,8 @@
 import { empiricalCdf } from '@/compute/gaussianCopula';
 import { admittedPropertyValue } from '@/lib/propertyAdmission';
 import { parseFiniteReal } from '@/lib/quantityRecord';
+import { filterAnalysisProducts } from '@/lib/analysisFilters';
+import { extractArrheniusLifetimePoints } from '@/lib/arrheniusInput';
 import React, {
   useState,
   useMemo,
@@ -346,40 +348,20 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
 
     // Run Pareto computation effect will be placed after getVal and filteredData
 
-    // Apply filters to baseData
-    const filteredData = useMemo(() => {
-      if (!baseData || baseData.length === 0) return [];
-      const filterKeys = Object.keys(filters);
-      if (filterKeys.length === 0) return baseData;
-
-      // Compile float boundaries ONCE outside the main 50,000 document iteration loop
-      const compiledFilters = filterKeys.map((key) => ({
-        key,
-        min: filters[key].min === "" ? -Infinity : safeParse(filters[key].min),
-        max: filters[key].max === "" ? Infinity : safeParse(filters[key].max),
-      }));
-
-      const numFilters = compiledFilters.length;
-      const res: Product[] = [];
-      const len = baseData.length;
-
-      for (let i = 0; i < len; i++) {
-        const p = baseData[i];
-        let pass = true;
-        for (let f = 0; f < numFilters; f++) {
-          const rule = compiledFilters[f];
-          const rawVal = p.properties[rule.key]?.value;
-          const numVal =
-            typeof rawVal === "number" ? rawVal : safeParse(String(rawVal));
-          if (isNaN(numVal) || numVal < rule.min || numVal > rule.max) {
-            pass = false;
-            break;
-          }
-        }
-        if (pass) res.push(p);
+    const formulaExecutor = useMemo(() => formulaEngine.compileGraph(formulas), [formulas]);
+    const getVal = useCallback((product: Product, key: string): number => {
+      if (/^formula[-_]/.test(key)) {
+        const value = formulaExecutor(product)[key.replace(/^formula[-_]/, '')];
+        return Number.isFinite(value) ? value : Number.NaN;
       }
-      return res;
-    }, [baseData, filters]);
+      return admittedPropertyValue(product.properties[key], key) ?? Number.NaN;
+    }, [formulaExecutor]);
+
+    // Filtering and every downstream chart share the same canonical/formula accessor.
+    const filteredData = useMemo(
+      () => filterAnalysisProducts(baseData ?? [], filters, getVal),
+      [baseData, filters, getVal],
+    );
 
     useEffect(() => {
       clearKde();
@@ -394,14 +376,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
         }
     }, [activeChart, filteredData, similarityFeatures, similarityThreshold, calculateSimilarity]);
 
-    const formulaExecutor = useMemo(() => formulaEngine.compileGraph(formulas), [formulas]);
-    const getVal = useCallback((product: Product, key: string): number => {
-      if (/^formula[-_]/.test(key)) {
-        const value = formulaExecutor(product)[key.replace(/^formula[-_]/, '')];
-        return Number.isFinite(value) ? value : Number.NaN;
-      }
-      return admittedPropertyValue(product.properties[key], key) ?? Number.NaN;
-    }, [formulaExecutor]);
+
 
     useEffect(() => {
       const keys = numericProperties.filter(key => !key.startsWith('formula_'));
@@ -1566,26 +1541,19 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                         <div className="space-y-3">
                             <div className="bg-orange-50 dark:bg-orange-900/10 p-2 rounded border border-orange-100 dark:border-orange-800/50">
                                 <p className="text-[10px] text-orange-800 dark:text-orange-400 mb-2 font-bold leading-tight">
-                                  {language === "en" ? "Click 'Extract' to automatically read from temperature-specific attributes of the selected product, or enter manually." : "可以点击“提取”从当前选中牌号的名字带温度的属性中自动提取，或手动输入。"}
+                                  {language === "en" ? "Pre-filled values are illustrative examples. Extract only declared time-to-failure observations from one test series and failure criterion; time units are converted to hours. Manual inputs below are hours and require the same endpoint." : "预填值仅为示例。仅提取声明了同一试验系列、失效判据与温度的失效时间，统一换算为小时。下方手动输入也须采用小时及同一失效判据。"}
                                 </p>
                                 <motion.button
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
                                     onClick={() => {
                                         if(filteredData.length !== 1) return alert(language === "en" ? "Please filter down to exactly 1 product first!" : "请在左侧筛选面板中只保留1款牌号数据！");
-                                        const p = filteredData[0];
-                                        const newPts = [];
-                                        for(const k of numericProperties) {
-                                             const val = getVal(p, k);
-                                             if(!isNaN(val) && val > 0) {
-                                                 const match = k.match(/(\d+)\s*[℃C]/);
-                                                 if(match) {
-                                                     newPts.push({ id: Date.now() + newPts.length, temp: Number(match[1]), time: val });
-                                                 }
-                                             }
+                                        try {
+                                            const extracted = extractArrheniusLifetimePoints(filteredData[0]);
+                                            setArrheniusPoints(extracted.points.map((point, index) => ({ id: index, temp: point.tempC, time: point.time })));
+                                        } catch (error) {
+                                            alert((language === "en" ? "Extraction failed: " : "提取失败：") + (error instanceof Error ? error.message : String(error)));
                                         }
-                                        if(newPts.length >= 2) setArrheniusPoints(newPts); 
-                                        else alert(language === "en" ? "Extraction failed: selected product lacks temperature-tagged failure time attributes (e.g., OIT_150C). Please enter manually." : "提取失败：该材料缺乏带温度标记的失效时间属性（如: 氧化诱导期_150C），请手动输入。");
                                     }}
                                     className="w-full bg-white dark:bg-slate-800 border border-orange-200 dark:border-orange-700 text-orange-600 dark:text-orange-400 text-[10px] py-1 rounded hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors"
                                 >
@@ -3024,7 +2992,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                 <div className="absolute inset-0 pt-4 pb-6 px-6 flex flex-col">
                    <div className="mb-4">
                       <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2"><Flame className="text-orange-500"/> {language === "en" ? "Thermal Oxidative Aging Life Extrapolation (Arrhenius Plot)" : "热氧老化寿命预测 (Arrhenius Plot)"}</h3>
-                      <p className="text-sm text-slate-500">{language === "en" ? "Estimating Activation Energy from high-temperature accelerated aging, extrapolating lifespan at ambient conditions." : "通过高温加速老化实测数据推算表观活化能，外推/预测常温或服役工况下的材料预期耐候寿命。"}</p>
+                      <p className="text-sm text-slate-500">{language === "en" ? "Exploratory log-lifetime fit. Use one failure mechanism and criterion; the fit does not validate the mechanism or qualify a service lifetime." : "对数寿命探索性拟合；输入须属于同一失效机理与判据。拟合通过不等于机理验证或服役寿命放行。"}</p>
                    </div>
                    <div className="flex-1 overflow-hidden relative">
                        {arrheniusError ? (
@@ -3061,7 +3029,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
                                                  <span>{language === "en" ? "R² (goodness of fit):" : "R²（拟合优度）："}</span> <span className="font-mono font-bold bg-white/50 dark:bg-black/20 px-1 rounded">{arrheniusResult.rSquared.toFixed(4)}</span>
                                             </div>
                                             <div className="flex justify-between pb-1">
-                                                <span>{language === "en" ? "Pre-exponential Factor (ln A):" : "指前因子 (ln A):"}</span> <span className="font-mono font-bold">{arrheniusResult.equation.b.toFixed(2)}</span>
+                                                <span>{language === "en" ? "Log-time intercept b:" : "对数时间截距 b："}</span> <span className="font-mono font-bold">{arrheniusResult.equation.b.toFixed(2)}</span>
                                             </div>
                                         </div>
                                     </div>

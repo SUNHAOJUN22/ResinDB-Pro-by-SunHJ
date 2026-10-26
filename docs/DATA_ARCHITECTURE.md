@@ -210,3 +210,90 @@ measurement exists. Product views do not claim external manufacturer-database
 verification merely because a record is present. These software checks support
 screening; they neither authenticate a measurement nor release an industrial
 material or parameter.
+
+## 10. Suggested declarations and analysis inputs
+
+The new-product editor presents individual historical declarations: value, unit,
+source record and test context stay together. Clicking a suggestion replaces the
+value and unit in one state update, including a previously entered unit. It does
+not combine raw values with the most frequent unit or pool a range across test
+conditions. Rejected or inconsistent quantities are unavailable as suggestions.
+A copied suggestion carries an annotation and `suggestion:<product-id>:<key>`
+provenance. A new product containing such a suggestion remains
+`UNKNOWN` / `NOT_FOR_RELEASE`; copying another sample does not create a measured
+fact. Direct manual entry retains its existing flow and source declaration.
+
+Analysis range filters use the same admitted canonical/formula accessor as the
+plot and downstream workers. A blank bound leaves that side unbounded; a filter
+still requires an available finite observation. Invalid bounds, contradictory
+quantities and unavailable formula results cannot be replaced by zero.
+
+### Explicit Arrhenius extraction contract
+
+Automatic extraction accepts only `VALID` time quantities whose preserved
+`quantity.raw.conditions` explicitly declares all of the following:
+
+| Field | Meaning |
+|---|---|
+| `observationKind` | Exact value `time-to-failure` |
+| `temperatureC` | Finite Celsius temperature greater than −273.15 |
+| `failureCriterion` | Non-empty, identical failure endpoint across the series |
+| `agingSeriesId` | Non-empty identifier of the compatible test series |
+
+These are an additional opt-in analysis contract in the existing extensible
+condition record, not a claim that old data already meets the contract. Raw
+`method` or `standard` must be present and identical across the extracted series.
+The raw/displayed value, unit and method must agree. Supported raw time units are
+`s`, `sec`, `min`, `h`, `hr` and `d`; conversion uses 60 seconds per minute,
+3,600 seconds per hour and 24 hours per day. The stored canonical time is checked
+independently against the raw conversion before passing hours to the worker.
+
+At least two distinct absolute temperatures and positive times are required by
+the existing two-parameter fit. Repeated temperatures remain separate declared
+observations rather than being silently averaged; two temperatures alone do not
+establish goodness of extrapolation or parameter uncertainty. Sample IDs, batch
+IDs, source keys and provenance references remain available in extraction output.
+An OIT/oxidation-induction assay or a temperature-tagged strength is not an
+automatically qualified lifetime. Missing declarations cause an explicit refusal;
+manual time input remains available in hours and requires the same endpoint.
+
+This contract checks consistency of declarations. It does not authenticate
+measurements, establish a single failure mechanism, validate an acceleration
+model, or release a service lifetime. The intercept of `ln(time) = m/T + b` is
+a log-time intercept, not directly a reaction-rate pre-exponential factor.
+
+Sources for the unit and model boundaries:
+[NIST SP 330, accepted time units](https://www.nist.gov/pml/special-publication-330/sp-330-section-4),
+[NIST reliability projection by failure mechanism](https://www.itl.nist.gov/div898/handbook/apr/section4/apr43.htm).
+
+Bayesian figures keep observations and predicted means on the same category
+coordinates. The model band is `mean ± 2 standard deviations` even for negative
+or zero-crossing responses; it is model uncertainty, not experimental acceptance.
+Candidate tooltips use the candidate series identity rather than a within-series
+index that could also identify the first historical observation.
+
+## 11. QA worksheet observation admission
+
+The PDF QA worksheet applies the same core-quantity admission as formula and
+comparison consumers before comparing a declaration with the user's thresholds.
+An explicit `UNKNOWN` or `INVALID` quantity remains unavailable. A stored `VALID`
+quantity must agree with its preserved raw value, unit and test conditions and
+with the displayed declaration; recomputing a plausible value cannot repair an
+inconsistent historical record during export.
+
+Legacy manual declarations without an embedded quantity remain supported when
+their value, unit, method, source and sample or batch identity satisfy the
+existing contract. MFR also requires its temperature and load. Historical MFR
+spellings `g/10 mins`, `g/(10 min)` and `g*10min-1` are normalized only on a detached
+admission copy; the original declaration and report's raw-value fields remain
+unchanged.
+
+Pressure conversion preserves SI symbol case. Supported `Pa`, `kPa`, `MPa` and
+`GPa` declarations are converted through the core quantity contract. Unsupported
+`mPa` is refused rather than interpreted as `MPa`: milli and mega differ by a
+factor of one billion. See [NIST, writing SI units and prefixes](https://www.nist.gov/pml/owm/writing-si-metric-system-units).
+
+Rejected observations produce `NOT_ASSESSED` and no canonical numeric result in
+the worksheet. These consistency checks do not authenticate a measurement,
+validate a material for service, or make a material-release or regulatory
+decision. The existing screening-only boundary remains in the exported report.

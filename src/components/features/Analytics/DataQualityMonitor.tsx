@@ -68,6 +68,10 @@ export const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({ products
   }, [result, searchQuery, missingUrgencyFilter]);
 
 
+  if (products.length === 0) {
+    return <div role="status" className="p-6 text-slate-500">Data quality not assessed: no products are selected.</div>;
+  }
+
   if (isAnomalizing && !result) {
     return (
       <div className="flex flex-col items-center justify-center p-12 min-h-[400px] text-center space-y-4">
@@ -102,7 +106,11 @@ export const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({ products
     );
   }
 
-  const healthScore = result?.healthScore ?? 100;
+  const expectedValues = result ? result.totalValuesChecked + result.totalMissingCount : 0;
+  if (!result || expectedValues === 0) {
+    return <div role="status" className="p-6 text-slate-500">Data quality not assessed: no diagnostic observations are available.</div>;
+  }
+  const healthScore = result.healthScore;
   
   // Custom helper for coloring health score
   const getScoreColor = (score: number) => {
@@ -120,7 +128,7 @@ export const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({ products
         {/* Quality Health Score Card */}
         <div className={`md:col-span-1 p-6 border rounded-3xl flex flex-col items-center justify-center text-center space-y-3 ${getScoreColor(healthScore)}`}>
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 leading-none">
-            Dataset Integrity
+            Dataset Screening Score
           </p>
           <div className="relative flex items-center justify-center">
             <span className="text-4xl font-extrabold tracking-tighter">
@@ -131,7 +139,7 @@ export const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({ products
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tight bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
             {healthScore >= 90 ? (
               <>
-                <CheckCircle2 size={12} className="text-emerald-500" /> Great Quality
+                <CheckCircle2 size={12} className="text-emerald-500" /> Few Statistical Flags
               </>
             ) : healthScore >= 75 ? (
               <>
@@ -214,13 +222,13 @@ export const DataQualityMonitor: React.FC<DataQualityMonitorProps> = ({ products
         <div className="p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-900 rounded-2xl flex flex-col justify-between">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Missing Values Rate</span>
           <span className="text-xl font-black text-indigo-600 dark:text-indigo-400 mt-1 font-mono">
-            {result && result.totalValuesChecked > 0 ? ((result.totalMissingCount / (result.totalValuesChecked + result.totalMissingCount)) * 100).toFixed(1) : 0}%
+            {((result.totalMissingCount / expectedValues) * 100).toFixed(1)}%
           </span>
         </div>
         <div className="p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-900 rounded-2xl flex flex-col justify-between">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Outlying Values Rate</span>
           <span className="text-xl font-black text-rose-500 mt-1 font-mono">
-            {result && result.totalValuesChecked > 0 ? ((result.totalOutliersCount / result.totalValuesChecked) * 100).toFixed(2) : 0}%
+            {result.totalValuesChecked > 0 ? `${((result.totalOutliersCount / result.totalValuesChecked) * 100).toFixed(2)}%` : 'N/A'}
           </span>
         </div>
         <div className="p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-900 rounded-2xl flex flex-col justify-between">
