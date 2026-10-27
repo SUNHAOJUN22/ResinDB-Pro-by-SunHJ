@@ -1,0 +1,78 @@
+name: Pinned optimization toolchain
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/workflows/optimization-toolchain.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: optimization-toolchain-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  node-toolchain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 1ac6d7e7beb1c154490424bffac6559b9501fdd4
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+      - name: Preserve the lock-bound development installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm ls --all
+          destination="$RUNNER_TEMP/optimization-node-toolchain"
+          mkdir -p "$destination"
+          tar -czf "$destination/node_modules.tar.gz" node_modules
+          cp package-lock.json "$destination/package-lock.json"
+          node --version > "$destination/node-version.txt"
+          npm --version > "$destination/npm-version.txt"
+          git rev-parse HEAD > "$destination/source-commit.txt"
+          (cd "$destination" && sha256sum node_modules.tar.gz package-lock.json > SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: optimization-node-toolchain-${{ github.run_id }}
+          path: ${{ runner.temp }}/optimization-node-toolchain
+          retention-days: 7
+          if-no-files-found: error
+  python-toolchain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: SUNHAOJUN22/TsaoDFT_skill
+          ref: 5b0423e88d4989b36ab74cfddcaeadb77fd0085f
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.13'
+      - name: Download the constrained Python development wheels
+        shell: bash
+        run: |
+          set -euo pipefail
+          destination="$RUNNER_TEMP/optimization-python-toolchain"
+          mkdir -p "$destination"
+          python -m pip download --only-binary=:all: --dest "$destination" \
+            -c constraints/py313.txt -r requirements-dev.txt
+          cp constraints/py313.txt "$destination/constraints.txt"
+          cp requirements-dev.txt "$destination/requirements-dev.txt"
+          cp requirements.txt "$destination/requirements.txt"
+          git rev-parse HEAD > "$destination/source-commit.txt"
+          (cd "$destination" && sha256sum *.whl > SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: optimization-python-toolchain-${{ github.run_id }}
+          path: ${{ runner.temp }}/optimization-python-toolchain
+          retention-days: 7
+          if-no-files-found: error
