@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "base_commit": "97d08b9c758829ec3c5434c3e95a9df6706022a3",
+  "base_tree": "dd87b0be1b602c23b77d141da055553f09bdd614",
+  "candidate_tree": "9c49029ef78d69242ad03d9e3749cfd63b56a6bd",
+  "patch_sha256": "1cd7e86f130cb6a1de7677afb3b31e82f29a7377d9a0a8a74b31888657146fde",
+  "paths": [
+    "README.en.md",
+    "README.md",
+    "README.zh-CN.md",
+    "docs/WORKBENCH_OPTIMIZATION.md",
+    "package.json",
+    "reports/UNICODE_INTEGRITY_REPORT.json",
+    "scripts/build-metrics.mjs",
+    "scripts/lib/build-budget.mjs",
+    "scripts/tests/build-budget-contract.node.mjs",
+    "scripts/tests/validation-receipt-contract.node.mjs",
+    "scripts/validation-receipt-contract.mjs",
+    "src/components/App.tsx",
+    "src/components/charts/AnalysisMethodPanel.tsx",
+    "src/components/charts/AnalysisModeNavigation.tsx",
+    "src/components/charts/DataVisualizer.tsx",
+    "src/components/charts/DataVisualizerLegacy.tsx",
+    "src/components/charts/ScientificEChart.tsx",
+    "src/components/charts/analysisModes.ts",
+    "src/components/charts/chartResizeScheduler.ts",
+    "src/components/features/Ai/AiCopilot.tsx",
+    "src/components/features/Ai/AiCopilotLauncher.tsx",
+    "src/components/ui/DeferredMount.tsx",
+    "src/components/views/DashboardView.tsx",
+    "src/compute/distributions.ts",
+    "src/workers/mahalanobisWorker.ts",
+    "tests/fixtures/chi-square-isf-reference.json",
+    "tests/science/mahalanobisTailAndAdmission.test.ts",
+    "tests/science/numericalPerformance.test.ts",
+    "tests/unit/analysisWorkbench.test.tsx",
+    "tests/unit/chartResizeScheduler.test.ts",
+    "tests/unit/deferredMount.test.tsx",
+    "vite.config.ts"
+  ],
+  "parts": [
+    {
+      "path": ".github/optimization-transfer/patch-1.b64",
+      "sha256": "cf6309a7c7211b93d5c11b25142bf1f25b3299bb61293ef67b76b4225b918665"
+    },
+    {
+      "path": ".github/optimization-transfer/patch-2.b64",
+      "sha256": "24ac7bb06a277751780b619cca06b7964ddbf3eb9dd62ca963c07a0c7ccb7266"
+    },
+    {
+      "path": ".github/optimization-transfer/patch-3-01.b64",
+      "sha256": "c6ee5b0af5fa100766c7bdaa2c19f78a810295863aa78e14edd4ccc7f704a077"
+    },
+    {
+      "path": ".github/optimization-transfer/patch-3-02.b64",
+      "sha256": "f80dfa83930cee64b05e4c7fe18c5b1140e5e8fd15e0e09c8fbe4dba4e5147e5"
+    },
+    {
+      "path": ".github/optimization-transfer/patch-3-03.b64",
+      "sha256": "d835b224a388d3047d841ee7b8eb122a17179aa6277c61cb3af5d0dda7573657"
+    },
+    {
+      "path": ".github/optimization-transfer/patch-3-04.b64",
+      "sha256": "f57c64f14d714c502e711e8e611ef64abd0c9930f62502427e4b8d6aa46ae1b4"
+    },
+    {
+      "path": ".github/optimization-transfer/patch-4-01.b64",
+      "sha256": "f250cf034271016c3500fc91fc5845afa5a60713f2a5f577adbadba4339bfdbe"
+    },
+    {
+      "path": ".github/optimization-transfer/patch-4-02.b64",
+      "sha256": "471818db0187276ac2fb0f1aa4f180588358883ac9b4be80b77985c9653c2933"
+    },
+    {
+      "path": ".github/optimization-transfer/patch-4-03.b64",
+      "sha256": "61902c73f816727aaf6bac3b5ac01e4083d2227d8b36f8d8f6219f2e72336881"
+    },
+    {
+      "path": ".github/optimization-transfer/patch-4-04.b64",
+      "sha256": "744ea4884238b708483a356a97a5b7e5caff05c8ea6c3803da759050e896814a"
+    },
+    {
+      "path": ".github/optimization-transfer/patch-5-01.b64",
+      "sha256": "fa8bfe0f272691b0d12cb681097edebe8799b78b44e3dbf4ccb0bf345aec639e"
+    },
+    {
+      "path": ".github/optimization-transfer/patch-5-02.b64",
+      "sha256": "1b1e4a3ebf14f7fefddbd48f1f145dec8c2d30fa09f720dcdf6a97e81a208df7"
+    },
+    {
+      "path": ".github/optimization-transfer/patch-5-03.b64",
+      "sha256": "e4b26c4742710ce20556cae27b76d7364d4e03c4f5cbf00d5908d412cc3b5d13"
+    },
+    {
+      "path": ".github/optimization-transfer/patch-5-04.b64",
+      "sha256": "88cb4f86fdeb68a2ff861ffb6b1d3cd1725ec5adadb4f38ce06ccb44e8f1ee05"
+    }
+  ]
+}
