@@ -1,4 +1,4 @@
-import { initialJavaScriptBudget } from './lib/build-budget.mjs';
+import { assertStartupEntryIsolation, initialJavaScriptBudget } from './lib/build-budget.mjs';
 import { createGzip } from 'node:zlib';
 import { pipeline } from 'node:stream/promises';
 import { createReadStream, createWriteStream } from 'node:fs';
@@ -11,6 +11,7 @@ for(const file of files){const relative=path.relative(dist,file).replaceAll(path
 const html=await readFile(path.join(dist,'index.html'),'utf8'); const entryMatch=html.match(/<script[^>]+src="([^"]+\.js)"/); const modulePreloads=[...html.matchAll(/rel="modulepreload"[^>]+href="([^"]+\.js)"/g)].map(m=>m[1]);
 const totalBytes=rows.reduce((s,r)=>s+r.bytes,0); const dataBytes=rows.filter(r=>r.file.startsWith('data/')).reduce((s,r)=>s+r.bytes,0); const largest=[...rows].sort((a,b)=>b.bytes-a.bytes).slice(0,16); const entryFile=(entryMatch?.[1]??'').replace(/^\//,''); const entry=rows.find(r=>r.file===entryFile); const echarts=rows.filter(r=>/echarts-core.*\.js$/.test(r.file)).sort((a,b)=>b.bytes-a.bytes)[0];
 const manifest=JSON.parse(await readFile(path.join(dist,'.vite','manifest.json'),'utf8'));
+assertStartupEntryIsolation(manifest);
 const initialJs=initialJavaScriptBudget(manifest,rows);
 const budgets={entryGzipBytes:350000,echartsRawBytes:900000,initialJsGzipBytes:400000};
 if(initialJs.gzipBytes>budgets.initialJsGzipBytes) throw new Error(`Initial static dependency budget exceeded: ${initialJs.gzipBytes} > ${budgets.initialJsGzipBytes}`);

@@ -40,3 +40,22 @@ export function initialJavaScriptBudget(manifest, rows) {
   if (!Number.isSafeInteger(gzipBytes)) throw new Error('Invalid startup size total');
   return { scope: 'entry-and-transitive-static-imports', files, gzipBytes };
 }
+
+/** Startup dependencies must not execute the app entry in order to initialize themselves. */
+export function assertStartupEntryIsolation(manifest, entryKey = 'index.html') {
+  // Reuse the fail-closed shape/path validation, including all reachable chunks.
+  initialJavaScriptFiles(manifest, entryKey);
+  const visited = new Set();
+  const queue = [entryKey];
+  while (queue.length) {
+    const key = queue.pop();
+    if (visited.has(key)) continue;
+    visited.add(key);
+    for (const dependency of manifest[key].imports ?? []) {
+      if (dependency === entryKey || manifest[dependency].file === manifest[entryKey].file) {
+        throw new Error(`Startup chunk imports application entry: ${key} -> ${dependency}`);
+      }
+      queue.push(dependency);
+    }
+  }
+}

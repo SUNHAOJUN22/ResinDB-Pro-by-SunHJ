@@ -71,13 +71,17 @@ export default defineConfig(({ mode }) => {
         output: {
           onlyExplicitManualChunks: true,
           manualChunks(id) {
+            // Keep the CommonJS runtime below application and vendor chunks.
+            // With explicit chunks it must not be hoisted into the app entry.
+            if (id === '\0commonjsHelpers.js') return 'runtime-helpers';
             if (!id.includes('node_modules')) return undefined;
             if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) return 'react-core';
             if (id.includes('/echarts/') || id.includes('/zrender/') || id.includes('/echarts-for-react/')) return 'echarts-core';
             if (id.includes('/recharts/') || id.includes('/d3-')) return 'data-visualization';
             if (id.includes('/jspdf/') || id.includes('/html2canvas/')) return 'reporting';
             if (id.includes('/react-markdown/') || id.includes('/remark-') || id.includes('/micromark')) return 'markdown';
-            if (id.includes('/lucide-react/') || id.includes('/motion/')) return 'ui-toolkit';
+            if (id.includes('/lucide-react/') || id.includes('/motion/') || id.includes('/framer-motion/')
+                || id.includes('/motion-dom/') || id.includes('/motion-utils/')) return 'ui-toolkit';
             return undefined;
           },
         },

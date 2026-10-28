@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { initialJavaScriptBudget, initialJavaScriptFiles } from '../lib/build-budget.mjs';
+import { assertStartupEntryIsolation, initialJavaScriptBudget, initialJavaScriptFiles } from '../lib/build-budget.mjs';
 const manifest = {
   'index.html': { isEntry: true, file: 'assets/index.js', imports: ['react', 'shared'], dynamicImports: ['report'] },
   react: { file: 'assets/react.js', imports: ['shared'] },
@@ -30,4 +30,18 @@ test('rejects traversal and external manifest paths', () => {
   for (const file of ['../other.js', '/assets/shared.js', 'https://example.com/a.js', 'assets\\shared.js']) {
     assert.throws(() => initialJavaScriptFiles({ ...manifest, shared: { file } }));
   }
+});
+
+test('rejects self-import and vendor-to-entry startup back edges', () => {
+  for (const data of [
+    { ...manifest, 'index.html': { ...manifest['index.html'], imports: ['index.html'] } },
+    { ...manifest, shared: { ...manifest.shared, imports: ['index.html'] } },
+    { ...manifest, shared: { file: 'assets/index.js' } },
+  ]) assert.throws(() => assertStartupEntryIsolation(data), /imports application entry/);
+});
+test('permits shared vendor cycles and lazy tools without an entry back edge', () => {
+  assert.doesNotThrow(() => assertStartupEntryIsolation(manifest));
+  assert.doesNotThrow(() => assertStartupEntryIsolation({ ...manifest,
+    report: { file: 'assets/report.js', imports: ['index.html'] },
+  }));
 });
