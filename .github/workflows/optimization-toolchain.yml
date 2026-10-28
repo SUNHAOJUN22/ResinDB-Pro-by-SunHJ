@@ -147,7 +147,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api repos/SUNHAOJUN22/ResinDB-Pro-by-SunHJ/actions/jobs/122680155567/logs \
+          gh api --allow-escape-sequences repos/SUNHAOJUN22/ResinDB-Pro-by-SunHJ/actions/jobs/122680155567/logs \
             > "$RUNNER_TEMP/optimization-source-snapshots/resin-failed-job-122680155567.log"
           sha256sum "$RUNNER_TEMP/optimization-source-snapshots/resin-failed-job-122680155567.log" \
             > "$RUNNER_TEMP/optimization-source-snapshots/failed-log.sha256"
