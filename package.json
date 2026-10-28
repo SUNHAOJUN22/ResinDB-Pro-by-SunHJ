@@ -24,7 +24,7 @@
     "validate:unicode": "node scripts/validate-repository-unicode.mjs --audit",
     "verify:external-data": "node scripts/verify-external-data.mjs",
     "data:manifest": "node scripts/generate-data-manifest.mjs",
-    "metrics:build": "node scripts/build-metrics.mjs",
+    "metrics:build": "node --test scripts/tests/build-budget-contract.node.mjs && node scripts/build-metrics.mjs",
     "metrics:coverage": "node scripts/coverage-metrics.mjs",
     "report:validation": "node scripts/generate-validation-dashboard.mjs",
     "validate:docs": "node scripts/validate-repository-docs.mjs && node scripts/validate-i18n-visuals.mjs",

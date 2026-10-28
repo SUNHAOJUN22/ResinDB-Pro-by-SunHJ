@@ -1,11 +1,11 @@
-import { chiSquareUpperTailQuantileWilsonHilferty } from '@/compute/distributions';
+import { chiSquareUpperTailQuantile } from '@/compute/distributions';
 import {
   choleskyFactorize,
   dotProduct,
   solveCholesky,
 } from '@/compute/linearAlgebra';
 
-const MAHALANOBIS_MODEL_VERSION = 'regularized-cholesky-mahalanobis-2.0.0';
+const MAHALANOBIS_MODEL_VERSION = 'regularized-cholesky-mahalanobis-3.0.0';
 
 export interface MahalanobisMessage {
   type: 'CALCULATE_MAHALANOBIS';
@@ -25,9 +25,12 @@ export interface MahalanobisResponse {
     modelVersion: typeof MAHALANOBIS_MODEL_VERSION;
     diagnostics: {
       distanceDefinition: 'squared-mahalanobis';
-      thresholdApproximation: 'wilson-hilferty-with-acklam-normal-quantile';
+      thresholdApproximation: 'numerical-inverse-gamma';
       alpha: number;
       observations: number;
+      suppliedObservations: number;
+      excludedObservations: number;
+      screeningOnly: true;
       dimensions: number;
       covarianceRegularization: number;
       choleskyJitter: number;
@@ -43,6 +46,9 @@ export interface MahalanobisResponse {
 self.onmessage = (event: MessageEvent<MahalanobisMessage>) => {
   try {
     const { data, features, alpha = 0.01 } = event.data.payload;
+    if (!Array.isArray(data) || !Array.isArray(features) || features.some(feature => typeof feature !== 'string' || !feature.trim())) {
+      throw new TypeError('Data and feature names must be valid arrays.');
+    }
     if (features.length < 2) throw new Error('请至少选择2个特征进行多元异常检测。');
     if (new Set(features).size !== features.length) throw new Error('特征名称不得重复。');
     if (!Number.isFinite(alpha) || alpha <= 0 || alpha >= 0.5) {
@@ -50,8 +56,9 @@ self.onmessage = (event: MessageEvent<MahalanobisMessage>) => {
     }
 
     const validData = (data ?? []).filter((row) => (
-      row
-      && features.every((feature) => Number.isFinite(Number(row[feature])))
+      row !== null && typeof row === 'object' && !Array.isArray(row)
+      && features.every((feature) => Object.hasOwn(row, feature)
+        && typeof row[feature] === 'number' && Number.isFinite(row[feature]))
     ));
     const observations = validData.length;
     const dimensions = features.length;
@@ -62,7 +69,7 @@ self.onmessage = (event: MessageEvent<MahalanobisMessage>) => {
     const mean = new Float64Array(dimensions);
     for (const row of validData) {
       for (let dimension = 0; dimension < dimensions; dimension++) {
-        mean[dimension] += Number(row[features[dimension]]);
+        mean[dimension] += row[features[dimension]];
       }
     }
     for (let dimension = 0; dimension < dimensions; dimension++) mean[dimension] /= observations;
@@ -70,10 +77,10 @@ self.onmessage = (event: MessageEvent<MahalanobisMessage>) => {
     const covariance = new Float64Array(dimensions * dimensions);
     for (const row of validData) {
       for (let left = 0; left < dimensions; left++) {
-        const leftDifference = Number(row[features[left]]) - mean[left];
+        const leftDifference = row[features[left]] - mean[left];
         for (let right = 0; right <= left; right++) {
           covariance[left * dimensions + right] += (
-            leftDifference * (Number(row[features[right]]) - mean[right])
+            leftDifference * (row[features[right]] - mean[right])
           );
         }
       }
@@ -93,7 +100,7 @@ self.onmessage = (event: MessageEvent<MahalanobisMessage>) => {
       covariance[dimension * dimensions + dimension] += covarianceRegularization;
     }
     const factorization = choleskyFactorize(covariance, dimensions);
-    const threshold = chiSquareUpperTailQuantileWilsonHilferty(dimensions, alpha);
+    const threshold = chiSquareUpperTailQuantile(dimensions, alpha);
 
     const difference = new Float64Array(dimensions);
     const solved = new Float64Array(dimensions);
@@ -108,7 +115,7 @@ self.onmessage = (event: MessageEvent<MahalanobisMessage>) => {
     for (let index = 0; index < observations; index++) {
       const row = validData[index];
       for (let dimension = 0; dimension < dimensions; dimension++) {
-        difference[dimension] = Number(row[features[dimension]]) - mean[dimension];
+        difference[dimension] = row[features[dimension]] - mean[dimension];
       }
       solveCholesky(factorization, difference, solved, forwardWorkspace);
       const rawDistance = dotProduct(difference, solved);
@@ -139,9 +146,12 @@ self.onmessage = (event: MessageEvent<MahalanobisMessage>) => {
         modelVersion: MAHALANOBIS_MODEL_VERSION,
         diagnostics: {
           distanceDefinition: 'squared-mahalanobis',
-          thresholdApproximation: 'wilson-hilferty-with-acklam-normal-quantile',
+          thresholdApproximation: 'numerical-inverse-gamma',
           alpha,
           observations,
+          suppliedObservations: data.length,
+          excludedObservations: data.length - observations,
+          screeningOnly: true,
           dimensions,
           covarianceRegularization,
           choleskyJitter: factorization.jitter,

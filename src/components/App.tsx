@@ -48,7 +48,7 @@ const FilterPanel = lazy(() =>
 const ImportModal = lazy(() =>
   import("@/components/modals/ImportModal").then((m) => ({ default: m.ImportModal })),
 );
-import { ProfileModal } from "@/components/modals/ProfileModal";
+const ProfileModal = lazy(() => import("@/components/modals/ProfileModal").then(module => ({ default: module.ProfileModal })));
 const AdminModal = lazy(() =>
   import("@/components/modals/AdminModal").then((m) => ({ default: m.AdminModal })),
 );
@@ -127,12 +127,13 @@ import { DataProvider } from "@/contexts/DataContext";
 // --- Main App Component ---
 
 import { FloatingParticles } from '@/components/ui/FloatingParticles';
-import { AiCopilot } from '@/components/features/Ai/AiCopilot';
+import { AiCopilotLauncher } from '@/components/features/Ai/AiCopilotLauncher';
+import { DeferredMount } from '@/components/ui/DeferredMount';
 
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { SystemNav } from '@/components/layout/SystemNav';
-import { AddProductModal } from "@/components/modals/AddProductModal";
-import { SmartAnalysisModal } from "@/components/modals/SmartAnalysisModal";
+const AddProductModal = lazy(() => import("@/components/modals/AddProductModal").then(module => ({ default: module.AddProductModal })));
+const SmartAnalysisModal = lazy(() => import("@/components/modals/SmartAnalysisModal").then(module => ({ default: module.SmartAnalysisModal })));
 
 // Memoized components to prevent unnecessary flickering and re-renders
 const MemoizedTopBar = memo(TopBar);
@@ -602,12 +603,15 @@ const AppContent = memo(() => {
           onOpenAdmin={() => openModal("admin")}
           t={t}
         />
+        <DeferredMount active={isModalOpen("import")}>
         <ImportModal
           isOpen={isModalOpen("import")}
           onClose={() => closeModal("import")}
           allProducts={allProducts}
           onImport={handleImportData}
         />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("profile")}>
         <ProfileModal
           isOpen={isModalOpen("profile")}
           onClose={() => closeModal("profile")}
@@ -618,22 +622,34 @@ const AppContent = memo(() => {
           }}
           onAddToast={addToast}
         />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("admin")}>
         <AdminModal isOpen={isModalOpen("admin")} onClose={() => closeModal("admin")} />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("systemHealth")}>
         <SystemHealthModal
           isOpen={isModalOpen("systemHealth")}
           onClose={() => closeModal("systemHealth")}
           status={systemStatus}
           addToast={addToast}
         />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("feedback")}>
         <FeedbackModal
           isOpen={isModalOpen("feedback")}
           onClose={() => closeModal("feedback")}
         />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("help")}>
         <HelpModal isOpen={isModalOpen("help")} onClose={() => closeModal("help")} />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("shortcuts")}>
         <ShortcutsModal
           isOpen={isModalOpen("shortcuts")}
           onClose={() => closeModal("shortcuts")}
         />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("commandPalette")}>
         <CommandPalette
           isOpen={isModalOpen("commandPalette")}
           onClose={() => closeModal("commandPalette")}
@@ -650,6 +666,8 @@ const AppContent = memo(() => {
           manufacturers={manufacturers as Manufacturer[]}
           onViewProduct={setViewingProduct}
         />
+        </DeferredMount>
+        <DeferredMount active={Boolean(viewingProduct)}>
         <ProductDetailDrawer
           isOpen={!!viewingProduct}
           product={viewingProduct!}
@@ -659,25 +677,35 @@ const AppContent = memo(() => {
           onProductClick={setViewingProduct}
           onAddToast={addToast}
         />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("addProduct")}>
         <AddProductModal
           isOpen={isModalOpen("addProduct")}
           onClose={() => closeModal("addProduct")}
           onSave={handleCreate}
           allProducts={allProducts}
         />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("smartAnalysis")}>
         <SmartAnalysisModal
           isOpen={isModalOpen("smartAnalysis")}
           onClose={() => closeModal("smartAnalysis")}
           product={analyzingProduct}
         />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("databaseSync")}>
         <DatabaseSyncModal
           isOpen={isModalOpen("databaseSync")}
           onClose={() => closeModal("databaseSync")}
         />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("dataQualityAudit")}>
         <DataQualityAuditModal
           isOpen={isModalOpen("dataQualityAudit")}
           onClose={() => closeModal("dataQualityAudit")}
         />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("smartExport")}>
         <SmartExportModal
           isOpen={isModalOpen("smartExport")}
           onClose={() => closeModal("smartExport")}
@@ -685,11 +713,15 @@ const AppContent = memo(() => {
           handleExport={handleExport}
           handleExportPdf={handleExportPdf}
         />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("qaReport")}>
         <QaReportModal
           isOpen={isModalOpen("qaReport")}
           onClose={() => closeModal("qaReport")}
           products={allProducts.filter((p) => selectedIds.has(p.id))}
         />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("comparison")}>
         <ComparisonView
           isOpen={isModalOpen("comparison")}
           products={allProducts.filter((p) => selectedIds.has(p.id))}
@@ -707,6 +739,7 @@ const AppContent = memo(() => {
             setSelectedIds(next);
           }}
         />
+        </DeferredMount>
         <AnimatePresence mode="popLayout">
           {showFilters && (
             <motion.div
@@ -737,24 +770,31 @@ const AppContent = memo(() => {
             />
           )}
         </AnimatePresence>
+        <DeferredMount active={isModalOpen("batchEdit")}>
         <BatchEditModal
           isOpen={isModalOpen("batchEdit")}
           onClose={() => closeModal("batchEdit")}
           onSave={handleBatchUpdate}
           selectedProducts={allProducts.filter((p) => selectedIds.has(p.id))}
         />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("bulkTagging")}>
         <BulkTaggingModal
           isOpen={isModalOpen("bulkTagging")}
           onClose={() => closeModal("bulkTagging")}
           onSave={handleBatchTagging}
           selectedProducts={allProducts.filter((p) => selectedIds.has(p.id))}
         />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("bulkReorder")}>
         <BulkReorderModal
           isOpen={isModalOpen("bulkReorder")}
           onClose={() => closeModal("bulkReorder")}
           onSave={handleBatchReorder}
           selectedProducts={allProducts.filter((p) => selectedIds.has(p.id))}
         />
+        </DeferredMount>
+        <DeferredMount active={isModalOpen("formulaEditor")}>
         <FormulaEditorModal
           isOpen={isModalOpen("formulaEditor")}
           onClose={() => closeModal("formulaEditor")}
@@ -764,15 +804,18 @@ const AppContent = memo(() => {
           onRemove={removeFormula}
           allProducts={allProducts}
         />
-        <AiCopilot
+        </DeferredMount>
+        <AiCopilotLauncher
           data={filteredData}
           activeChart={activeView === "analytics" ? "Visualizer" : undefined}
           actions={applicationActions}
         />
+        <DeferredMount active={isHistoryOpen}>
         <HistoryDrawer 
           isOpen={isHistoryOpen} 
           onClose={() => setHistoryOpen(false)} 
         />
+        </DeferredMount>
         <AnimatePresence>
           {showTour && (
             <OnboardingTour

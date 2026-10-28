@@ -1,0 +1,35 @@
+import { Activity, BarChart3, BrainCircuit, Calculator, Combine, Factory, Flame, GitMerge, Hexagon, Layers, Map, Network, ScatterChart, ShieldAlert, Target, ThermometerSnowflake, Waves, Zap } from 'lucide-react';
+export const ANALYSIS_GROUPS = {
+  compare: { zh: '材料对比', en: 'Compare materials' },
+  association: { zh: '关联与结构', en: 'Associations' },
+  distribution: { zh: '分布与可靠性', en: 'Distributions' },
+  response: { zh: '响应与优化', en: 'Response & optimization' },
+  conditions: { zh: '条件与模型', en: 'Conditions & models' },
+  quality: { zh: '质量筛查', en: 'Quality screening' },
+} as const;
+export const ANALYSIS_MODES = [
+  { id: 'radar', group: 'compare', icon: Hexagon },
+  { id: 'canvas_scatter', group: 'compare', icon: Layers },
+  { id: 'ashby', group: 'compare', icon: ScatterChart },
+  { id: 'mfr_density', group: 'compare', icon: Target },
+  { id: 'parallel', group: 'compare', icon: Layers },
+  { id: 'correlation', group: 'association', icon: Target },
+  { id: 'similarity_graph', group: 'association', icon: Network },
+  { id: 'feature_importance', group: 'association', icon: BarChart3 },
+  { id: 'copula', group: 'association', icon: Combine },
+  { id: 'gpc', group: 'distribution', icon: Waves },
+  { id: 'kde_topology', group: 'distribution', icon: Map },
+  { id: 'weibull', group: 'distribution', icon: ShieldAlert },
+  { id: 'bayes', group: 'distribution', icon: BrainCircuit },
+  { id: 'rsm', group: 'response', icon: Calculator },
+  { id: 'moo', group: 'response', icon: GitMerge },
+  { id: 'sobol', group: 'response', icon: BarChart3 },
+  { id: 'rheology', group: 'conditions', icon: Activity },
+  { id: 'wlf_tts', group: 'conditions', icon: ThermometerSnowflake },
+  { id: 'arrhenius', group: 'conditions', icon: Flame },
+  { id: 'kinetics', group: 'conditions', icon: Zap },
+  { id: 'prony', group: 'conditions', icon: Activity },
+  { id: 'spc', group: 'quality', icon: Factory },
+  { id: 'mahalanobis', group: 'quality', icon: Target },
+] as const;
+export type AnalysisMode = typeof ANALYSIS_MODES[number]['id'];

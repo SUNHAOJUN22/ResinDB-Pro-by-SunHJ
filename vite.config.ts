@@ -65,9 +65,11 @@ export default defineConfig(({ mode }) => {
     resolve: { alias: { '@': path.resolve(__dirname, './src') } },
     build: {
       outDir: 'dist',
+      manifest: true,
       chunkSizeWarningLimit: 900,
       rollupOptions: {
         output: {
+          onlyExplicitManualChunks: true,
           manualChunks(id) {
             if (!id.includes('node_modules')) return undefined;
             if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) return 'react-core';

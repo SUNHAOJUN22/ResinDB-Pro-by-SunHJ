@@ -6,6 +6,7 @@ import React, {
   useState,
 } from 'react';
 import { AlertCircle, Database, Loader2 } from 'lucide-react';
+import { createChartResizeScheduler } from './chartResizeScheduler';
 import { useLanguage } from '@/contexts/LanguageContext';
 import * as echarts from '@/lib/echarts';
 import { applyScientificFigurePolicy, type ScientificFigureTheme } from './scientificFigurePolicy';
@@ -75,6 +76,7 @@ export const ScientificEChart: React.FC<ScientificEChartProps> = React.memo(({
   const descriptionId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<echarts.ECharts | null>(null);
+  const resizeSchedulerRef = useRef<ReturnType<typeof createChartResizeScheduler> | null>(null);
   const onChartReadyRef = useRef(onChartReady);
   const reducedMotion = useReducedMotion();
   const normalizedOption = useMemo(() => (
@@ -112,19 +114,22 @@ export const ScientificEChart: React.FC<ScientificEChartProps> = React.memo(({
     chart.on('finished', markRendered);
     container.dataset.scientificChartRendered = 'false';
 
-    const resizeAfterLayout = () => {
-      if (disposed || chart.isDisposed()) return;
-      const bounds = container.getBoundingClientRect();
-      if (bounds.width > 0 && bounds.height > 0) {
-        chart.resize({ animation: { duration: 0 } });
-      }
-    };
-    const frame = requestAnimationFrame(resizeAfterLayout);
-    void document.fonts?.ready.then(resizeAfterLayout);
+    const scheduler = createChartResizeScheduler(container, chart);
+    resizeSchedulerRef.current = scheduler;
+    const scheduleResize = () => scheduler.schedule();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleResize);
+    if (observer) observer.observe(container);
+    else window.addEventListener('resize', scheduleResize);
+    scheduler.schedule(true);
+    // A completed font load needs a text relayout even if dimensions did not change.
+    void document.fonts?.ready.then(() => scheduler.schedule(true));
 
     return () => {
       disposed = true;
-      cancelAnimationFrame(frame);
+      scheduler.dispose();
+      observer?.disconnect();
+      window.removeEventListener('resize', scheduleResize);
+      resizeSchedulerRef.current = null;
       chart.off('finished', markRendered);
       delete container.dataset.scientificChartRendered;
       if (!chart.isDisposed()) chart.dispose();
@@ -142,53 +147,9 @@ export const ScientificEChart: React.FC<ScientificEChartProps> = React.memo(({
       return undefined;
     }
     chart.setOption(normalizedOption, { notMerge: true, lazyUpdate: false });
-    const resize = () => {
-      const bounds = container?.getBoundingClientRect();
-      if (bounds && bounds.width > 0 && bounds.height > 0 && !chart.isDisposed()) {
-        chart.resize({ animation: { duration: 0 } });
-      }
-    };
-    resize();
-    const frame = requestAnimationFrame(resize);
-    return () => cancelAnimationFrame(frame);
+    resizeSchedulerRef.current?.schedule();
+    return undefined;
   }, [empty, error, normalizedOption]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return undefined;
-    let frame = 0;
-    const scheduleResize = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const chart = chartRef.current;
-        const bounds = container.getBoundingClientRect();
-        if (chart && !chart.isDisposed() && bounds.width > 0 && bounds.height > 0) {
-          chart.resize({ animation: { duration: 0 } });
-        }
-      });
-    };
-
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', scheduleResize);
-      scheduleResize();
-      return () => {
-        cancelAnimationFrame(frame);
-        window.removeEventListener('resize', scheduleResize);
-      };
-    }
-
-    const observer = new ResizeObserver((entries) => {
-      if (entries.some((entry) => entry.contentRect.width > 0 && entry.contentRect.height > 0)) {
-        scheduleResize();
-      }
-    });
-    observer.observe(container);
-    scheduleResize();
-    return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-    };
-  }, []);
 
   const unavailable = !normalizedOption && !loading && !empty && !error;
   const stateVisible = loading || empty || Boolean(error) || unavailable;

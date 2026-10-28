@@ -1,3 +1,5 @@
+import { AnalysisModeNavigation } from './AnalysisModeNavigation';
+import { AnalysisMethodPanel } from './AnalysisMethodPanel';
 import { empiricalCdf } from '@/compute/gaussianCopula';
 import { admittedPropertyValue } from '@/lib/propertyAdmission';
 import { parseFiniteReal } from '@/lib/quantityRecord';
@@ -19,10 +21,6 @@ import {
   X,
   FileJson,
   Image as ImageIcon,
-  Hexagon,
-  ScatterChart,
-  Waves,
-  Info,
   Loader2,
   Filter,
   Plus,
@@ -31,8 +29,6 @@ import {
   Thermometer,
   Target,
   Calculator,
-  Layers,
-  Network,
   BarChart3,
   Map,
   ShieldAlert,
@@ -757,7 +753,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row gap-4 overflow-y-auto lg:overflow-hidden custom-scrollbar">
         {/* Scientific Controls Sidebar */}
         <div
-          className={`flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl lg:rounded-3xl transition-all duration-500 ease-out shrink-0 overflow-hidden shadow-xl print:hidden ${showConfig ? "w-full lg:w-72 opacity-100 translate-x-0" : "w-0 opacity-0 -translate-x-10 border-0 pointer-events-none"}`}
+          className={`flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl transition-all duration-200 ease-out shrink-0 overflow-hidden shadow-sm print:hidden ${showConfig ? "w-full lg:w-72 opacity-100 translate-x-0" : "w-0 opacity-0 -translate-x-10 border-0 pointer-events-none"}`}
         >
           <div className="p-4 md:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/80 dark:bg-slate-950/50 backdrop-blur-sm">
             <div className="flex items-center gap-2 font-black text-xs md:text-sm text-slate-800 dark:text-white uppercase tracking-widest">
@@ -775,177 +771,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
           </div>
 
           <div className="flex-1 overflow-y-auto custom-scrollbar">
-            <div className="p-4 space-y-2">
-              {[
-                {
-                  id: "radar",
-                  label: t("chart_radar"),
-                  icon: Hexagon,
-                  color: "text-indigo-500",
-                },
-                {
-                  id: "canvas_scatter",
-                  label: t("chart_canvas_scatter"),
-                  icon: Layers,
-                  color: "text-purple-500",
-                },
-                {
-                  id: "correlation",
-                  label: t("chart_correlation"),
-                  icon: Target,
-                  color: "text-rose-500",
-                },
-                {
-                  id: "ashby",
-                  label: t("chart_ashby"),
-                  icon: ScatterChart,
-                  color: "text-rose-500",
-                },
-                {
-                  id: "mfr_density",
-                  label: t("chart_mfr_density"),
-                  icon: Target,
-                  color: "text-sky-500",
-                },
-                {
-                  id: "gpc",
-                  label: t("chart_gpc"),
-                  icon: Waves,
-                  color: "text-blue-500",
-                },
-                {
-                  id: "rheology",
-                  label: t("chart_rheology"),
-                  icon: Activity,
-                  color: "text-amber-500",
-                },
-                {
-                  id: "parallel",
-                  label: t("chart_parallel"),
-                  icon: Layers,
-                  color: "text-emerald-500",
-                },
-                {
-                  id: "similarity_graph",
-                  label: t("chart_similarity_graph"),
-                  icon: Network,
-                  color: "text-purple-500",
-                },
-                {
-                   id: "rsm",
-                   label: t("chart_rsm"),
-                   icon: Calculator,
-                   color: "text-indigo-500"
-                },
-                {
-                   id: "feature_importance",
-                   label: t("chart_feature_importance"),
-                   icon: BarChart3,
-                   color: "text-rose-500"
-                },
-                {
-                   id: "kde_topology",
-                   label: t("chart_kde_topology"),
-                   icon: Map,
-                   color: "text-orange-500"
-                },
-                {
-                   id: "weibull",
-                   label: t("chart_weibull"),
-                   icon: ShieldAlert,
-                   color: "text-cyan-500"
-                },
-                {
-                   id: "wlf_tts",
-                   label: t("chart_wlf_tts"),
-                   icon: ThermometerSnowflake,
-                   color: "text-blue-500"
-                },
-                {
-                   id: "copula",
-                   label: t("chart_copula"),
-                   icon: Combine,
-                   color: "text-fuchsia-500"
-                },
-                {
-                   id: "arrhenius",
-                   label: t("chart_arrhenius"),
-                   icon: Flame,
-                   color: "text-orange-600"
-                },
-                {
-                   id: "sobol",
-                   label: t("chart_sobol"),
-                   icon: BarChart3,
-                   color: "text-indigo-500"
-                },
-                {
-                   id: "spc",
-                   label: t("chart_spc"),
-                   icon: Factory,
-                   color: "text-emerald-600"
-                },
-                {
-                   id: "bayes",
-                   label: t("chart_bayes"),
-                   icon: BrainCircuit,
-                   color: "text-pink-500"
-                },
-                {
-                   id: "moo",
-                   label: t("chart_moo"),
-                   icon: GitMerge,
-                   color: "text-orange-500"
-                },
-                {
-                   id: "mahalanobis",
-                   label: t("chart_mahalanobis"),
-                   icon: Target,
-                   color: "text-rose-600"
-                },
-                {
-                   id: "kinetics",
-                   label: t("chart_kinetics"),
-                   icon: Zap,
-                   color: "text-teal-500"
-                },
-                {
-                   id: "prony",
-                   label: t("chart_prony"),
-                   icon: Activity,
-                   color: "text-purple-500"
-                }
-              ].map((item) => (
-                <motion.button
-                  key={item.id}
-                  data-chart-mode={item.id}
-                  aria-pressed={activeChart === item.id}
-                  whileHover={{ x: 4 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setActiveChart(item.id as ViewChartType)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-2xl border transition-all duration-200 group relative overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 ${
-                    activeChart === item.id
-                      ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent shadow-lg"
-                      : "bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-                  }`}
-                >
-                  <div
-                    className={`p-2 rounded-xl bg-slate-100 dark:bg-slate-700/50 ${activeChart === item.id ? "bg-white/20 text-white" : item.color}`}
-                  >
-                    <item.icon size={18} />
-                  </div>
-                  <span className="text-xs font-bold uppercase tracking-wide">
-                    {item.label}
-                  </span>
-                  {activeChart === item.id && (
-                    <motion.div
-                      layoutId="active-chart-indicator"
-                      className="absolute right-0 top-0 bottom-0 w-1 bg-emerald-500"
-                    ></motion.div>
-                  )}
-                </motion.button>
-              ))}
-            </div>
+            <AnalysisModeNavigation active={activeChart} onSelect={setActiveChart} />
 
             {/* --- Canvas Scatter Specific Settings --- */}
             {activeChart === "canvas_scatter" && (
@@ -2467,25 +2293,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
               </div>
             </div>
 
-            <div className="mx-4 mt-2 mb-6 p-4 bg-slate-50 dark:bg-slate-950/30 rounded-2xl border border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2 mb-2 text-slate-400 dark:text-slate-500">
-                <Info size={14} />
-                <span className="text-[10px] font-bold uppercase tracking-widest">
-                  {t("chartContext")}
-                </span>
-              </div>
-              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
-                {(chartDescriptions as Record<string, string>)[activeChart]}
-              </p>
-              <div className="mt-3 pt-3 border-t border-slate-200/50 dark:border-slate-800/50 flex items-center justify-between text-[10px]">
-                <span className="text-slate-400 font-bold uppercase tracking-wider">
-                  {language === "en" ? "Active Dataset" : "可用数据集"}
-                </span>
-                <span className="text-blue-600 dark:text-blue-400 font-black bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded-full">
-                  {language === "en" ? `${filteredData.length} Items` : `共 ${filteredData.length} 项`}
-                </span>
-              </div>
-            </div>
+
           </div>
 
           <div className="p-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-3 bg-white dark:bg-slate-900 shrink-0">
@@ -2516,7 +2324,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
         </div>
 
         {/* Chart Canvas Area */}
-        <div className="flex-1 flex flex-col bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-[2rem] relative min-h-[300px] shadow-2xl overflow-hidden group">
+        <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl relative min-h-[300px] shadow-sm overflow-hidden group">
           <div className="absolute top-6 right-6 z-30 flex items-center gap-3">
             {!showConfig && (
               <motion.button
@@ -2530,14 +2338,15 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = React.memo(
             )}
           </div>
 
-          <div className="shrink-0 px-4 pt-3">
+          <div className="shrink-0 space-y-2 px-4 pt-3">
+            <AnalysisMethodPanel mode={activeChart} records={filteredData.length} description={(chartDescriptions as Record<string, string>)[activeChart]} />
             {/* Explanation occupies layout space, never covers data. */}
             <div className="w-full">
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 key={activeChart}
-                className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-l-4 border-emerald-500 p-4 rounded-r-2xl shadow-xl border-y border-r border-slate-200 dark:border-slate-800"
+                className="bg-white dark:bg-slate-900 border-l-4 border-emerald-500 p-3 rounded-r-xl shadow-sm border-y border-r border-slate-200 dark:border-slate-800"
               >
                 <div className="flex items-center gap-2 mb-1">
                   <Activity size={14} className="text-emerald-500" />

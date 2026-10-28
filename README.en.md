@@ -255,3 +255,7 @@ Reports and coverage are generated in local `artifacts/` and `coverage/`. Every 
 The current scope is traceable materials screening, numerical boundaries, local persistence and reviewable scientific displays. Units use a finite registry: general compound-unit grammar, affine Celsius conversion, full mol/eq chemical dimensions and automatic experimental certification are not implemented. Safety-critical selection, compliance and service-life conclusions require independent experiments and domain review. The next-stage vision is to connect real measurements, explicit interfaces and versioned evidence; artwork does not demonstrate implementation.
 
 The [historical image archive](README.visual-archive.md) preserves earlier UI screenshots and concept diagrams with explicit historical labels. They are not evidence from the current execution.
+
+## Workbench and numerical performance
+
+Analysis methods are grouped and searchable, with method-specific explanations and formulas. Heavy tools load on first use and preserve drafts after closing. The initial static JavaScript budget covers the complete import closure. Mahalanobis uses a numerical inverse survival function and separates missing values from real zero. See the [workbench optimization and validation contract](docs/WORKBENCH_OPTIMIZATION.md). These software changes do not confer scientific or engineering certification.

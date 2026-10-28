@@ -302,7 +302,7 @@ describe('numerical performance contracts', () => {
       },
       'MAHALANOBIS_RESULT',
     );
-    expect(mahalanobis).toMatchObject({ modelVersion: 'regularized-cholesky-mahalanobis-2.0.0' });
+    expect(mahalanobis).toMatchObject({ modelVersion: 'regularized-cholesky-mahalanobis-3.0.0' });
 
     const prony = await runWorker(
       () => import('@/workers/pronyWorker'),

@@ -19,7 +19,8 @@ import { AiApiSettingsModal } from '@/components/modals/AiApiSettingsModal';
 import { getAiInsights, isAiConfigured } from '@/services/aiService';
 import { generateId } from '@/lib/utils';
 
-interface AiCopilotProps {
+export interface AiCopilotProps {
+  initialOpen?: boolean;
   data: Product[];
   activeChart?: string;
   actions: {
@@ -62,10 +63,10 @@ async function readImage(file: File): Promise<{ data: string; mimeType: string }
   return { data: result.slice(commaIndex + 1), mimeType: file.type };
 }
 
-export const AiCopilot: React.FC<AiCopilotProps> = React.memo(({ data, activeChart }) => {
+export const AiCopilot: React.FC<AiCopilotProps> = React.memo(({ data, activeChart, initialOpen = false }) => {
   const { language } = useLanguage();
   const zh = language === 'zh';
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [configured, setConfigured] = useState(() => isAiConfigured());
   const [query, setQuery] = useState('');

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { lazy, Suspense, useState } from "react";
 import { motion, AnimatePresence, Reorder, useDragControls } from "motion/react";
 import { GripHorizontal } from "lucide-react";
 import { WelcomeBanner } from '@/components/features/Dashboard/DashboardComponents';
@@ -6,7 +6,7 @@ import { DataGrid } from '@/components/features/DataGrid/DataGrid';
 import { DashboardStats } from '@/components/features/Dashboard/DashboardStats';
 import { ControlToolbar } from '@/components/ui/ControlToolbar';
 import { SystemAlert } from '@/components/ui/SystemAlert';
-import { MarketTrendsSection } from '@/components/features/Dashboard/MarketTrendsSection';
+const MarketTrendsSection = lazy(() => import('@/components/features/Dashboard/MarketTrendsSection').then(module => ({ default: module.MarketTrendsSection })));
 import { ChemicalSimilaritySearch } from '@/components/features/Dashboard/ChemicalSimilaritySearch';
 import { BulkValidation } from '@/components/features/Dashboard/BulkValidation';
 
@@ -120,7 +120,7 @@ export const DashboardView = React.memo(() => {
             className="w-full relative group"
             gripClassName="absolute -left-6 top-6 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-opacity z-50"
           >
-            <MarketTrendsSection products={allProducts} t={t} />
+            <Suspense fallback={<div role="status" className="min-h-40 rounded-xl border border-slate-200 p-4 text-sm text-slate-500">{t("loading", "Loading")}</div>}><MarketTrendsSection products={allProducts} t={t} /></Suspense>
           </DraggableSection>
         ) : null;
       case "validation":

@@ -74,9 +74,9 @@ test('test totals reconcile without Boolean or string coercion', () => {
   }
 });
 test('missing build budgets are rejected rather than crashing or coercing', () => {
-  const valid = {entry: {gzipBytes: 10}, echarts: {bytes: 20}, budgets: {entryGzipBytes: 10, echartsRawBytes: 20}};
+  const valid = {schemaVersion: 3, initialJs: {scope: 'entry-and-transitive-static-imports', files: [{file: 'assets/index.js', gzipBytes: 10}], gzipBytes: 10}, entry: {gzipBytes: 10}, echarts: {bytes: 20}, budgets: {entryGzipBytes: 10, echartsRawBytes: 20, initialJsGzipBytes: 10}};
   assert.equal(validBuildBudgets(valid), true);
-  for (const invalid of [null, {}, {...valid, budgets: undefined}, {...valid, entry: {gzipBytes: true}}, {...valid, entry: {gzipBytes: 11}}, {...valid, echarts: {bytes: '20'}}, {...valid, budgets: {entryGzipBytes: Infinity, echartsRawBytes: 20}}]) {
+  for (const invalid of [null, {}, {...valid, initialJs: undefined}, {...valid, initialJs: {...valid.initialJs, gzipBytes: 0}}, {...valid, initialJs: {...valid.initialJs, gzipBytes: 11}}, {...valid, initialJs: {...valid.initialJs, files: [...valid.initialJs.files, ...valid.initialJs.files]}}, {...valid, budgets: undefined}, {...valid, entry: {gzipBytes: true}}, {...valid, entry: {gzipBytes: 11}}, {...valid, echarts: {bytes: '20'}}, {...valid, budgets: {entryGzipBytes: Infinity, echartsRawBytes: 20}}]) {
     assert.equal(validBuildBudgets(invalid), false);
   }
 });
@@ -96,7 +96,7 @@ function runReceipt(t, override = {}, prepare = () => {}) {
     'ci-gates.json': {schemaVersion: 1, status: 'PASS', gates: [...REQUIRED_CORE_GATES, 'single-main-branch']},
     'test-results.json': {success: true, numTotalTests: 1, numPassedTests: 1, numFailedTests: 0},
     'coverage-summary.json': {scopeComplete: true, coverageScope: 'production-typescript-excluding-tests-and-declarations'},
-    'build-metrics.json': {entry: {gzipBytes: 10}, echarts: {bytes: 20}, budgets: {entryGzipBytes: 10, echartsRawBytes: 20}, externalResinDataBytes: 1},
+    'build-metrics.json': {schemaVersion: 3, initialJs: {scope: 'entry-and-transitive-static-imports', files: [{file: 'assets/index.js', gzipBytes: 10}], gzipBytes: 10}, entry: {gzipBytes: 10}, echarts: {bytes: 20}, budgets: {entryGzipBytes: 10, echartsRawBytes: 20, initialJsGzipBytes: 10}, externalResinDataBytes: 1},
     'ui-smoke-manifest.json': {screenshots},
     'npm-audit-prod.json': {metadata: {vulnerabilities: {high: 0, critical: 0}}},
     'npm-audit-all.json': {metadata: {vulnerabilities: {high: 0, critical: 0}}},

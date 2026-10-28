@@ -55,6 +55,16 @@ export function validTestEvidence(tests) {
 }
 
 export function validBuildBudgets(build) {
+  const initial = build?.initialJs;
+  if (build?.schemaVersion !== 3 || initial?.scope !== 'entry-and-transitive-static-imports'
+      || !Array.isArray(initial.files) || initial.files.length === 0
+      || !count(initial.gzipBytes) || initial.gzipBytes === 0
+      || !count(build?.budgets?.initialJsGzipBytes) || build.budgets.initialJsGzipBytes === 0
+      || initial.gzipBytes > build.budgets.initialJsGzipBytes
+      || initial.files.some(row => typeof row?.file !== 'string' || !row.file.endsWith('.js')
+        || !count(row.gzipBytes) || row.gzipBytes === 0)
+      || new Set(initial.files.map(row => row.file)).size !== initial.files.length
+      || initial.files.reduce((sum, row) => sum + row.gzipBytes, 0) !== initial.gzipBytes) return false;
   return count(build?.entry?.gzipBytes) && build.entry.gzipBytes > 0
     && count(build?.echarts?.bytes) && build.echarts.bytes > 0
     && count(build?.budgets?.entryGzipBytes) && build.budgets.entryGzipBytes > 0
