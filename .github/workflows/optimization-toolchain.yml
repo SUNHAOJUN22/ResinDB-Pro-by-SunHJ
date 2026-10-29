@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 1ac6d7e7beb1c154490424bffac6559b9501fdd4
+          ref: c706b98c69bdaef567bbf5ee52d972c3a67728a4
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -52,7 +52,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: SUNHAOJUN22/TsaoDFT_skill
-          ref: 5b0423e88d4989b36ab74cfddcaeadb77fd0085f
+          ref: 65318eb434c12ac07a878b588e54d593bca373e2
           persist-credentials: false
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
@@ -102,8 +102,8 @@ jobs:
               "AspenOps-Agent": "5590f1552e3e7ef3e7e46c0e16e6275ebf88f078",
               "TsaoSciComputation": "830f7b3acab452e985f3961d00334fc47aeb4e13",
               "TSAO-PROCESSING-SKILL": "5c87aeee54c6c54a0016746e429dd9fa6bc8a5e7",
-              "ResinDB-Pro-by-SunHJ": "8392532a0318dfdf447485e16b4d6095743f8b7d",
-              "TsaoDFT_skill": "5b0423e88d4989b36ab74cfddcaeadb77fd0085f",
+              "ResinDB-Pro-by-SunHJ": "c706b98c69bdaef567bbf5ee52d972c3a67728a4",
+              "TsaoDFT_skill": "65318eb434c12ac07a878b588e54d593bca373e2",
               "TsaoSciResearcher": "01c82e5e95378f17b0c8c86296f9fbb7c1f4e9f2",
               "OpenDeepMind_skill": "d9fe3c83cd59321ac5e5ac86e08e279d451fd197",
           }
@@ -147,9 +147,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api --allow-escape-sequences repos/SUNHAOJUN22/ResinDB-Pro-by-SunHJ/actions/jobs/122680155567/logs \
-            > "$RUNNER_TEMP/optimization-source-snapshots/resin-failed-job-122680155567.log"
-          sha256sum "$RUNNER_TEMP/optimization-source-snapshots/resin-failed-job-122680155567.log" \
+          gh api --allow-escape-sequences repos/SUNHAOJUN22/ResinDB-Pro-by-SunHJ/actions/jobs/122710130054/logs \
+            > "$RUNNER_TEMP/optimization-source-snapshots/resin-failed-job-122710130054.log"
+          sha256sum "$RUNNER_TEMP/optimization-source-snapshots/resin-failed-job-122710130054.log" \
             > "$RUNNER_TEMP/optimization-source-snapshots/failed-log.sha256"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
