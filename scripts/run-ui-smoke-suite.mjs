@@ -1,5 +1,7 @@
+import { isRetryableBrowserStartupFailure } from './lib/ui-smoke-failure.mjs';
 import { spawnOwnedProcess } from './lib/owned-process.mjs';
 import {
+  mkdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -46,6 +48,15 @@ function buildHardenedRuntimeCopy(relativePath) {
   const sourcePath = path.join(root, relativePath);
   let source = readFileSync(sourcePath, 'utf8');
   source = `import { stopOwnedChild } from './lib/owned-process.mjs';\n${source}`;
+  if (relativePath === 'scripts/ui-smoke-test.mjs') {
+    source = `import { throwApplicationFailure } from './lib/ui-smoke-failure.mjs';\n${source}`;
+    source = replaceExactlyOnce(
+      source,
+      /if \(state\.alert\) throw new Error\('Authenticated UI rendered the System Alert error boundary'\);/g,
+      'if (state.alert) await throwApplicationFailure(session, state, artifactDir);',
+      'authenticated application failure evidence contract',
+    );
+  }
   source = replaceExactlyOnce(
     source,
     /const debugPort = \d+;/g,
@@ -137,6 +148,15 @@ async function runHardenedScript({ relativePath, profilePrefix }) {
       settled = true;
       try {
         await cleanupRun({ owned, profilePrefix, runtimePath });
+        const artifactDirectory = path.join(root, 'artifacts');
+        mkdirSync(artifactDirectory, { recursive: true });
+        const evidenceName = `${profilePrefix}-attempt-${runtimeSequence}`;
+        writeFileSync(path.join(artifactDirectory, `${evidenceName}.log`), output, 'utf8');
+        writeFileSync(path.join(artifactDirectory, `${evidenceName}.json`), `${JSON.stringify({
+          script: relativePath, exitCode: code ?? 1, signal: signal ?? null,
+          error: error ? String(error) : null, debugPort,
+          qualification: 'BROWSER_ATTEMPT_NOT_RELEASE_ACCEPTANCE',
+        }, null, 2)}\n`, 'utf8');
         if (error) throw error;
         resolve({ code: code ?? 1, signal, output, debugPort });
       } catch (cleanupError) { reject(cleanupError); }
@@ -156,8 +176,7 @@ let primaryResult;
 for (let attempt = 1; attempt <= 3; attempt += 1) {
   primaryResult = await runHardenedScript(primaryContract);
   if (primaryResult.code === 0) break;
-  const retryable = /Timed out waiting for .*json\/version|Address already in use|DevTools/i
-    .test(primaryResult.output);
+  const retryable = isRetryableBrowserStartupFailure(primaryResult.output);
   if (!retryable || attempt === 3) break;
   console.warn(
     `Chromium startup contract failed on dynamic port ${primaryResult.debugPort}; retrying after bounded cleanup (${attempt}/3).`,

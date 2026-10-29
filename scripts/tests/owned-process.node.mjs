@@ -1,3 +1,7 @@
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { applicationRuntimeErrors, isRetryableBrowserStartupFailure, throwApplicationFailure } from '../lib/ui-smoke-failure.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
@@ -67,4 +71,47 @@ test('port-conflict cleanup does not terminate the existing server', async t => 
   await conflicting.stop();
   assert.equal(server.child.exitCode, null);
   assert.equal(server.child.signalCode, null);
+});
+
+
+test('normal DevTools startup cannot make application or policy failures retryable', () => {
+  const ready = 'DevTools listening on ws://127.0.0.1:9224/devtools/browser/example';
+  for (const reason of [
+    'Authenticated UI rendered the System Alert error boundary',
+    'application-error-boundary', 'net::ERR_BLOCKED_BY_ADMINISTRATOR',
+    'Unable to find required chart', 'Scientific canvas evidence failed',
+  ]) assert.equal(isRetryableBrowserStartupFailure(`${reason}\n${ready}`), false);
+  assert.equal(isRetryableBrowserStartupFailure(ready), false);
+  assert.equal(isRetryableBrowserStartupFailure(null), false);
+});
+
+test('only recognized startup failure messages are eligible for a bounded retry', () => {
+  for (const reason of ['Timed out waiting for http://127.0.0.1:34567/json/version',
+    'bind() failed: Address already in use', 'listen EADDRINUSE: 127.0.0.1:4174']) {
+    assert.equal(isRetryableBrowserStartupFailure(reason), true);
+    assert.equal(isRetryableBrowserStartupFailure(`${reason}\nSystem Alert`), false);
+  }
+  assert.equal(isRetryableBrowserStartupFailure('Timed out waiting for http://127.0.0.1:4174/'), false);
+});
+
+test('browser failure evidence retains exception and error-console payloads only', () => {
+  const exception = { method: 'Runtime.exceptionThrown', params: { exceptionDetails: { text: 'boom' } } };
+  const consoleError = { method: 'Runtime.consoleAPICalled', params: { type: 'error', args: [{ description: 'stack' }] } };
+  const events = [null, exception, { method: 'Runtime.consoleAPICalled', params: { type: 'log' } },
+    consoleError, { method: 'Page.loadEventFired' }];
+  assert.deepEqual(applicationRuntimeErrors(events), [exception, consoleError]);
+  assert.equal(events.length, 5);
+});
+
+
+test('an unavailable diagnostic screenshot cannot mask the original application failure', async t => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'resindb-failure-contract-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const event = { method: 'Runtime.exceptionThrown', params: { exceptionDetails: { text: 'fixture error' } } };
+  const session = { events: [event], command: async () => { throw new Error('fixture capture failure'); } };
+  await assert.rejects(throwApplicationFailure(session, { text: 'System Alert' }, directory),
+    /Authenticated UI rendered the System Alert error boundary.*fixture error/);
+  const evidence = JSON.parse(readFileSync(path.join(directory, 'ui-smoke-failure.json'), 'utf8'));
+  assert.equal(evidence.reason, 'application-error-boundary');
+  assert.deepEqual(evidence.runtimeErrors, [event]);
 });
