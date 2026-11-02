@@ -75,6 +75,8 @@ export default defineConfig(({ mode }) => {
             // With explicit chunks it must not be hoisted into the app entry.
             if (id === '\0commonjsHelpers.js') return 'runtime-helpers';
             if (!id.includes('node_modules')) return undefined;
+            // Shared TypeScript helpers must not initialize through a lazy app chunk.
+            if (id.includes('/tslib/')) return 'runtime-helpers';
             if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) return 'react-core';
             if (id.includes('/echarts/') || id.includes('/zrender/') || id.includes('/echarts-for-react/')) return 'echarts-core';
             if (id.includes('/recharts/') || id.includes('/d3-')) return 'data-visualization';

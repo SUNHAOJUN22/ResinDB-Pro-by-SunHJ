@@ -354,7 +354,7 @@ export const ProductDetailDrawer: React.FC<ProductDetailDrawerProps> = React.mem
       {isOpen && (
         <motion.div
           key="product-drawer-overlay-container"
-          className="fixed inset-0 z-[50] pointer-events-none flex"
+          className="fixed inset-0 z-[150] pointer-events-none flex"
         >
           <motion.div
             key="product-drawer-backdrop"

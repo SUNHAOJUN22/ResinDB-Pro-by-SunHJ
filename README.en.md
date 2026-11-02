@@ -259,3 +259,5 @@ The [historical image archive](README.visual-archive.md) preserves earlier UI sc
 ## Workbench and numerical performance
 
 Analysis methods are grouped and searchable, with method-specific explanations and formulas. Heavy tools load on first use and preserve drafts after closing. The initial static JavaScript budget covers the complete import closure. Mahalanobis uses a numerical inverse survival function and separates missing values from real zero. See the [workbench optimization and validation contract](docs/WORKBENCH_OPTIMIZATION.md). These software changes do not confer scientific or engineering certification.
+
+Shared CommonJS and `tslib` helpers live in `runtime-helpers`. The build checks both the startup entry and the ECharts vendor dependency closure, rejecting vendor imports of an application entry or a lazy application module. This prevents circular initialization between chart registration and shared helpers. Existing bundle size budgets remain unchanged.

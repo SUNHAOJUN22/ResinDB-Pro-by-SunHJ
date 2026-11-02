@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assertStartupEntryIsolation, initialJavaScriptBudget, initialJavaScriptFiles } from '../lib/build-budget.mjs';
+import { assertStartupEntryIsolation, assertVendorChunkIsolation, initialJavaScriptBudget, initialJavaScriptFiles } from '../lib/build-budget.mjs';
 const manifest = {
   'index.html': { isEntry: true, file: 'assets/index.js', imports: ['react', 'shared'], dynamicImports: ['report'] },
   react: { file: 'assets/react.js', imports: ['shared'] },
@@ -44,4 +44,36 @@ test('permits shared vendor cycles and lazy tools without an entry back edge', (
   assert.doesNotThrow(() => assertStartupEntryIsolation({ ...manifest,
     report: { file: 'assets/report.js', imports: ['index.html'] },
   }));
+});
+
+test('rejects vendor dependencies on direct or indirect lazy application registration', () => {
+  const chunks = {
+    'index.html': { isEntry: true, file: 'assets/index.js' },
+    chart: { name: 'echarts-core', file: 'assets/echarts-core.js', imports: ['helpers'] },
+    helpers: { file: 'assets/helpers.js' },
+    registration: { isDynamicEntry: true, file: 'assets/registration.js', imports: ['chart'] },
+  };
+  for (const dependency of ['registration', 'index.html']) {
+    assert.throws(() => assertVendorChunkIsolation({ ...chunks,
+      chart: { ...chunks.chart, imports: [dependency] },
+    }), /Vendor chunk imports application module/);
+    assert.throws(() => assertVendorChunkIsolation({ ...chunks,
+      helpers: { ...chunks.helpers, imports: [dependency] },
+    }), /Vendor chunk imports application module/);
+  }
+});
+
+test('permits helper-only vendor cycles and rejects incomplete vendor closures', () => {
+  const chunks = {
+    chart: { name: 'echarts-core', file: 'assets/echarts-core.js', imports: ['helpers'] },
+    helpers: { file: 'assets/helpers.js', imports: ['chart'] },
+    registration: { isDynamicEntry: true, file: 'assets/registration.js', imports: ['chart'] },
+  };
+  assert.doesNotThrow(() => assertVendorChunkIsolation(chunks));
+  for (const data of [null, [], {}, { ...chunks, alias: { ...chunks.chart } }]) {
+    assert.throws(() => assertVendorChunkIsolation(data));
+  }
+  assert.throws(() => assertVendorChunkIsolation({ ...chunks,
+    helpers: { ...chunks.helpers, imports: ['absent'] },
+  }), /Missing static import/);
 });

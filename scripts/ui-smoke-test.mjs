@@ -26,6 +26,7 @@ const screenshotPaths = {
   dashboard: path.join(artifactDir, 'ui-dashboard-zh-light.png'),
   emptyState: path.join(artifactDir, 'ui-empty-state.png'),
   productDetail: path.join(artifactDir, 'ui-product-detail.png'),
+  productDetailMobile: path.join(artifactDir, 'ui-product-detail-mobile.png'),
   analytics: path.join(artifactDir, 'ui-scientific-analytics.png'),
   scatter: path.join(artifactDir, 'ui-scatter-zh-light.png'),
   dependencyMap: path.join(artifactDir, 'ui-dependency-map.png'),
@@ -173,6 +174,90 @@ async function capture(session, targetPath) {
     fromSurface: true,
   });
   writeFileSync(targetPath, Buffer.from(screenshot.data, 'base64'));
+}
+
+async function pointerTarget(session, selector, description) {
+  await waitForCondition(session, `Boolean(document.querySelector(${JSON.stringify(selector)}))`, description);
+  await evaluate(session, `document.querySelector(${JSON.stringify(selector)}).scrollIntoView({ block: 'nearest', inline: 'nearest' })`);
+  let previous = null;
+  let stableSamples = 0;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const current = await evaluate(session, `(() => {
+      const target = document.querySelector(${JSON.stringify(selector)});
+      if (!target) return null;
+      const rect = target.getBoundingClientRect();
+      const left = Math.max(0, rect.left), right = Math.min(innerWidth, rect.right);
+      const top = Math.max(0, rect.top), bottom = Math.min(innerHeight, rect.bottom);
+      const x = (left + right) / 2, y = (top + bottom) / 2;
+      const hit = document.elementFromPoint(x, y);
+      return {
+        x, y, width: rect.width, height: rect.height,
+        visible: right > left && bottom > top,
+        hitTarget: Boolean(hit && target.contains(hit)),
+        hitTag: hit?.tagName ?? null,
+        hitLabel: hit?.getAttribute('aria-label') ?? null,
+        hitHtml: hit?.outerHTML.slice(0, 500) ?? null,
+      };
+    })()`);
+    if (current?.visible && previous && Math.abs(current.x - previous.x) < 0.25
+        && Math.abs(current.y - previous.y) < 0.25) stableSamples += 1;
+    else stableSamples = 0;
+    if (stableSamples >= 2) return current;
+    previous = current;
+    await sleep(50);
+  }
+  throw new Error(`Pointer target did not settle: ${description}: ${JSON.stringify(previous)}`);
+}
+
+async function dispatchPointerClick(session, target, clickCount = 1) {
+  const { x, y } = target;
+  await session.command('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+  await session.command('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount });
+  await session.command('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount });
+}
+
+async function exerciseProductDrawerPointer(session) {
+  const closeSelector = 'button[aria-label="Close details"]';
+  const evidence = [];
+  for (const viewport of [
+    { width: 1600, height: 1000, mobile: false },
+    { width: 390, height: 844, mobile: true },
+  ]) {
+    // Open through the actual row pointer target at desktop size before checking
+    // each close layout. The second layout also runs if the first close is blocked.
+    await session.command('Emulation.setDeviceMetricsOverride', {
+      width: 1600, height: 1000, mobile: false, deviceScaleFactor: 1,
+    });
+    let opening = null;
+    if (!await evaluate(session, `Boolean(document.querySelector(${JSON.stringify(closeSelector)}))`)) {
+      opening = await pointerTarget(session, 'tbody tr[data-index] td:nth-child(2)', 'product row');
+      if (!opening.hitTarget) throw new Error(`Product row pointer is obstructed: ${JSON.stringify(opening)}`);
+      await dispatchPointerClick(session, opening, 1);
+      await dispatchPointerClick(session, opening, 2);
+      await waitForCondition(session, `Boolean(document.querySelector(${JSON.stringify(closeSelector)}))`, 'product detail drawer');
+    }
+    await session.command('Emulation.setDeviceMetricsOverride', { ...viewport, deviceScaleFactor: 1 });
+    const closing = await pointerTarget(session, closeSelector, 'product drawer close');
+    await capture(session, viewport.mobile ? screenshotPaths.productDetailMobile : screenshotPaths.productDetail);
+    // Dispatch even for an obstructed hit: the regression records both the real
+    // hit-test result and whether a real mouse press/release closed the drawer.
+    await dispatchPointerClick(session, closing);
+    let closed = false;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      closed = await evaluate(session, `!document.querySelector(${JSON.stringify(closeSelector)})`);
+      if (closed) break;
+      await sleep(50);
+    }
+    evidence.push({ viewport, opening, closing, closed, passed: closing.hitTarget && closed });
+  }
+  await session.command('Emulation.setDeviceMetricsOverride', {
+    width: 1600, height: 1000, mobile: false, deviceScaleFactor: 1,
+  });
+  writeFileSync(path.join(artifactDir, 'ui-drawer-pointer.json'), `${JSON.stringify(evidence, null, 2)}\n`);
+  if (evidence.some(item => !item.passed)) {
+    throw new Error(`Product detail drawer pointer interaction failed: ${JSON.stringify(evidence)}`);
+  }
+  return evidence;
 }
 
 async function searchDashboard(session, query, expectedCount) {
@@ -428,15 +513,7 @@ try {
     return true;
   })()`);
   await waitForCondition(session, `document.querySelectorAll('tbody tr[data-index]').length > 0`, 'data grid rows after clearing search');
-  await evaluate(session, `(() => {
-    const row = document.querySelector('tbody tr[data-index]');
-    if (!row) throw new Error('No product row available');
-    row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window }));
-    return true;
-  })()`);
-  await waitForCondition(session, `!!document.querySelector('button[aria-label="Close details"]')`, 'product detail drawer');
-  await capture(session, screenshotPaths.productDetail);
-  await evaluate(session, `document.querySelector('button[aria-label="Close details"]').click()`);
+  const drawerPointerInteractions = await exerciseProductDrawerPointer(session);
   await waitForCondition(session, `!document.querySelector('button[aria-label="Close details"]')`, 'product detail drawer close');
 
   await clickButtonByTitle(session, ['科研可视化', 'Scientific Visualization']);
@@ -693,6 +770,7 @@ try {
     appUrl,
     scatterCanvas: scatterEvidence,
     localeSearch,
+    drawerPointerInteractions,
     recordCount: await evaluate(session, `Number(document.querySelector('[data-testid="record-count"]')?.dataset.count)`),
     screenshots: Object.fromEntries(Object.entries(screenshotPaths).map(([name, file]) => [name, path.basename(file)])),
     preferences: savedPreferences,

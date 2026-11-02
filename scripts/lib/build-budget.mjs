@@ -59,3 +59,30 @@ export function assertStartupEntryIsolation(manifest, entryKey = 'index.html') {
     }
   }
 }
+
+/** Vendor runtimes must initialize without evaluating a lazy application module. */
+export function assertVendorChunkIsolation(manifest, vendorNames = ['echarts-core']) {
+  if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
+    throw new Error('Missing Vite manifest');
+  }
+  for (const name of vendorNames) {
+    const roots = Object.keys(manifest).filter(key => manifest[key]?.name === name);
+    if (roots.length !== 1) throw new Error(`Expected one vendor chunk: ${name}`);
+    const root = roots[0];
+    // Validate the entire vendor dependency closure, including unresolved edges.
+    initialJavaScriptFiles({ ...manifest, [root]: { ...manifest[root], isEntry: true } }, root);
+    const visited = new Set();
+    const queue = [root];
+    while (queue.length) {
+      const key = queue.pop();
+      if (visited.has(key)) continue;
+      visited.add(key);
+      for (const dependency of manifest[key].imports ?? []) {
+        if (manifest[dependency].isEntry || manifest[dependency].isDynamicEntry) {
+          throw new Error(`Vendor chunk imports application module: ${key} -> ${dependency}`);
+        }
+        queue.push(dependency);
+      }
+    }
+  }
+}
