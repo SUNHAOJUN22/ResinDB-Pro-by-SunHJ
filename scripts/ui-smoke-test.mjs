@@ -176,33 +176,37 @@ async function capture(session, targetPath) {
   writeFileSync(targetPath, Buffer.from(screenshot.data, 'base64'));
 }
 
-async function pointerTarget(session, selector, description) {
+async function pointerTarget(session, selector, description, horizontalFraction = 0.5) {
   await waitForCondition(session, `Boolean(document.querySelector(${JSON.stringify(selector)}))`, description);
-  await evaluate(session, `document.querySelector(${JSON.stringify(selector)}).scrollIntoView({ block: 'nearest', inline: 'nearest' })`);
+  await evaluate(session, `document.querySelector(${JSON.stringify(selector)}).scrollIntoView({ block: 'center', inline: 'center' })`);
   let previous = null;
   let stableSamples = 0;
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+  const started = Date.now();
+  for (let attempt = 0; attempt < 200 && Date.now() - started < 10_000; attempt += 1) {
     const current = await evaluate(session, `(() => {
       const target = document.querySelector(${JSON.stringify(selector)});
       if (!target) return null;
       const rect = target.getBoundingClientRect();
-      const left = Math.max(0, rect.left), right = Math.min(innerWidth, rect.right);
-      const top = Math.max(0, rect.top), bottom = Math.min(innerHeight, rect.bottom);
-      const x = (left + right) / 2, y = (top + bottom) / 2;
+      const { left, right, top, bottom, width, height } = rect;
+      const x = left + width * ${JSON.stringify(horizontalFraction)}, y = top + height / 2;
+      const visible = [left, right, top, bottom, width, height].every(Number.isFinite)
+        && width > 0 && height > 0;
+      const fullyVisible = visible && left >= 0 && top >= 0
+        && right <= innerWidth && bottom <= innerHeight
+        && x >= 1 && y >= 1 && x < innerWidth - 1 && y < innerHeight - 1;
       const hit = document.elementFromPoint(x, y);
       return {
-        x, y, width: rect.width, height: rect.height,
-        visible: right > left && bottom > top,
+        x, y, left, right, top, bottom, width, height, visible, fullyVisible,
         hitTarget: Boolean(hit && target.contains(hit)),
         hitTag: hit?.tagName ?? null,
         hitLabel: hit?.getAttribute('aria-label') ?? null,
         hitHtml: hit?.outerHTML.slice(0, 500) ?? null,
       };
     })()`);
-    if (current?.visible && previous && Math.abs(current.x - previous.x) < 0.25
-        && Math.abs(current.y - previous.y) < 0.25) stableSamples += 1;
+    if (current?.fullyVisible && current.hitTarget && previous?.fullyVisible && previous.hitTarget
+        && ['left', 'right', 'top', 'bottom', 'width', 'height'].every(key => Math.abs(current[key] - previous[key]) < 0.25)) stableSamples += 1;
     else stableSamples = 0;
-    if (stableSamples >= 2) return current;
+    if (stableSamples >= 3) return { ...current, stableSamples, attempts: attempt + 1, waitedMs: Date.now() - started };
     previous = current;
     await sleep(50);
   }
@@ -219,44 +223,56 @@ async function dispatchPointerClick(session, target, clickCount = 1) {
 async function exerciseProductDrawerPointer(session) {
   const closeSelector = 'button[aria-label="Close details"]';
   const evidence = [];
+  const saveEvidence = () => writeFileSync(path.join(artifactDir, 'ui-drawer-pointer.json'), `${JSON.stringify(evidence, null, 2)}\n`);
+  saveEvidence();
   for (const viewport of [
     { width: 1600, height: 1000, mobile: false },
     { width: 390, height: 844, mobile: true },
   ]) {
-    // Open through the actual row pointer target at desktop size before checking
-    // each close layout. The second layout also runs if the first close is blocked.
-    await session.command('Emulation.setDeviceMetricsOverride', {
-      width: 1600, height: 1000, mobile: false, deviceScaleFactor: 1,
-    });
-    let opening = null;
-    if (!await evaluate(session, `Boolean(document.querySelector(${JSON.stringify(closeSelector)}))`)) {
-      opening = await pointerTarget(session, 'tbody tr[data-index] td:nth-child(2)', 'product row');
-      if (!opening.hitTarget) throw new Error(`Product row pointer is obstructed: ${JSON.stringify(opening)}`);
-      await dispatchPointerClick(session, opening, 1);
-      await dispatchPointerClick(session, opening, 2);
+    const interaction = { viewport, opening: null, opened: false, closing: null, closed: false, passed: false };
+    evidence.push(interaction);
+    try {
+      await session.command('Emulation.setDeviceMetricsOverride', { ...viewport, deviceScaleFactor: 1 });
+      if (await evaluate(session, `Boolean(document.querySelector(${JSON.stringify(closeSelector)}))`)) {
+        throw new Error('Product drawer must be closed before testing each viewport');
+      }
+      if (viewport.mobile) {
+        const sidebarBackdrop = 'div[class~="md:hidden"][class~="z-[55]"]';
+        if (await evaluate(session, `Boolean(document.querySelector(${JSON.stringify(sidebarBackdrop)}))`)) {
+          // The normal mobile sidebar backdrop closes the menu on a click.
+          // Its exposed right side is outside the sidebar that covers its center.
+          interaction.sidebarDismissal = await pointerTarget(session, sidebarBackdrop, 'mobile sidebar backdrop', 0.9);
+          await dispatchPointerClick(session, interaction.sidebarDismissal);
+          await waitForCondition(session, `!document.querySelector(${JSON.stringify(sidebarBackdrop)})`, 'mobile sidebar close');
+        }
+        interaction.sidebarClosed = true;
+      }
+      interaction.opening = await pointerTarget(session, 'tbody tr[data-index] td:nth-child(2)', 'product row');
+      await dispatchPointerClick(session, interaction.opening, 1);
+      await dispatchPointerClick(session, interaction.opening, 2);
       await waitForCondition(session, `Boolean(document.querySelector(${JSON.stringify(closeSelector)}))`, 'product detail drawer');
+      interaction.opened = true;
+      await pointerTarget(session, closeSelector, 'product drawer close before capture');
+      await capture(session, viewport.mobile ? screenshotPaths.productDetailMobile : screenshotPaths.productDetail);
+      // Screenshot capture can span animation frames. Recheck the live rectangle
+      // and hit target before dispatching actual pointer events.
+      interaction.closing = await pointerTarget(session, closeSelector, 'product drawer close');
+      await dispatchPointerClick(session, interaction.closing);
+      await waitForCondition(session, `!document.querySelector(${JSON.stringify(closeSelector)})`, 'product detail drawer close');
+      interaction.closed = true;
+      interaction.passed = interaction.opening.hitTarget && interaction.opened
+        && interaction.closing.hitTarget && interaction.closed;
+      if (!interaction.passed) throw new Error('Product drawer did not complete a verified pointer open and close');
+    } catch (error) {
+      interaction.error = error instanceof Error ? error.message : String(error);
+      throw new Error(`Product detail drawer pointer interaction failed: ${JSON.stringify(interaction)}`);
+    } finally {
+      saveEvidence();
     }
-    await session.command('Emulation.setDeviceMetricsOverride', { ...viewport, deviceScaleFactor: 1 });
-    const closing = await pointerTarget(session, closeSelector, 'product drawer close');
-    await capture(session, viewport.mobile ? screenshotPaths.productDetailMobile : screenshotPaths.productDetail);
-    // Dispatch even for an obstructed hit: the regression records both the real
-    // hit-test result and whether a real mouse press/release closed the drawer.
-    await dispatchPointerClick(session, closing);
-    let closed = false;
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      closed = await evaluate(session, `!document.querySelector(${JSON.stringify(closeSelector)})`);
-      if (closed) break;
-      await sleep(50);
-    }
-    evidence.push({ viewport, opening, closing, closed, passed: closing.hitTarget && closed });
   }
   await session.command('Emulation.setDeviceMetricsOverride', {
     width: 1600, height: 1000, mobile: false, deviceScaleFactor: 1,
   });
-  writeFileSync(path.join(artifactDir, 'ui-drawer-pointer.json'), `${JSON.stringify(evidence, null, 2)}\n`);
-  if (evidence.some(item => !item.passed)) {
-    throw new Error(`Product detail drawer pointer interaction failed: ${JSON.stringify(evidence)}`);
-  }
   return evidence;
 }
 
