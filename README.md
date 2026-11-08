@@ -14,6 +14,22 @@ ResinDB 是 React / TypeScript 材料数据与科研筛选工作区，提供本�
 
 ![代码交付边界](docs/current-main/resindb-current-main-zh.svg)
 
+## 从数据到可解释决策
+
+```mermaid
+flowchart LR
+  A["数据来源与原始记录"] --> B["单位、测试条件与有效性"]
+  B --> C["公式依赖图与计算工作器"]
+  C --> D["统计图、有效样本和筛选"]
+  D --> E{"科学解释与适用域"}
+  E -->|"拒绝缺失或外推"| B
+  E -->|"通过复核"| F["有证据的决策"]
+  classDef core fill:#0F766E,color:#fff,stroke:#5EEAD4;
+  class B,C,D core;
+```
+
+这是**技术架构示意，不是实验测量图**。区分 DEMO/SYNTHETIC 与真实 MEASURED 数据，遇到 `UNKNOWN`/`INVALID` 不得猜测单位或把缺失值补成零。修改后应分别执行 `npm run validate:docs`、`npm run validate:compute`、`npm test`、`npm run build`，浏览器交互另以 UI 测试为准。
+
 ## 安装与运行
 
 ```bash
