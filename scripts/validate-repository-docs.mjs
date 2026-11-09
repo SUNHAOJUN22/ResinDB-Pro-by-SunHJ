@@ -122,6 +122,7 @@ for (const [path, language] of [['README.md', 'zh'], ['README.zh-CN.md', 'zh'], 
     `docs/assets/vision-${language}.png`,
     `docs/localized-vision/resindb-vision-${language}.svg`,
     `docs/current-main/resindb-current-main-${language}.svg`,
+    `docs/assets/atlas-v2/architecture-${language}.svg`,
   ], ROOT);
   const png = readFileSync(resolve(ROOT, `docs/assets/vision-${language}.png`));
   if (png.length < 20000 || !png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) fail(`Invalid localized PNG: ${language}`);

@@ -14,6 +14,12 @@ ResinDB 是 React / TypeScript 材料数据与科研筛选工作区，提供本�
 
 ![代码交付边界](docs/current-main/resindb-current-main-zh.svg)
 
+## 可编辑科学架构图
+
+![材料数据来源与计算资格四阶段概念图](docs/assets/atlas-v2/architecture-zh.svg)
+
+本图仅为可编辑技术示意，不包含实测数值或自动科学认证。真实结果以原始来源、量纲与测试条件审核为准。
+
 ## 安装与运行
 
 ```bash
