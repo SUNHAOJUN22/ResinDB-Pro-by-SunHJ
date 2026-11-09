@@ -1,5 +1,6 @@
 import { createWorkerProgressMessage } from '@/compute/workerProtocol';
 import { comparisonObservations } from '@/utils/productUtils';
+import { parseFiniteReal } from '@/lib/quantityRecord';
 import type { Product } from '@/types/index';
 
 const SIMILARITY_MODEL_VERSION = 'zscore-cosine-overlap-canonical-f64-4.0.0';
@@ -88,8 +89,10 @@ function parseFinitePropertyValue(value: unknown): ParsedValue {
   if (typeof value === 'string') {
     const trimmed = value.trim();
     if (trimmed.length === 0) return { value: Number.NaN, observed: false, rejected: false };
-    const parsed = Number(trimmed);
-    return Number.isFinite(parsed)
+    // Use the same admission parser as canonical quantities: Number() alone
+    // accepts hex literals and turns nonzero underflow into apparent zero.
+    const parsed = parseFiniteReal(trimmed);
+    return parsed !== null
       ? { value: parsed, observed: true, rejected: false }
       : { value: Number.NaN, observed: false, rejected: true };
   }

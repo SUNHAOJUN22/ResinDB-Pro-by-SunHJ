@@ -151,6 +151,24 @@ describe('similarity missingness and overlap contract', () => {
     });
   });
 
+  it('counts hexadecimal and nonzero-underflow text as rejected, not admitted', async () => {
+    const response = await runSimilarity({
+      products: [
+        makeProduct('p1', { A: { value: '0x10' }, B: { value: 1 }, C: { value: 2 } }),
+        makeProduct('p2', { A: { value: '1e-9999' }, B: { value: 2 }, C: { value: 3 } }),
+        makeProduct('p3', { A: { value: '3.5' }, B: { value: 3 }, C: { value: 4 } }),
+        makeProduct('p4', { A: { value: '4.5' }, B: { value: 4 }, C: { value: 5 } }),
+      ],
+      features: ['A', 'B', 'C'],
+      threshold: -1,
+    });
+    expect(response.type).toBe('SIMILARITY_CALCULATED');
+    expect(response.payload?.diagnostics).toMatchObject({
+      strictNumericRejections: 2,
+      numericParsingPolicy: 'strict-finite-full-string',
+    });
+  });
+
   it('rejects duplicate product IDs and blank feature names', async () => {
     const duplicateIds = await runSimilarity({
       products: [
