@@ -14,6 +14,12 @@ The AI-designed image illustrates the project vision. Its text and equations exp
 
 ![Code delivery boundary](docs/current-main/resindb-current-main-en.svg)
 
+## Visual architecture: traceable science boundary
+
+![ResinDB-Pro-by-SunHJ editable architecture overview](docs/assets/atlas-v2/architecture-en.svg)
+
+Editable architecture schematic, not a solver result or experimental measurement. Verification must be tied to source code, declared conditions and exact-commit test evidence.
+
 ## Install and run
 
 ```bash

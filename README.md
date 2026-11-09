@@ -14,6 +14,12 @@ ResinDB 是 React / TypeScript 材料数据与科研筛选工作区，提供本�
 
 ![代码交付边界](docs/current-main/resindb-current-main-zh.svg)
 
+## 架构可视化：来源、计算与证据
+
+![ResinDB-Pro-by-SunHJ 科学架构可编辑示意](docs/assets/atlas-v2/architecture-zh.svg)
+
+可编辑概念图，不是外部求解器结果；实际资格必须依据源代码、条件与测试记录核验。
+
 ## 从数据到可解释决策
 
 ```mermaid
