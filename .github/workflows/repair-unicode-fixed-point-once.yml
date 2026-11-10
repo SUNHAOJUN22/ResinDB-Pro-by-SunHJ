@@ -1,0 +1,78 @@
+name: One-time Unicode fixed-point rebuild
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/repair-unicode-fixed-point-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: one-time-unicode-fixed-point-rebuild
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    if: github.actor == 'SUNHAOJUN22'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact repair tree
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+      - name: Verify immutable repair base
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "90e120aa84c29a5c05da9c9063fd6f3820539e26"
+          test "$GITHUB_REF" = "refs/heads/main"
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Rebuild deterministic tracked reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run validate:docs
+          node scripts/validate-repository-unicode.mjs --write
+          npm run validate:source
+          npm run validate:data
+          npm run validate:compute
+          npm run validate:scientific-ui
+      - name: Prove only the Unicode report changed
+        shell: python
+        run: |
+          import subprocess
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only'], text=True
+          ).splitlines())
+          expected = {'reports/UNICODE_INTEGRITY_REPORT.json'}
+          if changed != expected:
+              raise SystemExit(f'unexpected tracked changes: {sorted(changed)}')
+      - name: Remove staging workflow and commit fixed point
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/repair-unicode-fixed-point-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/UNICODE_INTEGRITY_REPORT.json
+          test "$(git diff --cached --name-only | LC_ALL=C sort)" = $'.github/workflows/repair-unicode-fixed-point-once.yml\nreports/UNICODE_INTEGRITY_REPORT.json'
+          git commit -m "chore(validation): refresh Unicode source inventory"
+      - name: Verify clean fixed point
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/validate-repository-unicode.mjs --write
+          git diff --exit-code
+          git diff --cached --exit-code
+      - name: Publish one atomic generated-artifact commit
+        shell: bash
+        run: git push origin HEAD:main
