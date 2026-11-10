@@ -3,7 +3,7 @@ import { comparisonObservations } from '@/utils/productUtils';
 import { parseFiniteReal } from '@/lib/quantityRecord';
 import type { Product } from '@/types/index';
 
-const SIMILARITY_MODEL_VERSION = 'zscore-cosine-overlap-canonical-f64-4.0.0';
+const SIMILARITY_MODEL_VERSION = 'zscore-cosine-overlap-canonical-f64-4.1.0';
 const MINIMUM_SHARED_FEATURES = 2;
 
 export interface SimilarityMessage {
@@ -120,29 +120,60 @@ function swap(heap: IndexedEdge[], left: number, right: number): void {
   heap[right] = temporary;
 }
 
-function retainStrongest(heap: IndexedEdge[], edge: IndexedEdge, limit: number): void {
-  if (heap.length < limit) {
-    heap.push(edge);
-    let index = heap.length - 1;
-    while (index > 0) {
-      const parent = Math.floor((index - 1) / 2);
-      if (heap[parent].value <= heap[index].value) break;
-      swap(heap, parent, index);
-      index = parent;
-    }
-    return;
-  }
-  heap[0] = edge;
-  let index = 0;
+function compareText(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
+function compareEdgeKey(
+  leftValue: number,
+  leftSource: string,
+  leftTarget: string,
+  rightValue: number,
+  rightSource: string,
+  rightTarget: string,
+): number {
+  if (leftValue < rightValue) return -1;
+  if (leftValue > rightValue) return 1;
+  const sourceOrder = compareText(rightSource, leftSource);
+  if (sourceOrder !== 0) return sourceOrder;
+  return compareText(rightTarget, leftTarget);
+}
+
+function compareIndexedEdges(left: IndexedEdge, right: IndexedEdge): number {
+  return compareEdgeKey(
+    left.value,
+    left.source,
+    left.target,
+    right.value,
+    right.source,
+    right.target,
+  );
+}
+
+function siftWeakestDown(heap: IndexedEdge[], start = 0): void {
+  let index = start;
   while (true) {
     const left = index * 2 + 1;
     const right = left + 1;
-    let smallest = index;
-    if (left < heap.length && heap[left].value < heap[smallest].value) smallest = left;
-    if (right < heap.length && heap[right].value < heap[smallest].value) smallest = right;
-    if (smallest === index) break;
-    swap(heap, index, smallest);
-    index = smallest;
+    let weakest = index;
+    if (left < heap.length && compareIndexedEdges(heap[left], heap[weakest]) < 0) weakest = left;
+    if (right < heap.length && compareIndexedEdges(heap[right], heap[weakest]) < 0) weakest = right;
+    if (weakest === index) break;
+    swap(heap, index, weakest);
+    index = weakest;
+  }
+}
+
+function insertRetainedEdge(heap: IndexedEdge[], edge: IndexedEdge): void {
+  heap.push(edge);
+  let index = heap.length - 1;
+  while (index > 0) {
+    const parent = Math.floor((index - 1) / 2);
+    if (compareIndexedEdges(heap[parent], heap[index]) <= 0) break;
+    swap(heap, parent, index);
+    index = parent;
   }
 }
 
@@ -330,26 +361,56 @@ self.onmessage = (event: MessageEvent<SimilarityMessage>) => {
         const similarity = Math.max(-1, Math.min(1, rawCosine * featureCoverage));
         if (similarity < threshold) continue;
         edgesAboveThreshold += 1;
-        if (
-          maxEdges !== undefined
-          && retainedEdges.length >= maxEdges
-          && similarity <= retainedEdges[0].value
-        ) {
-          continue;
-        }
-        const edge: IndexedEdge = {
-          source: products[left].id,
-          target: products[right].id,
+      const leftId = products[left].id;
+      const rightId = products[right].id;
+      const sourceId = compareText(leftId, rightId) <= 0 ? leftId : rightId;
+      const targetId = sourceId === leftId ? rightId : leftId;
+      if (maxEdges === undefined) {
+        retainedEdges.push({
+          source: sourceId,
+          target: targetId,
           value: similarity,
           rawCosine,
           featureCoverage,
           sharedFeatures,
           leftIndex: left,
           rightIndex: right,
-        };
+        });
         edgeObjectsAllocated += 1;
-        if (maxEdges === undefined) retainedEdges.push(edge);
-        else retainStrongest(retainedEdges, edge, maxEdges);
+      } else if (retainedEdges.length < maxEdges) {
+        insertRetainedEdge(retainedEdges, {
+          source: sourceId,
+          target: targetId,
+          value: similarity,
+          rawCosine,
+          featureCoverage,
+          sharedFeatures,
+          leftIndex: left,
+          rightIndex: right,
+        });
+        edgeObjectsAllocated += 1;
+      } else {
+        const weakest = retainedEdges[0];
+        if (compareEdgeKey(
+          similarity,
+          sourceId,
+          targetId,
+          weakest.value,
+          weakest.source,
+          weakest.target,
+        ) <= 0) {
+          continue;
+        }
+        weakest.source = sourceId;
+        weakest.target = targetId;
+        weakest.value = similarity;
+        weakest.rawCosine = rawCosine;
+        weakest.featureCoverage = featureCoverage;
+        weakest.sharedFeatures = sharedFeatures;
+        weakest.leftIndex = left;
+        weakest.rightIndex = right;
+        siftWeakestDown(retainedEdges);
+      }
       }
       const completed = left + 1;
       if (completed % progressInterval === 0 || completed === productCount) {
@@ -362,11 +423,7 @@ self.onmessage = (event: MessageEvent<SimilarityMessage>) => {
       }
     }
 
-    retainedEdges.sort((left, right) => (
-      right.value - left.value
-      || left.source.localeCompare(right.source)
-      || left.target.localeCompare(right.target)
-    ));
+    retainedEdges.sort((left, right) => -compareIndexedEdges(left, right));
     for (const edge of retainedEdges) {
       nodes[edge.leftIndex].value += 1;
       nodes[edge.rightIndex].value += 1;

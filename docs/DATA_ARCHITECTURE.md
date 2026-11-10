@@ -198,7 +198,7 @@ requires at least three compatible properties observed for every displayed
 product; absent axes are not fabricated as zero. Missing diagnostic targets yield
 an incomplete screening statement, and constant Spearman features display N/A.
 Similarity admission changes the evidence version to
-`zscore-cosine-overlap-canonical-f64-4.0.0`; z-score normalization, overlap policy,
+`zscore-cosine-overlap-canonical-f64-4.1.0`; z-score normalization, overlap policy,
 minimum shared-feature requirement, thresholds and binary64 computation remain
 unchanged.
 
