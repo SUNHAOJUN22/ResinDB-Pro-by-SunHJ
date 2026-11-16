@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
-import { networkInterfaces } from 'node:os';
+import { uiSmokeNetwork } from './lib/ui-smoke-network.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,15 +10,7 @@ const previewPort = 4176;
 const debugPort = 9226;
 const artifacts = path.join(root, 'artifacts');
 const downloads = path.join('/tmp', `resindb-phase2l-${process.pid}`);
-const hosts = Object.values(networkInterfaces()).flat().filter(Boolean)
-  .filter((entry) => entry.family === 'IPv4' && !entry.internal)
-  .map((entry) => entry.address);
-const appCandidates = [...new Set([
-  process.env.RESINDB_UI_HOST,
-  '127.0.0.1',
-  'localhost',
-  ...hosts,
-].filter(Boolean).map((host) => `http://${host}:${previewPort}`))];
+const { host, appUrlCandidates: appCandidates } = uiSmokeNetwork(previewPort);
 const dependencyShot = path.join(artifacts, 'ui-phase2l-dependency-heatmap.png');
 const rheologyShot = path.join(artifacts, 'ui-phase2l-rheology-proxy.png');
 const manifestPath = path.join(artifacts, 'ui-phase2l-manifest.json');
@@ -33,7 +25,7 @@ const chromeCandidates = [
 const chromeBin = chromeCandidates.find((candidate) => existsSync(candidate));
 if (!chromeBin) throw new Error(`No Chromium found: ${chromeCandidates.join(', ')}`);
 
-const preview = spawn(process.execPath, [vite, 'preview', '--host', '0.0.0.0', '--port', String(previewPort), '--strictPort'], {
+const preview = spawn(process.execPath, [vite, 'preview', '--host', host, '--port', String(previewPort), '--strictPort'], {
   cwd: root,
   env: { ...process.env, NODE_ENV: 'production' },
   stdio: ['ignore', 'pipe', 'pipe'],

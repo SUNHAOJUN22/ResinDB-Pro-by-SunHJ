@@ -2,25 +2,13 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { networkInterfaces } from 'node:os';
+import { uiSmokeNetwork } from './lib/ui-smoke-network.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const viteBin = path.join(projectRoot, 'node_modules', 'vite', 'bin', 'vite.js');
-const host = '0.0.0.0';
-const healthHost = '127.0.0.1';
 const previewPort = 4174;
 const debugPort = 9224;
-const healthUrl = `http://${healthHost}:${previewPort}`;
-let networkHosts = [];
-try {
-  networkHosts = Object.values(networkInterfaces()).flat().filter(Boolean)
-    .filter((entry) => entry.family === 'IPv4' && !entry.internal)
-    .map((entry) => entry.address);
-} catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
-  console.warn(`Unable to enumerate external IPv4 interfaces; using loopback UI smoke candidates: ${message}`);
-}
-const appUrlCandidates = [...new Set([process.env.RESINDB_UI_HOST, '127.0.0.1', 'localhost', ...networkHosts].filter(Boolean).map((candidate) => `http://${candidate}:${previewPort}`))];
+const { host, healthHost, healthUrl, appUrlCandidates } = uiSmokeNetwork(previewPort);
 const artifactDir = path.join(projectRoot, 'artifacts');
 const screenshotPaths = {
   dashboard: path.join(artifactDir, 'ui-dashboard-zh-light.png'),

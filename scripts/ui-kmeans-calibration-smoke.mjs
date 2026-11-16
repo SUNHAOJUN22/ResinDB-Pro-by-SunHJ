@@ -8,26 +8,13 @@ import {
 } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { networkInterfaces } from 'node:os';
+import { uiSmokeNetwork } from './lib/ui-smoke-network.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const viteBin = path.join(projectRoot, 'node_modules', 'vite', 'bin', 'vite.js');
-const host = '0.0.0.0';
-const healthHost = '127.0.0.1';
 const previewPort = 4175;
 const debugPort = 9225;
-const healthUrl = `http://${healthHost}:${previewPort}`;
-const networkHosts = Object.values(networkInterfaces())
-  .flat()
-  .filter(Boolean)
-  .filter((entry) => entry.family === 'IPv4' && !entry.internal)
-  .map((entry) => entry.address);
-const appUrlCandidates = [...new Set([
-  process.env.RESINDB_UI_HOST,
-  '127.0.0.1',
-  'localhost',
-  ...networkHosts,
-].filter(Boolean).map((candidate) => `http://${candidate}:${previewPort}`))];
+const { host, healthHost, healthUrl, appUrlCandidates } = uiSmokeNetwork(previewPort);
 const artifactDir = path.join(projectRoot, 'artifacts');
 const screenshotPath = path.join(artifactDir, 'ui-kmeans-device-calibration.png');
 const auditScreenshotPath = path.join(artifactDir, 'ui-kmeans-profile-audit.png');

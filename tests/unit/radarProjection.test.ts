@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Product, PropertyValue } from '@/types/index';
 import { buildFiniteRadarProjection } from '@/utils/radarProjection';
+import { canonicalizeCoreProperty } from '@/lib/quantityRecord';
 
 function product(values: Record<string, unknown>): Product {
   const properties: Record<string, PropertyValue> = {};
@@ -20,6 +21,15 @@ function product(values: Record<string, unknown>): Product {
 }
 
 describe('finite radar projection', () => {
+  it('rejects canonical core measurements that contradict the displayed declaration', () => {
+    const fixture = product({ density: 900, B: 2, C: 3, D: 4 });
+    fixture.properties.density.unit = 'kg/m³';
+    fixture.properties.density.quantity = canonicalizeCoreProperty('density', { value: 900, unit: 'kg/m³' });
+    fixture.properties.density.quantity.canonical!.value = 30;
+    const result = buildFiniteRadarProjection(fixture, { preferredKeys: ['density', 'B', 'C', 'D'], maximumDimensions: 4 });
+    expect(result.keys).toEqual(['B', 'C', 'D']);
+    expect(result.omittedKeys).toEqual(['density']);
+  });
   it('preserves real zero while rejecting missing, partial, boolean and non-finite inputs', () => {
     const result = buildFiniteRadarProjection(
       product({

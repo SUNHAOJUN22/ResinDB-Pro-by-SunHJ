@@ -12,10 +12,10 @@ import {
 import type { Product } from '@/types/index';
 import {
   buildNormalizedComparisonProfile,
-  parseFiniteNumericValue,
   type SimilarityResult,
 } from '@/services/mathUtils';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { comparisonObservations } from '@/utils/productUtils';
 
 interface SimilarProductsRadarProps {
   targetProduct: Product;
@@ -38,13 +38,29 @@ export const SimilarProductsRadar: React.FC<SimilarProductsRadarProps> = ({
 }) => {
   const { tProp } = useLanguage();
 
-  const profile = useMemo(() => buildNormalizedComparisonProfile(
-    targetProduct,
-    similarProducts.slice(0, 3),
-    allProducts,
-    (product, key) => parseFiniteNumericValue(product.properties[key]?.value),
-    6,
-  ), [allProducts, similarProducts, targetProduct]);
+  const profile = useMemo(() => {
+    const selected = similarProducts.slice(0, 3);
+    // Use the same canonical values and conditions as governed comparison
+    // views. Raw cells can have different units, or belong to
+    // explicitly rejected quantity records, despite containing finite numbers.
+    const references = new Map(allProducts.map(product => [product.id, product]));
+    references.set(targetProduct.id, targetProduct);
+    selected.forEach(({ product }) => references.set(product.id, product));
+    const products = [...references.values()];
+    const productIndices = new Map(products.map((product, index) => [product.id, index]));
+    const admitted = new Map<string, ReturnType<typeof comparisonObservations>>();
+    return buildNormalizedComparisonProfile(
+      targetProduct,
+      selected,
+      products,
+      (product, key) => {
+        if (!admitted.has(key)) admitted.set(key, comparisonObservations(products, key, true));
+        const index = productIndices.get(product.id);
+        return index === undefined ? null : admitted.get(key)?.[index]?.value ?? null;
+      },
+      6,
+    );
+  }, [allProducts, similarProducts, targetProduct]);
 
   const data = useMemo<RadarDatum[]>(() => profile.points.map((point) => ({
     subject: tProp(point.key).slice(0, 12),
