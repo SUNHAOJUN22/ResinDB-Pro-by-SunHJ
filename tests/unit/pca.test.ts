@@ -86,4 +86,25 @@ describe('deterministic NIPALS PCA', () => {
       loadingVectors: [],
     });
   });
+
+  it.each([1e-150, 1e150, 1e-300, 1e300])('preserves PCA directions and rescaled scores at scale %s', (scale) => {
+    const data = [[-2, 0], [2, 0], [0, -1], [0, 1]];
+    const expected = PCA.getComponents(data, 2);
+    const actual = PCA.getComponents(data.map((row) => row.map((value) => value * scale)), 2);
+    expect(actual.loadingVectors).toHaveLength(2);
+    actual.loadingVectors.forEach((row, component) => row.forEach((value, column) => {
+      expect(value).toBeCloseTo(expected.loadingVectors[component][column], 13);
+    }));
+    actual.projected.forEach((row, index) => row.forEach((value, column) => {
+      expect(value / scale).toBeCloseTo(expected.projected[index][column], 13);
+    }));
+  });
+
+  it('does not let a huge constant column erase a small varying column', () => {
+    const result = PCA.getComponents([[-2e-150], [-1e-150], [1e-150], [2e-150]]
+      .map(([value]) => [1e308, value]), 2);
+    expect(result.loadingVectors).toHaveLength(1);
+    expect(result.loadingVectors[0]).toEqual([0, 1]);
+    expect(result.projected.map((row) => row[0] / 1e-150)).toEqual([-2, -1, 1, 2]);
+  });
 });

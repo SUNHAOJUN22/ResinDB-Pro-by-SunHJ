@@ -64,7 +64,7 @@ describe('similarity Top-K determinism', () => {
     expect(firstEdges).toHaveLength(1);
     expect(firstEdges[0]).toMatchObject({ source: 'a', target: 'b' });
     expect(firstEdges[0].value as number).toBeCloseTo(1, 12);
-    expect(first.modelVersion).toBe('zscore-cosine-overlap-canonical-f64-4.1.0');
+    expect(first.modelVersion).toBe('zscore-cosine-overlap-canonical-f64-4.1.1');
     expect(first.diagnostics).toMatchObject({
       edgesAboveThreshold: 2,
       edgesReturned: 1,

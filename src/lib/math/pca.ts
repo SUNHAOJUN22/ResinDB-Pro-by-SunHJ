@@ -1,3 +1,5 @@
+import { summarizeFinite } from '@/lib/numericAggregation';
+
 export interface PCAResult {
   projected: number[][];
   loadingVectors: number[][];
@@ -83,20 +85,42 @@ export class PCA {
     if (componentLimit === 0) return { projected, loadingVectors: [] };
 
     const means = new Float64Array(columnCount);
-    for (const row of validData) {
-      for (let column = 0; column < columnCount; column++) means[column] += row[column];
+    for (let column = 0; column < columnCount; column++) {
+      means[column] = summarizeFinite(validData, (row) => row[column])!.mean;
     }
-    for (let column = 0; column < columnCount; column++) means[column] /= rowCount;
 
     const residual = new Float64Array(rowCount * columnCount);
-    let totalCenteredEnergy = 0;
+    let centeringFactor = 1;
+    let residualMagnitude = 0;
     for (let row = 0; row < rowCount; row++) {
       const offset = row * columnCount;
       for (let column = 0; column < columnCount; column++) {
         const centered = validData[row][column] - means[column];
         residual[offset + column] = centered;
-        totalCenteredEnergy += centered * centered;
+        if (!Number.isFinite(centered)) centeringFactor = 0.5;
+        residualMagnitude = Math.max(residualMagnitude, Math.abs(centered));
       }
+    }
+    // Opposite finite extremes can overflow subtraction. Half-sized centering
+    // keeps the working matrix finite; restore this common factor in scores.
+    if (centeringFactor !== 1) {
+      residualMagnitude = 0;
+      for (let row = 0; row < rowCount; row++) {
+        for (let column = 0; column < columnCount; column++) {
+          const centered = validData[row][column] * centeringFactor - means[column] * centeringFactor;
+          residual[row * columnCount + column] = centered;
+          residualMagnitude = Math.max(residualMagnitude, Math.abs(centered));
+        }
+      }
+    }
+    if (residualMagnitude === 0) return { projected, loadingVectors: [] };
+    // One global power-of-two factor preserves covariance PCA, unlike column
+    // standardization. Center first so large constant columns do not hide signal.
+    const residualScale = 2 ** Math.min(1023, Math.floor(Math.log2(residualMagnitude)));
+    let totalCenteredEnergy = 0;
+    for (let index = 0; index < residual.length; index++) {
+      residual[index] /= residualScale;
+      totalCenteredEnergy += residual[index] * residual[index];
     }
     if (!(totalCenteredEnergy > 0)) return { projected, loadingVectors: [] };
 
@@ -195,7 +219,9 @@ export class PCA {
       const storedLoading = Float64Array.from(loading);
       orthonormalLoadings.push(storedLoading);
       loadingVectors.push(Array.from(storedLoading));
-      for (let row = 0; row < rowCount; row++) projected[row][component] = score[row];
+      for (let row = 0; row < rowCount; row++) {
+        projected[row][component] = score[row] * residualScale / centeringFactor;
+      }
 
       for (let row = 0; row < rowCount; row++) {
         const offset = row * columnCount;

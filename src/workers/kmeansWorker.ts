@@ -18,7 +18,7 @@ import {
 } from '@/compute/random';
 import { createWorkerProgressMessage } from '@/compute/workerProtocol';
 
-const KMEANS_MODEL_VERSION = 'kmeans-plus-plus-adaptive-silhouette-f64-wasm-4.0.0';
+const KMEANS_MODEL_VERSION = 'kmeans-plus-plus-adaptive-silhouette-f64-wasm-4.0.1';
 const FULL_SILHOUETTE_LIMIT = 1_500;
 const DEFAULT_MAX_SILHOUETTE_SAMPLE = 1_000;
 const MAX_LLOYD_ITERATIONS = 50;
@@ -284,23 +284,37 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
     self.postMessage(createWorkerProgressMessage({ ratio: 0, phase: 'normalization' }));
     const values = matrix.values;
     const featureMeans = new Float64Array(dimensions);
+    const featureScales = new Float64Array(dimensions);
     const finiteCounts = new Uint32Array(dimensions);
     for (let sample = 0; sample < sampleCount; sample++) {
       const offset = sample * dimensions;
       for (let dimension = 0; dimension < dimensions; dimension++) {
         const value = values[offset + dimension];
         if (Number.isFinite(value)) {
-          featureMeans[dimension] += value;
-          finiteCounts[dimension] += 1;
+          featureScales[dimension] = Math.max(featureScales[dimension], Math.abs(value));
         }
       }
     }
+    // Scaling by a power of two preserves binary precision while preventing
+    // finite columns from overflowing/underflowing their means and variances.
     for (let dimension = 0; dimension < dimensions; dimension++) {
-      featureMeans[dimension] = finiteCounts[dimension] > 0
-        ? featureMeans[dimension] / finiteCounts[dimension]
-        : 0;
+      featureScales[dimension] = featureScales[dimension] > 0
+        ? 2 ** Math.min(1023, Math.floor(Math.log2(featureScales[dimension])))
+        : 1;
     }
-
+    for (let sample = 0; sample < sampleCount; sample++) {
+      const offset = sample * dimensions;
+      for (let dimension = 0; dimension < dimensions; dimension++) {
+        const value = values[offset + dimension];
+        if (Number.isFinite(value)) {
+          const scaled = value / featureScales[dimension];
+          values[offset + dimension] = scaled;
+          finiteCounts[dimension] += 1;
+          // Incremental averaging also keeps constant columns exactly constant.
+          featureMeans[dimension] += (scaled - featureMeans[dimension]) / finiteCounts[dimension];
+        }
+      }
+    }
     let missingValuesImputed = 0;
     const standardDeviations = new Float64Array(dimensions);
     for (let sample = 0; sample < sampleCount; sample++) {
@@ -316,7 +330,9 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
         standardDeviations[dimension] += centered * centered;
       }
     }
+    let hasVariableFeature = false;
     for (let dimension = 0; dimension < dimensions; dimension++) {
+      if (standardDeviations[dimension] > 0) hasVariableFeature = true;
       standardDeviations[dimension] = Math.sqrt(
         standardDeviations[dimension] / sampleCount,
       ) || 1;
@@ -336,7 +352,9 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
       payload.silhouetteSampleSize,
       normalizedSeed,
     );
-    const maxTestedK = Math.min(maxK, Math.floor(sampleCount / 2), 10);
+    const maxTestedK = hasVariableFeature
+      ? Math.min(maxK, Math.floor(sampleCount / 2), 10)
+      : 1;
     const assignmentSession = createKMeansAssignmentSession({
       matrix: values,
       sampleCount,
@@ -469,7 +487,10 @@ self.onmessage = (event: MessageEvent<KMeansMessage>) => {
             otherCounts[cluster] += 1;
           }
         }
-        const within = ownCount > 0 ? ownDistance / ownCount : 0;
+        // The within-cluster average is undefined for singletons; the standard
+        // silhouette convention assigns zero, not perfect separation (one).
+        if (ownCount === 0) continue;
+        const within = ownDistance / ownCount;
         let nearestOther = Infinity;
         for (let cluster = 0; cluster < k; cluster++) {
           if (cluster !== ownCluster && otherCounts[cluster] > 0) {

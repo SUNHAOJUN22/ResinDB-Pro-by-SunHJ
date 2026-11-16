@@ -3,7 +3,7 @@ import { comparisonObservations } from '@/utils/productUtils';
 import { parseFiniteReal } from '@/lib/quantityRecord';
 import type { Product } from '@/types/index';
 
-const SIMILARITY_MODEL_VERSION = 'zscore-cosine-overlap-canonical-f64-4.1.0';
+const SIMILARITY_MODEL_VERSION = 'zscore-cosine-overlap-canonical-f64-4.1.1';
 const MINIMUM_SHARED_FEATURES = 2;
 
 export interface SimilarityMessage {
@@ -251,6 +251,7 @@ self.onmessage = (event: MessageEvent<SimilarityMessage>) => {
     const normalized = new Float64Array(matrixLength);
     const observed = new Uint8Array(matrixLength);
     const means = new Float64Array(featureCount);
+    const featureScales = new Float64Array(featureCount);
     const finiteCounts = new Uint32Array(featureCount);
     let strictNumericRejections = 0;
 
@@ -262,7 +263,7 @@ self.onmessage = (event: MessageEvent<SimilarityMessage>) => {
         normalized[offset + feature] = observation?.value ?? Number.NaN;
         if (observation !== null) {
           observed[offset + feature] = 1;
-          means[feature] += observation.value;
+          featureScales[feature] = Math.max(featureScales[feature], Math.abs(observation.value));
           finiteCounts[feature] += 1;
         } else if (parseFinitePropertyValue(products[product].properties?.[features[feature]]?.value).rejected) {
           strictNumericRejections += 1;
@@ -270,6 +271,17 @@ self.onmessage = (event: MessageEvent<SimilarityMessage>) => {
       }
     }
     for (let feature = 0; feature < featureCount; feature++) {
+      // Work in dimensionless power-of-two units. Both the variance and the
+      // near-constant threshold must be independent of the declared unit scale.
+      const scale = featureScales[feature] > 0
+        ? 2 ** Math.min(1023, Math.floor(Math.log2(featureScales[feature])))
+        : 1;
+      for (let product = 0; product < productCount; product++) {
+        const index = product * featureCount + feature;
+        if (observed[index] === 0) continue;
+        normalized[index] /= scale;
+        means[feature] += normalized[index];
+      }
       means[feature] = finiteCounts[feature] > 0 ? means[feature] / finiteCounts[feature] : 0;
     }
 
