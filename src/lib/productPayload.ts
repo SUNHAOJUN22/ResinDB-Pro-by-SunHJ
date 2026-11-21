@@ -17,7 +17,7 @@ function isPropertyValue(value: unknown): value is PropertyValue {
   if (value.provenanceRefs !== undefined && !stringArray(value.provenanceRefs)) return false;
   if (value.quantity !== undefined) {
     const quantity = value.quantity;
-    if (!isRecord(quantity) || !isRecord(quantity.raw) || !['VALID', 'UNKNOWN', 'INVALID'].includes(String(quantity.status)) || !stringArray(quantity.reasonCodes) || !stringArray(quantity.provenanceRefs)) return false;
+    if (!isRecord(quantity) || !isRecord(quantity.raw) || typeof quantity.status !== 'string' || !['VALID', 'UNKNOWN', 'INVALID'].includes(quantity.status) || !stringArray(quantity.reasonCodes) || !stringArray(quantity.provenanceRefs)) return false;
     const canonical = quantity.canonical;
     if (quantity.status === 'VALID' && (!isRecord(canonical) || typeof canonical.value !== 'number' || !Number.isFinite(canonical.value) || typeof canonical.unit !== 'string' || !canonical.unit.trim() || typeof canonical.dimension !== 'string' || !canonical.dimension.trim())) return false;
     if (quantity.status !== 'VALID' && canonical !== undefined) return false;
@@ -63,9 +63,9 @@ function stringArray(value: unknown): value is string[] {
 }
 function isGovernance(value: unknown): boolean {
   return isRecord(value)
-    && ['DEMO', 'SYNTHETIC', 'REFERENCE', 'MEASURED', 'IMPORTED', 'UNKNOWN'].includes(String(value.sourceType))
-    && ['DEMO', 'SYNTHETIC', 'REFERENCE', 'MEASURED', 'IMPORTED', 'NOT_FOR_RELEASE', 'UNKNOWN'].includes(String(value.recordStatus))
-    && ['PUBLIC', 'INTERNAL', 'RESTRICTED', 'UNKNOWN'].includes(String(value.confidentiality))
+    && typeof value.sourceType === 'string' && ['DEMO', 'SYNTHETIC', 'REFERENCE', 'MEASURED', 'IMPORTED', 'UNKNOWN'].includes(value.sourceType)
+    && typeof value.recordStatus === 'string' && ['DEMO', 'SYNTHETIC', 'REFERENCE', 'MEASURED', 'IMPORTED', 'NOT_FOR_RELEASE', 'UNKNOWN'].includes(value.recordStatus)
+    && typeof value.confidentiality === 'string' && ['PUBLIC', 'INTERNAL', 'RESTRICTED', 'UNKNOWN'].includes(value.confidentiality)
     && typeof value.license === 'string' && stringArray(value.provenanceRefs)
     && (value.lastVerifiedAt === undefined || isIsoDate(value.lastVerifiedAt));
 }

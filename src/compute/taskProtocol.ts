@@ -41,11 +41,11 @@ export function throwIfAborted(signal: AbortSignal): void {
 }
 
 export function raceWithAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) return Promise.reject(getAbortError(signal));
-
   return new Promise<T>((resolve, reject) => {
     const onAbort = () => reject(getAbortError(signal));
-    signal.addEventListener('abort', onAbort, { once: true });
+    if (signal.aborted) onAbort();
+    else signal.addEventListener('abort', onAbort, { once: true });
+    // Observe the started operation even if cancellation won during startup.
     operation.then(resolve, reject).finally(() => {
       signal.removeEventListener('abort', onAbort);
     });
