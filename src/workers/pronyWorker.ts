@@ -1,7 +1,7 @@
 import { createWorkerProgressMessage } from '@/compute/workerProtocol';
 import { summarizeFinite } from '@/lib/numericAggregation';
 
-const PRONY_MODEL_VERSION = 'generalized-maxwell-nnls-fista-2.1.0';
+const PRONY_MODEL_VERSION = 'generalized-maxwell-nnls-fista-scaled-3.0.0';
 const MAX_TERMS = 50;
 const MAX_OPTIMIZATION_ITERATIONS = 10_000;
 
@@ -31,6 +31,8 @@ export interface PronyResponse {
       ridgeLambda: number;
       lipschitzConstant: number;
       tolerance: number;
+      normalization: 'common-modulus-scale';
+      modulusScale: number;
       memory: {
         vectorStrategy: 'reused-float64-double-buffer';
         fistaVectorAllocations: 3;
@@ -97,30 +99,61 @@ self.onmessage = (event: MessageEvent<PronyMessage>) => {
     const maximumOmega = validData[observationCount - 1].omega;
     const minimumTau = 1 / maximumOmega;
     const maximumTau = 1 / minimumOmega;
+    if (![minimumTau, maximumTau].every((value) => Number.isFinite(value) && value > 0)) {
+      throw new RangeError('Prony relaxation times are not representable as finite positive values.');
+    }
     const tau = new Array<number>(numTerms);
     if (numTerms === 1) {
-      tau[0] = Math.sqrt(minimumTau * maximumTau);
+      tau[0] = Math.sqrt(minimumTau) * Math.sqrt(maximumTau);
     } else {
       const minimumLogTau = Math.log10(minimumTau);
       const step = (Math.log10(maximumTau) - minimumLogTau) / (numTerms - 1);
-      for (let term = 0; term < numTerms; term++) tau[term] = 10 ** (minimumLogTau + term * step);
+      tau[0] = minimumTau;
+      tau[numTerms - 1] = maximumTau;
+      for (let term = 1; term < numTerms - 1; term++) tau[term] = 10 ** (minimumLogTau + term * step);
+    }
+    if (!tau.every((value) => Number.isFinite(value) && value > 0)) {
+      throw new RangeError('Prony relaxation-time grid is not representable.');
     }
 
+    const storageSummary = summarizeFinite(validData, (point) => point.storage);
+    const lossSummary = summarizeFinite(validData, (point) => point.loss);
+    if (!storageSummary || !lossSummary) throw new Error('Prony input contains no finite modulus values.');
+    // A common scale keeps NNLS convergence and mode selection independent of
+    // modulus units, and avoids overflowing squared norms and residuals.
+    const modulusScale = Math.max(storageSummary.maximum, lossSummary.maximum) || 1;
+    const normalizeModulus = (value: number): number => {
+      const normalized = value / modulusScale;
+      if (value !== 0 && normalized === 0) throw new RangeError('Prony modulus normalization underflowed a nonzero observation.');
+      return normalized;
+    };
+    const restoreModulus = (value: number): number => {
+      const restored = value * modulusScale;
+      if (!Number.isFinite(restored) || (value !== 0 && restored === 0)) {
+        throw new RangeError('Prony output modulus or error is not representable as a finite number.');
+      }
+      return restored;
+    };
     const coefficientCount = numTerms + 1;
     const equationCount = 2 * observationCount;
     const design = new Float64Array(equationCount * coefficientCount);
     const target = new Float64Array(equationCount);
     for (let observation = 0; observation < observationCount; observation++) {
       const point = validData[observation];
-      target[observation] = point.storage;
-      target[observation + observationCount] = point.loss;
+      target[observation] = normalizeModulus(point.storage);
+      target[observation + observationCount] = normalizeModulus(point.loss);
       design[observation * coefficientCount] = 1;
       for (let term = 0; term < numTerms; term++) {
         const omegaTau = point.omega * tau[term];
-        const omegaTauSquared = omegaTau * omegaTau;
-        const denominator = 1 + omegaTauSquared;
-        design[observation * coefficientCount + term + 1] = omegaTauSquared / denominator;
-        design[(observation + observationCount) * coefficientCount + term + 1] = omegaTau / denominator;
+        const ratio = omegaTau > 1 ? (1 / point.omega) / tau[term] : omegaTau;
+        const denominator = 1 + ratio * ratio;
+        const storageBasis = omegaTau > 1 ? 1 / denominator : ratio * ratio / denominator;
+        const lossBasis = ratio / denominator;
+        if (![storageBasis, lossBasis].every((value) => Number.isFinite(value) && value > 0)) {
+          throw new RangeError('Prony Maxwell basis is not representable as finite positive values.');
+        }
+        design[observation * coefficientCount + term + 1] = storageBasis;
+        design[(observation + observationCount) * coefficientCount + term + 1] = lossBasis;
       }
     }
 
@@ -152,12 +185,9 @@ self.onmessage = (event: MessageEvent<PronyMessage>) => {
 
     const lipschitzConstant = estimateLargestEigenvalue(normalMatrix, coefficientCount);
     const stepSize = 1 / lipschitzConstant;
-    const storageSummary = summarizeFinite(validData, (point) => point.storage);
-    if (!storageSummary) throw new Error('Prony input contains no finite storage modulus values.');
-    const maximumStorage = storageSummary.maximum;
     let coefficients = new Float64Array(coefficientCount);
     let nextCoefficients = new Float64Array(coefficientCount);
-    coefficients.fill(maximumStorage / coefficientCount);
+    coefficients.fill(normalizeModulus(storageSummary.maximum) / coefficientCount);
     const accelerated = new Float64Array(coefficients);
     let momentum = 1;
     let converged = false;
@@ -205,12 +235,14 @@ self.onmessage = (event: MessageEvent<PronyMessage>) => {
       }
     }
 
-    const E_inf = coefficients[0];
-    const terms = tau.map((relaxationTime, index) => ({
+    const E_inf = restoreModulus(coefficients[0]);
+    const normalizedTerms = tau.map((relaxationTime, index) => ({
       tau: relaxationTime,
       E: coefficients[index + 1],
     })).filter((term) => term.E > 1e-10);
-    const E_sum = E_inf + terms.reduce((sum, term) => sum + term.E, 0);
+    const normalizedSum = coefficients[0] + normalizedTerms.reduce((sum, term) => sum + term.E, 0);
+    const E_sum = restoreModulus(normalizedSum);
+    const terms = normalizedTerms.map((term) => ({ tau: term.tau, E: restoreModulus(term.E) }));
     const points: {
       omega: number;
       storage: number;
@@ -219,23 +251,22 @@ self.onmessage = (event: MessageEvent<PronyMessage>) => {
       loss_fit: number;
     }[] = [];
     let squaredError = 0;
-    for (const point of validData) {
-      let storageFit = E_inf;
+    for (let observation = 0; observation < observationCount; observation++) {
+      const point = validData[observation];
+      let storageFit = coefficients[0];
       let lossFit = 0;
       for (let term = 0; term < numTerms; term++) {
-        const omegaTau = point.omega * tau[term];
-        const omegaTauSquared = omegaTau * omegaTau;
-        const denominator = 1 + omegaTauSquared;
-        storageFit += coefficients[term + 1] * omegaTauSquared / denominator;
-        lossFit += coefficients[term + 1] * omegaTau / denominator;
+        storageFit += coefficients[term + 1] * design[observation * coefficientCount + term + 1];
+        lossFit += coefficients[term + 1] * design[(observation + observationCount) * coefficientCount + term + 1];
       }
-      squaredError += (storageFit - point.storage) ** 2 + (lossFit - point.loss) ** 2;
+      squaredError += (storageFit - target[observation]) ** 2
+        + (lossFit - target[observation + observationCount]) ** 2;
       points.push({
         omega: point.omega,
         storage: point.storage,
         loss: point.loss,
-        storage_fit: storageFit,
-        loss_fit: lossFit,
+        storage_fit: restoreModulus(storageFit),
+        loss_fit: restoreModulus(lossFit),
       });
     }
     terms.sort((left, right) => left.tau - right.tau);
@@ -255,7 +286,7 @@ self.onmessage = (event: MessageEvent<PronyMessage>) => {
         E_sum,
         terms,
         points,
-        error_metric: Math.sqrt(squaredError / (2 * observationCount)),
+        error_metric: restoreModulus(Math.sqrt(squaredError / (2 * observationCount))),
         abaqusCard,
         modelVersion: PRONY_MODEL_VERSION,
         optimization: {
@@ -266,6 +297,8 @@ self.onmessage = (event: MessageEvent<PronyMessage>) => {
           ridgeLambda,
           lipschitzConstant,
           tolerance,
+          normalization: 'common-modulus-scale',
+          modulusScale,
           memory: {
             vectorStrategy: 'reused-float64-double-buffer',
             fistaVectorAllocations: 3,

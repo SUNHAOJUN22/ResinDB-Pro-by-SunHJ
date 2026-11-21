@@ -1,6 +1,6 @@
 import { summarizeFinite } from '@/lib/numericAggregation';
 
-const KINETICS_MODEL_VERSION = 'kissinger-first-order-extrapolation-2.0.0';
+const KINETICS_MODEL_VERSION = 'kissinger-first-order-extrapolation-2.1.0';
 
 export interface KineticsMessage {
   type: 'RUN_KINETICS';
@@ -53,7 +53,7 @@ self.onmessage = (event: MessageEvent<KineticsMessage>) => {
       const temperatureKelvin = row.tp + 273.15;
       return {
         x: 1 / temperatureKelvin,
-        y: Math.log(row.beta / (temperatureKelvin * temperatureKelvin)),
+        y: Math.log(row.beta) - 2 * Math.log(temperatureKelvin),
       };
     });
     const observations = points.length;
@@ -77,12 +77,12 @@ self.onmessage = (event: MessageEvent<KineticsMessage>) => {
       : 0;
 
     const gasConstant = 8.31446261815324;
-    const activationEnergyJoules = -slope * gasConstant;
-    const E = activationEnergyJoules / 1000;
+    const E = -slope * (gasConstant / 1000);
     if (!(E > 0) || !Number.isFinite(E)) {
       throw new Error('Kissinger fit does not yield a positive finite apparent activation energy.');
     }
-    const A = (activationEnergyJoules / gasConstant) * Math.exp(intercept);
+    const logA = Math.log(-slope) + intercept;
+    const A = Math.exp(logA);
     if (!(A > 0) || !Number.isFinite(A)) throw new Error('Kissinger pre-exponential estimate is invalid.');
 
     const xBounds = summarizeFinite(points, (point) => point.x);
@@ -94,14 +94,19 @@ self.onmessage = (event: MessageEvent<KineticsMessage>) => {
       { x: minimumX - padding, y: slope * (minimumX - padding) + intercept },
       { x: maximumX + padding, y: slope * (maximumX + padding) + intercept },
     ];
-    const rateConstant = A * Math.exp(-activationEnergyJoules / (gasConstant * isoTemperatureKelvin));
+    const rateConstant = Math.exp(logA + slope / isoTemperatureKelvin);
     if (!(rateConstant > 0) || !Number.isFinite(rateConstant)) {
       throw new Error('Isothermal first-order rate constant is invalid at the requested temperature.');
     }
-    const timeToNinetyNinePercent = -Math.log(0.01) / rateConstant;
+    const integratedRate = -Math.log(0.01);
+    const timeToNinetyNinePercent = integratedRate / rateConstant;
+    if (!Number.isFinite(timeToNinetyNinePercent) || !(timeToNinetyNinePercent > 0)) {
+      throw new RangeError('Isothermal 99-percent time is not representable as a finite positive time.');
+    }
     const isoCurve = Array.from({ length: 101 }, (_, index) => {
-      const time = timeToNinetyNinePercent * index / 100;
-      return { time, alpha: (1 - Math.exp(-rateConstant * time)) * 100 };
+      const fraction = index / 100;
+      const time = timeToNinetyNinePercent * fraction;
+      return { time, alpha: -Math.expm1(-integratedRate * fraction) * 100 };
     });
 
     self.postMessage({

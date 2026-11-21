@@ -321,7 +321,7 @@ describe('numerical performance contracts', () => {
       'PRONY_RESULT',
     );
     expect(prony).toMatchObject({
-      modelVersion: 'generalized-maxwell-nnls-fista-2.1.0',
+      modelVersion: 'generalized-maxwell-nnls-fista-scaled-3.0.0',
       optimization: {
         memory: {
           vectorStrategy: 'reused-float64-double-buffer',
