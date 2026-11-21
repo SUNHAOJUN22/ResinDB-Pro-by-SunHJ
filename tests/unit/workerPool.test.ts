@@ -55,6 +55,58 @@ afterEach(() => {
 });
 
 describe('LazyWorkerPool', () => {
+  it.each([
+    { name: 'an empty string', successType: '' },
+    { name: 'an empty list', successType: [] },
+    { name: 'only whitespace', successType: [' ', '\t'] },
+  ])('rejects $name success types before allocating task resources', ({ successType }) => {
+    vi.useFakeTimers();
+    const workers: FakeWorker[] = [];
+    const pool = new LazyWorkerPool({ maxWorkers: 1 });
+    const controller = new AbortController();
+    const addListener = vi.spyOn(controller.signal, 'addEventListener');
+
+    try {
+      expect(() => pool.submit({
+        poolKey: 'invalid',
+        createWorker: workerFactory(workers),
+        message: { id: 1 },
+        successType,
+        signal: controller.signal,
+        timeoutMs: 5_000,
+      })).toThrowError(new TypeError('successType must contain at least one non-empty value'));
+      expect(vi.getTimerCount()).toBe(0);
+      expect(addListener).not.toHaveBeenCalled();
+      expect(workers).toHaveLength(0);
+      expect(pool.getStats()).toMatchObject({ queued: 0, running: 0, workers: 0 });
+    } finally {
+      controller.abort();
+      pool.dispose();
+      vi.clearAllTimers();
+      addListener.mockRestore();
+    }
+  });
+
+  it('accepts normalized success types and ignores unrelated messages', async () => {
+    const workers: FakeWorker[] = [];
+    const pool = new LazyWorkerPool({ maxWorkers: 1 });
+    try {
+      const handle = pool.submit({
+        poolKey: 'normalized',
+        createWorker: workerFactory(workers),
+        message: { id: 1 },
+        successType: [' ', ' DONE ', 'ALTERNATE', 'DONE'],
+      });
+      workers[0].emitMessage({ type: 'UNRELATED' });
+      expect(pool.getStats().running).toBe(1);
+      workers[0].emitMessage({ type: 'ALTERNATE', payload: 42 });
+      await expect(handle.promise).resolves.toMatchObject({ payload: 42 });
+      expect(pool.getStats().running).toBe(0);
+    } finally {
+      pool.dispose();
+    }
+  });
+
   it('creates workers only on demand, reuses them, and disposes them after idle timeout', async () => {
     vi.useFakeTimers();
     const workers: FakeWorker[] = [];

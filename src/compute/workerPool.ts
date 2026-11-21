@@ -133,6 +133,7 @@ export class LazyWorkerPool {
     if (this.disposed) throw new Error('Worker pool has been disposed');
     const poolKey = request.poolKey.trim();
     if (!poolKey) throw new TypeError('poolKey must be a non-empty string');
+    const successTypes = normalizeSuccessTypes(request.successType);
     const abortScope = createTaskAbortScope(request.signal, request.timeoutMs);
     const taskId = request.taskId?.trim() || createTaskId();
     let task!: QueuedTask;
@@ -143,7 +144,7 @@ export class LazyWorkerPool {
         poolKey,
         createWorker: request.createWorker,
         message: request.message,
-        successTypes: normalizeSuccessTypes(request.successType),
+        successTypes,
         errorType: request.errorType?.trim() || 'ERROR',
         transfer: [...new Set(request.transfer ?? [])],
         priority: request.priority ?? 'scientific',
