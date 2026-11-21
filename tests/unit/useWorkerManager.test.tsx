@@ -3,6 +3,10 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { sharedWorkerPool } from '@/compute/workerPool';
 import { useWorkerManager } from '@/hooks/workers/useWorkerManager';
+import { useKMeansWorker } from '@/hooks/workers/useKMeansWorker';
+import { kmeansBackendProfileStore } from '@/compute/kmeansBackendProfileStore';
+import { clearKMeansWorkloadSnapshot, getKMeansWorkloadSnapshot } from '@/compute/kmeansWorkloadStore';
+import type { KMeansResponse } from '@/workers/kmeansWorker';
 
 class HookWorker {
   readonly posts: { message: unknown; transfer: Transferable[] }[] = [];
@@ -42,6 +46,9 @@ afterEach(() => {
   cleanup();
   sharedWorkerPool.disposeKey('hook-manager-test');
   sharedWorkerPool.disposeKey('PARETO_RESULT');
+  sharedWorkerPool.disposeKey('KMEANS_RESULT');
+  clearKMeansWorkloadSnapshot();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -163,5 +170,152 @@ describe('cancelled or changed cohorts cannot revive stale results', () => {
     expect(result.current.paretoFrontIds.size).toBe(0);
     await act(async () => { workers.at(-1)!.emit({ type: 'PARETO_RESULT', payload: { paretoIds: ['new'] } }); await Promise.resolve(); });
     expect([...result.current.paretoFrontIds]).toEqual(['new']);
+  });
+});
+
+describe('K-Means replacement while a backend profile is loading', () => {
+  const missingProfile = {
+    status: 'missing' as const,
+    profile: null,
+    environment: null,
+    reason: null,
+    savedAt: null,
+    migration: null,
+    migrationHistory: [],
+  };
+
+  function response(id: string): Extract<KMeansResponse, { type: 'KMEANS_RESULT' }> {
+    return {
+      type: 'KMEANS_RESULT',
+      payload: {
+        clusters: { [id]: 0 },
+        k: 1,
+        centroids: [[0]],
+        silhouetteScore: null,
+        reproducibility: {
+          seed: 'handoff-test',
+          seedSource: 'user',
+          randomAlgorithm: 'xoshiro128**',
+          randomAlgorithmVersion: '1.0.0',
+          modelVersion: 'kmeans-plus-plus-adaptive-silhouette-f64-wasm-4.0.1',
+        },
+        modelSelection: {
+          method: 'full-silhouette',
+          evaluatedSamples: 1,
+          totalSamples: 1,
+          candidateCount: 0,
+          missingValuesImputed: 0,
+        },
+        performance: {
+          inputTransport: 'row-major-f64-transferable',
+          numericInputBytes: 8,
+          matrixStorage: 'row-major-float64',
+          assignmentStorage: 'int32',
+          lloydIterations: 1,
+          distanceEvaluations: 1,
+          assignmentKernel: null,
+        },
+      },
+    };
+  }
+
+  function setup() {
+    const workers: HookWorker[] = [];
+    vi.stubGlobal('Worker', class extends HookWorker {
+      constructor() {
+        super();
+        workers.push(this);
+      }
+    });
+    const load = vi.spyOn(kmeansBackendProfileStore, 'load').mockResolvedValue(missingProfile);
+    const hook = renderHook(useKMeansWorker);
+    return { ...hook, workers, load };
+  }
+
+  function pendingProfile() {
+    let resolve!: (value: typeof missingProfile) => void;
+    const promise = new Promise<typeof missingProfile>((done) => { resolve = done; });
+    return { promise, resolve };
+  }
+
+  it('invalidates active old work before awaiting the replacement profile and accepts the new result', async () => {
+    const { result, workers, load } = setup();
+    await act(async () => {
+      await result.current.computeKMeans([{ id: 'old', values: { x: 1 } }], ['x']);
+    });
+    const profile = pendingProfile();
+    load.mockReturnValueOnce(profile.promise);
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.computeKMeans([{ id: 'new', values: { x: 2 } }], ['x']);
+    });
+    await act(async () => {
+      workers[0].emit(response('old'));
+      await Promise.resolve();
+    });
+
+    expect(result.current.clusters).toEqual({});
+    expect(workers[0].terminated).toBe(true);
+    expect(getKMeansWorkloadSnapshot()).toBeNull();
+    await act(async () => {
+      profile.resolve(missingProfile);
+      await pending;
+    });
+    expect(workers).toHaveLength(2);
+    await act(async () => {
+      workers[1].emit(response('new'));
+      await Promise.resolve();
+    });
+    expect(result.current.clusters).toEqual({ new: 0 });
+    expect(result.current.isComputingKMeans).toBe(false);
+  });
+
+  it('clears completed results and workload as soon as a new nonempty cohort is requested', async () => {
+    const { result, workers, load } = setup();
+    await act(async () => {
+      await result.current.computeKMeans([{ id: 'old', values: { x: 1 } }], ['x']);
+      workers[0].emit(response('old'));
+      await Promise.resolve();
+    });
+    expect(result.current.clusters).toEqual({ old: 0 });
+    expect(getKMeansWorkloadSnapshot()).not.toBeNull();
+    const profile = pendingProfile();
+    load.mockReturnValueOnce(profile.promise);
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.computeKMeans([{ id: 'new', values: { x: 2 } }], ['x']);
+    });
+
+    expect(result.current.clusters).toEqual({});
+    expect(result.current.bestK).toBe(0);
+    expect(result.current.performance).toBeNull();
+    expect(result.current.reproducibility).toBeNull();
+    expect(getKMeansWorkloadSnapshot()).toBeNull();
+    await act(async () => {
+      profile.resolve(missingProfile);
+      await pending;
+    });
+  });
+
+  it('invalidates an old success already queued for delivery before the replacement profile resolves', async () => {
+    const { result, workers, load } = setup();
+    await act(async () => {
+      await result.current.computeKMeans([{ id: 'old', values: { x: 1 } }], ['x']);
+    });
+    const profile = pendingProfile();
+    load.mockReturnValueOnce(profile.promise);
+    let pending!: Promise<void>;
+    await act(async () => {
+      workers[0].emit(response('old'));
+      pending = result.current.computeKMeans([{ id: 'new', values: { x: 2 } }], ['x']);
+      await Promise.resolve();
+    });
+
+    expect(result.current.clusters).toEqual({});
+    expect(result.current.performance).toBeNull();
+    await act(async () => {
+      profile.resolve(missingProfile);
+      await pending;
+    });
   });
 });

@@ -66,10 +66,12 @@ export function useKMeansWorker() {
     options: KMeansExecutionOptions = {},
   ) => {
     const request = ++latestRequest.current;
+    // Invalidate the previous cohort before the asynchronous profile lookup can
+    // let its worker or already-queued success callback publish stale results.
+    cancel('K-Means inputs changed or clustering was cleared');
+    clearKMeansWorkloadSnapshot();
+    setResult(null);
     if (keys.length === 0 || data.length === 0) {
-      cancel('K-Means inputs changed or clustering was cleared');
-      clearKMeansWorkloadSnapshot();
-      setResult(null);
       return;
     }
     const requestedBackend = options.backend ?? 'auto';
