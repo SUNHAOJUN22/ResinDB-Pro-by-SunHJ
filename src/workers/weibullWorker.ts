@@ -1,4 +1,4 @@
-const WEIBULL_MODEL_VERSION = 'two-parameter-median-rank-ols-2.0.0';
+const WEIBULL_MODEL_VERSION = 'two-parameter-median-rank-ols-2.1.0';
 
 export interface WeibullMessage {
   type: 'CALCULATE_WEIBULL';
@@ -58,15 +58,22 @@ self.onmessage = (event: MessageEvent<WeibullMessage>) => {
     if (!(m > 0) || !Number.isFinite(m)) {
       throw new Error('The fitted Weibull shape parameter is not positive and finite.');
     }
-    const intercept = meanY - m * meanX;
-    const eta = Math.exp(-intercept / m);
+    const logEta = meanX - meanY / m;
+    const eta = Math.exp(logEta);
     if (!(eta > 0) || !Number.isFinite(eta)) throw new Error('The fitted Weibull scale is invalid.');
     const denominator = centeredXX * centeredYY;
     const rSquared = denominator > 0
       ? Math.max(0, Math.min(1, centeredXY * centeredXY / denominator))
       : 0;
     const failureProbabilityForSafeValue = 0.05 as const;
-    const safeValue95 = eta * (-Math.log1p(-failureProbabilityForSafeValue)) ** (1 / m);
+    // Keep the scale and probability together until the final exponentiation:
+    // the probability factor alone can underflow while the quantile is finite.
+    const safeValue95 = Math.exp(
+      logEta + Math.log(-Math.log1p(-failureProbabilityForSafeValue)) / m,
+    );
+    if (!(safeValue95 > 0) || !Number.isFinite(safeValue95)) {
+      throw new Error('The fitted Weibull failure quantile is not positive and finite at this numeric scale.');
+    }
 
     self.postMessage({
       type: 'WEIBULL_RESULT',

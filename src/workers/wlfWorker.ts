@@ -1,6 +1,6 @@
 import { createWorkerProgressMessage } from '@/compute/workerProtocol';
 
-const WLF_MODEL_VERSION = 'tts-horizontal-wlf-coarse-fine-2.0.0';
+const WLF_MODEL_VERSION = 'tts-horizontal-wlf-coarse-fine-2.1.0';
 const SEARCH_MIN = -10;
 const SEARCH_MAX = 10;
 const COARSE_STEP = 0.25;
@@ -147,6 +147,9 @@ self.onmessage = (event: MessageEvent<WlfMessage>) => {
       }))
       .filter((curve) => curve.points.length >= 2);
     if (validCurves.length < 2) throw new Error('At least 2 complete temperature curves are required for TTS.');
+    if (new Set(validCurves.map((curve) => curve.temp)).size !== validCurves.length) {
+      throw new Error('WLF requires one curve per distinct temperature; combine repeated measurements before fitting.');
+    }
 
     let referenceIndex = 0;
     let referenceDistance = Math.abs(validCurves[0].temp - refTemp);
@@ -226,12 +229,14 @@ self.onmessage = (event: MessageEvent<WlfMessage>) => {
       const aT = shiftByTemperature.get(curve.temp) ?? 1;
       return {
         temp: curve.temp,
-        points: curve.points.map((point) => ({
-          originalRate: point.rate,
-          originalVisc: point.visc,
-          rate: point.rate * aT,
-          visc: point.visc / aT,
-        })),
+        points: curve.points.map((point) => {
+          const rate = point.rate * aT;
+          const visc = point.visc / aT;
+          if (!(rate > 0) || !Number.isFinite(rate) || !(visc > 0) || !Number.isFinite(visc)) {
+            throw new Error('Shifted WLF master-curve rate and viscosity must remain positive and finite.');
+          }
+          return { originalRate: point.rate, originalVisc: point.visc, rate, visc };
+        }),
       };
     });
     self.postMessage(createWorkerProgressMessage({ ratio: 1, phase: 'complete' }));
