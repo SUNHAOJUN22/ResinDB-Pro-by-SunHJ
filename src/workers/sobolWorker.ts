@@ -11,7 +11,7 @@ import {
 import type { FormulaConfig, Product } from '@/types/index';
 import { formulaEngine } from '@/lib/formulaParser';
 
-const SENSITIVITY_MODEL_VERSION = 'saltelli-jansen-normal-numeric-dictionary-3.0.0';
+const SENSITIVITY_MODEL_VERSION = 'saltelli-jansen-normal-dimension-stable-4.0.0';
 const MAX_BASE_SAMPLE_SIZE = 250_000;
 
 export interface SobolMessage {
@@ -96,7 +96,7 @@ self.onmessage = (event: MessageEvent<SobolMessage>) => {
     for (const [key, variance] of Object.entries(variances)) {
       validateVariancePercent(variance, key);
     }
-    const actualSeed = seed ?? deriveRandomSeed('saltelli-jansen-normal-v3', {
+    const actualSeed = seed ?? deriveRandomSeed('saltelli-jansen-normal-v4', {
       targetFormulaId,
       formulas,
       product,
@@ -105,7 +105,7 @@ self.onmessage = (event: MessageEvent<SobolMessage>) => {
       baseSampleSize,
     });
     const random = createSeededRandom(actualSeed);
-    const evaluator = formulaEngine.compilePropertyGraph(formulas);
+    const evaluator = formulaEngine.compileSampledPropertyGraph(formulas, product);
     const baseProperties = formulaEngine.createPropertyDictionary(product);
     const workingProperties = { ...baseProperties };
     const formulaResults: Record<string, number> = {};
@@ -120,9 +120,13 @@ self.onmessage = (event: MessageEvent<SobolMessage>) => {
     for (const [key, numericValue] of Object.entries(baseProperties)) {
       const variancePercent = variances[key];
       if (Number.isFinite(numericValue) && variancePercent !== undefined && variancePercent > 0) {
+        const standardDeviation = Math.abs(numericValue) * (variancePercent / 100);
+        if (!Number.isFinite(standardDeviation) || (numericValue !== 0 && standardDeviation === 0)) {
+          throw new RangeError(`Input standard deviation is not representable for ${key}`);
+        }
         inputKeys.push(key);
         inputMeans.push(numericValue);
-        inputStandardDeviations.push(Math.abs(numericValue) * (variancePercent / 100));
+        inputStandardDeviations.push(standardDeviation);
         inputBounds.push(bounds?.[key]);
       }
     }
@@ -202,16 +206,59 @@ self.onmessage = (event: MessageEvent<SobolMessage>) => {
       }
     }
 
-    let sum = 0;
-    let sumSquares = 0;
-    for (let sample = 0; sample < baseSampleSize; sample++) {
-      sum += outputA[sample] + outputB[sample];
-      sumSquares += outputA[sample] ** 2 + outputB[sample] ** 2;
+    // Jansen indices are invariant to a common affine transformation of all
+    // outputs. Center before scaling to retain small changes on a large offset.
+    // Opposite-sign extremes can overflow the subtraction itself; in that case
+    // divide first using one common finite scale. Reuse the existing buffers.
+    const anchor = outputA[0];
+    let differenceScale = 0;
+    let absoluteScale = 0;
+    let subtractionOverflowed = false;
+    for (const buffer of [outputA, outputB]) {
+      for (const value of buffer) {
+        absoluteScale = Math.max(absoluteScale, Math.abs(value));
+        const difference = value - anchor;
+        if (Number.isFinite(difference)) differenceScale = Math.max(differenceScale, Math.abs(difference));
+        else subtractionOverflowed = true;
+      }
     }
-    const mean = sum / (2 * baseSampleSize);
-    const outputVariance = sumSquares / (2 * baseSampleSize) - mean ** 2;
-    const varianceTolerance = Number.EPSILON * Math.max(1, mean ** 2) * 64;
-    if (!Number.isFinite(outputVariance) || outputVariance <= varianceTolerance) {
+    const scale = subtractionOverflowed ? absoluteScale : differenceScale;
+    if (scale === 0) {
+      throw new Error('Output variance is numerically zero; sensitivity indices cannot be estimated.');
+    }
+    const normalizeOutput = (value: number): number => {
+      const difference = value - anchor;
+      const normalized = Number.isFinite(difference)
+        ? difference / scale : value / scale - anchor / scale;
+      if (!Number.isFinite(normalized) || (difference !== 0 && normalized === 0)) {
+        throw new RangeError('Sensitivity output normalization is not representable.');
+      }
+      return normalized;
+    };
+    let sum = 0;
+    let sumCorrection = 0;
+    for (const buffer of [outputA, outputB]) {
+      for (let sample = 0; sample < baseSampleSize; sample++) {
+        const value = normalizeOutput(buffer[sample]);
+        buffer[sample] = value;
+        const next = sum + value;
+        sumCorrection += Math.abs(sum) >= Math.abs(value) ? (sum - next) + value : (value - next) + sum;
+        sum = next;
+      }
+    }
+    const mean = (sum + sumCorrection) / (2 * baseSampleSize);
+    let sumSquares = 0;
+    let squareCorrection = 0;
+    for (const buffer of [outputA, outputB]) {
+      for (const value of buffer) {
+        const term = (value - mean) ** 2;
+        const next = sumSquares + term;
+        squareCorrection += Math.abs(sumSquares) >= term ? (sumSquares - next) + term : (term - next) + sumSquares;
+        sumSquares = next;
+      }
+    }
+    const outputVariance = (sumSquares + squareCorrection) / (2 * baseSampleSize);
+    if (!Number.isFinite(outputVariance) || outputVariance <= 0) {
       throw new Error('Output variance is numerically zero; sensitivity indices cannot be estimated.');
     }
 
@@ -222,12 +269,18 @@ self.onmessage = (event: MessageEvent<SobolMessage>) => {
       let totalContribution = 0;
       let firstContributionComplement = 0;
       for (let sample = 0; sample < baseSampleSize; sample++) {
-        const outputHybrid = evaluate(matrixA, sample, matrixB, dimension);
+        const outputHybrid = normalizeOutput(evaluate(matrixA, sample, matrixB, dimension));
         totalContribution += (outputA[sample] - outputHybrid) ** 2;
         firstContributionComplement += (outputB[sample] - outputHybrid) ** 2;
       }
+      if (!Number.isFinite(totalContribution) || !Number.isFinite(firstContributionComplement)) {
+        throw new RangeError('Sensitivity variance contributions are not representable.');
+      }
       const totalIndex = Math.max(0, totalContribution / (2 * baseSampleSize * outputVariance));
       let firstIndex = Math.max(0, 1 - firstContributionComplement / (2 * baseSampleSize * outputVariance));
+      if (!Number.isFinite(totalIndex) || !Number.isFinite(firstIndex)) {
+        throw new RangeError('Sensitivity indices are not representable.');
+      }
       if (firstIndex > totalIndex) firstIndex = totalIndex;
       firstOrder.push({ name: inputKeys[dimension], value: firstIndex });
       totalEffect.push({ name: inputKeys[dimension], value: totalIndex });

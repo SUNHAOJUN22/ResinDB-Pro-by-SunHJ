@@ -158,6 +158,10 @@ export function sampleNormalWithinBounds(
   bounds?: NumericBounds,
   maximumAttempts = 10_000,
 ): number {
+  if (!Number.isFinite(mean)) throw new TypeError('Normal mean must be finite');
+  if (!Number.isFinite(standardDeviation) || standardDeviation < 0) {
+    throw new TypeError('Normal standard deviation must be a non-negative finite number');
+  }
   if (!Number.isInteger(maximumAttempts) || maximumAttempts < 1) {
     throw new RangeError('maximumAttempts must be a positive integer');
   }
@@ -172,6 +176,13 @@ export function sampleNormalWithinBounds(
   if (standardDeviation === 0) return mean;
   for (let attempt = 0; attempt < maximumAttempts; attempt++) {
     const sample = random.normal(mean, standardDeviation);
+    if (!Number.isFinite(sample)) {
+      // A finite truncation boundary still determines that an overflowing tail
+      // draw is outside the requested distribution; reject it as usual.
+      if ((sample === Infinity && Number.isFinite(maximum))
+          || (sample === -Infinity && Number.isFinite(minimum))) continue;
+      throw new RangeError('Normal sample is not representable as a finite number');
+    }
     if (sample >= minimum && sample <= maximum) return sample;
   }
   throw new Error(`Unable to sample within bounds after ${maximumAttempts} attempts`);

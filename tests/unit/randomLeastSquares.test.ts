@@ -37,6 +37,25 @@ describe('seeded scientific randomness', () => {
     expect(values).toEqual(Array.from({ length: 20 }, () => sampleNormalWithinBounds(second, 10, 3, { min: 8, max: 12 })));
     expect(values.every((value) => value >= 8 && value <= 12)).toBe(true);
   });
+
+  it.each([NaN, Infinity, -Infinity])('rejects a non-finite mean even at zero variance: %s', (mean) => {
+    expect(() => sampleNormalWithinBounds(createSeededRandom('zero-variance'), mean, 0)).toThrow(/mean.*finite/i);
+  });
+
+  it('rejects an overflowing unbounded draw instead of accepting Infinity', () => {
+    expect(() => sampleNormalWithinBounds(createSeededRandom('e'), 1e308, 1e308)).toThrow(/representable/i);
+  });
+
+  it('rejects overflowing tails outside finite bounds and continues valid truncated sampling', () => {
+    const value = sampleNormalWithinBounds(createSeededRandom('e'), 1e308, 1e308, { min: 0, max: 1.7e308 });
+    expect(Number.isFinite(value)).toBe(true);
+    expect(value).toBeGreaterThanOrEqual(0);
+    expect(value).toBeLessThanOrEqual(1.7e308);
+  });
+
+  it('returns a finite deterministic value for valid zero variance', () => {
+    expect(sampleNormalWithinBounds(createSeededRandom('zero-variance'), 10, 0, { min: 8, max: 12 })).toBe(10);
+  });
 });
 
 describe('least-squares reference solver', () => {
