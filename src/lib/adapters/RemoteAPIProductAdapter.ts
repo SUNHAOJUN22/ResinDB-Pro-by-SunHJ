@@ -44,7 +44,13 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
     return this.fallbackAdapter;
   }
 
-  private async request(path: string, init?: RequestInit): Promise<Response> {
+  private request(path: string, init?: RequestInit): Promise<Response>;
+  private request<T>(path: string, init: RequestInit | undefined, consume: (response: Response) => Promise<T>): Promise<T>;
+  private async request<T>(
+    path: string,
+    init?: RequestInit,
+    consume?: (response: Response) => Promise<T>,
+  ): Promise<Response | T> {
     const controller = new AbortController();
     const timeout = globalThis.setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 
@@ -66,7 +72,8 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
           }`,
         );
       }
-      return response;
+      // Reading a JSON or export body is part of the request deadline too.
+      return consume ? await consume(response) : response;
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
         throw new Error(`Remote API request timed out after ${DEFAULT_TIMEOUT_MS} ms`, { cause: error });
@@ -104,8 +111,8 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
     if (query) params.set('q', query);
     if (categoryId) params.set('categoryId', categoryId);
     const suffix = params.size > 0 ? `?${params.toString()}` : '';
-    const response = await this.request(`/products${suffix}`);
-    return parseProductList(await response.json(), 'search');
+    return this.request(`/products${suffix}`, undefined,
+      async response => parseProductList(await response.json(), 'search'));
   }
 
   async readAuthoritative(): Promise<Product[]> {
@@ -114,12 +121,11 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
 
   async create(product: Partial<Product>): Promise<Product> {
     try {
-      const response = await this.request('/products', {
+      return await this.request('/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(product),
-      });
-      return parseProductPayload(await response.json(), 'create');
+      }, async response => parseProductPayload(await response.json(), 'create'));
     } catch (error) {
       throw new Error(`Remote create failed; no local write was applied: ${describeError(error)}`, { cause: error });
     }
@@ -127,12 +133,11 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
 
   async update(product: Product): Promise<Product> {
     try {
-      const response = await this.request(`/products/${encodeURIComponent(product.id)}`, {
+      return await this.request(`/products/${encodeURIComponent(product.id)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(product),
-      });
-      return parseProductPayload(await response.json(), 'update');
+      }, async response => parseProductPayload(await response.json(), 'update'));
     } catch (error) {
       throw new Error(`Remote update failed; no local write was applied: ${describeError(error)}`, { cause: error });
     }
@@ -154,12 +159,11 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
   async batchCreate(products: Partial<Product>[]): Promise<Product[]> {
     if (products.length === 0) return [];
     try {
-      const response = await this.request('/products/batch-create', {
+      return await this.request('/products/batch-create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ products }),
-      });
-      return parseProductList(await response.json(), 'batch-create');
+      }, async response => parseProductList(await response.json(), 'batch-create'));
     } catch (error) {
       throw new Error(`Remote batch create failed; no local write was applied: ${describeError(error)}`, { cause: error });
     }
@@ -181,12 +185,11 @@ export class RemoteAPIProductAdapter implements IProductAdapter {
   async exportReport(products: Product[], format: 'csv' | 'json' | 'xml'): Promise<Blob> {
     return this.withReadFallback(
       async () => {
-        const response = await this.request(`/products/export?format=${encodeURIComponent(format)}`, {
+        return this.request(`/products/export?format=${encodeURIComponent(format)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ products }),
-        });
-        return response.blob();
+        }, response => response.blob());
       },
       (adapter) => adapter.exportReport(products, format),
       'Remote report export failed',
