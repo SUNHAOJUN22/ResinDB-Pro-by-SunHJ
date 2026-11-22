@@ -7,6 +7,7 @@ import {
   categoryNameFromId,
 } from '@/data/resinData';
 import { PolymerDataValidator } from './PolymerDataValidator';
+import { resolveCorePropertyKey } from '@/lib/quantityRecord';
 import type { MaterialPropertyValue, MaterialRecord, MaterialPhysicsSpecs } from './types';
 
 function normalizedRecordKey(record: Pick<MaterialRecord, 'grade' | 'manufacturer'>): string {
@@ -130,8 +131,7 @@ function productToMaterialProperty(property: PropertyValue): MaterialPropertyVal
       referenceId: property.referenceId,
       sourceUrl: property.sourceUrl,
     },
-    status: 'UNKNOWN',
-    reasonCodes: ['UNVALIDATED_LEGACY_PROPERTY'],
+    // No quantity declaration exists yet; validation assigns its initial status.
     provenanceRefs: [...(property.provenanceRefs ?? [])],
   };
 }
@@ -212,11 +212,34 @@ export class UniversalStorageBridge {
 
   public static deleteLabRecord(id: string): void {
     const { originals: records } = this.readCollection(this.LAB_STORAGE_KEY, () => LAB_RECORDS);
+    if (!records.some((record) => record.id === id)) return;
     // Let persistence errors reach the caller; a failed deletion is not success.
     localStorage.setItem(
       this.LAB_STORAGE_KEY,
       JSON.stringify(records.filter((record) => record.id !== id)),
     );
+  }
+
+  public static replaceLabRecords(records: MaterialRecord[]): void {
+    const validated = records.map((record) => {
+      const cleaned = PolymerDataValidator.validateAndClean(record);
+      if (!cleaned) throw new Error('INVALID_MATERIAL_RECORD');
+      return cleaned;
+    });
+    // Preserve unreadable existing bytes instead of replacing a display fallback.
+    const { originals } = this.readCollection(this.LAB_STORAGE_KEY, () => LAB_RECORDS);
+    const previousById = new Map(originals.map((record) => [record.id, record]));
+    for (const record of validated) {
+      const previous = previousById.get(record.id);
+      if (!previous) continue;
+      // Product snapshots do not represent these laboratory-only source fields.
+      if (record.batchNo === undefined) record.batchNo = previous.batchNo;
+      if (record.description === undefined) record.description = previous.description;
+      const unmapped = Object.fromEntries(Object.entries(previous.properties ?? {})
+        .filter(([key]) => resolveCorePropertyKey(key) === null));
+      record.properties = { ...unmapped, ...record.properties };
+    }
+    localStorage.setItem(this.LAB_STORAGE_KEY, JSON.stringify(validated));
   }
 
   public static getOpenMarketRecords(): MaterialRecord[] {
@@ -311,7 +334,7 @@ export class UniversalStorageBridge {
 
     const createdTimestamp = product.createdAt ? Date.parse(product.createdAt) : Number.NaN;
     const source = product.isExperimental ? 'my_lab' : defaultSource;
-    return {
+    const record: MaterialRecord = {
       id: product.id,
       source,
       category: categoryNameFromId(product.categoryIds?.[0] || 'root_plastic'),
@@ -329,5 +352,9 @@ export class UniversalStorageBridge {
             provenanceRefs: [],
           },
     };
+    // Assign initial legacy status here; existing declared states remain governed.
+    const governed = PolymerDataValidator.validateAndClean(record);
+    if (!governed) throw new Error('INVALID_MATERIAL_RECORD');
+    return governed;
   }
 }

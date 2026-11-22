@@ -3,6 +3,7 @@ import {
   CORE_QUANTITY_CONTRACTS,
   canonicalizeCoreProperty,
   resolveCorePropertyKey,
+  verifyCoreQuantityRecord,
   type RawQuantity,
 } from '@/lib/quantityRecord';
 
@@ -52,10 +53,20 @@ function propertyProvenance(property: MaterialPropertyValue): string[] {
 }
 
 function governedProperty(key: string, property: MaterialPropertyValue): MaterialPropertyValue {
-  const result = canonicalizeCoreProperty(key, toRaw(property), propertyProvenance(property));
+  // Only a legacy property without a declared status receives first validation.
+  // No reason-code spelling can promote an existing UNKNOWN/INVALID declaration.
+  const result = property.status === undefined
+    ? canonicalizeCoreProperty(key, toRaw(property), propertyProvenance(property))
+    : verifyCoreQuantityRecord(key, {
+      raw: property.raw ?? toRaw(property),
+      canonical: property.canonical,
+      status: property.status,
+      reasonCodes: [...(property.reasonCodes ?? [])],
+      provenanceRefs: property.provenanceRefs ? [...property.provenanceRefs] : propertyProvenance(property),
+    });
   const reasonCodes = [...result.reasonCodes];
   let status = result.status;
-  let canonical = result.canonical;
+  let canonical = status === 'VALID' ? result.canonical : undefined;
   if (canonical && status === 'VALID') {
     const range = PHYSICAL_RANGES[key];
     if (range && (canonical.value < range.min || canonical.value > range.max)) {

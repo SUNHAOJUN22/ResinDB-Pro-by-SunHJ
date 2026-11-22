@@ -183,6 +183,19 @@ helpers observe the separate transaction-completion promise before issuing
 requests and abort/drain on request errors while preserving the original error.
 Caches and lab mirrors are published only after transaction commit.
 
+Reclassifying an experimental record removes its old laboratory mirror. A
+committed history restoration replaces that mirror with exactly the experimental
+records in the restored catalog, including an empty set. These secondary writes
+remain best effort: a localStorage failure is logged without reversing a committed
+IndexedDB transaction, and unreadable existing mirror bytes are preserved. Reads
+and conversions retain declared `UNKNOWN`/`INVALID` states; a legacy marker alone
+does not authorize revalidation of an already governed quantity.
+For identities retained in the mirror, existing batch numbers, descriptions and
+unmapped source properties are preserved because Product snapshots do not encode
+them. Core quantities and their aliases come entirely from the restored snapshot,
+so removed observations are not revived. This cannot reconstruct laboratory-only
+metadata already absent from both the current mirror and the snapshot.
+
 ## 9. Comparable scientific observations and UI evidence
 
 Comparison percentages, radar axes, numeric reorder presets, Spearman payloads

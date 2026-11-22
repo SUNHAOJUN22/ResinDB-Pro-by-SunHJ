@@ -377,14 +377,14 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     await db.put('products', updatedProduct);
     this.registerMutationUpdate(updatedProduct);
 
-    // Sync to UniversalStorageBridge if experimental
-    if (updatedProduct.isExperimental) {
-      try {
+    // Reclassification must also remove the old experimental mirror after commit.
+    try {
+      if (updatedProduct.isExperimental) {
         const rec = UniversalStorageBridge.productToRecord(updatedProduct, 'my_lab');
         UniversalStorageBridge.saveLabRecord(rec);
-      } catch (err) {
-        logger.error("Failed to sync experimental update to storage bridge", err);
-      }
+      } else UniversalStorageBridge.deleteLabRecord(updatedProduct.id);
+    } catch (err) {
+      logger.error("Failed to sync experimental update to storage bridge", err);
     }
     
     return updatedProduct;
@@ -407,10 +407,10 @@ export class IndexedDBProductAdapter implements IProductAdapter {
     });
     for (const product of updated) {
       this.registerMutationUpdate(product);
-      if (product.isExperimental) {
-        try { UniversalStorageBridge.saveLabRecord(UniversalStorageBridge.productToRecord(product, 'my_lab')); }
-        catch (error) { logger.error('Lab mirror failed after batch update commit', error); }
-      }
+      try {
+        if (product.isExperimental) UniversalStorageBridge.saveLabRecord(UniversalStorageBridge.productToRecord(product, 'my_lab'));
+        else UniversalStorageBridge.deleteLabRecord(product.id);
+      } catch (error) { logger.error('Lab mirror failed after batch update commit', error); }
     }
   }
 
@@ -496,9 +496,11 @@ export class IndexedDBProductAdapter implements IProductAdapter {
       this.rebuildIndices();
     }
     // Secondary lab mirroring happens only after the main transaction commits.
-    for (const product of imported.filter(product => product.isExperimental)) {
-      try { UniversalStorageBridge.saveLabRecord(UniversalStorageBridge.productToRecord(product, 'my_lab')); }
-      catch (error) { logger.error('Lab mirror failed after import commit', error); }
+    for (const product of imported) {
+      try {
+        if (product.isExperimental) UniversalStorageBridge.saveLabRecord(UniversalStorageBridge.productToRecord(product, 'my_lab'));
+        else UniversalStorageBridge.deleteLabRecord(product.id);
+      } catch (error) { logger.error('Lab mirror failed after import commit', error); }
     }
     return imported;
   }
@@ -596,5 +598,11 @@ ${props}
       ...product, properties: verifyPropertyQuantities(product.properties),
     }));
     this.rebuildIndices();
+    try {
+      UniversalStorageBridge.replaceLabRecords(
+        this.cachedProducts.filter(product => product.isExperimental)
+          .map(product => UniversalStorageBridge.productToRecord(product, 'my_lab')),
+      );
+    } catch (error) { logger.error('Lab mirror failed after snapshot restore commit', error); }
   }
 }
